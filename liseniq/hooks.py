@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+import frappe
+
 from . import __version__ as app_version
+from functools import wraps
 
 app_name = "liseniq"
 app_title = "Liseniq"
@@ -10,6 +13,17 @@ app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "adolfo.hernandez@mentum.group"
 app_license = "MIT"
+
+
+def login_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if frappe.session.user == "Guest":
+            frappe.local.response["type"] = "redirect"
+            frappe.local.response["location"] = "/login"
+            return
+        return func(*args, **kwargs)
+    return wrapper
 
 # Includes in <head>
 # ------------------

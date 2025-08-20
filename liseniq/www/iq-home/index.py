@@ -1,7 +1,10 @@
 import frappe
 from frappe.utils import getdate, formatdate
+from liseniq.hooks import login_required
 
+@login_required
 def get_context(context):
+    
     context.no_cache = 1
     context.page_title = "Inicio"
     context.no_breadcrumbs = True

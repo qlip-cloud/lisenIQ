@@ -1,0 +1,267 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2024, Mentum Group. All rights reserved.
+# For license information, please see license.txt
+
+import frappe
+import json
+
+def get_context(context):
+    """
+    Prepara y pasa los datos para la página principal que muestra
+    todas las plantillas, filtradas por compañía y privacidad.
+    """
+    context.page_title = "Plantillas"
+
+    if frappe.session.user == "Guest":
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = "/login"
+        return
+
+    user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
+    if not user_company:
+        frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
+
+    templates_from_db = frappe.get_list(
+        "qp_IQ_Template",
+        filters=[
+            ['custom_company', '=', user_company]
+        ],
+        or_filters=[
+            ['tp_owner', '=', frappe.session.user],
+            ['tp_owner', 'is', 'not set']
+        ],
+        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner"],
+        order_by="creation desc"
+    )
+    
+    processed_templates = []
+    for template_data in templates_from_db:
+        try:
+            doc = frappe.get_doc("qp_IQ_Template", template_data.name)
+            questions_count = len(doc.get("tp_questions", []))
+            
+            category_name = frappe.db.get_value(
+                "qp_IQ_QuestionCategory",
+                template_data.tp_category,
+                "qnc_category"
+            ) if template_data.tp_category else "Sin categoría"
+
+            template_data["questions_count"] = questions_count
+            template_data["category_name"] = category_name
+
+            attachment = frappe.get_all(
+                "File",
+                filters={
+                    "attached_to_doctype": "qp_IQ_Template",
+                    "attached_to_name": template_data.name,
+                    "is_folder": 0,
+                },
+                fields=["file_url"],
+                limit=1,
+            )
+            
+            template_data["tp_logo_url"] = attachment[0].file_url if attachment else None
+            processed_templates.append(template_data)
+        
+        except frappe.DoesNotExistError:
+            frappe.log_error(
+                f"No se pudo encontrar el documento de la plantilla: {template_data.name}",
+                "Error en index.py de IQ Templates"
+            )
+
+    context.templates = processed_templates
+
+    try:
+        categories_from_db = frappe.get_all(
+            "qp_IQ_QuestionCategory",
+            fields=["name", "qnc_category", "qnc_is_popular"],
+            order_by="qnc_category"
+        )
+        context.categories = categories_from_db
+    except frappe.DoesNotExistError:
+        context.categories = []
+
+    context.update({
+        "is_navbar_custom": True,
+        "no_cache": 1
+    })
+            
+    return context
+
+@frappe.whitelist()
+def get_questions_from_template(template_name):
+    """
+    Obtiene y formatea las preguntas de una plantilla específica para
+    ser usadas en otros wizards, como el de creación de mediciones.
+    """
+    frappe.has_permission("qp_IQ_Template", "read", doc=template_name)
+    
+    template_doc = frappe.get_doc("qp_IQ_Template", template_name)
+    questions = []
+
+    if not template_doc.tp_questions:
+        return []
+
+    for tq in template_doc.tp_questions:
+        q_doc = frappe.get_doc("qp_IQ_Question", tq.tq_question)
+        
+        type_name = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, "qnt_type_name") if q_doc.qn_type else "No definido"
+        demographic_name = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else None
+
+        question_data = {
+            "id": q_doc.name,
+            "text": q_doc.qn_statement,
+            "type": q_doc.qn_type,
+            "typeName": type_name,
+            "demographic": demographic_name,
+            "negative_statement": q_doc.qn_negative_statement,
+            "positive_statement": q_doc.qn_positive_statement,
+            "nps_min": q_doc.qn_nps_min,
+            "nps_max": q_doc.qn_nps_max,
+            "options": []
+        }
+
+        if q_doc.qn_response_options:
+            options = [opt.qo_option_text for opt in q_doc.qn_response_options]
+            question_data["options"] = options
+        
+        questions.append(question_data)
+        
+    return questions
+
+
+@frappe.whitelist()
+def get_demographic_suggestions_for_questions(search_term):
+    """
+    Obtiene sugerencias de tipos demográficos para preguntas.
+    """
+    if not search_term:
+        return []
+
+    return frappe.get_all(
+        "qp_IQ_DemographicType",
+        filters={
+            'dt_title': ['like', f'%{search_term}%'],
+            'dt_object_type': 'Pregunta'
+        },
+        fields=['dt_title'],
+        limit=10
+    )
+
+@frappe.whitelist()
+def create_question_from_template_wizard(question_data):
+    """
+    Crea un nuevo documento qp_IQ_Question desde el wizard de plantillas.
+    """
+    try:
+        data = frappe.parse_json(question_data)
+        
+        question_doc = frappe.new_doc("qp_IQ_Question")
+        
+        question_doc.qn_statement = data.get("qn_statement")
+        question_doc.qn_type = data.get("qn_type")
+        question_doc.qn_category = data.get("qn_category")
+        question_doc.qn_status = data.get("qn_status", "Activa")
+        question_doc.qn_negative_statement = data.get("qn_negative_statement")
+        question_doc.qn_positive_statement = data.get("qn_positive_statement")
+        
+        demographic_title = data.get("qn_demographic")
+        if demographic_title:
+            demographic_name = frappe.db.exists(
+                "qp_IQ_DemographicType",
+                {"dt_title": demographic_title, "dt_object_type": "Pregunta"}
+            )
+            if not demographic_name:
+                demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
+                demographic_doc.dt_title = demographic_title
+                demographic_doc.dt_object_type = "Pregunta"
+                demographic_doc.insert(ignore_permissions=True)
+                demographic_name = demographic_doc.name
+            
+            question_doc.qn_demographic = demographic_name
+
+        nps_min = data.get("qn_nps_min")
+        if nps_min is not None and nps_min != '':
+            question_doc.qn_nps_min = int(nps_min)
+
+        nps_max = data.get("qn_nps_max")
+        if nps_max is not None and nps_max != '':
+            question_doc.qn_nps_max = int(nps_max)
+        
+        if data.get("qn_response_options"):
+            for option in data.get("qn_response_options"):
+                question_doc.append("qn_response_options", {
+                    "qo_option_text": option.get("qo_option_text")
+                })
+        
+        question_doc.insert(ignore_permissions=True)
+        return question_doc.name
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Error en create_question_from_template_wizard")
+        frappe.throw(f"Ocurrió un error al crear la pregunta: {str(e)}")
+
+@frappe.whitelist()
+def get_bank_data(keyword=None, demographic=None):
+    """
+    Obtiene las preguntas y demográficos para el Banco de Preguntas.
+    """
+    OPTIONS_BASED_TYPES = [
+        'Selección Múltiple', 
+        'Selección Única', 
+        'Likert', 
+        'Escala de frecuencia', 
+        'Ranking (Calificación o Prioridad)'
+    ]
+
+    question_filters = {'qn_status': 'Activa'}
+    if keyword:
+        question_filters['qn_statement'] = ['like', f'%{keyword}%']
+    if demographic:
+        question_filters['qn_demographic'] = demographic
+
+    questions = frappe.get_list(
+        "qp_IQ_Question",
+        filters=question_filters,
+        fields=[
+            "name", "qn_statement as text", "qn_category", "qn_type", "qn_nps_min",
+            "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic"
+        ]
+    )
+
+    for q in questions:
+        if q.get("qn_category"):
+            q["category_name"] = frappe.db.get_value("qp_IQ_QuestionCategory", q["qn_category"], "qnc_category")
+        else:
+            q["category_name"] = "General"
+
+        if q.get("qn_type"):
+            q["type_name"] = frappe.db.get_value("qp_IQ_QuestionType", q["qn_type"], "qnt_type_name")
+        else:
+            q["type_name"] = "No definido"
+        
+        if q.get("qn_demographic"):
+            q["demographic_name"] = frappe.db.get_value("qp_IQ_DemographicType", q["qn_demographic"], "dt_title")
+        else:
+            q["demographic_name"] = None
+
+        if q.get("type_name") in OPTIONS_BASED_TYPES:
+            options = frappe.get_all(
+                "qp_IQ_QuestionOption",
+                filters={'parent': q.name, 'parenttype': 'qp_IQ_Question'},
+                fields=['qo_option_text'],
+                order_by='idx'
+            )
+            q['options'] = [opt['qo_option_text'] for opt in options]
+
+    demographics = frappe.get_all(
+        "qp_IQ_DemographicType",
+        filters={"dt_object_type": "Pregunta"},
+        fields=["name", "dt_title"],
+        order_by="dt_title"
+    )
+
+    return {
+        "questions": questions,
+        "demographics": demographics
+    }

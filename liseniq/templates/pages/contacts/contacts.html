@@ -1,0 +1,241 @@
+<div class="main-content-padding">
+
+    <!-- VISTA 1: LISTADO DE CONTACTOS -->
+    <div id="contacts-list-view">
+        <div class="page-actions-header">
+            <button id="btn-new-contact" class="btn btn-purple-main">Nuevo Contacto</button>
+        </div>
+        <div class="contacts-table-container">
+            <table class="table contacts-table">
+                <thead>
+                    <tr>
+                        <th class="contact-checkbox-cell"><input type="checkbox" id="select-all-contacts" title="Seleccionar todos"></th>
+                        <th>DNI</th>
+                        <th>Nombres</th>
+                        <th>Apellidos</th>
+                        <th>País</th>
+                        <th>Correo Electrónico</th>
+                        <th>Idioma</th>
+                        <th>Estatus</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if contacts %}
+                        {% for contact in contacts %}
+                        <tr data-name="{{ contact.name }}">
+                            <td class="contact-checkbox-cell"><input type="checkbox" class="contact-checkbox" data-name="{{ contact.name }}"></td>
+                            <td>{{ contact.dni }}</td>
+                            <td>{{ contact.first_name }}</td>
+                            <td>{{ contact.last_name }}</td>
+                            <td>{{ contact.country }}</td>
+                            <td>{{ contact.email }}</td>
+                            <td>{{ contact.language }}</td>
+                            <td>
+                                {% if contact.status %}
+                                <span class="status-badge status-{{ contact.status | lower }}">{{ contact.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="contact-actions">
+                                <i class="fa fa-pencil-square-o edit-contact-btn" title="Editar Contacto"></i>
+                                <i class="fa fa-trash-o delete-contact-btn" title="Eliminar Contacto"></i>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center p-5">No se encontraron contactos.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- VISTA 2: FORMULARIO DE CREACIÓN/EDICIÓN DE CONTACTO -->
+    <div id="contacts-create-view" class="d-none">
+        
+        <div id="contact-stepper-container"></div>
+
+        <form class="form-section-wrapper" novalidate>
+            
+            <!-- PASO 1: DATOS BÁSICOS -->
+            <div id="step-1-form">
+                <div class="page-title-section">
+                    <div class="breadcrumb-nav">
+                        <a href="#" id="breadcrumb-back-step1">Contactos</a> / <span class="form-mode-text">Nuevo Contacto</span>
+                    </div>
+                    <div class="title-with-action">
+                        <h3 class="page-main-title">Nuevo Contacto</h3>
+                        <button id="btn-next-step-1" type="button" class="btn btn-purple-main btn-form-nav">Siguiente</button>
+                    </div>
+                </div>
+                <div class="contact-form-container">
+                    <div class="contact-form-grid">
+                        <div class="form-group">
+                            <label for="contact-firstname">Nombres</label>
+                            <input type="text" id="contact-firstname" class="form-control" required data-required="true">
+                            <small id="contact-firstname-error" class="form-error-message d-none"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-lastname">Apellidos</label>
+                            <input type="text" id="contact-lastname" class="form-control" required data-required="true">
+                            <small id="contact-lastname-error" class="form-error-message d-none"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-doc-type">Tipo de Documento</label>
+                            <select id="contact-doc-type" class="form-control" data-default-doctype="{{ default_doctype or '' }}" required data-required="true">
+                                <option value="" selected>Seleccionar...</option>
+                                {% for doc_type in document_types %}
+                                    <option value="{{ doc_type.name }}" {% if doc_type.name == default_doctype %}selected{% endif %}>
+                                        {{ doc_type.dt_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small id="contact-doc-type-error" class="form-error-message d-none"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-doc-number">Número de Documento</label>
+                            <input type="text" id="contact-doc-number" class="form-control" required data-required="true">
+                            <small id="contact-doc-number-error" class="form-error-message d-none"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-country">País</label>
+                            <select id="contact-country" class="form-control" data-default-country="{{ default_country or '' }}" required data-required="true">
+                                <option value="">Seleccionar...</option>
+                                {% for country in latam_countries %}
+                                    <option value="{{ country.country_name }}" {% if country.country_name == default_country %}selected{% endif %}>
+                                        {{ country.country_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small id="contact-country-error" class="form-error-message d-none"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-language">Idioma</label>
+                            <select id="contact-language" class="form-control" data-default-language="{{ default_language or '' }}" required data-required="true">
+                                <option value="" selected>Seleccionar...</option>
+                                {% for lang in language %}
+                                    <option value="{{ lang.name }}" {% if lang.name == default_language %}selected{% endif %}>
+                                        {{ lang.la_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small id="contact-language-error" class="form-error-message d-none"></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PASO 2: DATOS OPCIONALES -->
+            <div id="step-2-form" class="d-none">
+                <div class="page-title-section">
+                     <div class="breadcrumb-nav">
+                        <a href="#" id="breadcrumb-back-step2">Contactos</a> / <span class="form-mode-text">Nuevo Contacto</span>
+                    </div>
+                    <div class="title-with-action">
+                        <h3 class="page-main-title">Nuevo Contacto</h3>
+                        <div class="form-action-buttons">
+                           <button id="btn-back-step-2" type="button" class="btn btn-outline-purple btn-form-nav">Atrás</button>
+                           <button id="btn-next-step-2" type="button" class="btn btn-purple-main btn-form-nav">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="contact-form-container">
+                    <div class="contact-form-grid">
+                        <div class="form-group">
+                            <label for="contact-email">Correo Electrónico</label>
+                            <input type="email" id="contact-email" class="form-control">
+                            <small id="contact-email-error" class="form-error-message d-none"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-birthdate">Fecha de Nacimiento</label>
+                            <input type="date" id="contact-birthdate" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-gender">Género</label>
+                            <select id="contact-gender" class="form-control">
+                                <option selected value="">Seleccionar...</option>
+                                {% for gener_types in gender %}
+                                    <option value="{{ gener_types.gender }}">{{ gener_types.gender }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-education">Nivel Académico</label>
+                            <select id="contact-education" class="form-control">
+                                <option value="" selected>Seleccionar...</option>
+                                {% for level in education_levels %}
+                                <option value="{{ level.name}}">{{ level.al_title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-entrydate">Fecha de Ingreso</label>
+                            <input type="date" id="contact-entrydate" class="form-control">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PASO 3: DATOS DEMOGRÁFICOS -->
+            <div id="step-3-form" class="d-none">
+                <div class="page-title-section">
+                     <div class="breadcrumb-nav">
+                        <a href="#" id="breadcrumb-back-step3">Contactos</a> / <span class="form-mode-text">Nuevo Contacto</span>
+                    </div>
+                    <div class="title-with-action">
+                        <h3 class="page-main-title">Nuevo Contacto</h3>
+                        <div class="form-action-buttons">
+                           <button id="btn-back-step-3" type="button" class="btn btn-outline-purple btn-form-nav">Atrás</button>
+                           <button id="btn-save-contact" type="button" class="btn btn-purple-main btn-form-nav">Crear</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="contact-form-container">
+                    <table class="demographics-table">
+                        <thead>
+                            <tr>
+                                <th>Tag</th>
+                                <th>Valor</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="demographics-tbody">
+                            <!-- Las filas se añadirán dinámicamente con JS -->
+                        </tbody>
+                    </table>
+                    <button id="btn-add-demographic" type="button" class="btn-add-demographic">+</button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="create-contact-modal" class="choice-modal-overlay d-none">
+    <div class="choice-modal-content">
+        <div class="choice-modal-header">
+            <h5 class="choice-modal-title">Crear Contacto</h5>
+            <button id="btn-close-modal" type="button" class="close" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="choice-modal-body">
+            <div class="modal-choice-card" id="btn-template-contact">
+                <i class="fa fa-file-text-o fa-2x mb-3"></i>
+                <span>Utilizar una plantilla</span>
+            </div>
+            <div class="modal-choice-card" id="btn-manual-contact">
+                <i class="fa fa-book fa-2x mb-3"></i>
+                <span>Crear contacto manual</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script para pasar datos del backend (Jinja) al frontend (JS) -->
+<script id="demographic-data" type="application/json">
+    {{ demographic_types_json | safe }}
+</script>

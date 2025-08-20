@@ -1,0 +1,22 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Contactos") }}
+{% endblock %}
+
+{% block page_main_content %}
+    {% include "templates/pages/contacts/contacts.html" %}
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/contacts.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script type="module" src="/assets/liseniq/js/contacts.js"></script>
+    <script type="module" src="/assets/liseniq/js/utils/stepper.js"></script>
+{% endblock %}

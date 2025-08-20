@@ -1,0 +1,32 @@
+{
+ "actions": [],
+ "creation": "2025-08-13 18:16:13.198368",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sr_contact"
+ ],
+ "fields": [
+  {
+   "fieldname": "sr_contact",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Contacto",
+   "options": "Contact",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-08-13 18:16:13.198368",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_SurveyRecipient",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

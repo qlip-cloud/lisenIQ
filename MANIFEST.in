@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include liseniq *.css
+recursive-include liseniq *.csv
+recursive-include liseniq *.html
+recursive-include liseniq *.ico
+recursive-include liseniq *.js
+recursive-include liseniq *.json
+recursive-include liseniq *.md
+recursive-include liseniq *.png
+recursive-include liseniq *.py
+recursive-include liseniq *.svg
+recursive-include liseniq *.txt
+recursive-exclude liseniq *.pyc

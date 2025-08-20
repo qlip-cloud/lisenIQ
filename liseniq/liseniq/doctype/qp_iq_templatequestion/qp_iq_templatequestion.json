@@ -1,0 +1,31 @@
+{
+ "actions": [],
+ "creation": "2025-06-09 12:19:55.052085",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "tq_question"
+ ],
+ "fields": [
+  {
+   "fieldname": "tq_question",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Pregunta",
+   "options": "qp_IQ_Question"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-07-12 19:35:21.758158",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_TemplateQuestion",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

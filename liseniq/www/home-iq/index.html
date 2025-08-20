@@ -1,0 +1,90 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Inicio", show_create_button=True, button_text="Crear Medicion", button_url="/measurement/new_measurement") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="main-content-padding home-container">
+
+    <!-- ======================================================================
+     SECCIÓN DE RESUMEN: ALGO PARA MEDIR (RENDERIZADO CONDICIONAL)
+     ======================================================================= -->
+    {% if show_summary_section %}
+    <section class="summary-section">
+        <h2 class="section-title">Algo para Medir</h2>
+        <div class="summary-cards-container">
+            {% for item in summary_data %}
+            <div class="summary-card">
+                <div class="summary-chart">
+                    <div class="chart-bar-bg"></div>
+                    <div class="chart-bar-fill" style="--bar-height: {{ item.bar1_height }}%;"></div>
+                </div>
+                <div class="summary-chart">
+                    <div class="chart-bar-bg"></div>
+                    <div class="chart-bar-fill" style="--bar-height: {{ item.bar2_height }}%;"></div>
+                </div>
+                <span class="summary-label">{{ item.status }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- ======================================================================
+     SECCIÓN PRINCIPAL: MEDICIONES
+     ======================================================================= -->
+    <section class="measurements-section">
+        <div class="measurements-header">
+            <h2 class="section-title">Mediciones</h2>
+            <button class="filter-button">
+                <i class="fa fa-filter"></i> Filtrar
+            </button>
+        </div>
+
+        <div class="measurements-grid">
+            {% if measurements %}
+                {% for m in measurements %}
+                <div class="measurement-card">
+                    <div class="card-header">
+                        <span class="status-badge status-{{ m.status.lower().replace(' ', '-') }}">{{ m.status }}</span>
+                    </div>
+                    <div class="card-body">
+                        <h3 class="card-title"> {{ m.title }}</h3>
+                        <p class="card-date">{{ m.start_date }} al {{ m.end_date }}</p>
+                    </div>
+                    <div class="card-footer">
+                        <div class="progress-info">
+                            <i class="fa fa-user-o progress-icon"></i>
+                            <span class="progress-text">{{ m.completed }} / {{ m.total }}</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="--progress-width: {{ m.percentage }}%;"></div>
+                        </div>
+                        <div class="percentage-display">{{ m.percentage }}%</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-measurements-message">
+                    <p>Aún no has creado ninguna medición.</p>
+                    <a href="/measurement/new_measurement" class="btn btn-purple-main">Crear mi primera medición</a>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/home.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script type="module" src="/assets/liseniq/js/home.js"></script>
+{% endblock %}

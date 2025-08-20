@@ -1,0 +1,261 @@
+<div class="main-content-padding">
+
+    <!-- Div oculto para pasar datos de preguntas precargadas del backend (Python) al frontend (JS) -->
+    <div id="preloaded-questions-data" data-questions='{{ preloaded_questions_json | e if preloaded_questions_json else "[]" }}' style="display: none;"></div>
+
+    <div id="measurement-stepper-container" class="mb-5"></div>
+
+    <!-- Wrapper estandarizado para el contenido del formulario -->
+    <div class="form-section-wrapper">
+        
+        <!-- PASO 1: Nombre de la Medición -->
+        <div id="step-1-form" class="d-none">
+            <div class="page-title-section">
+                <div class="breadcrumb-nav">
+                    <a href="#">Mediciones</a> / <span>Crear Medición</span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Nombre de la medición</h3>
+                    <button id="btn-next-step-1" type="button" class="btn btn-purple-main">Siguiente</button>
+                </div>
+            </div>
+            <div class="measurement-form-container">
+                <p class="text-muted small mb-4">Asígnale un nombre a tu medición para identificarla.</p>
+                <div class="form-group mb-5">
+                    <label for="measurement-name">Nombre de la medicion</label>
+                    <input type="text" id="measurement-name" class="form-control" data-required="true">
+                    <small id="measurement-name-error" class="form-error-message d-none"></small>
+                </div>
+                <div class="measurement-form-grid">
+                    <div class="form-group">
+                        <label for="measurement-start-date">Fecha Inicio</label>
+                        <input type="date" id="measurement-start-date" class="form-control" data-required="true">
+                        <small id="measurement-start-date-error" class="form-error-message d-none"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="measurement-end-date">Fecha de Finalizacion</label>
+                        <input type="date" id="measurement-end-date" class="form-control">
+                        <small id="measurement-end-date-error" class="form-error-message d-none"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASO 2: Preguntas -->
+        <div id="step-2-form" class="d-none">
+            <div class="page-title-section">
+                <div class="breadcrumb-nav">
+                    <a href="#">Mediciones</a> / 
+                    <span class="measurement-name-breadcrumb"></span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Preguntas</h3>
+                    <div class="form-action-buttons">
+                        <button id="btn-back-step-2" class="btn btn-outline-purple">Atrás</button>
+                        <button id="btn-next-step-2" class="btn btn-purple-main">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+            {% include "templates/pages/partials/iq_question_builder.html" %}
+        </div>
+
+        <!-- PASO 3: Contactos -->
+        <div id="step-3-form" class="d-none">
+            <div class="page-title-section">
+                <div class="breadcrumb-nav">
+                    <a href="#">Mediciones</a> / 
+                    <span class="measurement-name-breadcrumb"></span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Contactos</h3>
+                    <div class="form-action-buttons">
+                        <button id="btn-back-step-3" class="btn btn-outline-purple">Atrás</button>
+                        <button id="btn-next-step-3" class="btn btn-purple-main">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+            <div class="contacts-form-container">
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label for="survey-type-select">Tipo de Encuesta</label>
+                            <select id="survey-type-select" class="form-control form-select">
+                                <option value="all">Abierta a todos</option>
+                                <option value="selected">A mis contactos seleccionados</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label for="response-type-select">Tipo de Respuesta</label>
+                            <select id="response-type-select" class="form-control form-select">
+                                <option value="anonymous">Anónima</option>
+                                <option value="identified">Saber quién responde</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="selected-contacts-section" class="mt-4 d-none">
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check">
+                        <label class="form-check-label" for="send-all-contacts-check">
+                            Enviar a todos mis contactos
+                        </label>
+                    </div>
+                    
+                    <div class="row align-items-start">
+                        <div class="col-md-10">
+                            <div class="contacts-filter-section">
+                                <div class="form-group">
+                                    <label for="field-type-select">Tipos de campos</label>
+                                    <select id="field-type-select" class="form-control form-select">
+                                        <option value="" selected>Seleccionar tipo de campo...</option>
+                                        {% for demo in contact_demographics %}
+                                        <option value="{{ demo.name }}">{{ demo.dt_title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="categories-selection-container">
+                                    <div class="categories-box">
+                                        <label>Categorías disponibles</label>
+                                        <div id="available-categories" class="categories-list">
+                                            <!-- Los valores se cargarán aquí dinámicamente con JS -->
+                                        </div>
+                                    </div>
+                                    <div class="categories-arrow">
+                                        <i class="fa fa-arrow-right"></i>
+                                    </div>
+                                    <div class="categories-box">
+                                        <label>Categorías seleccionadas</label>
+                                        <div id="selected-categories" class="categories-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="contact-count-card">
+                                <span class="count-label">Número de contactos a enviar</span>
+                                <div class="count-display">
+                                    <span id="contact-count-number" class="count-number">0</span>
+                                    <i id="view-contacts-btn" class="fa fa-eye view-contacts-icon" title="Ver contactos seleccionados"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASO 4: Revisión -->
+        <div id="step-4-form" class="d-none">
+            <div class="page-title-section">
+                <div class="breadcrumb-nav">
+                    <a href="#">Mediciones</a> / 
+                    <span class="measurement-name-breadcrumb"></span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Revisión</h3>
+                    <div class="form-action-buttons">
+                        <button id="btn-back-step-4" class="btn btn-outline-purple">Atrás</button>
+                        <button id="btn-next-step-4" class="btn btn-purple-main">Enviar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="review-layout-grid">
+                <!-- Columna de Información General -->
+                <div class="review-info-container">
+                    <p class="review-section-title">Revisión</p>
+                    <h4 id="review-measurement-name" class="review-template-title"></h4>
+                    
+                    <div class="review-details-grid mt-4">
+                        <div>
+                            <p class="review-section-title">Tipo de encuesta</p>
+                            <p id="review-survey-type" class="review-detail-value"></p>
+                        </div>
+                        <div>
+                            <p class="review-section-title">Tipo de respuesta</p>
+                            <p id="review-response-type" class="review-detail-value"></p>
+                        </div>
+                        <div>
+                            <p class="review-section-title">Preguntas</p>
+                            <p id="review-questions-count" class="review-detail-value"></p>
+                        </div>
+                        <div>
+                            <p class="review-section-title">Número de contactos a enviar</p>
+                            <div class="count-display">
+                                <p id="review-contact-count" class="review-detail-value mb-0"></p>
+                                <i id="review-view-contacts-btn" class="fa fa-eye view-contacts-icon" title="Ver contactos seleccionados"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-check mt-4 mb-3">
+                        <input class="form-check-input" type="checkbox" value="" id="send-reminders-check">
+                        <label class="form-check-label" for="send-reminders-check">
+                            Enviar recordatorios
+                        </label>
+                    </div>
+
+                    <div id="reminders-section" class="d-none">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="reminder-frequency">Frecuencia de recordatorios</label>
+                                    <select id="reminder-frequency" class="form-control form-select">
+                                        <option value="Diaria">Diaria</option>
+                                        <option value="Semanal">Semanal</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="reminder-max">Número máximo de recordatorios</label>
+                                    <select id="reminder-max" class="form-control form-select">
+                                        <option>1</option>
+                                        <option>2</option>
+                                        <option>3</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Columna de Lista de Preguntas -->
+                <div class="review-questions-container">
+                     <p class="review-section-title">Preguntas</p>
+                     <div id="review-questions-list" class="review-questions-list">
+                        <!-- Las preguntas se renderizarán aquí con JS -->
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PARA VISUALIZAR CONTACTOS SELECCIONADOS -->
+<div id="view-contacts-modal" class="contacts-modal-overlay d-none">
+    <div class="contacts-modal-content">
+        <div class="contacts-modal-header">
+            <h5 class="contacts-modal-title">Contactos Seleccionados</h5>
+            <button id="btn-close-contacts-modal" type="button" class="close" aria-label="Cerrar">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="contacts-modal-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Género</th>
+                        <th>Área</th>
+                    </tr>
+                </thead>
+                <tbody id="selected-contacts-table-body">
+                    <!-- Filas de contactos se cargarán aquí -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

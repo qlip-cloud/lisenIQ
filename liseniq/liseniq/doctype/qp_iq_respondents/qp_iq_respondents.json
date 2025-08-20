@@ -1,0 +1,159 @@
+{
+ "actions": [],
+ "autoname": "RESP-##########",
+ "creation": "2025-06-09 09:50:25.206514",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "re_id_type",
+  "re_name",
+  "re_last_name",
+  "re_date_of_birth",
+  "re_gender",
+  "column_break_1",
+  "re_email",
+  "re_language",
+  "re_company",
+  "re_country",
+  "section_break_1",
+  "re_academic_level",
+  "re_date_of_entry",
+  "re_type_of_contract",
+  "re_position_level",
+  "column_break_2",
+  "re_tag_name",
+  "re_tag_value"
+ ],
+ "fields": [
+  {
+   "fieldname": "re_id_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Tipo de Identificaci\u00f3n",
+   "options": "qp_IQ_DocumentType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "re_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Nombre",
+   "reqd": 1
+  },
+  {
+   "fieldname": "re_last_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Apellido",
+   "reqd": 1
+  },
+  {
+   "fieldname": "re_country",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Pa\u00eds",
+   "options": "Country",
+   "reqd": 1
+  },
+  {
+   "fieldname": "re_email",
+   "fieldtype": "Data",
+   "label": "Correo Electr\u00f3nico",
+   "reqd": 1
+  },
+  {
+   "fieldname": "re_language",
+   "fieldtype": "Data",
+   "label": "Idioma",
+   "reqd": 1
+  },
+  {
+   "fieldname": "re_company",
+   "fieldtype": "Link",
+   "label": "Compa\u00f1ia",
+   "options": "qp_IQ_Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "re_gender",
+   "fieldtype": "Select",
+   "label": "Sexo",
+   "options": "Masculino\nFemenino\nOtro\nPrefiero no decirlo"
+  },
+  {
+   "fieldname": "re_date_of_birth",
+   "fieldtype": "Date",
+   "label": "Fecha de Nacimiento"
+  },
+  {
+   "fieldname": "re_academic_level",
+   "fieldtype": "Link",
+   "label": "Nivel Academico",
+   "options": "qp_IQ_AcademicLevel"
+  },
+  {
+   "fieldname": "re_date_of_entry",
+   "fieldtype": "Date",
+   "label": "Fecha de Ingreso"
+  },
+  {
+   "fieldname": "re_type_of_contract",
+   "fieldtype": "Select",
+   "label": "Tipo de Contrataci\u00f3n",
+   "options": "Temporal\nContratado\nPersonal Fijo"
+  },
+  {
+   "fieldname": "re_position_level",
+   "fieldtype": "Link",
+   "label": "Cargo",
+   "options": "qp_IQ_PositionLevel"
+  },
+  {
+   "fieldname": "re_tag_name",
+   "fieldtype": "Data",
+   "label": "Nombre de Tag"
+  },
+  {
+   "fieldname": "re_tag_value",
+   "fieldtype": "Data",
+   "label": "Valor de Tag"
+  },
+  {
+   "fieldname": "section_break_1",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-06-11 21:24:26.469710",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Respondents",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

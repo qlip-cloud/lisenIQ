@@ -1,0 +1,16 @@
+{% macro iq_header(title, show_create_button=False, button_text='', button_url='#') %}
+<div class="page-header-container">
+    <div class="d-flex justify-content-between align-items-center">
+        <h1 class="h5 mb-0">{{ title }}</h1>
+        <div class="d-flex align-items-center">
+            {% if show_create_button %}
+            <a href="{{ button_url }}" class="btn btn-outline-purple btn-sm mr-4">
+                + {{ button_text }}
+            </a>
+            {% endif %}
+            <i class="fa fa-bell-o text-muted mx-4" style="font-size: 1.2rem; cursor: pointer;"></i>
+            <img src="/assets/liseniq/images/qlip_avatar.png" class="rounded-circle" style="width: 35px; height: 35px; cursor: pointer;">
+        </div>
+    </div>
+</div>
+{% endmacro %}

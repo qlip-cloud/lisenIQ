@@ -1,0 +1,158 @@
+{
+ "actions": [],
+ "creation": "2025-06-04 20:52:15.249007",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "qn_type",
+  "qn_statement",
+  "bipolar_scale_section",
+  "qn_statement_positive",
+  "qn_statement_negative",
+  "qn_response_options",
+  "qn_optional",
+  "qn_category",
+  "qn_is_demographic",
+  "qn_demographic",
+  "qn_status",
+  "qn_helper_text",
+  "qn_owner",
+  "qn_positive_statement",
+  "qn_negative_statement",
+  "qn_nps_min",
+  "qn_nps_max"
+ ],
+ "fields": [
+  {
+   "fieldname": "qn_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Tipo de Pregunta",
+   "options": "qp_IQ_QuestionType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "qn_statement",
+   "fieldtype": "Small Text",
+   "label": "Texto de la Pregunta / Enunciado Principal"
+  },
+  {
+   "fieldname": "qn_response_options",
+   "fieldtype": "Table",
+   "label": "Opciones de respuesta",
+   "options": "qp_IQ_QuestionOption"
+  },
+  {
+   "default": "0",
+   "fieldname": "qn_optional",
+   "fieldtype": "Check",
+   "label": "Pregunta Opcional"
+  },
+  {
+   "fieldname": "qn_category",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Categoria de la Pregunta",
+   "options": "qp_IQ_QuestionCategory"
+  },
+  {
+   "default": "0",
+   "fieldname": "qn_is_demographic",
+   "fieldtype": "Check",
+   "label": "Es Demogr\u00e1fica"
+  },
+  {
+   "fieldname": "qn_demographic",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Dato Demogr\u00e1fico",
+   "options": "qp_IQ_DemographicType"
+  },
+  {
+   "default": "Activa",
+   "fieldname": "qn_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Estado de la Pregunta",
+   "options": "Activa\nArchivada\nEliminada"
+  },
+  {
+   "fieldname": "qn_helper_text",
+   "fieldtype": "Small Text",
+   "label": "Texto de Ayuda"
+  },
+  {
+   "fieldname": "qn_owner",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Due\u00f1o",
+   "options": "qp_IQ_Company"
+  },
+  {
+   "depends_on": "eval: doc.qn_type === '(-4 a 4) Anunciado Positivo y Negativo'",
+   "fieldname": "bipolar_scale_section",
+   "fieldtype": "Section Break",
+   "label": "Configuraci\u00f3n de Escala Bipolar"
+  },
+  {
+   "fieldname": "qn_statement_positive",
+   "fieldtype": "Data",
+   "label": "Enunciado del Extremo Positivo"
+  },
+  {
+   "fieldname": "qn_statement_negative",
+   "fieldtype": "Data",
+   "label": "Enunciado del Extremo Negativo"
+  },
+  {
+   "fieldname": "qn_positive_statement",
+   "fieldtype": "Small Text",
+   "label": "Enunciado Positivo"
+  },
+  {
+   "fieldname": "qn_negative_statement",
+   "fieldtype": "Small Text",
+   "label": "Enunciado Negativo"
+  },
+  {
+   "fieldname": "qn_nps_min",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Valor M\u00ednimo NPS"
+  },
+  {
+   "fieldname": "qn_nps_max",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Valor M\u00e1ximo NPS"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-08-12 22:08:50.562027",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Question",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,0 +1,104 @@
+{% extends "/templates/web.html" %}
+
+{# Importación de fuentes globales y ahora también los archivos CSS y JS del layout #}
+{% block style %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<!-- Se enlaza el CSS del layout directamente -->
+<link rel="stylesheet" href="/assets/liseniq/css/liseniq_base.css">
+{% endblock %}
+
+
+{% block content %}
+<!-- Cabecera para móvil -->
+<header class="mobile-header d-lg-none p-3 d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center">
+        <img src="/assets/liseniq/images/qlip_logo.png" alt="Logo Qlip" class="mr-2" style="height: 32px;">
+    </div>
+    <button class="btn border-0" type="button" id="sidebar-toggle">
+        <i class="fa fa-bars fa-lg"></i>
+    </button>
+</header>
+
+<div class="container-fluid">
+    <div class="row no-gutters">
+        <!-- Columna del Menú Lateral (Sidebar) -->
+        <aside id="app-sidebar" class="col-lg-2 sidebar-container p-4">
+            <div class="sidebar-sticky d-flex flex-column h-100">
+                <!-- Encabezado del Sidebar -->
+                <div class="sidebar-header text-center mb-4">
+                     <img src="/assets/liseniq/images/qlip_logo.png" alt="Logo Qlip" class="d-none d-lg-inline" style="height: 40px;">
+                     <button class="btn d-lg-none" id="sidebar-close-btn">&times;</button>
+                </div>
+                
+                <!-- Búsqueda -->
+                <div class="search-wrapper">
+                    <i class="fa fa-search search-icon"></i>
+                    <input type="text" class="form-control" placeholder="Buscar...">
+                </div>
+
+                <!-- Navegación -->
+                <h6 class="text-muted small">Menú Principal</h6>
+                <ul class="nav nav-pills flex-column">
+                    <li class="nav-item"><a href="/home-iq" class="nav-link {% if frappe.request.path == '/home-iq' %}active-link{% endif %}"><i class="fa fa-home fa-fw mr-3"></i>Inicio</a></li>
+                    <li class="nav-item"><a href="/iq-templates" class="nav-link {% if frappe.request.path.startswith('/iq-templates') %}active-link{% endif %}"><i class="fa fa-file-text-o fa-fw mr-3"></i>Plantillas</a></li>
+                    <li class="nav-item"><a href="/resultados" class="nav-link {% if frappe.request.path == '/resultados' %}active-link{% endif %}"><i class="fa fa-bar-chart fa-fw mr-3"></i>Resultados</a></li>
+                    <li class="nav-item"><a href="/contacts" class="nav-link {% if frappe.request.path == '/contacts' %}active-link{% endif %}"><i class="fa fa-users fa-fw mr-3"></i>Contactos</a></li>
+                    <li class="nav-item"><a href="/configuracion" class="nav-link"><i class="fa fa-cog fa-fw mr-3"></i>Configuración</a></li>
+                </ul>
+
+                <!-- Pie del Sidebar (Powered by) -->
+                <div class="mt-auto sidebar-footer">
+                    <p class="text-muted small">Powered by MENTUM Group</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Columna de Contenido Principal -->
+        <main class="col-lg-10 main-content">
+            {% block page_header %}{% endblock %}
+
+            <div id="global-notification-bar">
+                <span id="global-notification-message"></span>
+            </div>
+            
+            {% block page_main_content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<!-- Fondo oscuro para cuando el menú lateral esté abierto en móvil -->
+<div id="sidebar-overlay"></div>
+
+<!-- MODAL PARA CREAR MEDICIÓN -->
+<div id="create-measurement-modal" class="choice-modal-overlay d-none">
+    <div class="choice-modal-content">
+        <div class="choice-modal-header">
+            <h5 class="choice-modal-title">Crear Medición</h5>
+            <button id="btn-close-measurement-modal" type="button" class="close" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="choice-modal-body">
+            <div class="modal-choice-card" id="btn-template-measurement">
+                <i class="fa fa-file-text-o fa-2x mb-3"></i>
+                <span>Utilizar una plantilla</span>
+            </div>
+            <div class="modal-choice-card" id="btn-blank-measurement">
+                <i class="fa fa-book fa-2x mb-3"></i>
+                <span>Crear Medición en Blanco</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <!-- Se enlaza el JS del layout directamente -->
+    <script src="/assets/liseniq/js/liseniq_base.js"></script>
+{% endblock %}

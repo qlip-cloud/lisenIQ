@@ -185,3 +185,8 @@ website_context = {
 page_css = {
     # "iq_templates/index": "public/css/iq_templates.css",
 }
+
+fixtures = [
+	"User",
+    "Contact"
+]

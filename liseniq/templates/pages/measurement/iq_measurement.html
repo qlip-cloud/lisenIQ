@@ -1,14 +1,11 @@
 <div class="main-content-padding">
 
-    <!-- Div oculto para pasar datos de preguntas precargadas del backend (Python) al frontend (JS) -->
     <div id="preloaded-questions-data" data-questions='{{ preloaded_questions_json | e if preloaded_questions_json else "[]" }}' style="display: none;"></div>
 
     <div id="measurement-stepper-container" class="mb-5"></div>
 
-    <!-- Wrapper estandarizado para el contenido del formulario -->
     <div class="form-section-wrapper">
         
-        <!-- PASO 1: Nombre de la Medición -->
         <div id="step-1-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
@@ -22,7 +19,7 @@
             <div class="measurement-form-container">
                 <p class="text-muted small mb-4">Asígnale un nombre a tu medición para identificarla.</p>
                 <div class="form-group mb-5">
-                    <label for="measurement-name">Nombre de la medicion</label>
+                    <label for="measurement-name">Nombre de la medición</label>
                     <input type="text" id="measurement-name" class="form-control" data-required="true">
                     <small id="measurement-name-error" class="form-error-message d-none"></small>
                 </div>
@@ -33,7 +30,7 @@
                         <small id="measurement-start-date-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-end-date">Fecha de Finalizacion</label>
+                        <label for="measurement-end-date">Fecha de Finalización</label>
                         <input type="date" id="measurement-end-date" class="form-control">
                         <small id="measurement-end-date-error" class="form-error-message d-none"></small>
                     </div>
@@ -41,7 +38,6 @@
             </div>
         </div>
 
-        <!-- PASO 2: Preguntas -->
         <div id="step-2-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
@@ -59,7 +55,6 @@
             {% include "templates/pages/partials/iq_question_builder.html" %}
         </div>
 
-        <!-- PASO 3: Contactos -->
         <div id="step-3-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
@@ -121,7 +116,6 @@
                                     <div class="categories-box">
                                         <label>Categorías disponibles</label>
                                         <div id="available-categories" class="categories-list">
-                                            <!-- Los valores se cargarán aquí dinámicamente con JS -->
                                         </div>
                                     </div>
                                     <div class="categories-arrow">
@@ -148,7 +142,6 @@
             </div>
         </div>
 
-        <!-- PASO 4: Revisión -->
         <div id="step-4-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
@@ -164,7 +157,6 @@
                 </div>
             </div>
             <div class="review-layout-grid">
-                <!-- Columna de Información General -->
                 <div class="review-info-container">
                     <p class="review-section-title">Revisión</p>
                     <h4 id="review-measurement-name" class="review-template-title"></h4>
@@ -222,11 +214,9 @@
                         </div>
                     </div>
                 </div>
-                <!-- Columna de Lista de Preguntas -->
                 <div class="review-questions-container">
                      <p class="review-section-title">Preguntas</p>
                      <div id="review-questions-list" class="review-questions-list">
-                        <!-- Las preguntas se renderizarán aquí con JS -->
                      </div>
                 </div>
             </div>
@@ -234,7 +224,6 @@
     </div>
 </div>
 
-<!-- MODAL PARA VISUALIZAR CONTACTOS SELECCIONADOS -->
 <div id="view-contacts-modal" class="contacts-modal-overlay d-none">
     <div class="contacts-modal-content">
         <div class="contacts-modal-header">
@@ -253,7 +242,6 @@
                     </tr>
                 </thead>
                 <tbody id="selected-contacts-table-body">
-                    <!-- Filas de contactos se cargarán aquí -->
                 </tbody>
             </table>
         </div>

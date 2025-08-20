@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 from . import __version__ as app_version
 
 app_name = "liseniq"
@@ -13,8 +15,8 @@ app_license = "MIT"
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/liseniq/css/liseniq.css"
-# app_include_js = "/assets/liseniq/js/liseniq.js"
+app_include_css = "/assets/liseniq/css/liseniq_base.css"
+app_include_js = "/assets/liseniq/js/liseniq_base.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/liseniq/css/liseniq.css"
@@ -27,8 +29,8 @@ app_license = "MIT"
 # webform_include_js = {"doctype": "public/js/doctype.js"}
 # webform_include_css = {"doctype": "public/css/doctype.css"}
 
-# include js in page
-# page_js = {"page" : "public/js/file.js"}
+# Carga de CSS y JS para páginas específicas
+# ---------------------------------------------
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
@@ -40,7 +42,7 @@ app_license = "MIT"
 # ----------
 
 # application home page (will override Website Settings)
-# home_page = "login"
+home_page = "home-iq"
 
 # website user home page (by Role)
 # role_home_page = {
@@ -112,7 +114,7 @@ app_license = "MIT"
 # 	],
 # 	"weekly": [
 # 		"liseniq.tasks.weekly"
-# 	]
+# 	],
 # 	"monthly": [
 # 		"liseniq.tasks.monthly"
 # 	]
@@ -173,3 +175,13 @@ user_data_fields = [
 # 	"liseniq.auth.validate"
 # ]
 
+# Contexto Global y Reglas de Enrutamiento del Portal Web
+# ----------------------------------------------------
+
+website_context = {
+	"*": "liseniq.utils.global_website_context"
+}
+
+page_css = {
+    # "iq_templates/index": "public/css/iq_templates.css",
+}

@@ -1,0 +1,53 @@
+{
+ "actions": [],
+ "creation": "2025-06-09 10:47:02.316125",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pl_title",
+  "pl_job_code",
+  "pl_description"
+ ],
+ "fields": [
+  {
+   "fieldname": "pl_title",
+   "fieldtype": "Data",
+   "label": "Titulo"
+  },
+  {
+   "fieldname": "pl_job_code",
+   "fieldtype": "Data",
+   "label": "Codigo"
+  },
+  {
+   "fieldname": "pl_description",
+   "fieldtype": "Small Text",
+   "label": "Descripci\u00f3n"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-06-11 21:21:27.214970",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_PositionLevel",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,0 +1,216 @@
+/* ==========================================================================
+   1. VISTA DE LISTADO DE CONTACTOS
+   ========================================================================== */
+
+.page-actions-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1.5rem;
+}
+
+.contacts-table-container {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+.contacts-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.contacts-table th,
+.contacts-table td {
+    vertical-align: middle;
+    padding: 0.8rem 1rem !important;
+    text-align: left;
+    font-size: 0.8rem !important;
+}
+
+.contacts-table thead th {
+    font-weight: 500;
+    color: var(--text-color-secondary, #737373);
+    border-bottom: 1px solid #D4D2D2;
+}
+
+.contacts-table tbody tr {
+    border-bottom: 1px solid #D4D2D2;
+}
+
+.contacts-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.contacts-table td {
+    color: var(--text-color-primary, #000000);
+}
+
+.contacts-table .contact-checkbox-cell {
+    width: 30px;
+    text-align: center;
+}
+
+.contacts-table .contact-checkbox-cell input {
+    cursor: pointer;
+}
+
+.status-badge {
+    padding: 0.25em 0.6em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    display: inline-block;
+    line-height: 1;
+    text-transform: capitalize;
+}
+
+.status-badge.status-activo {
+    background-color: #d1fae5; /* Verde claro */
+    color: #065f46; /* Verde oscuro */
+}
+
+.status-badge.status-inactivo {
+    background-color: #fee2e2; /* Rojo claro */
+    color: #991b1b; /* Rojo oscuro */
+}
+
+.contact-actions {
+    text-align: right;
+}
+
+.contact-actions i {
+    font-size: 1.1rem;
+    cursor: pointer;
+    margin-left: 1.25rem;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.contact-actions .fa-pencil-square-o { color: #6c757d; }
+.contact-actions .fa-pencil-square-o:hover { opacity: 0.7; }
+.contact-actions .fa-trash-o { color: #E95E5E; }
+.contact-actions .fa-trash-o:hover { opacity: 0.7; }
+
+
+/* ==========================================================================
+   2. VISTA DE CREACIÓN DE CONTACTOS
+   ========================================================================== */
+
+.form-section-wrapper { max-width: 100%; }
+.contact-form-container { max-width: 70%; }
+.contact-form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2.5rem 2rem; }
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-size: 0.8rem; color: var(--text-color-secondary, #737373); margin-bottom: 0.5rem; }
+
+/*
+ * --------------------------------------------------------------------------
+ * Tabla de Demográficos
+ * --------------------------------------------------------------------------
+ */
+.demographics-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+}
+
+.demographics-table thead th {
+    text-align: left;
+    font-size: 0.8rem;
+    color: var(--text-color-secondary, #737373);
+    font-weight: 500;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #D4D2D2;
+}
+
+.demographics-table td {
+    padding: 0.75rem 0.5rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.demographics-table td:first-child { padding-left: 0; }
+.demographics-table td:last-child { padding-right: 0; }
+
+.demographics-table .form-control {
+    border: none !important;
+    padding: 0.5rem 0 !important;
+    background-color: transparent !important;
+    height: auto !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.demographics-table .form-control:focus { box-shadow: none !important; }
+.demographics-table .action-cell { text-align: center; width: 50px; }
+
+.demographics-table .delete-row {
+    font-size: 1.2rem;
+    color: #E95E5E;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.demographics-table .delete-row:hover { transform: scale(1.1); }
+
+.btn-add-demographic {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--brand-primary, #7B24FF);
+    color: white;
+    border: none;
+    font-size: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 4px;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    outline: none;
+}
+
+.btn-add-demographic:hover,
+.btn-add-demographic:focus {
+    background-color: #6a1fd6;
+    transform: translateY(-2px);
+    outline: none;
+    border: none;
+}
+
+/*
+ * --------------------------------------------------------------------------
+ * Componente de Autocompletar (Genérico)
+ * --------------------------------------------------------------------------
+ */
+.autocomplete-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    border: 1px solid #d1d8dd;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+}
+.autocomplete-results .autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+.autocomplete-results .autocomplete-item:hover { background-color: #f8f9fa; }
+
+
+/* ==========================================================================
+   4. MEDIA QUERIES
+   ========================================================================== */
+@media (max-width: 768px) {
+    .contact-form-container { max-width: 95%; }
+    .contact-form-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+}

@@ -1,0 +1,126 @@
+<div class="main-content-padding">
+    
+    <!-- Este div oculto pasa datos del backend al frontend -->
+    <div id="template-wizard-data" data-user-company="{{ user_company or '' }}"></div>
+
+    <div id="template-stepper-container" class="mb-5"></div>
+
+    <!-- Wrapper estandarizado para el contenido del formulario -->
+    <div class="form-section-wrapper">
+        
+        <!-- PASO 1: Nombre de la Plantilla -->
+        <div id="step-1">
+            <div class="page-title-section">
+                <div class="breadcrumb-nav"><a href="/iq-templates">Plantillas</a> / <span>Crear Plantilla</span></div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Nombre de la plantilla</h3>
+                    <button id="btn-step-1" class="btn btn-purple-main">Siguiente</button>
+                </div>
+            </div>
+            <div class="template-form-container">
+                <div class="form-section">
+                    <!-- Campo para hacer la plantilla privada -->
+                    <div class="form-group">
+                        <label for="template_is_private_input">Es plantilla privada</label>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" value="" id="template_is_private_input">
+                            <label class="form-check-label" for="template_is_private_input">
+                                Marcar si la plantilla solo debe ser visible para usted.
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="template_name_input">Nombre de la plantilla</label>
+                        <p class="text-muted small mb-2">Asígnale un nombre a tu plantilla para identificarla.</p>
+                        <input type="text" class="form-control" id="template_name_input" name="template_name" data-required="true">
+                        <small id="template_name_error" class="form-error-message d-none"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="template_category_input">Categoría</label>
+                        <select class="form-control form-select" id="template_category_input" name="template_category" data-required="true">
+                            <option value="" selected>Selecciona una categoría</option>
+                            {% for cat in question_categories %}
+                            <option value="{{ cat.name }}">{{ cat.qnc_category }}</option>
+                            {% endfor %}
+                        </select>
+                        <small id="template_category_error" class="form-error-message d-none"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="template_description_input">Descripción</label>
+                        <textarea class="form-control" id="template_description_input" name="template_description" rows="3" data-required="true"></textarea>
+                        <small id="template_description_error" class="form-error-message d-none"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="template_image_input">Imagen</label>
+                        <div class="file-upload-container">
+                            <input type="file" id="template_image_input" name="template_image" class="file-upload-input" accept="image/*">
+                            <label for="template_image_input" class="file-upload-label">
+                                <span id="file-name-display">Adjuntar archivo</span>
+                                <i class="fa fa-upload upload-icon"></i>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASO 2: Preguntas -->
+        <div id="step-2" class="d-none">
+            <div class="page-title-section">
+                <div class="breadcrumb-nav">
+                    <a href="/iq-templates">Plantillas</a> / 
+                    <span id="template_name_breadcrumb"></span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Preguntas</h3>
+                    <div class="form-action-buttons">
+                        <button id="btn-back-step-2" class="btn btn-outline-purple">Atrás</button>
+                        <button id="btn-step-2" class="btn btn-purple-main">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Se incluye la plantilla parcial del constructor de preguntas con la ruta corregida -->
+            {% include "templates/pages/partials/iq_question_builder.html" %}
+        </div>
+
+        <!-- PASO 3: REVISIÓN -->
+        <div id="step-3" class="d-none">
+            <div class="page-title-section">
+                 <div class="breadcrumb-nav">
+                    <a href="/iq-templates">Plantillas</a> / 
+                    <span id="template_name_breadcrumb_rev"></span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Revisión</h3>
+                    <div class="form-action-buttons">
+                        <button id="btn-back-step-3" class="btn btn-outline-purple">Atrás</button>
+                        <button id="btn-save-template" class="btn btn-purple-main">Crear</button>
+                    </div>
+                </div>
+            </div>
+            <div class="review-layout-grid">
+                <div class="review-info-container">
+                    <p class="review-section-title">Plantilla</p>
+                    <h4 id="review_template_name" class="review-template-title"></h4>
+                    <p class="review-section-title mt-4">Descripción</p>
+                    <p id="review_template_description" class="review-template-description"></p>
+                    <div class="review-details-grid">
+                        <div>
+                            <p class="review-section-title">Categoría</p>
+                            <p id="review_template_category" class="review-detail-value"></p>
+                        </div>
+                        <div>
+                            <p class="review-section-title">Preguntas</p>
+                            <p id="review_questions_count" class="review-detail-value"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="review-questions-container">
+                     <p class="review-section-title">Preguntas</p>
+                     <div id="review-questions-list-review" class="review-questions-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,19 +1,15 @@
-# -*- coding: utf-8 -*-
 import frappe
 import json
 import random
 import re
 from frappe import _
+from liseniq.hooks import login_required
 
+@login_required
 def get_context(context):
     context.page_title = _("Contactos")
 
     try:
-        if frappe.session.user == "Guest":
-            frappe.local.response["type"] = "redirect"
-            frappe.local.response["location"] = "/login"
-            return
-        
         user_doc = frappe.get_doc("User", frappe.session.user)
         context.user = user_doc
         

@@ -1,14 +1,10 @@
-# -*- coding: utf-8 -*-
 import frappe
 import json
+from liseniq.hooks import login_required
 
+@login_required
 def get_context(context):
     context.page_title = "Plantillas"
-
-    if frappe.session.user == "Guest":
-        frappe.local.response["type"] = "redirect"
-        frappe.local.response["location"] = "/login"
-        return
 
     user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
     if not user_company:

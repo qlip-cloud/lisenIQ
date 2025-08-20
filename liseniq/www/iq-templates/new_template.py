@@ -1,5 +1,5 @@
 import frappe
-from liseniq.hooks import login_required
+from liseniq.utils import login_required
 
 @login_required
 def get_context(context):

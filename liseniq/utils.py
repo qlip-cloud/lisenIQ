@@ -1,4 +1,5 @@
 import frappe
+from functools import wraps
 
 def get_all_templates():
     """
@@ -69,3 +70,15 @@ def get_page_categories():
         {"name": "Educacion", "id": "cat-educacion"},
         {"name": "Investigacion de mercado", "id": "cat-investigacion"}
     ]
+
+def login_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if frappe.session.user == "Guest":
+            frappe.local.response["type"] = "redirect"
+            frappe.local.response["location"] = "/login"
+            frappe.local.response["http_status_code"] = 302
+            return
+        return func(*args, **kwargs)
+    return wrapper
+

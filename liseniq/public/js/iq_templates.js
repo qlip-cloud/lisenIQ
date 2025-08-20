@@ -7,9 +7,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    // =========================================================================
-    // SELECTORES DEL DOM
-    // =========================================================================
     const step1 = document.getElementById('step-1');
     const step2 = document.getElementById('step-2');
     const step3 = document.getElementById('step-3');
@@ -25,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
         category: document.getElementById('template_category_input'),
         description: document.getElementById('template_description_input'),
         image: document.getElementById('template_image_input'),
-        isPrivate: document.getElementById('template_is_private_input') // Campo para privacidad
+        isPrivate: document.getElementById('template_is_private_input')
     };
 
     const wizardDataEl = document.getElementById('template-wizard-data');
@@ -45,9 +42,6 @@ document.addEventListener('DOMContentLoaded', function () {
         questionsList: document.getElementById('review-questions-list-review')
     };
 
-    // =========================================================================
-    // ESTADO Y LÓGICA DEL WIZARD
-    // =========================================================================
     const templateStepper = new Stepper('template-stepper-container', ['Nombre', 'Preguntas', 'Revisión']);
     
     const questionBuilder = new QuestionBuilder((questions) => {
@@ -61,10 +55,6 @@ document.addEventListener('DOMContentLoaded', function () {
         templateStepper.update(stepNumber);
     }
     
-    // =========================================================================
-    // VALIDACIÓN Y RENDERIZADO
-    // =========================================================================
-
     const showValidationError = (fieldId, message) => {
         const field = document.getElementById(fieldId);
         if (!field) return;
@@ -141,10 +131,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }
-
-    // =========================================================================
-    // LÓGICA DE GUARDADO
-    // =========================================================================
 
     async function handleSaveTemplate() {
         btnSaveTemplate.disabled = true;
@@ -229,10 +215,6 @@ document.addEventListener('DOMContentLoaded', function () {
             btnSaveTemplate.textContent = 'Crear';
         }
     }
-
-    // =========================================================================
-    // INICIALIZACIÓN Y LISTENERS
-    // =========================================================================
 
     function initializeEventListeners() {
         btnStep1?.addEventListener('click', () => {

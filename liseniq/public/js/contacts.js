@@ -4,9 +4,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!document.getElementById('contacts-list-view')) return;
 
-    // =========================================================================
-    // ESTADO DE LA APLICACIÓN Y SELECTORES
-    // =========================================================================
     const appState = {
         isEditMode: false,
         currentContactName: null,
@@ -44,24 +41,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const stepper = new Stepper(ui.stepperContainer, ['Datos Básicos', 'Datos Opcionales', 'Datos Demográficos']);
 
-    // =========================================================================
-    // FUNCIONES DE MANIPULACIÓN DEL DOM Y UI
-    // =========================================================================
-
-    // Muestra la vista especificada (lista o formulario)
     const showView = (view) => {
         ui.listView.classList.toggle('d-none', view !== 'list');
         ui.createView.classList.toggle('d-none', view !== 'form');
     };
 
-    // Muestra el paso del formulario especificado
     const showFormStep = (step) => {
         Object.values(ui.forms).forEach(form => form.classList.add('d-none'));
         ui.forms[`step${step}`].classList.remove('d-none');
         stepper.update(step);
     };
 
-    // Actualiza la UI del formulario según el modo (crear o editar)
     const updateFormUI = (mode) => {
         const isEdit = mode === 'edit';
         const title = isEdit ? 'Editar Contacto' : 'Nuevo Contacto';
@@ -73,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
         ui.buttons.save.textContent = buttonText;
     };
     
-    // Configura el formulario para el modo de creación de un nuevo contacto
     const setupFormForCreate = () => {
         appState.currentContactName = null;
         updateFormUI('create');
@@ -82,7 +71,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFormStep(1);
     };
 
-    // Configura el formulario para el modo de edición de un contacto existente
     const setupFormForEdit = (contactData) => {
         appState.currentContactName = contactData.name;
         updateFormUI('edit');
@@ -92,7 +80,6 @@ document.addEventListener('DOMContentLoaded', function () {
         showFormStep(1);
     };
 
-    // Restablece el formulario de creación/edición a su estado inicial
     const resetCreateForm = () => {
         const form = ui.createView.querySelector('form');
         if (form) form.reset();
@@ -105,9 +92,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (countrySelect) countrySelect.value = countrySelect.dataset.defaultCountry || '';
     };
 
-    // Rellena el formulario con los datos de un contacto existente
     const populateForm = (data) => {
-        // Formatea la fecha para asegurar compatibilidad con input type="date"
         const formatDate = (dateStr) => dateStr ? new Date(dateStr).toISOString().split('T')[0] : '';
 
         document.getElementById('contact-firstname').value = data.firstName || '';
@@ -122,7 +107,6 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('contact-education').value = data.education || '';
         document.getElementById('contact-entrydate').value = formatDate(data.entryDate);
 
-        // Limpia las filas demográficas existentes y las repopula con los datos del contacto
         ui.demographicsTbody.innerHTML = '';
         if (data.demographics && data.demographics.length > 0) {
             data.demographics.forEach(demo => addDemographicRow(demo.type, demo.value));
@@ -131,7 +115,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // Añade una nueva fila para un dato demográfico en el formulario
     const addDemographicRow = (type = '', value = '') => {
         const newRow = ui.demographicsTbody.insertRow();
         newRow.innerHTML = `
@@ -144,25 +127,20 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
     };
     
-    // Actualiza una fila de contacto existente en la tabla
     const updateContactInTable = (contact) => {
         const row = ui.tableBody.querySelector(`tr[data-name="${contact.name}"]`);
         if (row) row.innerHTML = getContactRowHTML(contact);
     };
 
-    // Añade un nuevo contacto a la tabla de contactos
     const addContactToTable = (contact) => {
         const noContactsRow = ui.tableBody.querySelector('td[colspan="9"]');
-        // Si no hay contactos, elimina el mensaje de "no contactos"
         if (noContactsRow) noContactsRow.parentElement.remove();
         
-        // Inserta la nueva fila al principio de la tabla
         const newRow = ui.tableBody.insertRow(0);
         newRow.setAttribute('data-name', contact.name);
         newRow.innerHTML = getContactRowHTML(contact);
     };
 
-    // Genera el HTML para una fila de contacto en la tabla
     const getContactRowHTML = (contact) => {
         const statusHTML = contact.status ? `<span class="status-badge status-${contact.status.toLowerCase()}">${contact.status}</span>` : '';
         return `
@@ -181,11 +159,8 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
     };
 
-    // Obtiene los datos del formulario de contacto
     const getContactFormData = () => {
         const demographics = [];
-        // Itera sobre cada fila demográfica para extraer tipo y valor.
-        // Solo añade el demográfico si ambos campos (tipo y valor) están rellenos.
         ui.demographicsTbody.querySelectorAll('tr').forEach(row => {
             const typeInput = row.querySelector('.demographic-type-input');
             const valueInput = row.querySelector('input[type="text"]:not(.demographic-type-input)');
@@ -211,12 +186,10 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     };
 
-    // Actualiza el estado del checkbox "seleccionar todo" en la tabla
     const updateSelectAllCheckboxState = () => {
         const allCheckboxes = ui.tableBody.querySelectorAll('.contact-checkbox');
         const checkedCount = Array.from(allCheckboxes).filter(cb => cb.checked).length;
         
-        // Actualiza el estado del checkbox "seleccionar todo" (marcado, desmarcado, indeterminado)
         if (allCheckboxes.length > 0) {
             ui.selectAllCheckbox.checked = checkedCount === allCheckboxes.length;
             ui.selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
@@ -226,11 +199,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // =========================================================================
-    // VALIDACIÓN DE FORMULARIOS
-    // =========================================================================
-
-    // Muestra un mensaje de error de validación para un campo específico
     const showValidationError = (fieldId, message) => {
         const field = document.getElementById(fieldId);
         const errorElement = document.getElementById(`${field.id}-error`);
@@ -241,7 +209,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // Limpia el mensaje de error de validación para un campo específico
     const clearValidationError = (fieldId) => {
         const field = document.getElementById(fieldId);
         const errorElement = document.getElementById(`${field.id}-error`);
@@ -251,7 +218,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // Limpia todos los mensajes de error de validación en el formulario
     const clearAllValidations = () => {
         ui.forms.step1.querySelectorAll('[data-required="true"]').forEach(field => {
             clearValidationError(field.id);
@@ -259,13 +225,11 @@ document.addEventListener('DOMContentLoaded', function () {
         clearValidationError('contact-email');
     };
 
-    // Valida los campos del primer paso del formulario de contacto
     const validateStep1 = () => {
         let isValid = true;
         clearAllValidations();
 
         const requiredFields = ui.forms.step1.querySelectorAll('[data-required="true"]');
-        // Expresión regular para validar nombres y apellidos (solo letras, espacios y caracteres latinos)
         const nameRegex = /^[a-zA-Z\sñÑáéíóúÁÉÍÓÚüÜ]+$/;
         
         requiredFields.forEach(field => {
@@ -274,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 isValid = false;
                 showValidationError(field.id, 'Este campo es obligatorio.');
             } else {
-                // Validación específica para campos de nombre y apellido
                 if (field.id === 'contact-firstname' || field.id === 'contact-lastname') {
                     if (!nameRegex.test(value)) {
                         isValid = false;
@@ -287,7 +250,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return isValid;
     };
 
-    // Valida los campos del segundo paso del formulario de contacto
     const validateStep2 = () => {
         let isValid = true;
         clearValidationError('contact-email');
@@ -295,7 +257,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const emailValue = emailField.value.trim();
         
         if (emailValue) {
-            // Expresión regular para validar el formato de correo electrónico
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(emailValue)) {
                 isValid = false;
@@ -305,11 +266,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return isValid;
     };
 
-    // =========================================================================
-    // LÓGICA DE NEGOCIO (LLAMADAS A FRAPPE)
-    // =========================================================================
-
-    // Maneja el guardado de un contacto (creación o actualización)
     const handleSave = () => {
         const contactData = getContactFormData();
         const method = appState.isEditMode ? 'update_contact' : 'create_contact';
@@ -326,7 +282,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         addContactToTable(r.message.new_contact);
                     }
                     showView('list');
-                    // Utiliza la notificación global en lugar de frappe.throw
                     showGlobalNotification(`Contacto ${appState.isEditMode ? 'actualizado' : 'creado'} correctamente.`, 'success');
                 } else {
                     showGlobalNotification(`Error: ${r.message.message || 'Ocurrió un error inesperado.'}`, 'error');
@@ -339,7 +294,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
-    // Maneja la eliminación de un contacto
     const handleDelete = (contactName, rowElement) => {
         frappe.confirm(
             '¿Estás seguro de que quieres eliminar este contacto?',
@@ -351,7 +305,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (r.message && r.message.status === 'success') {
                             rowElement.remove();
                             updateSelectAllCheckboxState();
-                            // Utiliza la notificación global en lugar de frappe.throw
                             showGlobalNotification('Contacto eliminado correctamente.', 'success');
                         } else {
                             showGlobalNotification(`Error al eliminar: ${r.message.message || 'Ocurrió un error inesperado.'}`, 'error');
@@ -366,7 +319,6 @@ document.addEventListener('DOMContentLoaded', function () {
         );
     };
 
-    // Maneja la edición de un contacto, obteniendo sus detalles y cargándolos en el formulario
     const handleEdit = (contactName) => {
         frappe.call({
             method: 'liseniq.www.contacts.index.get_contact_details',
@@ -379,7 +331,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
-    // Obtiene y renderiza sugerencias de tipos demográficos para el autocompletado
     const fetchDemographicSuggestions = (searchTerm, resultsContainer) => {
         frappe.call({
             method: 'liseniq.www.contacts.index.get_demographic_suggestions',
@@ -401,11 +352,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     };
 
-    // =========================================================================
-    // LISTENERS DE EVENTOS
-    // =========================================================================
-
-    // Inicializa todos los escuchadores de eventos para la UI
     function initializeEventListeners() {
         ui.buttons.newContact?.addEventListener('click', () => { ui.modal.classList.remove('d-none'); });
         ui.buttons.closeModal?.addEventListener('click', () => { ui.modal.classList.add('d-none'); });
@@ -434,7 +380,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (ui.demographicsTbody.rows.length > 1) {
                     e.target.closest('tr').remove();
                 } else {
-                    // Reutiliza la notificación global para advertencias
                     showGlobalNotification('Debe haber al menos un dato demográfico.', 'error');
                 }
             }
@@ -505,10 +450,6 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('contact-lastname').addEventListener('input', sanitizeNameInput);
     }
     
-    // =========================================================================
-    // INICIALIZACIÓN
-    // =========================================================================
-
     function init() {
         stepper.render();
         showView('list');

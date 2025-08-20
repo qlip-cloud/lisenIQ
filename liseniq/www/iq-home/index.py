@@ -22,7 +22,7 @@ def get_context(context):
 
     if not user_company:
         context.measurements = []
-        frappe.log_error("El usuario actual no tiene una compañía asignada.", "Error en home-iq/index.py")
+        frappe.log_error("El usuario actual no tiene una compañía asignada.", "Error en iq-home/index.py")
         return context
 
     # Obtener todas las mediciones (encuestas) de la compañía del usuario

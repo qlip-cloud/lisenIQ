@@ -1,15 +1,8 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2024, Mentum Group. All rights reserved.
-# For license information, please see license.txt
-
 import frappe
 import json
 
 def get_context(context):
-    """
-    Prepara y pasa los datos para la página principal que muestra
-    todas las plantillas, filtradas por compañía y privacidad.
-    """
     context.page_title = "Plantillas"
 
     if frappe.session.user == "Guest":
@@ -90,10 +83,6 @@ def get_context(context):
 
 @frappe.whitelist()
 def get_questions_from_template(template_name):
-    """
-    Obtiene y formatea las preguntas de una plantilla específica para
-    ser usadas en otros wizards, como el de creación de mediciones.
-    """
     frappe.has_permission("qp_IQ_Template", "read", doc=template_name)
     
     template_doc = frappe.get_doc("qp_IQ_Template", template_name)
@@ -132,9 +121,6 @@ def get_questions_from_template(template_name):
 
 @frappe.whitelist()
 def get_demographic_suggestions_for_questions(search_term):
-    """
-    Obtiene sugerencias de tipos demográficos para preguntas.
-    """
     if not search_term:
         return []
 
@@ -150,9 +136,6 @@ def get_demographic_suggestions_for_questions(search_term):
 
 @frappe.whitelist()
 def create_question_from_template_wizard(question_data):
-    """
-    Crea un nuevo documento qp_IQ_Question desde el wizard de plantillas.
-    """
     try:
         data = frappe.parse_json(question_data)
         
@@ -203,9 +186,6 @@ def create_question_from_template_wizard(question_data):
 
 @frappe.whitelist()
 def get_bank_data(keyword=None, demographic=None):
-    """
-    Obtiene las preguntas y demográficos para el Banco de Preguntas.
-    """
     OPTIONS_BASED_TYPES = [
         'Selección Múltiple', 
         'Selección Única', 

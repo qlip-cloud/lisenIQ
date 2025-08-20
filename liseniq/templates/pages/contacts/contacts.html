@@ -1,6 +1,5 @@
 <div class="main-content-padding">
 
-    <!-- VISTA 1: LISTADO DE CONTACTOS -->
     <div id="contacts-list-view">
         <div class="page-actions-header">
             <button id="btn-new-contact" class="btn btn-purple-main">Nuevo Contacto</button>
@@ -52,14 +51,12 @@
         </div>
     </div>
 
-    <!-- VISTA 2: FORMULARIO DE CREACIÓN/EDICIÓN DE CONTACTO -->
     <div id="contacts-create-view" class="d-none">
         
         <div id="contact-stepper-container"></div>
 
         <form class="form-section-wrapper" novalidate>
             
-            <!-- PASO 1: DATOS BÁSICOS -->
             <div id="step-1-form">
                 <div class="page-title-section">
                     <div class="breadcrumb-nav">
@@ -127,7 +124,6 @@
                 </div>
             </div>
 
-            <!-- PASO 2: DATOS OPCIONALES -->
             <div id="step-2-form" class="d-none">
                 <div class="page-title-section">
                      <div class="breadcrumb-nav">
@@ -178,7 +174,6 @@
                 </div>
             </div>
             
-            <!-- PASO 3: DATOS DEMOGRÁFICOS -->
             <div id="step-3-form" class="d-none">
                 <div class="page-title-section">
                      <div class="breadcrumb-nav">
@@ -202,7 +197,6 @@
                             </tr>
                         </thead>
                         <tbody id="demographics-tbody">
-                            <!-- Las filas se añadirán dinámicamente con JS -->
                         </tbody>
                     </table>
                     <button id="btn-add-demographic" type="button" class="btn-add-demographic">+</button>
@@ -213,7 +207,6 @@
     </div>
 </div>
 
-<!-- MODAL -->
 <div id="create-contact-modal" class="choice-modal-overlay d-none">
     <div class="choice-modal-content">
         <div class="choice-modal-header">
@@ -235,7 +228,6 @@
     </div>
 </div>
 
-<!-- Script para pasar datos del backend (Jinja) al frontend (JS) -->
 <script id="demographic-data" type="application/json">
     {{ demographic_types_json | safe }}
 </script>

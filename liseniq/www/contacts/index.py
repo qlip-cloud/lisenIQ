@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2024, Mentum Group. All rights reserved.
-# For license information, please see license.txt
-
 import frappe
 import json
 import random
@@ -9,9 +6,6 @@ import re
 from frappe import _
 
 def get_context(context):
-    """
-    Prepara y pasa el contexto a la plantilla Jinja.
-    """
     context.page_title = _("Contactos")
 
     try:
@@ -23,8 +17,6 @@ def get_context(context):
         user_doc = frappe.get_doc("User", frappe.session.user)
         context.user = user_doc
         
-        # Obtener la compañía del usuario logueado.
-        # Se asume que se ha añadido un campo 'custom_company' al DocType 'User'.
         user_company = user_doc.get("custom_company")
         if not user_company:
             frappe.throw(_("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador."), title=_("Error de Configuración"))
@@ -34,7 +26,6 @@ def get_context(context):
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error en get_context de Contactos")
-        # Si el error es una excepción específica de Frappe, muestra el mensaje.
         if isinstance(e, frappe.exceptions.ValidationError) or isinstance(e, frappe.exceptions.PermissionError):
              frappe.throw(str(e))
         else:
@@ -68,8 +59,6 @@ def get_context(context):
     context.default_doctype = "822f13806f"
     context.default_language = "es-CO"
 
-    # Filtrar contactos por la compañía del usuario.
-    # Se asume que el DocType 'Contact' tiene un campo 'custom_company' que lo vincula a 'qp_IQ_Company'.
     contacts_from_db = frappe.get_all(
         'Contact',
         filters={'custom_company': user_company},
@@ -119,7 +108,6 @@ def get_contact_details(contact_name):
     contact = frappe.get_doc("Contact", contact_name)
     user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
 
-    # Validar que el contacto pertenezca a la misma compañía del usuario.
     if contact.custom_company != user_company:
         frappe.throw(_("No tienes permiso para ver este contacto"))
 
@@ -154,10 +142,6 @@ def get_contact_details(contact_name):
     }
 
 def find_or_create_demographic_type(demographic_title):
-    """
-    Busca un tipo de demográfico por su título para el objeto 'Contacto'.
-    Si no existe, lo crea. Si ya existe, devuelve su ID.
-    """
     normalized_title = " ".join(demographic_title.strip().split()).title()
     object_type = "Contacto"
 
@@ -191,9 +175,6 @@ def find_or_create_demographic_type(demographic_title):
         )
 
 def _map_contact_data(contact_doc, data):
-    """
-    Mapea los datos del formulario al documento de Contacto y realiza validaciones.
-    """
     first_name = data.get("firstName")
     last_name = data.get("lastName")
     email = data.get("email")
@@ -210,7 +191,6 @@ def _map_contact_data(contact_doc, data):
     contact_doc.last_name = last_name
     contact_doc.gender = data.get("gender") if data.get("gender") != "Seleccionar..." else None
     
-    # Asignar la compañía del usuario al nuevo contacto.
     user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
     if not user_company:
         frappe.throw(_("No se pudo determinar la compañía del usuario."))
@@ -300,9 +280,6 @@ def delete_contact(contact_name):
 
 @frappe.whitelist()
 def get_demographic_suggestions(search_term):
-    """
-    Obtiene sugerencias de tipos demográficos para el autocompletado.
-    """
     if not search_term:
         return []
         

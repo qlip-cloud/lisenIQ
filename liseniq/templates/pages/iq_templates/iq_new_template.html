@@ -1,14 +1,11 @@
 <div class="main-content-padding">
     
-    <!-- Este div oculto pasa datos del backend al frontend -->
     <div id="template-wizard-data" data-user-company="{{ user_company or '' }}"></div>
 
     <div id="template-stepper-container" class="mb-5"></div>
 
-    <!-- Wrapper estandarizado para el contenido del formulario -->
     <div class="form-section-wrapper">
         
-        <!-- PASO 1: Nombre de la Plantilla -->
         <div id="step-1">
             <div class="page-title-section">
                 <div class="breadcrumb-nav"><a href="/iq-templates">Plantillas</a> / <span>Crear Plantilla</span></div>
@@ -19,7 +16,6 @@
             </div>
             <div class="template-form-container">
                 <div class="form-section">
-                    <!-- Campo para hacer la plantilla privada -->
                     <div class="form-group">
                         <label for="template_is_private_input">Es plantilla privada</label>
                         <div class="form-check mt-2">
@@ -65,7 +61,6 @@
             </div>
         </div>
 
-        <!-- PASO 2: Preguntas -->
         <div id="step-2" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
@@ -80,11 +75,9 @@
                     </div>
                 </div>
             </div>
-            <!-- Se incluye la plantilla parcial del constructor de preguntas con la ruta corregida -->
             {% include "templates/pages/partials/iq_question_builder.html" %}
         </div>
 
-        <!-- PASO 3: REVISIÓN -->
         <div id="step-3" class="d-none">
             <div class="page-title-section">
                  <div class="breadcrumb-nav">

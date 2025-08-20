@@ -1,20 +1,12 @@
-# Copyright (c) 2025, Mentum Group and contributors
-# For license information, please see license.txt
-
 import frappe
 import json
 
 def get_context(context):
-    """
-    Prepara y pasa el contexto a la plantilla para la página
-    de creación de nuevas mediciones.
-    """
     context.no_cache = 1
     context.page_title = "Crear Medición"
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
 
-    # Carga los datos demográficos de contacto y los tipos de preguntas
     try:
         context.contact_demographics = frappe.get_all(
             "qp_IQ_DemographicType",
@@ -34,16 +26,13 @@ def get_context(context):
     except frappe.DoesNotExistError:
         context.question_types = []
 
-    # Revisa si se está creando una medición desde una plantilla
     template_name = frappe.request.args.get('template')
     if template_name:
         try:
-            # Llama a la función del controlador de plantillas para obtener las preguntas
             questions = frappe.call(
                 'liseniq.www.iq-templates.index.get_questions_from_template',
                 template_name=template_name
             )
-            # Pasa las preguntas al contexto como una cadena JSON
             context.preloaded_questions_json = frappe.as_json(questions)
         except Exception as e:
             frappe.log_error(f"No se pudieron cargar las preguntas de la plantilla {template_name}: {e}", "Error en new_measurement.py")
@@ -55,10 +44,6 @@ def get_context(context):
 
 @frappe.whitelist()
 def get_demographic_values_for_contacts(demographic_type):
-    """
-    Obtiene los valores únicos y el color para un tipo demográfico 
-    específico asociado a los contactos.
-    """
     if not demographic_type:
         return frappe._dict({"values": [], "color": None})
 
@@ -79,10 +64,6 @@ def get_demographic_values_for_contacts(demographic_type):
 
 @frappe.whitelist()
 def get_filtered_contacts_count(filters='[]'):
-    """
-    Obtiene el conteo y los detalles de los contactos que coinciden con un
-    conjunto de filtros demográficos para el wizard de mediciones.
-    """
     filters = json.loads(filters)
 
     if not filters:
@@ -167,10 +148,6 @@ def get_filtered_contacts_count(filters='[]'):
 
 @frappe.whitelist()
 def save_measurement(data):
-    """
-    Guarda una nueva medición (Encuesta) y sus componentes (preguntas, encuestados)
-    basado en los datos recibidos del wizard de creación.
-    """
     try:
         data = json.loads(data)
         

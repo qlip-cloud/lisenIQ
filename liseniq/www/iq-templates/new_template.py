@@ -1,23 +1,14 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2024, Mentum Group. All rights reserved.
-# For license information, please see license.txt
-
 import frappe
 
 def get_context(context):
-    """
-    Prepara y pasa el contexto a la plantilla
-    para la página de creación de nuevas plantillas.
-    """
     context.page_title = "Crear Plantilla"
 
-    # Asegurarse de que el usuario está logueado
     if frappe.session.user == "Guest":
         frappe.local.response["type"] = "redirect"
         frappe.local.response["location"] = "/login"
         return
 
-    # Obtener la compañía del usuario y pasarla al contexto
     try:
         user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
         if not user_company:
@@ -27,8 +18,6 @@ def get_context(context):
         frappe.log_error(frappe.get_traceback(), "Error obteniendo la compañía del usuario")
         frappe.throw(str(e))
 
-
-    # Cargar categorías y tipos de preguntas
     try:
         question_categories = frappe.get_all(
             "qp_IQ_QuestionCategory",
@@ -48,7 +37,6 @@ def get_context(context):
         context.question_types = question_types
     except frappe.DoesNotExistError:
         context.question_types = []
-
 
     context.update({
         "is_navbar_custom": True,

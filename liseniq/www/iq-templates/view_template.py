@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2025, Mentum Group and contributors
-# For license information, please see license.txt
-
 import frappe
 
 def get_context(context):
@@ -12,14 +9,11 @@ def get_context(context):
     try:
         template_doc = frappe.get_doc("qp_IQ_Template", template_name)
 
-        # Obtener el nombre legible de la categoría
         if template_doc.tp_category:
             category_name = frappe.db.get_value("qp_IQ_QuestionCategory", template_doc.tp_category, "qnc_category")
         else:
             category_name = "Sin categoría"
 
-        # MODIFICADO: Construir un diccionario para pasar al contexto
-        # en lugar de pasar el DocType directamente.
         template_info = {
             "tp_name": template_doc.tp_name,
             "tp_description": template_doc.tp_description,
@@ -27,7 +21,6 @@ def get_context(context):
         }
         context.template_data = template_info
 
-        # Procesar las preguntas asociadas
         questions = []
         if template_doc.tp_questions:
             for tq in template_doc.tp_questions:

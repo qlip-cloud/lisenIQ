@@ -1,22 +1,9 @@
-<!-- 
-==========================================================================
-PLANTILLA PARCIAL: CONSTRUCTOR DE PREGUNTAS
-- DESCRIPCIÓN: Contiene la UI reutilizable para el paso de creación
-  de preguntas, incluyendo el banco de preguntas y el formulario manual.
-  Esta plantilla se puede incluir en cualquier wizard que necesite
-  funcionalidad para añadir preguntas.
-==========================================================================
--->
-
-<!-- Botón para abrir el banco de preguntas -->
 <div class="mt-4 mb-5">
     <button id="btn-open-question-bank" class="btn btn-outline-dark">Ver Biblioteca de preguntas</button>
 </div>
 
-<!-- Contenedor donde se renderizará la lista de preguntas añadidas -->
 <div id="questions-list" class="questions-list"></div>
 
-<!-- Formulario para añadir una pregunta manualmente -->
 <div class="add-question-form mt-4">
     <div class="row">
         <div class="col-md-4">
@@ -58,7 +45,6 @@ PLANTILLA PARCIAL: CONSTRUCTOR DE PREGUNTAS
         </button>
     </div>
 
-    <!-- Sección para escala bipolar -->
     <div id="bipolar-scale-section" class="bipolar-scale-section d-none">
         <label class="small text-muted">Enunciados de la escala</label>
         <div class="row">
@@ -75,7 +61,6 @@ PLANTILLA PARCIAL: CONSTRUCTOR DE PREGUNTAS
         </div>
     </div>
 
-    <!-- Sección para escala NPS -->
     <div id="nps-scale-section" class="nps-scale-section d-none">
         <label class="small text-muted">Rango de la Escala NPS</label>
         <div class="row">

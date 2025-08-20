@@ -1,15 +1,3 @@
-/**
- * ==========================================================================
- * ARCHIVO: iq_templates.css
- * DESCRIPCIÓN: Estilos específicos para la página de gestión de plantillas.
- * ==========================================================================
- */
-
-/* ==========================================================================
-   1. PÁGINA DE LISTADO DE PLANTILLAS (index.html)
-   ========================================================================== */
-
-/* --- Layout Principal y Scroll --- */
 .template-page-layout {
     display: flex;
     align-items: flex-start;
@@ -29,7 +17,6 @@
     padding-right: 1rem;
 }
 
-/* --- Estilos de Tarjetas --- */
 .template-card,
 .filter-card {
     border: 1px solid #e9ecef;
@@ -113,19 +100,9 @@
     color: white;
 }
 
-/* ==========================================================================
-   2. PÁGINA DE CREACIÓN DE PLANTILLAS (new_template.html)
-   ========================================================================== */
-
-/* --- Layout y Formularios --- */
 .form-wrapper { width: 90%; margin-left: auto; margin-right: auto; }
 .template-form-container { max-width: 550px; }
 
-/*
- * --------------------------------------------------------------------------
- * Campo de Carga de Archivos
- * --------------------------------------------------------------------------
- */
 .file-upload-container {
     position: relative;
     width: 100%;
@@ -182,7 +159,6 @@
     flex-shrink: 0;
 }
 
-/* --- Lista de Preguntas --- */
 .add-question-form { border: 1px solid #e9ecef; border-radius: 9px; padding: 1.5rem; }
 .add-question-form label { font-size: 0.8rem; }
 .add-question-form .form-control { font-size: 0.8rem; }
@@ -208,12 +184,10 @@
 .question-bipolar-statements strong, .question-nps-scale strong { color: #343a40; }
 
 
-/* --- Opciones de Pregunta (Formulario Manual) --- */
 .option-input-row { display: flex; align-items: center; margin-bottom: 1rem; gap: 1rem; }
 .option-number { font-weight: 600; color: var(--text-color-secondary, #6c757d); font-size: 0.8rem; }
 .btn-add-option { background-color: transparent; border: none; color: var(--brand-primary, #7B24FF); font-size: 1.5rem !important; line-height: 1; padding: 0; box-shadow: none !important; }
 
-/* --- Nuevos estilos para campos específicos --- */
 .bipolar-scale-section, .nps-scale-section {
     border-top: 1px solid #e9ecef;
     margin-top: 1.5rem;
@@ -231,11 +205,6 @@
     background-color: #f8f9fa;
 }
 
-/*
- * --------------------------------------------------------------------------
- * Componente de Autocompletar (Genérico para Demográficos)
- * --------------------------------------------------------------------------
- */
 .autocomplete-results {
     position: absolute;
     top: 100%;
@@ -259,11 +228,6 @@
 .autocomplete-results .autocomplete-item:hover { background-color: #f8f9fa; }
 
 
-/*
- * --------------------------------------------------------------------------
- * Paso 3: Revisión
- * --------------------------------------------------------------------------
- */
 .review-layout-grid {
     display: grid;
     grid-template-columns: 350px 1fr;
@@ -337,7 +301,7 @@
     flex-grow: 1;
 }
 .review-question-details {
-    padding-left: calc(1rem + 8px); /* Alinear con el texto */
+    padding-left: calc(1rem + 8px);
     margin-top: 0.5rem;
     font-size: 0.8rem;
     color: #6c757d;
@@ -363,9 +327,6 @@
 }
 
 
-/* ==========================================================================
-   3. COMPONENTE: BANCO DE PREGUNTAS (MODAL)
-   ========================================================================== */
 .question-bank-modal-overlay {
     position: fixed;
     top: 0;
@@ -440,7 +401,6 @@
     flex-direction: column;
 }
 
-/* --- Columna Izquierda: Filtros --- */
 .modal-sidebar {
     background-color: #fff;
     border-right: 1px solid #e9ecef;
@@ -466,7 +426,6 @@
     font-weight: 600;
 }
 
-/* --- Columna Central: Buscador y Preguntas --- */
 .modal-questions-list {
     padding: 1.5rem 2rem;
 }
@@ -585,7 +544,6 @@
     font-weight: 500;
 }
 
-/* --- Columna Derecha: Seleccionadas --- */
 .modal-selected-questions {
     background-color: #f8f9fa;
     border-left: 1px solid #e9ecef;
@@ -662,10 +620,6 @@
     grid-column: 1 / -1;
 }
 
-
-/* ==========================================================================
-   4. ESTILOS RESPONSIVOS
-   ========================================================================== */
 
 @media (max-width: 991.98px) {
     .template-page-layout {

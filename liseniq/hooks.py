@@ -42,7 +42,7 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 # ----------
 
 # application home page (will override Website Settings)
-home_page = "home-iq"
+# home_page = "iq-home"
 
 # website user home page (by Role)
 # role_home_page = {

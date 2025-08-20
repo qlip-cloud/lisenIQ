@@ -1,35 +1,3 @@
-/**
- * ==========================================================================
- * ARCHIVO: liseniq_base.css
- * VERSIÓN: 1.0.0
- * DESCRIPCIÓN: Hoja de estilos principal para el layout base de la aplicación.
- * Define la apariencia de elementos persistentes como el sidebar,
- * la tipografía, variables de color y estilos globales para
- * formularios, asegurando una apariencia consistente.
- * ==========================================================================
- *
- * ÍNDICE:
- * 1. VARIABLES Y ESTILOS BASE
- * 2. COMPONENTES GENÉRICOS (Botones, Formularios)
- * 3. LAYOUT Y COMPONENTES PRINCIPALES
- * 4. ESTILOS ESPECÍFICOS DE COMPONENTES
- * - Sidebar
- * - Cabecera de Página
- * 5. ESTILOS RESPONSIVOS
- *
- * ==========================================================================
- */
-
-
-/* ==========================================================================
-   1. VARIABLES Y ESTILOS BASE
-   ========================================================================== */
-
-/**
- * :root
- * Define variables CSS globales para el tema de la aplicación.
- * Facilita el mantenimiento y la consistencia del esquema de colores.
- */
 :root {
     --brand-primary: #7B24FF;
     --brand-primary-light: #f3e8ff;
@@ -39,10 +7,6 @@
     --text-color-secondary: #6c757d;
 }
 
-/**
- * body
- * Estilos fundamentales para el cuerpo del documento.
- */
 body {
     font-family: 'Rubik', sans-serif;
     background-color: #fff;
@@ -50,74 +14,48 @@ body {
     color: var(--text-color-primary);
 }
 
-/**
- * .main-content
- * Se elimina el padding para que cada página lo gestione según necesite.
- */
 .main-content {
-    padding: 0 /*!important*/;
+    padding: 0;
 }
 
 
-/* ==========================================================================
-   2. COMPONENTES GENÉRICOS (Botones, Formularios)
-   ========================================================================== */
-
-/**
- * Estilos para Formularios
- * Se estandariza la apariencia de los inputs y selects para un look & feel
- * consistente. Se usa !important con precaución para sobreescribir los
- * estilos por defecto de Frappe Framework de forma segura.
- */
 .form-control,
 .form-select {
-    border: none /*!important*/;
-    border-bottom: 1px solid var(--brand-primary) /*!important*/;
-    border-radius: 0 /*!important*/;
-    background: none /*!important*/;
-    box-shadow: none /*!important*/;
-    padding-left: 0.25rem /*!important*/;
+    border: none;
+    border-bottom: 1px solid var(--brand-primary);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    padding-left: 0.25rem;
     transition: background-color 0.2s ease-in-out;
 }
 
 .form-control:focus,
 .form-select:focus {
-    background-color: #fdfaff /*!important*/; /* Sutil color de fondo en focus */
-    border-bottom-width: 2px /*!important*/;
+    background-color: #fdfaff;
+    border-bottom-width: 2px;
 }
 
-/**
- * Exclusión específica para el input de búsqueda del sidebar.
- * Este input tiene un diseño único y no debe heredar los estilos globales.
- */
 .search-wrapper .form-control {
-    background-color: #EEEDEC /*!important*/;
-    border-radius: 9px /*!important*/;
+    background-color: #EEEDEC;
+    border-radius: 9px;
     height: 56px;
-    border: 1px solid transparent /*!important*/; /* Borde base */
-    padding-left: 2.75rem /*!important*/;
-    padding-right: 1rem /*!important*/;
+    border: 1px solid transparent;
+    padding-left: 2.75rem;
+    padding-right: 1rem;
     font-size: 0.875rem;
-    box-shadow: none /*!important*/;
+    box-shadow: none;
     width: 100%;
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .search-wrapper .form-control:focus {
-    background-color: #fff /*!important*/;
-    border: 1.5px solid var(--brand-primary) /*!important*/;
-    box-shadow: none /*!important*/;
+    background-color: #fff;
+    border: 1.5px solid var(--brand-primary);
+    box-shadow: none;
 }
 
 
-/* ==========================================================================
-   3. LAYOUT Y COMPONENTES PRINCIPALES
-   ========================================================================== */
-
-/**
- * .page-header-container
- * Contenedor para la cabecera de la página, típicamente mostrando el título.
- */
 .page-header-container {
     background-color: var(--brand-light-gray);
     padding: 1.6rem 2rem;
@@ -125,14 +63,9 @@ body {
 }
 
 .page-header-container h5 {
-    font-size: 0.8125rem; /* 13px */
+    font-size: 0.8125rem;
 }
 
-/**
- * .sidebar-container
- * Contenedor principal del sidebar, hecho "sticky" para que permanezca
- * visible al hacer scroll en vista de escritorio.
- */
 .sidebar-container {
     position: sticky;
     top: 0;
@@ -142,18 +75,8 @@ body {
 }
 
 
-/* ==========================================================================
-   4. ESTILOS ESPECÍFICOS DE COMPONENTES
-   ========================================================================== */
-
-/*
- * --------------------------------------------------------------------------
- * Componente: Sidebar
- * --------------------------------------------------------------------------
- */
-
 .sidebar-header {
-    margin-bottom: 3.5rem /*!important*/;
+    margin-bottom: 3.5rem;
 }
 
 .sidebar-container h6.text-muted.small {
@@ -161,10 +84,9 @@ body {
     text-transform: none;
     font-weight: 600;
     padding-left: 0;
-    margin-bottom: 1.8rem /*!important*/;
+    margin-bottom: 1.8rem;
 }
 
-/* Menú de Navegación */
 .sidebar-container .nav-pills {
     padding-left: 0;
 }
@@ -184,14 +106,12 @@ body {
     font-size: 0.8125rem;
 }
 
-/* Estado activo y hover para los enlaces */
 .sidebar-container .nav-link.active-link,
 .sidebar-container .nav-link:not(.active-link):hover {
-    background-color: var(--brand-primary-light) /*!important*/;
-    color: var(--brand-primary) /*!important*/;
+    background-color: var(--brand-primary-light);
+    color: var(--brand-primary);
 }
 
-/* Buscador del Sidebar */
 .search-wrapper {
     position: relative;
     margin-bottom: 3rem;
@@ -202,7 +122,7 @@ body {
     left: 1rem;
     top: 50%;
     transform: translateY(-50%);
-    pointer-events: none; /* El icono no debe capturar clics */
+    pointer-events: none;
     color: var(--text-color-secondary);
     z-index: 10;
 }
@@ -212,7 +132,6 @@ body {
     font-weight: 500;
 }
 
-/* Pie de Página del Sidebar */
 .sidebar-footer {
     padding-top: 1rem;
     border-top: none;
@@ -223,12 +142,7 @@ body {
 }
 
 
-/* ==========================================================================
-   5. ESTILOS RESPONSIVOS
-   ========================================================================== */
-
 @media (max-width: 991.98px) {
-    /* Cabecera para Móviles */
     .mobile-header {
         position: sticky;
         top: 0;
@@ -237,7 +151,6 @@ body {
         z-index: 1030;
     }
 
-    /* Comportamiento del Sidebar en Móviles (Off-canvas) */
     .sidebar-container {
         position: fixed;
         top: 0;
@@ -255,13 +168,12 @@ body {
     }
 
     #sidebar-close-btn {
-        display: block; /* Visible solo en móvil */
+        display: block;
         font-size: 1.75rem;
         line-height: 1;
         padding: 0.5rem 1rem;
     }
 
-    /* Overlay para el fondo oscuro cuando el sidebar está abierto */
     #sidebar-overlay {
         position: fixed;
         top: 0;

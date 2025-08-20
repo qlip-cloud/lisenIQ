@@ -9,13 +9,10 @@ export class Stepper {
         }
     }
 
-    // Genera el HTML del stepper y lo inserta en el contenedor.
-    // Este método debe ser llamado una vez para inicializar el componente.
     render() {
         if (!this.container) return;
 
         this.container.className = 'stepper-wrapper';
-        // Se usa un ID único para la línea activa para evitar conflictos si hay múltiples steppers en la misma página.
         const activeLineId = `stepper-active-line-${this.container.id}`;
         
         this.container.innerHTML = `
@@ -33,25 +30,20 @@ export class Stepper {
             </div>
         `;
 
-        // Guardar referencias a los elementos generados para un acceso más rápido en `update`.
         this.stepperItems = this.container.querySelectorAll('.stepper-item');
         this.stepperLabels = this.container.querySelectorAll('.step-name');
         this.activeLine = this.container.querySelector(`#${activeLineId}`);
         
-        // Inicializar el estado visual al primer paso.
         this.update(this.currentStep);
     }
 
-    // Actualiza el estado visual del stepper para reflejar el paso actual.
     update(stepNumber) {
         if (!this.stepperItems || !this.activeLine) {
-            // No hacer nada si el stepper no ha sido renderizado.
             return;
         }
         
         this.currentStep = stepNumber;
 
-        // 1. Actualiza los círculos de los pasos (items).
         this.stepperItems.forEach(item => {
             const step = parseInt(item.dataset.step, 10);
             item.classList.remove('active', 'completed');
@@ -62,7 +54,6 @@ export class Stepper {
             }
         });
 
-        // 2. Actualiza las etiquetas de texto de los pasos.
         if (this.stepperLabels) {
             this.stepperLabels.forEach((label, index) => {
                 label.classList.remove('active');
@@ -72,9 +63,7 @@ export class Stepper {
             });
         }
 
-        // 3. Actualiza la longitud de la línea de progreso activa.
         const stepCount = this.steps.length - 1;
-        // Se calcula el porcentaje de ancho basado en el paso actual.
         const widthPercentage = stepCount > 0 ? ((this.currentStep - 1) / stepCount) * 100 : 0;
         this.activeLine.style.width = `${widthPercentage}%`;
     }

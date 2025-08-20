@@ -1,4 +1,3 @@
-// Constantes para tipos de preguntas y opciones predefinidas
 const OPTIONS_BASED_TYPES = ['Selección Múltiple', 'Selección Única', 'Likert', 'Escala de frecuencia', 'Ranking (Calificación o Prioridad)'];
 const BIPOLAR_SCALE_TYPES = ['(-4 a 4) Anunciado Positivo y Negativo'];
 const NPS_SCALE_TYPES = ['NPS (Net Promoter Score)'];
@@ -11,7 +10,6 @@ const DEFAULT_LIKERT_OPTIONS = [
     'Totalmente de acuerdo'
 ];
 
-// Clase Principal para la construcción y gestión de preguntas
 export class QuestionBuilder {
     constructor(onQuestionsUpdate) {
         this.questions = [];
@@ -32,7 +30,6 @@ export class QuestionBuilder {
         this.resetAddQuestionForm();
     }
 
-    // Mapea los elementos de la interfaz de usuario (UI)
     _mapUI() {
         return {
             buttons: {
@@ -67,17 +64,14 @@ export class QuestionBuilder {
         };
     }
 
-    // Inicializa todos los escuchadores de eventos para la UI
     _initializeEventListeners() {
         const { buttons, questionForm, bankModal } = this.ui;
 
-        // Escuchadores de eventos para el banco de preguntas
         buttons.openQuestionBank?.addEventListener('click', () => this.openModal());
         bankModal.closeBtn?.addEventListener('click', () => this.closeModal());
         bankModal.modal?.addEventListener('click', (e) => { if (e.target === bankModal.modal) this.closeModal(); });
         bankModal.addSelectedBtn?.addEventListener('click', () => this.addSelectedQuestions());
 
-        // Debounce para la búsqueda en el banco de preguntas
         bankModal.searchInput?.addEventListener('input', (e) => {
             clearTimeout(this.searchDebounceTimer);
             this.searchDebounceTimer = setTimeout(() => {
@@ -86,7 +80,6 @@ export class QuestionBuilder {
             }, 300);
         });
 
-        // Manejo de selección de demográfico en el banco de preguntas
         bankModal.categoryList?.addEventListener('click', (e) => {
             const target = e.target.closest('.category-filter-item');
             if (!target) return;
@@ -99,7 +92,6 @@ export class QuestionBuilder {
             this.fetchBankData();
         });
 
-        // Manejo de selección/deselección de preguntas en el banco
         bankModal.questionsContainer?.addEventListener('click', (e) => {
             const addIcon = e.target.closest('.add-icon');
             if (!addIcon) return;
@@ -116,7 +108,6 @@ export class QuestionBuilder {
             this.renderModalSelectedQuestions();
         });
 
-        // Escuchadores de eventos para el formulario manual de preguntas
         buttons.addQuestion?.addEventListener('click', () => this.addManualQuestion());
         questionForm.listContainer?.addEventListener('click', (e) => this.handleQuestionListActions(e));
         questionForm.text?.addEventListener('input', () => this._clearValidationError(questionForm.text));
@@ -124,7 +115,6 @@ export class QuestionBuilder {
         buttons.addOption?.addEventListener('click', () => this.addOptionRow());
         questionForm.optionsContainer?.addEventListener('click', (e) => this.handleOptionsActions(e));
 
-        // Escuchadores de eventos para el autocompletado de demográficos
         questionForm.demographic?.addEventListener('input', () => this.onDemographicInput());
         questionForm.demographicResults?.addEventListener('click', (e) => this.onDemographicSelect(e));
         document.addEventListener('click', (e) => {
@@ -134,10 +124,6 @@ export class QuestionBuilder {
         });
     }
 
-    // =========================================================================
-    // MÉTODOS PÚBLICOS
-    // =========================================================================
-    
     getQuestions() {
         return this.questions;
     }
@@ -146,10 +132,6 @@ export class QuestionBuilder {
         this.questions = initialQuestions || [];
         this.renderQuestions();
     }
-
-    // =========================================================================
-    // MÉTODOS DE RENDERIZADO Y UI
-    // =========================================================================
 
     renderQuestions() {
         const { listContainer } = this.ui.questionForm;
@@ -220,10 +202,6 @@ export class QuestionBuilder {
         `;
         return questionCard;
     }
-
-    // =========================================================================
-    // MÉTODOS DEL BANCO DE PREGUNTAS
-    // =========================================================================
 
     async fetchBankData() {
         this.ui.bankModal.questionsContainer.innerHTML = `<div class="text-center p-5"><i class="fa fa-spinner fa-spin"></i> Cargando...</div>`;
@@ -383,10 +361,6 @@ export class QuestionBuilder {
         this.closeModal();
     }
 
-    // =========================================================================
-    // MÉTODOS DEL FORMULARIO MANUAL
-    // =========================================================================
-
     resetAddQuestionForm() {
         const qf = this.ui.questionForm;
         qf.text.value = '';
@@ -519,10 +493,6 @@ export class QuestionBuilder {
         this.resetAddQuestionForm();
     }
 
-    // =========================================================================
-    // MANEJADORES DE EVENTOS
-    // =========================================================================
-
     handleQuestionListActions(e) {
         const questionItem = e.target.closest('.question-item');
         if (!questionItem) return;
@@ -602,10 +572,6 @@ export class QuestionBuilder {
         }
     }
     
-    // =========================================================================
-    // MÉTODOS PRIVADOS DE UTILIDAD
-    // =========================================================================
-
     _setLikertOptions() {
         const { optionsContainer } = this.ui.questionForm;
         const { addOption } = this.ui.buttons;

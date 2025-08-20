@@ -2,15 +2,12 @@
 {% from "/templates/macros/iq_header.html" import iq_header %}
 
 {% block page_header %}
-    {{ iq_header(title="Inicio", show_create_button=True, button_text="Crear Medicion", button_url="/measurement/new_measurement") }}
+    {{ iq_header(title="Inicio") }}
 {% endblock %}
 
 {% block page_main_content %}
 <div class="main-content-padding home-container">
 
-    <!-- ======================================================================
-     SECCIÓN DE RESUMEN: ALGO PARA MEDIR (RENDERIZADO CONDICIONAL)
-     ======================================================================= -->
     {% if show_summary_section %}
     <section class="summary-section">
         <h2 class="section-title">Algo para Medir</h2>
@@ -32,9 +29,6 @@
     </section>
     {% endif %}
 
-    <!-- ======================================================================
-     SECCIÓN PRINCIPAL: MEDICIONES
-     ======================================================================= -->
     <section class="measurements-section">
         <div class="measurements-header">
             <h2 class="section-title">Mediciones</h2>
@@ -51,8 +45,16 @@
                         <span class="status-badge status-{{ m.status.lower().replace(' ', '-') }}">{{ m.status }}</span>
                     </div>
                     <div class="card-body">
-                        <h3 class="card-title"> {{ m.title }}</h3>
-                        <p class="card-date">{{ m.start_date }} al {{ m.end_date }}</p>
+                        <h3 class="card-title">{{ m.title }}</h3>
+                        <p class="card-date">
+                            {% if m.start_date and m.end_date %}
+                                {{ m.start_date }} al {{ m.end_date }}
+                            {% elif m.start_date %}
+                                {{ m.start_date }} sin fecha límite
+                            {% else %}
+                                Libre
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="card-footer">
                         <div class="progress-info">

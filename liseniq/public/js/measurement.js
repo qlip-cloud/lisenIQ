@@ -1,14 +1,8 @@
-/**
- * @file measurement.js
- * @description Lógica para el wizard de creación de mediciones.
- */
-
 import { Stepper } from './utils/stepper.js';
 import { QuestionBuilder } from './question_builder.js';
 
 class MeasurementCreator {
     constructor() {
-        // Mapeo de elementos de la UI
         this.ui = {
             stepperContainer: document.getElementById('measurement-stepper-container'),
             steps: {
@@ -66,7 +60,6 @@ class MeasurementCreator {
             breadcrumbs: document.querySelectorAll('.measurement-name-breadcrumb'),
         };
 
-        // Estado de la aplicación
         this.state = {
             currentStep: 1,
             contactCountDebounceTimer: null,
@@ -86,7 +79,6 @@ class MeasurementCreator {
             }
         };
         
-        // Inicialización de componentes
         if (this.ui.stepperContainer) {
             this.stepper = new Stepper('measurement-stepper-container', ['Nombre', 'Preguntas', 'Contactos', 'Revisión']);
             this.questionBuilder = new QuestionBuilder((questions) => {
@@ -95,16 +87,12 @@ class MeasurementCreator {
             });
             this.initializeEventListeners();
             this.initializeDefaults();
-            this.loadPreloadedQuestions(); // Cargar preguntas de la plantilla
+            this.loadPreloadedQuestions();
             this.stepper.render();
             this.showStep(1);
             this.updateContactCount();
         }
     }
-
-    // =========================================================================
-    // INICIALIZACIÓN
-    // =========================================================================
 
     initializeDefaults() {
         const today = new Date().toISOString().split('T')[0];
@@ -129,10 +117,6 @@ class MeasurementCreator {
             }
         }
     }
-
-    // =========================================================================
-    // MANEJO DE PASOS (STEPPER)
-    // =========================================================================
 
     showStep(stepNumber) {
         this.state.currentStep = stepNumber;
@@ -201,10 +185,6 @@ class MeasurementCreator {
         });
     }
 
-    // =========================================================================
-    // LÓGICA DE VALIDACIÓN Y UI
-    // =========================================================================
-    
     updateBreadcrumbs() {
         this.ui.breadcrumbs.forEach(bc => {
             bc.textContent = this.state.measurementData.name || 'Nueva Medición';
@@ -245,10 +225,6 @@ class MeasurementCreator {
             errorElement.classList.add('d-none');
         }
     }
-
-    // =========================================================================
-    // LÓGICA DEL PASO DE CONTACTOS
-    // =========================================================================
 
     handleSurveyTypeChange() {
         const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
@@ -358,10 +334,6 @@ class MeasurementCreator {
         }
     }
 
-    // =========================================================================
-    // LÓGICA DEL PASO DE REVISIÓN Y GUARDADO
-    // =========================================================================
-
     renderReviewStep() {
         const { measurementName, surveyType, responseType, questionsCount, contactCount, questionsList } = this.ui.reviewStep;
         const { surveyTypeSelect, responseTypeSelect } = this.ui.contactsStep;
@@ -448,10 +420,6 @@ class MeasurementCreator {
             ${optionsHtml}`;
         return item;
     }
-
-    // =========================================================================
-    // LÓGICA DEL MODAL DE CONTACTOS
-    // =========================================================================
 
     showContactsModal() {
         const { modal, tableHead, tableBody } = this.ui.contactsModal;

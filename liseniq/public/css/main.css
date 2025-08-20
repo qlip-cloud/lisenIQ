@@ -1,45 +1,9 @@
-/**
- * ==========================================================================
- * ARCHIVO: main.css
- * VERSIÓN: 1.5.4
- * DESCRIPCIÓN: Estilos Generales y Componentes Reutilizables de la Aplicación.
- * ==========================================================================
- *
- * ÍNDICE:
- * 1. ESTILOS GLOBALES Y UTILITARIOS
- * 2. COMPONENTES GENÉRICOS
- * - Botones Homologados
- * - Componente Stepper Unificado
- * - Componente de Título de Página
- * - Estilos de Formularios Unificados
- * - Estilos de Validación de Formularios
- * - Barra de Notificación Global
- * - Modal de Selección de Opciones
- * 3. ESTILOS RESPONSIVOS Y DE GRILLA
- *
- * ==========================================================================
- */
-
-
-/* ==========================================================================
-   1. ESTILOS GLOBALES Y UTILITARIOS
-   ========================================================================== */
-
 .main-content-padding {
     padding: 2rem;
     font-size: 0.8rem;
 }
 
 
-/* ==========================================================================
-   2. COMPONENTES GENÉRICOS
-   ========================================================================== */
-
-/*
- * --------------------------------------------------------------------------
- * Componente: Botones Homologados
- * --------------------------------------------------------------------------
- */
 .btn-purple-main,
 .btn-outline-purple {
     min-width: 120px;
@@ -82,11 +46,6 @@
     color: white;
 }
 
-/*
- * --------------------------------------------------------------------------
- * Componente: Stepper Unificado
- * --------------------------------------------------------------------------
- */
 .stepper-wrapper {
     width: 100%;
     margin: 2rem auto 4rem auto;
@@ -173,11 +132,6 @@
     font-weight: 600;
 }
 
-/*
- * --------------------------------------------------------------------------
- * Componente: Título de Página y Miga de Pan (Breadcrumb)
- * --------------------------------------------------------------------------
- */
 .page-title-section {
     margin-bottom: 2.5rem;
 }
@@ -216,11 +170,6 @@
     gap: 0.5rem;
 }
 
-/*
- * --------------------------------------------------------------------------
- * Componente: Estilos de Formularios Unificados
- * --------------------------------------------------------------------------
- */
 .form-group {
     display: flex;
     flex-direction: column;
@@ -233,11 +182,6 @@
     margin-bottom: 0.5rem;
 }
 
-/*
- * --------------------------------------------------------------------------
- * Componente: Estilos de Validación de Formularios
- * --------------------------------------------------------------------------
- */
 .form-error-message {
     color: #e53e3e;
     font-size: 0.875em;
@@ -252,11 +196,6 @@
     background-image: none !important;
 }
 
-/*
- * --------------------------------------------------------------------------
- * Componente: Barra de Notificación Global
- * --------------------------------------------------------------------------
- */
 #global-notification-bar {
     padding: 1rem;
     color: white;
@@ -280,11 +219,6 @@
     background-color: #E95E5E;
 }
 
-/*
- * --------------------------------------------------------------------------
- * Componente: Modal de Selección de Opciones
- * --------------------------------------------------------------------------
- */
 .choice-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(123, 36, 255, 0.20); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1050; }
 .choice-modal-content { background-color: #fff; border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,.1); display: flex; flex-direction: column; }
 .choice-modal-header { padding: 1.5rem; border-bottom: none; display: flex; justify-content: center; align-items: center; position: relative; }
@@ -297,16 +231,7 @@
 .modal-choice-card span { font-weight: 500; font-size: 0.8rem; color: var(--text-color-primary, #000000); }
 
 
-/* ==========================================================================
-   3. ESTILOS RESPONSIVOS Y DE GRILLA
-   ========================================================================== */
-
-/*
- * --------------------------------------------------------------------------
- * Clases de columna personalizadas para la grilla de Bootstrap.
- * --------------------------------------------------------------------------
- */
-@media (min-width: 1200px) { /* xl breakpoint */
+@media (min-width: 1200px) {
     .col-xl-5-cols {
         -ms-flex: 0 0 20%;
         flex: 0 0 20%;

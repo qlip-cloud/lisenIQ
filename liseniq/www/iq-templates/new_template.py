@@ -2,6 +2,10 @@ import frappe
 
 
 def get_context(context):
+
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+
     context.page_title = "Crear Plantilla"
 
     try:

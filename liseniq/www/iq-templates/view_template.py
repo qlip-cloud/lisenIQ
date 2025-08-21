@@ -3,6 +3,10 @@ from liseniq.utils import login_required
 
 
 def get_context(context):
+
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+
     template_name = frappe.request.args.get('name')
     if not template_name:
         frappe.throw("No se especificó el nombre de la plantilla.", frappe.DoesNotExistError)

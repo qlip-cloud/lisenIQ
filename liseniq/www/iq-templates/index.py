@@ -4,6 +4,10 @@ from liseniq.utils import login_required
 
 
 def get_context(context):
+
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+
     context.page_title = "Plantillas"
 
     user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")

@@ -1,9 +1,11 @@
 import frappe
 from frappe.utils import getdate, formatdate
-from liseniq.utils import login_required
+from frappe import _
 
-@login_required
 def get_context(context):
+
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Beneficiario aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
 
     context.no_cache = 1
     context.page_title = "Inicio"
@@ -72,5 +74,10 @@ def get_context(context):
         {"status": "En Proceso", "bar1_height": 85, "bar2_height": 40},
         {"status": "En Proceso", "bar1_height": 60, "bar2_height": 45}
     ]
+
+    context.update({
+        "is_navbar_custom": True,
+        "no_cache": 1
+    })
      
     return context

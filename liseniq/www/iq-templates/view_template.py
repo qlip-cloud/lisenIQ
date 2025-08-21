@@ -52,5 +52,10 @@ def get_context(context):
     context.page_title = f"Ver Modelo: {template_doc.tp_name}"
     context.no_cache = 1
     context.is_navbar_custom = True
+
+    context.update({
+        "is_navbar_custom": True,
+        "no_cache": 1
+    })
     
     return context

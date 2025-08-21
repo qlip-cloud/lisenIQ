@@ -1,6 +1,6 @@
 import frappe
 import json
-from liseniq.utils import login_required
+from frappe import _
 
 
 def get_context(context):

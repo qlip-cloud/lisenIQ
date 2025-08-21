@@ -41,7 +41,12 @@ def get_context(context):
             context.preloaded_questions_json = "[]"
     else:
         context.preloaded_questions_json = "[]"
-            
+
+    context.update({
+        "is_navbar_custom": True,
+        "no_cache": 1
+    })
+
     return context
 
 @frappe.whitelist()

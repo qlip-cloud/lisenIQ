@@ -38,5 +38,10 @@ def get_context(context):
         "is_navbar_custom": True,
         "no_cache": 1
     })
+
+    context.update({
+        "is_navbar_custom": True,
+        "no_cache": 1
+    })
             
     return context

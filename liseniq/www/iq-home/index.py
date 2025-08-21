@@ -2,10 +2,11 @@ import frappe
 from frappe.utils import getdate, formatdate
 from frappe import _
 
+
 def get_context(context):
 
     if frappe.session.user == "Guest":
-        frappe.throw(_("Beneficiario aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
 
     context.no_cache = 1
     context.page_title = "Inicio"

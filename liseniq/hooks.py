@@ -187,6 +187,10 @@ page_css = {
 }
 
 fixtures = [
-	"User",
-    "Contact"
+	{
+		"doctype": "Custom Field",
+		"filters": [
+			["dt", "in", ["User", "Contact"]]
+		]
+	},
 ]

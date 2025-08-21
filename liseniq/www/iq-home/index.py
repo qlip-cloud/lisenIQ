@@ -74,5 +74,10 @@ def get_context(context):
         {"status": "En Proceso", "bar1_height": 85, "bar2_height": 40},
         {"status": "En Proceso", "bar1_height": 60, "bar2_height": 45}
     ]
+
+    context.update({
+        "is_navbar_custom": True,
+        "no_cache": 1
+    })
      
     return context

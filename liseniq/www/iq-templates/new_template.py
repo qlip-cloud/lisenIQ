@@ -37,9 +37,12 @@ def get_context(context):
     except frappe.DoesNotExistError:
         context.question_types = []
 
-    context.update({
-        "is_navbar_custom": True,
-        "no_cache": 1
-    })
-            
+    # context.update({
+    #     "is_navbar_custom": True,
+    #     "no_cache": 1
+    # })
+
+    context.no_cache = 1
+    context.is_navbar_custom = True
+     
     return context

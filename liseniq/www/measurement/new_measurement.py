@@ -1,9 +1,13 @@
 import frappe
 import json
-from liseniq.utils import login_required
+from frappe import _
 
 
 def get_context(context):
+
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+
     context.no_cache = 1
     context.page_title = "Crear Medición"
     context.no_breadcrumbs = True

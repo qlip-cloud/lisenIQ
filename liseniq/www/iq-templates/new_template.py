@@ -1,7 +1,12 @@
 import frappe
+from frappe import _
 
 
 def get_context(context):
+
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+
     context.page_title = "Crear Plantilla"
 
     try:
@@ -35,7 +40,8 @@ def get_context(context):
 
     context.update({
         "is_navbar_custom": True,
-        "no_cache": 1
+        "no_cache": 1,
+        "question_categories": question_categories,
     })
-            
+
     return context

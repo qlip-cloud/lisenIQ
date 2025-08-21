@@ -1,7 +1,7 @@
 import frappe
 from liseniq.utils import login_required
 
-@login_required
+
 def get_context(context):
     template_name = frappe.request.args.get('name')
     if not template_name:

@@ -2,7 +2,7 @@ import frappe
 import json
 from liseniq.utils import login_required
 
-@login_required
+
 def get_context(context):
     context.no_cache = 1
     context.page_title = "Crear Medición"

@@ -3,11 +3,19 @@ import json
 import random
 import re
 from frappe import _
-from liseniq.utils import login_required
 
 
 def get_context(context):
+
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+    
     context.page_title = _("Contactos")
+
+    context.no_cache = 1
+    context.page_title = "Inicio"
+    context.no_breadcrumbs = True
+    context.is_navbar_custom = True
 
     try:
         user_doc = frappe.get_doc("User", frappe.session.user)

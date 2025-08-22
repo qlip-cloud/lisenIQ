@@ -24,6 +24,7 @@ class MeasurementCreator {
                 name: document.getElementById('measurement-name'),
                 startDate: document.getElementById('measurement-start-date'),
                 endDate: document.getElementById('measurement-end-date'),
+                timezone: document.getElementById('measurement-timezone'),
             },
             contactsStep: {
                 surveyTypeSelect: document.getElementById('survey-type-select'),
@@ -67,6 +68,7 @@ class MeasurementCreator {
                 name: '',
                 startDate: '',
                 endDate: '',
+                timezone: 'America/Caracas',
                 questions: [],
                 contacts: {
                     surveyType: 'all',
@@ -80,7 +82,7 @@ class MeasurementCreator {
         };
         
         if (this.ui.stepperContainer) {
-            this.stepper = new Stepper('measurement-stepper-container', ['Nombre', 'Preguntas', 'Contactos', 'Revisión']);
+            this.stepper = new Stepper('measurement-stepper-container', ['Nombre', 'Preguntas', 'Participantes', 'Revisión']);
             this.questionBuilder = new QuestionBuilder((questions) => {
                 this.state.measurementData.questions = questions;
                 this.ui.navButtons.next2.disabled = questions.length === 0;
@@ -95,10 +97,6 @@ class MeasurementCreator {
     }
 
     initializeDefaults() {
-        const today = new Date().toISOString().split('T')[0];
-        if (this.ui.step1Form.startDate) {
-            this.ui.step1Form.startDate.value = today;
-        }
     }
 
     loadPreloadedQuestions() {
@@ -145,8 +143,10 @@ class MeasurementCreator {
         navButtons.next2?.addEventListener('click', () => this.showStep(3));
         navButtons.back3?.addEventListener('click', () => this.showStep(2));
         navButtons.next3?.addEventListener('click', () => {
-            this.renderReviewStep();
-            this.showStep(4);
+            if (this.validateStep3()) {
+                this.renderReviewStep();
+                this.showStep(4);
+            }
         });
         navButtons.back4?.addEventListener('click', () => this.showStep(3));
         navButtons.next4?.addEventListener('click', () => this.saveMeasurement());
@@ -193,18 +193,48 @@ class MeasurementCreator {
 
     validateStep1() {
         let isValid = true;
-        const fieldsToValidate = Object.values(this.ui.step1Form);
+        const { name, startDate, endDate, timezone } = this.ui.step1Form;
         
-        fieldsToValidate.forEach(field => this.clearValidationError(field));
+        [name, startDate, timezone].forEach(field => this.clearValidationError(field));
+        this.clearValidationError(endDate);
 
-        fieldsToValidate.forEach(field => {
-            if (field && field.dataset.required === 'true' && !field.value.trim()) {
-                isValid = false;
-                this.showValidationError(field, 'Este campo es obligatorio.');
-            }
-        });
+        if (name && name.dataset.required === 'true' && !name.value.trim()) {
+            isValid = false;
+            this.showValidationError(name, 'Este campo es obligatorio.');
+        }
+
+        if (name && name.value.trim().length > 75) {
+            isValid = false;
+            this.showValidationError(name, 'El nombre no puede exceder los 75 caracteres.');
+        }
+
+        if (startDate && startDate.dataset.required === 'true' && !startDate.value) {
+            isValid = false;
+            this.showValidationError(startDate, 'Este campo es obligatorio.');
+        }
+        
+        if (timezone && timezone.dataset.required === 'true' && !timezone.value) {
+            isValid = false;
+            this.showValidationError(timezone, 'Este campo es obligatorio.');
+        }
+
+        if (startDate.value && endDate.value && endDate.value < startDate.value) {
+            isValid = false;
+            this.showValidationError(endDate, 'La fecha de finalización no puede ser anterior a la fecha de inicio.');
+        }
 
         return isValid;
+    }
+    
+    validateStep3() {
+        const { surveyTypeSelect } = this.ui.contactsStep;
+        const { list: contactsList } = this.state.measurementData.contacts;
+
+        if (surveyTypeSelect.value === 'selected' && contactsList.length === 0) {
+            showGlobalNotification('Debe seleccionar al menos un participante para continuar.', 'error');
+            return false;
+        }
+        return true;
     }
 
     showValidationError(field, message) {
@@ -363,6 +393,7 @@ class MeasurementCreator {
             name: this.state.measurementData.name,
             startDate: step1Form.startDate.value,
             endDate: step1Form.endDate.value,
+            timezone: step1Form.timezone.value,
             questions: this.state.measurementData.questions,
             contacts: {
                 surveyType: contactsStep.surveyTypeSelect.value,

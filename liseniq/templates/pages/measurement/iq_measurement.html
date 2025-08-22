@@ -20,19 +20,28 @@
                 <p class="text-muted small mb-4">Asígnale un nombre a tu medición para identificarla.</p>
                 <div class="form-group mb-5">
                     <label for="measurement-name">Nombre de la medición</label>
-                    <input type="text" id="measurement-name" class="form-control" data-required="true">
+                    <input type="text" id="measurement-name" class="form-control" data-required="true" maxlength="75">
                     <small id="measurement-name-error" class="form-error-message d-none"></small>
                 </div>
                 <div class="measurement-form-grid">
                     <div class="form-group">
-                        <label for="measurement-start-date">Fecha Inicio</label>
-                        <input type="date" id="measurement-start-date" class="form-control" data-required="true">
+                        <label for="measurement-start-date">Fecha y Hora de Inicio</label>
+                        <input type="datetime-local" id="measurement-start-date" class="form-control" data-required="true">
                         <small id="measurement-start-date-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-end-date">Fecha de Finalización</label>
-                        <input type="date" id="measurement-end-date" class="form-control">
+                        <label for="measurement-end-date">Fecha y Hora de Finalización</label>
+                        <input type="datetime-local" id="measurement-end-date" class="form-control">
                         <small id="measurement-end-date-error" class="form-error-message d-none"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="measurement-timezone">Zona Horaria</label>
+                        <select id="measurement-timezone" class="form-control form-select" data-required="true">
+                            {% for tz in timezones %}
+                            <option value="{{ tz }}" {% if tz == 'America/Caracas' %}selected{% endif %}>{{ tz }}</option>
+                            {% endfor %}
+                        </select>
+                        <small id="measurement-timezone-error" class="form-error-message d-none"></small>
                     </div>
                 </div>
             </div>
@@ -62,7 +71,7 @@
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
-                    <h3 class="page-main-title">Contactos</h3>
+                    <h3 class="page-main-title">Participantes</h3>
                     <div class="form-action-buttons">
                         <button id="btn-back-step-3" class="btn btn-outline-purple">Atrás</button>
                         <button id="btn-next-step-3" class="btn btn-purple-main">Siguiente</button>
@@ -73,19 +82,19 @@
                 <div class="row">
                     <div class="col-md-5">
                         <div class="form-group">
-                            <label for="survey-type-select">Tipo de Encuesta</label>
+                            <label for="survey-type-select">Público a participar</label>
                             <select id="survey-type-select" class="form-control form-select">
-                                <option value="all">Abierta a todos</option>
-                                <option value="selected">A mis contactos seleccionados</option>
+                                <option value="all">Publico Externo</option>
+                                <option value="selected">Contactos Cargados Previamente</option>
                             </select>
                         </div>
                     </div>
                     <div class="col-md-5">
                         <div class="form-group">
-                            <label for="response-type-select">Tipo de Respuesta</label>
+                            <label for="response-type-select">¿Quiere saber los detalles de quien respondió?</label>
                             <select id="response-type-select" class="form-control form-select">
                                 <option value="anonymous">Anónima</option>
-                                <option value="identified">Saber quién responde</option>
+                                <option value="identified">No Anónima </option>
                             </select>
                         </div>
                     </div>
@@ -103,9 +112,9 @@
                         <div class="col-md-10">
                             <div class="contacts-filter-section">
                                 <div class="form-group">
-                                    <label for="field-type-select">Tipos de campos</label>
+                                    <label for="field-type-select">Tipo de Segmentación</label>
                                     <select id="field-type-select" class="form-control form-select">
-                                        <option value="" selected>Seleccionar tipo de campo...</option>
+                                        <option value="" selected>Seleccionar tipo de segmentación...</option>
                                         {% for demo in contact_demographics %}
                                         <option value="{{ demo.name }}">{{ demo.dt_title }}</option>
                                         {% endfor %}

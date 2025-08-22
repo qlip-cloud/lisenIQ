@@ -32,6 +32,16 @@ def get_context(context):
     except frappe.DoesNotExistError:
         context.question_types = []
 
+    try:
+        meta = frappe.get_meta("qp_IQ_Survey")
+        timezone_field = meta.get_field("su_timezone")
+        if timezone_field and timezone_field.options:
+            context.timezones = timezone_field.options.split('\n')
+        else:
+            context.timezones = []
+    except frappe.DoesNotExistError:
+        context.timezones = []
+
     template_name = frappe.request.args.get('template')
     if template_name:
         try:
@@ -218,6 +228,7 @@ def save_measurement(data):
         survey.su_owner = user_company
         survey.su_start_date = data.get("startDate")
         survey.su_end_date = data.get("endDate")
+        survey.su_timezone = data.get("timezone")
         survey.su_is_anonymous = 1 if data.get("contacts", {}).get("responseType") == "anonymous" else 0
         survey.su_status = status_name
 

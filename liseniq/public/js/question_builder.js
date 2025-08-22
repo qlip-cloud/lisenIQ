@@ -249,7 +249,7 @@ export class QuestionBuilder {
         
         const allDemographicsItem = document.createElement('li');
         allDemographicsItem.className = 'category-filter-item active';
-        allDemographicsItem.textContent = 'Todos los Demográficos';
+        allDemographicsItem.textContent = 'Todos los Temas';
         allDemographicsItem.setAttribute('data-demographic-id', '');
         categoryList.appendChild(allDemographicsItem);
 

@@ -57,16 +57,16 @@ def get_context(context):
             "percentage": percentage
         })
 
-    measurements_data.append({
-        "name": "mock-data-card",
-        "title": "Medición de Clima Laboral",
-        "status": "En Proceso",
-        "start_date": "01 Sep 2024",
-        "end_date": "30 Sep 2024",
-        "completed": 50,
-        "total": 150,
-        "percentage": 33
-    })
+    # measurements_data.append({
+    #     "name": "mock-data-card",
+    #     "title": "Medición de Clima Laboral",
+    #     "status": "En Proceso",
+    #     "start_date": "01 Sep 2024",
+    #     "end_date": "30 Sep 2024",
+    #     "completed": 50,
+    #     "total": 150,
+    #     "percentage": 33
+    # })
 
     context.measurements = measurements_data
     

@@ -10,9 +10,10 @@ def get_context(context):
 
     context.page_title = "Plantillas"
 
-    user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
-    if not user_company:
+    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    if not user_contact_info:
         frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
+    user_company = user_contact_info
 
     templates_from_db = frappe.get_list(
         "qp_IQ_Template",

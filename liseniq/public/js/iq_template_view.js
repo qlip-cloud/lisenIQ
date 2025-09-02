@@ -3,12 +3,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (btnCreateMeasurement) {
         btnCreateMeasurement.addEventListener('click', function() {
-            console.log('Botón "Crear Medición" pulsado. Acción no implementada.');
-            
-            if (typeof showGlobalNotification === 'function') {
-                showGlobalNotification('Funcionalidad "Crear Medición" aún no implementada.', 'error', 3000);
+            const urlParams = new URLSearchParams(window.location.search);
+            const templateName = urlParams.get('name');
+            if (templateName) {
+                window.location.href = `/measurement/new_measurement?template=${encodeURIComponent(templateName)}`;
             } else {
-                alert('Funcionalidad "Crear Medición" aún no implementada.');
+                console.error('No se pudo encontrar el nombre de la plantilla en la URL.');
+                if (typeof showGlobalNotification === 'function') {
+                    showGlobalNotification('Error: No se pudo identificar la plantilla actual.', 'error');
+                } else {
+                    showGlobalNotification('Error: No se pudo identificar la plantilla actual.', 'error');
+                }
             }
         });
     }

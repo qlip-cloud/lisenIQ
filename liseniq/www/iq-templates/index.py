@@ -9,6 +9,9 @@ def get_context(context):
         frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
 
     context.page_title = "Plantillas"
+    context.no_breadcrumbs = True
+    context.is_navbar_custom = True
+    context.no_cache = 1
 
     user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
     if not user_contact_info:
@@ -74,11 +77,6 @@ def get_context(context):
         context.categories = categories_from_db
     except frappe.DoesNotExistError:
         context.categories = []
-
-    context.update({
-        "is_navbar_custom": True,
-        "no_cache": 1
-    })
             
     return context
 

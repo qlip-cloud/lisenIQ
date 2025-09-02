@@ -21,9 +21,13 @@ def get_context(context):
         user_doc = frappe.get_doc("User", frappe.session.user)
         context.user = user_doc
         
-        user_company = user_doc.get("custom_company")
-        if not user_company:
+        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, ["name", "custom_company"], as_dict=True)
+
+        if not contact_info or not contact_info.custom_company:
             frappe.throw(_("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador."), title=_("Error de Configuración"))
+
+        user_company = contact_info.custom_company
+        user_contact_name = contact_info.name
 
         context.user_company = frappe.get_doc("qp_IQ_Company", user_company)
         csrf_token = frappe.sessions.get_csrf_token()
@@ -65,7 +69,10 @@ def get_context(context):
 
     contacts_from_db = frappe.get_all(
         'Contact',
-        filters={'custom_company': user_company},
+        filters={
+            'custom_company': user_company,
+            'name': ['!=', user_contact_name]
+        },
         fields=[
             'name', 'custom_document_number', 'first_name', 'last_name',
             'custom_country', 'custom_language', 'custom_status'
@@ -110,7 +117,11 @@ def get_contact_details(contact_name):
         frappe.throw(_("Contacto no encontrado"))
 
     contact = frappe.get_doc("Contact", contact_name)
-    user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
+    
+    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    if not user_contact_info:
+        frappe.throw(_("No se pudo determinar la compañía del usuario."))
+    user_company = user_contact_info
 
     if contact.custom_company != user_company:
         frappe.throw(_("No tienes permiso para ver este contacto"))
@@ -195,10 +206,10 @@ def _map_contact_data(contact_doc, data):
     contact_doc.last_name = last_name
     contact_doc.gender = data.get("gender") if data.get("gender") != "Seleccionar..." else None
     
-    user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
-    if not user_company:
+    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    if not user_contact_info:
         frappe.throw(_("No se pudo determinar la compañía del usuario."))
-    contact_doc.custom_company = user_company
+    contact_doc.custom_company = user_contact_info
 
     contact_doc.custom_dob = data.get("birthdate") or None
     contact_doc.custom_language = data.get("language")
@@ -250,7 +261,11 @@ def create_contact(contact_data):
 def update_contact(contact_name, contact_data):
     try:
         contact_doc = frappe.get_doc("Contact", contact_name)
-        user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
+        
+        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        if not user_contact_info:
+            frappe.throw(_("No se pudo determinar la compañía del usuario."))
+        user_company = user_contact_info
         
         if contact_doc.custom_company != user_company:
             frappe.throw(_("No tienes permiso para editar este contacto"))
@@ -270,7 +285,11 @@ def update_contact(contact_name, contact_data):
 def delete_contact(contact_name):
     try:
         contact_doc = frappe.get_doc("Contact", contact_name)
-        user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
+        
+        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        if not user_contact_info:
+            frappe.throw(_("No se pudo determinar la compañía del usuario."))
+        user_company = user_contact_info
 
         if contact_doc.custom_company != user_company:
             frappe.throw(_("No tienes permiso para eliminar este contacto"))

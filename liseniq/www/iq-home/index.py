@@ -15,12 +15,14 @@ def get_context(context):
 
     context.show_summary_section = False
 
-    user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
+    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
 
-    if not user_company:
+    if not user_contact_info:
         context.measurements = []
         frappe.log_error("El usuario actual no tiene una compañía asignada.", "Error en iq-home/index.py")
         return context
+    
+    user_company = user_contact_info
 
     try:
         surveys = frappe.get_all(

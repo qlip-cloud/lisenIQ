@@ -10,10 +10,10 @@ def get_context(context):
     context.page_title = "Crear Plantilla"
 
     try:
-        user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
-        if not user_company:
+        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        if not contact_info:
             frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
-        context.user_company = user_company
+        context.user_company = contact_info
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error obteniendo la compañía del usuario")
         frappe.throw(str(e))

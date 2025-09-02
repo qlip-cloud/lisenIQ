@@ -86,9 +86,14 @@ def get_demographic_values_for_contacts(demographic_type):
 @frappe.whitelist()
 def get_filtered_contacts_count(filters='[]'):
     filters = json.loads(filters)
+    user_contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
+
+    base_filters = {'status': ["in", ["Enabled", "Passive"]]}
+    if user_contact_name:
+        base_filters['name'] = ["!=", user_contact_name]
 
     if not filters:
-        all_contacts = frappe.get_list("Contact", filters={'status': ["in", ["Enabled", "Passive"]]}, fields=["name", "first_name", "last_name"])
+        all_contacts = frappe.get_list("Contact", filters=base_filters, fields=["name", "first_name", "last_name"])
         contacts_for_modal = [{"name": c.name, "Nombre": f"{c.first_name} {c.last_name or ''}".strip()} for c in all_contacts]
         return {
             "count": len(all_contacts),
@@ -127,9 +132,13 @@ def get_filtered_contacts_count(filters='[]'):
     if not matching_contact_names:
         return {"count": 0, "headers": ["Nombre"], "contacts": []}
 
+    contact_filters = {"name": ["in", matching_contact_names], "status": ["in", ["Enabled", "Passive"]]}
+    if user_contact_name:
+        contact_filters["name"] = ["in", [name for name in matching_contact_names if name != user_contact_name]]
+
     contact_docs = frappe.get_all(
         "Contact",
-        filters={"name": ["in", matching_contact_names], "status": ["in", ["Enabled", "Passive"]]},
+        filters=contact_filters,
         fields=["name", "first_name", "last_name"]
     )
     
@@ -208,11 +217,12 @@ def save_measurement(data):
                         new_question.insert(ignore_permissions=True)
                         manual_question_map[q["id"]] = new_question.name
 
-        user_company = frappe.db.get_value("User", frappe.session.user, "custom_company")
-        if not user_company:
+        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        if not user_contact_info:
             message = "El usuario actual no tiene una compañía asignada para definir la propiedad de la medición."
             frappe.log_error(message, "Error en save_measurement")
             return {"status": "error", "message": message}
+        user_company = user_contact_info
         
         default_status_text = "Borrador"
         status_name = frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": default_status_text}, "name")

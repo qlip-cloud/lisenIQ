@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const statusHTML = contact.status ? `<span class="status-badge status-${contact.status.toLowerCase()}">${contact.status}</span>` : '';
         return `
             <td class="contact-checkbox-cell"><input type="checkbox" class="contact-checkbox" data-name="${contact.name}"></td>
-            <td>${contact.docNumber || ''}</td>
+            <td>${contact.custom_document_number || ''}</td>
             <td>${contact.firstName || ''}</td>
             <td>${contact.lastName || ''}</td>
             <td>${contact.country || ''}</td>

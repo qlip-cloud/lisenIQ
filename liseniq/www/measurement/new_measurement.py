@@ -1,7 +1,7 @@
 import frappe
 import json
 from frappe import _
-
+from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT
 
 def get_context(context):
 
@@ -24,8 +24,10 @@ def get_context(context):
         context.contact_demographics = []
 
     try:
+        allowed_question_types = ["Likert", "Abierta", "NPS", "Selección Múltiple"]
         context.question_types = frappe.get_all(
             "qp_IQ_QuestionType",
+            filters={"qnt_type_name": ["in", allowed_question_types]},
             fields=["name", "qnt_type_name"],
             order_by="qnt_type_name"
         )
@@ -181,6 +183,8 @@ def save_measurement(data):
     try:
         data = json.loads(data)
         
+        question_types_map = {qt.name: qt.qnt_type_name for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name"])}
+        
         manual_question_map = {}
         if data.get("questions"):
             for q in data["questions"]:
@@ -217,6 +221,86 @@ def save_measurement(data):
                         new_question.insert(ignore_permissions=True)
                         manual_question_map[q["id"]] = new_question.name
 
+        surveyjs_doc_name = None
+        if data.get("questions"):
+            elements = []
+            for q in data["questions"]:
+                question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
+                
+                question_type_title = question_types_map.get(q["type"])
+                
+                surveyjs_type = "text"
+                if question_type_title == "Selección Múltiple":
+                    surveyjs_type = "radiogroup"
+                elif question_type_title == "Abierta":
+                    surveyjs_type = "comment"
+                elif question_type_title == "NPS":
+                    surveyjs_type = "rating"
+                elif question_type_title == "Likert":
+                    surveyjs_type = "radiogroup"
+
+                element = {
+                    "type": surveyjs_type,
+                    "name": question_name,
+                    "title": q["text"]
+                }
+
+                if question_type_title in ["Likert", "Selección Múltiple"] and q.get("options"):
+                    element["choices"] = q["options"]
+                elif question_type_title == "NPS":
+                    element["rateMin"] = q.get("nps_min", 0)
+                    element["rateMax"] = q.get("nps_max", 10)
+
+                elements.append(element)
+
+            survey_json_content = {
+                "title": data["name"],
+                "description": "",
+                "pages": [
+                    {
+                        "name": "page1",
+                        "elements": elements
+                    }
+                ]
+            }
+
+            surveyjs_doc = frappe.new_doc("Survey")
+            surveyjs_doc.name = data["name"]
+            surveyjs_doc.title = data["name"]
+            surveyjs_doc.survey_json = json.dumps(survey_json_content)
+            surveyjs_doc.insert(ignore_permissions=True)
+            surveyjs_doc_name = surveyjs_doc.name
+
+            web_form_route = data["name"].lower().replace(" ", "-")           
+            web_form = frappe.new_doc("Web Form")
+            web_form.title = data["name"]
+            web_form.route = web_form_route
+            web_form.doc_type = "Survey Response"
+            web_form.module = "Frappe Survey"
+            web_form.client_script = WEB_FORM_CLIENT_SCRIPT
+            web_form.published = 1
+
+            survey_response_meta = frappe.get_meta("Survey Response")
+            fieldtype_mapping = {
+                "Long Text": "Text Editor"
+            }
+            for field in survey_response_meta.fields:
+                if field.fieldtype not in ["Section Break", "Column Break", "Tab Break"]:
+                    web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
+                    web_form.append("web_form_fields", {
+                        "fieldname": field.fieldname,
+                        "fieldtype": web_form_fieldtype,
+                        "label": field.label,
+                        "reqd": field.reqd,
+                        "options": field.options,
+                        "hidden": field.hidden,
+                        "read_only": field.read_only,
+                        "default": field.default,
+                        "description": field.description,
+                    })
+
+            web_form.insert(ignore_permissions=True)
+
         user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
         if not user_contact_info:
             message = "El usuario actual no tiene una compañía asignada para definir la propiedad de la medición."
@@ -241,6 +325,8 @@ def save_measurement(data):
         survey.su_timezone = data.get("timezone")
         survey.su_is_anonymous = 1 if data.get("contacts", {}).get("responseType") == "anonymous" else 0
         survey.su_status = status_name
+        if surveyjs_doc_name:
+            survey.su_surveyjs_survey = surveyjs_doc_name
 
         if data.get("reminders"):
             survey.su_send_reminders = 1

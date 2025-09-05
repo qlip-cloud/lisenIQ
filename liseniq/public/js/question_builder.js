@@ -1,6 +1,6 @@
-const OPTIONS_BASED_TYPES = ['Selección Múltiple', 'Selección Única', 'Likert', 'Escala de frecuencia', 'Ranking (Calificación o Prioridad)'];
-const BIPOLAR_SCALE_TYPES = ['(-4 a 4) Anunciado Positivo y Negativo'];
-const NPS_SCALE_TYPES = ['NPS (Net Promoter Score)'];
+const OPTIONS_BASED_TYPES = ['Selección Múltiple', 'Likert'];
+const BIPOLAR_SCALE_TYPES = [];
+const NPS_SCALE_TYPES = ['NPS'];
 const LIKERT_TYPE_NAME = 'Likert';
 const DEFAULT_LIKERT_OPTIONS = [
     'Totalmente en desacuerdo',
@@ -166,13 +166,6 @@ export class QuestionBuilder {
             </div>`;
         }
         
-        if (BIPOLAR_SCALE_TYPES.includes(questionDisplayName)) {
-            additionalInfoHtml = `<div class="question-bipolar-statements">
-                <p><strong>Negativo:</strong> ${frappe.utils.escape_html(question.negative_statement || '')}</p>
-                <p><strong>Positivo:</strong> ${frappe.utils.escape_html(question.positive_statement || '')}</p>
-            </div>`;
-        }
-
         if (NPS_SCALE_TYPES.includes(questionDisplayName)) {
             additionalInfoHtml = `<div class="question-nps-scale">
                 <p><strong>Escala:</strong> de ${frappe.utils.escape_html(question.nps_min)} a ${frappe.utils.escape_html(question.nps_max)}</p>
@@ -398,17 +391,6 @@ export class QuestionBuilder {
             isValid = false;
         }
 
-        if (BIPOLAR_SCALE_TYPES.includes(questionTypeName)) {
-            if (!qf.negativeStatement.value.trim()) {
-                this._showValidationError(qf.negativeStatement, 'Este campo es requerido.');
-                isValid = false;
-            }
-            if (!qf.positiveStatement.value.trim()) {
-                this._showValidationError(qf.positiveStatement, 'Este campo es requerido.');
-                isValid = false;
-            }
-        }
-
         if (NPS_SCALE_TYPES.includes(questionTypeName)) {
             const min = parseInt(qf.npsMin.value, 10);
             const max = parseInt(qf.npsMax.value, 10);
@@ -476,11 +458,6 @@ export class QuestionBuilder {
             newQuestion.options = DEFAULT_LIKERT_OPTIONS;
         } else if (OPTIONS_BASED_TYPES.includes(questionTypeName)) {
             newQuestion.options = Array.from(qf.optionsContainer.querySelectorAll('.option-input')).map(input => input.value.trim()).filter(Boolean);
-        }
-
-        if (BIPOLAR_SCALE_TYPES.includes(questionTypeName)) {
-            newQuestion.negative_statement = qf.negativeStatement.value.trim();
-            newQuestion.positive_statement = qf.positiveStatement.value.trim();
         }
 
         if (NPS_SCALE_TYPES.includes(questionTypeName)) {

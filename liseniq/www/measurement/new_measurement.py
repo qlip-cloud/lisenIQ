@@ -242,13 +242,14 @@ def save_measurement(data):
                 element = {
                     "type": surveyjs_type,
                     "name": question_name,
-                    "title": q["text"]
+                    "title": q["text"],
+                    "isRequired": "true"
                 }
 
                 if question_type_title in ["Likert", "Selección Múltiple"] and q.get("options"):
                     element["choices"] = q["options"]
                 elif question_type_title == "NPS":
-                    element["rateMin"] = q.get("nps_min", 0)
+                    element["rateMin"] = q.get("nps_min", 1)
                     element["rateMax"] = q.get("nps_max", 10)
 
                 elements.append(element)

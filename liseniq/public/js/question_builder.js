@@ -394,12 +394,12 @@ export class QuestionBuilder {
         if (NPS_SCALE_TYPES.includes(questionTypeName)) {
             const min = parseInt(qf.npsMin.value, 10);
             const max = parseInt(qf.npsMax.value, 10);
-            if (isNaN(min) || qf.npsMin.value === '') {
-                this._showValidationError(qf.npsMin, 'Debe ser un número.');
+            if (isNaN(min) || min < 1) {
+                this._showValidationError(qf.npsMin, 'El valor mínimo debe ser 1 o mayor.');
                 isValid = false;
             }
-            if (isNaN(max) || qf.npsMax.value === '') {
-                this._showValidationError(qf.npsMax, 'Debe ser un número.');
+            if (isNaN(max) || max !== 10) {
+                this._showValidationError(qf.npsMax, 'El valor máximo debe ser 10.');
                 isValid = false;
             }
             if (!isNaN(min) && !isNaN(max) && min >= max) {

@@ -1,7 +1,7 @@
 import frappe
 import json
 from frappe import _
-from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT
+from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
 
 def get_context(context):
 
@@ -242,13 +242,14 @@ def save_measurement(data):
                 element = {
                     "type": surveyjs_type,
                     "name": question_name,
-                    "title": q["text"]
+                    "title": q["text"],
+                    "isRequired": "true"
                 }
 
                 if question_type_title in ["Likert", "Selección Múltiple"] and q.get("options"):
                     element["choices"] = q["options"]
                 elif question_type_title == "NPS":
-                    element["rateMin"] = q.get("nps_min", 0)
+                    element["rateMin"] = q.get("nps_min", 1)
                     element["rateMax"] = q.get("nps_max", 10)
 
                 elements.append(element)
@@ -278,6 +279,7 @@ def save_measurement(data):
             web_form.doc_type = "Survey Response"
             web_form.module = "Frappe Survey"
             web_form.client_script = WEB_FORM_CLIENT_SCRIPT
+            web_form.custom_css = WEB_FORM_CUSTOM_CSS
             web_form.published = 1
 
             survey_response_meta = frappe.get_meta("Survey Response")

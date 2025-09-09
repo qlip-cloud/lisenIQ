@@ -24,10 +24,9 @@ const load_survey = function (survey_name) {
   $('<div id="surveyElement"></div>').appendTo($(".page_content"));
   frappe
     .call({
-      method: "frappe.client.get",
+      method: "liseniq.utils.api_survey.get_public_survey",
       args: {
-        doctype: "Survey",
-        name: frappe.web_form.title,
+        survey_name: frappe.web_form.title,
       },
     })
     .then((r) => {
@@ -60,12 +59,14 @@ const submit_response = function (data) {
   window.saving = true;
   frappe.form_dirty = false;
   
-  const currentDate = frappe.datetime.nowdate();
+  const urlParams = new URLSearchParams(window.location.search);
+  const dni = urlParams.get("dni");
   
   let args = {
     doctype: frappe.web_form.doc_type,
+    survey: frappe.web_form.title,
     response_json: JSON.stringify(data),
-    user: currentDate
+    user: dni || "Anonimo"
   };
   console.log(args);
   frappe.call({
@@ -85,4 +86,20 @@ const submit_response = function (data) {
     },
   });
 };
+"""
+
+WEB_FORM_CUSTOM_CSS = """
+/* Oculta la barra de navegación principal de Frappe */
+.navbar {
+    display: none !important;
+}
+
+/* Oculta la cabecera de la página (donde a veces sale el título y botones) */
+.page-head {
+    display: none !important;
+}
+
+.web-form-container, .page-container {
+    padding-top: 15px !important;
+}
 """

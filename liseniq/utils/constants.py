@@ -87,3 +87,19 @@ const submit_response = function (data) {
   });
 };
 """
+
+WEB_FORM_CUSTOM_CSS = """
+/* Oculta la barra de navegación principal de Frappe */
+.navbar {
+    display: none !important;
+}
+
+/* Oculta la cabecera de la página (donde a veces sale el título y botones) */
+.page-head {
+    display: none !important;
+}
+
+.web-form-container, .page-container {
+    padding-top: 15px !important;
+}
+"""

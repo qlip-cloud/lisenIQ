@@ -1,7 +1,7 @@
 import frappe
 import json
 from frappe import _
-from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT
+from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
 
 def get_context(context):
 
@@ -279,6 +279,7 @@ def save_measurement(data):
             web_form.doc_type = "Survey Response"
             web_form.module = "Frappe Survey"
             web_form.client_script = WEB_FORM_CLIENT_SCRIPT
+            web_form.custom_css = WEB_FORM_CUSTOM_CSS
             web_form.published = 1
 
             survey_response_meta = frappe.get_meta("Survey Response")

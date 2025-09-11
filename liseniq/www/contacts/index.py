@@ -245,6 +245,29 @@ def _map_contact_data(contact_doc, data):
 def create_contact(contact_data):
     try:
         data = json.loads(contact_data)
+
+        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        if not user_contact_info:
+            return {"status": "error", "message": _("No se pudo determinar la compañía del usuario.")}
+        user_company = user_contact_info
+
+        doc_number = data.get("docNumber")
+        if doc_number:
+            existing_contact = frappe.db.exists("Contact", {
+                "custom_document_number": doc_number,
+                "custom_company": user_company
+            })
+            if existing_contact:
+                return {"status": "error", "message": _("Ya existe un contacto con el número de documento {0} en su compañía.").format(doc_number)}
+
+        email = data.get("email")
+        if email:
+            if frappe.db.exists("Contact", {
+                "custom_company": user_company,
+                "name": ("in", frappe.get_all("Contact Email", filters={"email_id": email}, pluck="parent"))
+            }):
+                return {"status": "error", "message": _("Ya existe un contacto con el correo electrónico {0} en su compañía.").format(email)}
+
         new_contact = frappe.new_doc("Contact")
         new_contact.custom_status = "Activo"
         _map_contact_data(new_contact, data)
@@ -264,13 +287,23 @@ def update_contact(contact_name, contact_data):
         
         user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
         if not user_contact_info:
-            frappe.throw(_("No se pudo determinar la compañía del usuario."))
+            return {"status": "error", "message": _("No se pudo determinar la compañía del usuario.")}
         user_company = user_contact_info
         
         if contact_doc.custom_company != user_company:
-            frappe.throw(_("No tienes permiso para editar este contacto"))
+            return {"status": "error", "message": _("No tienes permiso para editar este contacto")}
 
         data = json.loads(contact_data)
+
+        email = data.get("email")
+        if email:
+            existing_contacts = frappe.get_all("Contact Email", filters={"email_id": email}, fields=["parent"])
+            for c in existing_contacts:
+                if c.parent != contact_name:
+                    parent_contact_company = frappe.db.get_value("Contact", c.parent, "custom_company")
+                    if parent_contact_company == user_company:
+                        return {"status": "error", "message": _("Ya existe otro contacto con el correo electrónico {0} en su compañía.").format(email)}
+
         _map_contact_data(contact_doc, data)
         contact_doc.save(ignore_permissions=True)
 

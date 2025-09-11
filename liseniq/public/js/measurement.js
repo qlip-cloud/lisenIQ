@@ -387,7 +387,7 @@ class MeasurementCreator {
         const saveButton = navButtons.next4;
 
         saveButton.disabled = true;
-        saveButton.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Enviando...`;
+        saveButton.innerHTML = `<i class="fa fa-spinner fa-spin"> </i> Enviando...`;
 
         const measurementPayload = {
             name: this.state.measurementData.name,
@@ -417,7 +417,7 @@ class MeasurementCreator {
 
             if (response.message && response.message.status === 'success') {
                 showGlobalNotification(response.message.message, 'success');
-                setTimeout(() => window.location.href = `/iq-templates`, 2000);
+                setTimeout(() => window.location.href = `/iq-home`, 2000);
             } else {
                 throw new Error(response.message.message || 'Ocurrió un error al guardar la medición.');
             }

@@ -310,7 +310,7 @@ def save_measurement(data):
             return {"status": "error", "message": message}
         user_company = user_contact_info
         
-        default_status_text = "Borrador"
+        default_status_text = "Programada"
         status_name = frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": default_status_text}, "name")
         
         if not status_name:

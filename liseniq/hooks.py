@@ -102,10 +102,12 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"liseniq.tasks.all"
-# 	],
+scheduler_events = {
+	"cron": {
+		"*/2 * * * *": [
+			"liseniq.tasks.launch_pending_surveys"
+		]
+	},
 # 	"daily": [
 # 		"liseniq.tasks.daily"
 # 	],
@@ -118,7 +120,7 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 # 	"monthly": [
 # 		"liseniq.tasks.monthly"
 # 	]
-# }
+}
 
 # Testing
 # -------

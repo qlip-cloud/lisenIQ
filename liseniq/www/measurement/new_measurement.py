@@ -343,13 +343,19 @@ def save_measurement(data):
                 if question_name:
                     survey.append("su_questions", {"sq_question": question_name})
 
+        survey.insert(ignore_permissions=True)
+
         if data.get("contacts", {}).get("list"):
             contact_names = [c.get("name") for c in data["contacts"]["list"] if c.get("name")]
             if contact_names:
                 for contact_name in contact_names:
-                    survey.append("su_recipients", {"sr_contact": contact_name})
-
-        survey.insert(ignore_permissions=True)
+                    frappe.get_doc({
+                        "doctype": "qp_IQ_Survey_Recipient",
+                        "survey": survey.name,
+                        "contact": contact_name,
+                        "status": "Not Sent"
+                    }).insert(ignore_permissions=True)
+        
         frappe.db.commit()
         
         return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}

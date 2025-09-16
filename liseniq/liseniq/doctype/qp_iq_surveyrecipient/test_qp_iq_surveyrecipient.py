@@ -4,5 +4,5 @@
 # import frappe
 import unittest
 
-class Testqp_IQ_Survey_Recipient(unittest.TestCase):
+class Testqp_IQ_SurveyRecipient(unittest.TestCase):
 	pass

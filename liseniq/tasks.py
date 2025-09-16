@@ -2,13 +2,14 @@
 from __future__ import unicode_literals
 import frappe
 from frappe.utils import now
+import base64
 
 def launch_pending_surveys():
 	"""
 	Busca encuestas de IQ cuya fecha de inicio ha pasado y su estado es 'Programada'.
 	Actualiza el estado de estas encuestas a 'En Progreso'.
 	"""
-	frappe.log_error("Iniciando tarea launch_pending_surveys", "DEBUG PING")
+	frappe.log_error("Iniciando tarea launch_pending_surveys", "Survey Task Start")
 	try:
 		# Obtener el 'name' del estado 'En Progreso' desde el Doctype qp_IQ_SurveyStatus
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
@@ -22,7 +23,7 @@ def launch_pending_surveys():
 			frappe.log_error("No se encontró el estado 'Programada' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
 			return
 
-		frappe.log_error(f"Estados: En Progreso='{status_in_progress}', Programada='{status_scheduled}'", "DEBUG PING")
+		frappe.log_error(f"Estados: En Progreso='{status_in_progress}', Programada='{status_scheduled}'", "Survey Task Status")
 
 		# Buscar encuestas programadas cuya fecha de inicio ya pasó
 		pending_surveys = frappe.get_all(
@@ -34,14 +35,14 @@ def launch_pending_surveys():
 			fields=["name", "su_name"]
 		)
 
-		frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "DEBUG PING")
+		frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
 
 		if not pending_surveys:
 			return
 
 		for survey in pending_surveys:
 			try:
-				frappe.log_error(f"Procesando encuesta: {survey.name} ({survey.su_name})", "DEBUG PING")
+				frappe.log_error(f"Procesando encuesta: {survey.name} ({survey.su_name})", "Survey Task Processing")
 				# Actualizar el estado de la encuesta a 'En Progreso'
 				frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_in_progress)
 
@@ -53,36 +54,45 @@ def launch_pending_surveys():
 
 				# Obtener destinatarios desde el nuevo Doctype
 				recipients_docs = frappe.get_all(
-					"qp_IQ_Survey_Recipient",
+					"qp_IQ_SurveyRecipient",
 					filters={"sr_survey": survey.name, "sr_status": "Not Sent"},
 					fields=["name", "sr_contact"]
 				)
 
 				if not recipients_docs:
-					frappe.log_error(f"Encuesta {survey.name} no tiene destinatarios pendientes. Saltando.", "DEBUG PING")
+					frappe.log_error(f"Encuesta {survey.name} no tiene destinatarios pendientes. Saltando.", "Survey Task Skip")
 					continue
 				
-				# Obtener los correos electrónicos de los contactos
-				contact_to_email_map = {
-					c.name: c.email_id for c in frappe.get_all(
+				# Obtener los correos electrónicos y DNI de los contactos
+				contact_details_map = {
+					c.name: {"email": c.email_id, "dni": c.custom_document_number}
+					for c in frappe.get_all(
 						"Contact",
 						filters={"name": ["in", [d.sr_contact for d in recipients_docs]]},
-						fields=["name", "email_id"]
-					) if c.email_id
+						fields=["name", "email_id", "custom_document_number"]
+					) if c.email_id and c.custom_document_number
 				}
 
 				# Preparar y enviar el correo para cada destinatario
 				subject = f"Invitación para completar la medición: {survey.su_name}"
 
 				for recipient_doc in recipients_docs:
-					contact_email = contact_to_email_map.get(recipient_doc.sr_contact)
-					if not contact_email:
+					contact_details = contact_details_map.get(recipient_doc.sr_contact)
+					if not contact_details:
+						frappe.log_error(f"Contacto {recipient_doc.sr_contact} no tiene email o DNI. Saltando.", "Survey Task Skip Contact")
 						continue
 
+					contact_email = contact_details["email"]
+					contact_dni = contact_details["dni"]
+
 					# Generar y guardar el enlace único
+					timestamp = now()
+					payload = f"{contact_dni}|{timestamp}".encode('utf-8')
+					encoded_id = base64.b64encode(payload).decode('utf-8')
+					
 					base_url = frappe.utils.get_url(web_form_route)
-					unique_url = f"{base_url}?recipient_id={recipient_doc.name}"
-					frappe.db.set_value("qp_IQ_Survey_Recipient", recipient_doc.name, "sr_unique_url", unique_url)
+					unique_url = f"{base_url}:8000?new=1&id={encoded_id}"
+					frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_link", unique_url)
 
 					message = f"""
 						<p>Hola,</p>
@@ -98,7 +108,7 @@ def launch_pending_surveys():
 						debug_recipient = frappe.conf.get("debug_email_recipient")
 						if debug_recipient:
 							recipients = [debug_recipient]
-							frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo a: {recipients}", "DEBUG PING")
+							frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo a: {recipients}", "Survey Task Debug Email")
 						else:
 							frappe.log_error("Modo debug de correo activo pero 'debug_email_recipient' no está configurado.", "launch_pending_surveys")
 							continue
@@ -110,7 +120,7 @@ def launch_pending_surveys():
 						frappe.log_error("No se ha configurado un remitente de correo por defecto (default_outgoing=1).", "launch_pending_surveys")
 						continue
 					
-					frappe.log_error(f"Intentando enviar correo. De: {sender_email}, Para: {recipients}", "DEBUG PING")
+					frappe.log_error(f"Intentando enviar correo. De: {sender_email}, Para: {recipients}", "Survey Task Sending Email")
 
 					frappe.sendmail(
 						recipients=recipients,
@@ -121,12 +131,12 @@ def launch_pending_surveys():
 					)
 
 					# Actualizar estado del destinatario
-					frappe.db.set_value("qp_IQ_Survey_Recipient", recipient_doc.name, {
+					frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
 						"sr_status": "Sent",
 						"sr_sent_on": now()
 					})
 
-					frappe.log_error(f"Correo para la encuesta {survey.name} enviado a {contact_email} (o encolado).", "DEBUG PING")
+					frappe.log_error(f"Correo para la encuesta {survey.name} enviado a {contact_email} (o encolado).", "Survey Task Email Sent")
 
 				frappe.db.commit()
 			except Exception as e:

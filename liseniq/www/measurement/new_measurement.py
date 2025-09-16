@@ -344,16 +344,17 @@ def save_measurement(data):
                     survey.append("su_questions", {"sq_question": question_name})
 
         survey.insert(ignore_permissions=True)
+        frappe.db.commit()
 
         if data.get("contacts", {}).get("list"):
             contact_names = [c.get("name") for c in data["contacts"]["list"] if c.get("name")]
             if contact_names:
                 for contact_name in contact_names:
                     frappe.get_doc({
-                        "doctype": "qp_IQ_Survey_Recipient",
-                        "survey": survey.name,
-                        "contact": contact_name,
-                        "status": "Not Sent"
+                        "doctype": "qp_IQ_SurveyRecipient",
+                        "sr_survey": survey.name,
+                        "sr_contact": contact_name,
+                        "sr_status": "Not Sent"
                     }).insert(ignore_permissions=True)
         
         frappe.db.commit()

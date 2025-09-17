@@ -68,7 +68,7 @@ class MeasurementCreator {
                 name: '',
                 startDate: '',
                 endDate: '',
-                timezone: 'America/Caracas',
+                timezone: 'America/Bogota',
                 questions: [],
                 contacts: {
                     surveyType: 'all',

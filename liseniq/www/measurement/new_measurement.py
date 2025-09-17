@@ -325,7 +325,10 @@ def save_measurement(data):
         survey.su_start_date = data.get("startDate")
         survey.su_end_date = data.get("endDate")
         survey.su_timezone = data.get("timezone")
-        survey.su_is_anonymous = 1 if data.get("contacts", {}).get("responseType") == "anonymous" else 0
+        
+        has_contacts = bool(data.get("contacts", {}).get("list"))
+        survey.su_is_anonymous = 0 if has_contacts else 1
+
         survey.su_status = status_name
         if surveyjs_doc_name:
             survey.su_surveyjs_survey = surveyjs_doc_name

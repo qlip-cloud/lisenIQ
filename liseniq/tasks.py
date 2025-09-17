@@ -74,7 +74,7 @@ def launch_pending_surveys():
 				}
 
 				# Preparar y enviar el correo para cada destinatario
-				subject = f"Invitación para completar la medición: {survey.su_name}"
+				subject = f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
 
 				for recipient_doc in recipients_docs:
 					contact_details = contact_details_map.get(recipient_doc.sr_contact)
@@ -91,15 +91,95 @@ def launch_pending_surveys():
 					encoded_id = base64.b64encode(payload).decode('utf-8')
 					
 					base_url = frappe.utils.get_url(web_form_route)
-					unique_url = f"{base_url}:8000?new=1&id={encoded_id}"
+					unique_url = f"{base_url}?new=1&id={encoded_id}"
 					frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_link", unique_url)
 
 					message = f"""
-						<p>Hola,</p>
-						<p>Has sido invitado a participar en la siguiente medición: <strong>{survey.su_name}</strong>.</p>
-						<p>Por favor, haz clic en el siguiente enlace para comenzar:</p>
-						<p><a href="{unique_url}">{unique_url}</a></p>
-						<p>Gracias.</p>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {{
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #f7f9fc;
+      color: #333333;
+      margin: 0;
+      padding: 0;
+    }}
+    .container {{
+      max-width: 600px;
+      margin: 20px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      padding: 30px;
+    }}
+    .header {{
+      text-align: center;
+      border-bottom: 2px solid #004aad;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }}
+    .header h1 {{
+      color: #004aad;
+      font-size: 22px;
+      margin: 0;
+    }}
+    .btn {{
+      display: inline-block;
+      background-color: #004aad;
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-top: 20px;
+    }}
+    .info {{
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #f0f4ff;
+      border-left: 4px solid #004aad;
+    }}
+    .footer {{
+      font-size: 12px;
+      color: #777777;
+      margin-top: 25px;
+      text-align: center;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1> {survey.su_name} </h1>
+    </div>
+    <p>Hola,</p>
+    <p>Te damos la bienvenida al <strong>proceso de Medición - {survey.su_name}</strong>, una iniciativa clave que nos permitirá obtener información valiosa acerca de nuestra compañía y avanzar en nuestro propósito de mejora continua.</p>
+
+    <div class="info">
+      <p><strong>Información importante sobre la encuesta:</strong></p>
+      <ul>
+        <li>Completarla tomará menos de <strong>20 minutos</strong>.</li>
+        <li>Tus respuestas serán manejadas de forma <strong>confidencial</strong> y con fines estadísticos.</li>
+        <li>Usa <strong>Google Chrome</strong> y asegúrate de estar conectado a internet.</li>
+        <li>Este enlace es <strong>personal e intransferible</strong>.</li>
+      </ul>
+    </div>
+
+    <p style="text-align:center;">
+      <a href="{unique_url}" class="btn">Iniciar encuesta</a>
+    </p>
+
+    <p>Agradecemos de antemano tu tiempo y tus valiosos aportes en este importante proceso.</p>
+
+    <div class="footer">
+      Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>
+    </div>
+  </div>
+</body>
+</html>
 					"""
 					
 					recipients = [contact_email]

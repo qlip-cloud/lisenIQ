@@ -91,6 +91,12 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 # ---------------
 # Hook on document methods and events
 
+doc_events = {
+	"Survey Response": {
+		"validate": "liseniq.utils.survey_response.process_survey_response"
+	}
+}
+
 # doc_events = {
 # 	"*": {
 # 		"on_update": "method",
@@ -104,7 +110,7 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 
 scheduler_events = {
 	"cron": {
-		"*/2 * * * *": [
+		"*/10 * * * *": [
 			"liseniq.tasks.launch_pending_surveys"
 		]
 	},

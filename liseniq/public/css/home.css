@@ -149,7 +149,7 @@
     text-transform: capitalize;
 }
 
-.status-badge.status-en-proceso { background-color: #e0f2fe; color: #0284c7; }
+.status-badge.status-en-progreso { background-color: #e0f2fe; color: #0284c7; }
 .status-badge.status-finalizada { background-color: #dcfce7; color: #16a34a; }
 .status-badge.status-programada { background-color: #fef9c3; color: #ca8a04; }
 .status-badge.status-borrador { background-color: #e5e7eb; color: #4b5563; }
@@ -205,6 +205,22 @@
     border-radius: 4px;
     transition: width 0.5s ease-in-out;
     width: var(--progress-width, 0%);
+}
+
+.measurement-card.status-en-progreso .progress-bar {
+    background-color: #0284c7;
+}
+
+.measurement-card.status-finalizada .progress-bar {
+    background-color: #16a34a;
+}
+
+.measurement-card.status-programada .progress-bar {
+    background-color: #ca8a04;
+}
+
+.measurement-card.status-borrador .progress-bar {
+    background-color: #4b5563;
 }
 
 .progress-text {

@@ -1,31 +1,98 @@
 {
  "actions": [],
- "creation": "2025-08-13 18:16:13.198368",
+ "creation": "2025-09-15 19:52:48.180243",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "sr_contact"
+  "sr_survey",
+  "sr_contact",
+  "sr_link",
+  "sr_status",
+  "sr_sent_on",
+  "sr_survey_response",
+  "sr_reminder_send",
+  "sr_last_reminder_send",
+  "sr_next_reminder"
  ],
  "fields": [
+  {
+   "fieldname": "sr_survey",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Medicion",
+   "options": "qp_IQ_Survey"
+  },
   {
    "fieldname": "sr_contact",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_preview": 1,
    "label": "Contacto",
-   "options": "Contact",
-   "reqd": 1
+   "options": "Contact"
+  },
+  {
+   "fieldname": "sr_link",
+   "fieldtype": "Data",
+   "label": "Link"
+  },
+  {
+   "fieldname": "sr_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Estatus Link",
+   "options": "Not Sent\nSent\nResponded"
+  },
+  {
+   "fieldname": "sr_sent_on",
+   "fieldtype": "Datetime",
+   "label": "Fecha De Envio"
+  },
+  {
+   "fieldname": "sr_survey_response",
+   "fieldtype": "Link",
+   "label": "Respuestas",
+   "options": "Survey Response"
+  },
+  {
+   "fieldname": "sr_reminder_send",
+   "fieldtype": "Int",
+   "label": "Recordatorios Enviados"
+  },
+  {
+   "fieldname": "sr_last_reminder_send",
+   "fieldtype": "Datetime",
+   "label": "Fecha De Ultimo Recordatorio"
+  },
+  {
+   "fieldname": "sr_next_reminder",
+   "fieldtype": "Datetime",
+   "label": "Pr\u00f3ximo Recordatorio a Enviar"
   }
  ],
  "index_web_pages_for_search": 1,
- "istable": 1,
  "links": [],
- "modified": "2025-08-13 18:16:13.198368",
+ "modified": "2025-09-21 11:17:20.913813",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",
  "owner": "Administrator",
- "permissions": [],
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "track_changes": 1

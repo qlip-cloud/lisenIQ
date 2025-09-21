@@ -310,7 +310,7 @@ def save_measurement(data):
             return {"status": "error", "message": message}
         user_company = user_contact_info
         
-        default_status_text = "Borrador"
+        default_status_text = "Programada"
         status_name = frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": default_status_text}, "name")
         
         if not status_name:
@@ -325,7 +325,10 @@ def save_measurement(data):
         survey.su_start_date = data.get("startDate")
         survey.su_end_date = data.get("endDate")
         survey.su_timezone = data.get("timezone")
-        survey.su_is_anonymous = 1 if data.get("contacts", {}).get("responseType") == "anonymous" else 0
+        
+        has_contacts = bool(data.get("contacts", {}).get("list"))
+        survey.su_is_anonymous = 0 if has_contacts else 1
+
         survey.su_status = status_name
         if surveyjs_doc_name:
             survey.su_surveyjs_survey = surveyjs_doc_name
@@ -343,13 +346,20 @@ def save_measurement(data):
                 if question_name:
                     survey.append("su_questions", {"sq_question": question_name})
 
+        survey.insert(ignore_permissions=True)
+        frappe.db.commit()
+
         if data.get("contacts", {}).get("list"):
             contact_names = [c.get("name") for c in data["contacts"]["list"] if c.get("name")]
             if contact_names:
                 for contact_name in contact_names:
-                    survey.append("su_recipients", {"sr_contact": contact_name})
-
-        survey.insert(ignore_permissions=True)
+                    frappe.get_doc({
+                        "doctype": "qp_IQ_SurveyRecipient",
+                        "sr_survey": survey.name,
+                        "sr_contact": contact_name,
+                        "sr_status": "Not Sent"
+                    }).insert(ignore_permissions=True)
+        
         frappe.db.commit()
         
         return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}

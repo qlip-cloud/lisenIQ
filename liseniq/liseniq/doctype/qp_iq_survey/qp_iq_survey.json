@@ -146,7 +146,7 @@
   },
   {
    "fieldname": "su_recipients",
-   "fieldtype": "Table",
+   "fieldtype": "Link",
    "label": "Destinatarios",
    "options": "qp_IQ_SurveyRecipient"
   },
@@ -159,7 +159,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-22 15:00:39.262725",
+ "modified": "2025-09-15 20:04:39.428765",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

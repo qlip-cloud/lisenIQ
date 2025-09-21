@@ -60,13 +60,13 @@ const submit_response = function (data) {
   frappe.form_dirty = false;
   
   const urlParams = new URLSearchParams(window.location.search);
-  const dni = urlParams.get("dni");
+  const user_id = urlParams.get("id");
   
   let args = {
     doctype: frappe.web_form.doc_type,
     survey: frappe.web_form.title,
     response_json: JSON.stringify(data),
-    user: dni || "Anonimo"
+    user: user_id || "Anonimo"
   };
   console.log(args);
   frappe.call({

@@ -35,8 +35,8 @@ def get_context(context):
 
     measurements_data = []
     for survey in surveys:
-        total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"parent": survey.name})
-        total_responses = frappe.db.count("qp_IQ_Response", {"rs_survey": survey.name})
+        total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
+        total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": "Responded"})
 
         percentage = 0
         if total_recipients > 0:

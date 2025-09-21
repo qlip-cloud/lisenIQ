@@ -6,10 +6,6 @@ import base64
 from frappe.utils.data import get_datetime, add_to_date
 
 def launch_pending_surveys():
-	"""
-	Busca encuestas de IQ cuya fecha de inicio ha pasado y su estado es 'Programada'.
-	Actualiza el estado de estas encuestas a 'En Progreso'.
-	"""
 	frappe.log_error("Iniciando tarea launch_pending_surveys", "Survey Task Start")
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
@@ -217,9 +213,6 @@ def launch_pending_surveys():
 
 @frappe.whitelist()
 def send_survey_reminders():
-	"""
-	Busca encuestas 'En Progreso' y envía recordatorios a los destinatarios que no han respondido.
-	"""
 	frappe.log_error("Iniciando tarea send_survey_reminders", "Reminder Task Start")
 	try:
 		now_dt = get_datetime(now())
@@ -357,3 +350,66 @@ def send_survey_reminders():
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Error en send_survey_reminders")
 
+@frappe.whitelist()
+def delete_iq_survey_fully(survey_name):
+    try:
+        web_form_title = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name")
+        if not web_form_title:
+            frappe.log_error(f"No se encontró la encuesta de IQ: {survey_name}", "delete_iq_survey_fully")
+            return f"Error: No se encontró la encuesta de IQ: {survey_name}"
+
+        recipient_names = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": survey_name}, pluck="name")
+        for recipient_name in recipient_names:
+            frappe.delete_doc("qp_IQ_SurveyRecipient", recipient_name, force=1, ignore_permissions=True)
+        frappe.log_error(f"Eliminados {len(recipient_names)} destinatarios para {survey_name}", "delete_iq_survey_fully")
+
+        web_form_name = frappe.db.get_value("Web Form", {"title": web_form_title}, "name")
+        if web_form_name:
+            survey_doc_name = frappe.db.get_value("Survey", {"title": web_form_title}, "name")
+            if survey_doc_name:
+                response_names = frappe.get_all("Survey Response", filters={"survey": survey_doc_name}, pluck="name")
+                for response_name in response_names:
+                    frappe.delete_doc("Survey Response", response_name, force=1, ignore_permissions=True)
+                frappe.log_error(f"Eliminadas {len(response_names)} respuestas para la encuesta {survey_doc_name}", "delete_iq_survey_fully")
+                
+                frappe.delete_doc("Survey", survey_doc_name, force=1, ignore_permissions=True)
+                frappe.log_error(f"Eliminado el doctype Survey: {survey_doc_name}", "delete_iq_survey_fully")
+
+            frappe.delete_doc("Web Form", web_form_name, force=1, ignore_permissions=True)
+            frappe.log_error(f"Eliminado Web Form: {web_form_name}", "delete_iq_survey_fully")
+
+        frappe.delete_doc("qp_IQ_Survey", survey_name, force=1, ignore_permissions=True)
+        frappe.log_error(f"Eliminada encuesta de IQ: {survey_name}", "delete_iq_survey_fully")
+
+        frappe.db.commit()
+        return f"Encuesta {survey_name} eliminada exitosamente."
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "delete_iq_survey_fully")
+        return f"Error al eliminar la encuesta: {e}"
+
+@frappe.whitelist()
+def delete_all_iq_surveys():
+    try:
+        all_surveys = frappe.get_all("qp_IQ_Survey", pluck="name")
+        if not all_surveys:
+            message = "No se encontraron encuestas de IQ para eliminar."
+            frappe.log_error(message, "delete_all_iq_surveys")
+            return message
+
+        total_surveys = len(all_surveys)
+        frappe.log_error(f"Se encontraron {total_surveys} encuestas de IQ para eliminar. Iniciando proceso...", "delete_all_iq_surveys")
+
+        for i, survey_name in enumerate(all_surveys):
+            delete_iq_survey_fully(survey_name)
+        
+        success_message = f"Proceso completado. Se eliminaron {total_surveys} encuestas de IQ."
+        frappe.log_error(success_message, "delete_all_iq_surveys")
+        return success_message
+
+    except Exception as e:
+        frappe.db.rollback()
+        error_message = f"Ocurrió un error durante la eliminación masiva: {frappe.get_traceback()}"
+        frappe.log_error(error_message, "delete_all_iq_surveys")
+        return f"Error durante la eliminación masiva: {e}"

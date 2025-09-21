@@ -3,11 +3,11 @@ const BIPOLAR_SCALE_TYPES = [];
 const NPS_SCALE_TYPES = ['NPS'];
 const LIKERT_TYPE_NAME = 'Likert';
 const DEFAULT_LIKERT_OPTIONS = [
-    'Totalmente en desacuerdo',
-    'En desacuerdo',
-    'Ni acuerdo ni desacuerdo',
+    'Totalmente de acuerdo',
     'De acuerdo',
-    'Totalmente de acuerdo'
+    'Ni acuerdo ni desacuerdo',
+    'En desacuerdo',
+    'Totalmente en desacuerdo',
 ];
 
 export class QuestionBuilder {
@@ -291,7 +291,7 @@ export class QuestionBuilder {
                 </div>
                 ${optionsPreviewHtml}
                 <div class="question-details">
-                    <span class="category-tag">• Tag: ${frappe.utils.escape_html(q.demographic_name)}</span>
+                    <span class="category-tag">• Tag: ${frappe.utils.escape_html(q.demographic_name || 'General')}</span>
                     <span>Tipo: ${frappe.utils.escape_html(q.type_name)}</span>
                 </div>
             `;
@@ -322,7 +322,7 @@ export class QuestionBuilder {
                     <div class="item-content">
                         <p class="item-text">${frappe.utils.escape_html(q.text)}</p>
                         <div class="item-details">
-                            <span class="category-tag-selected">• ${frappe.utils.escape_html(q.demographic_name)}</span>
+                            <span class="category-tag-selected">• ${frappe.utils.escape_html(q.demographic_name || 'General')}</span>
                             <span>${frappe.utils.escape_html(q.type_name)}</span>
                         </div>
                     </div>

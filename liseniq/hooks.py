@@ -110,10 +110,13 @@ doc_events = {
 
 scheduler_events = {
 	"cron": {
-		"*/10 * * * *": [
+		"*/5 * * * *": [
 			"liseniq.tasks.launch_pending_surveys"
 		]
 	},
+	"hourly": [
+		"liseniq.tasks.send_survey_reminders"
+	],
 # 	"daily": [
 # 		"liseniq.tasks.daily"
 # 	],

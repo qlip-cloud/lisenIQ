@@ -18,12 +18,12 @@
             </div>
             <div class="measurement-form-container">
                 <p class="text-muted small mb-4">Asígnale un nombre a tu medición para identificarla.</p>
-                <div class="form-group mb-5">
-                    <label for="measurement-name">Nombre de la medición</label>
-                    <input type="text" id="measurement-name" class="form-control" data-required="true" maxlength="75">
-                    <small id="measurement-name-error" class="form-error-message d-none"></small>
-                </div>
                 <div class="measurement-form-grid">
+                    <div class="form-group">
+                        <label for="measurement-name">Nombre de la medición</label>
+                        <input type="text" id="measurement-name" class="form-control" data-required="true" maxlength="75">
+                        <small id="measurement-name-error" class="form-error-message d-none"></small>
+                    </div>
                     <div class="form-group">
                         <label for="measurement-start-date">Fecha y Hora de Inicio</label>
                         <input type="datetime-local" id="measurement-start-date" class="form-control" data-required="true">

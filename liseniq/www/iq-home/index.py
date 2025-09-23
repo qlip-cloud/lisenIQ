@@ -25,9 +25,28 @@ def get_context(context):
     user_company = user_contact_info
 
     try:
+        survey_statuses = frappe.get_all("qp_IQ_SurveyStatus", fields=["name", "se_status"], order_by="se_status")
+        context.survey_statuses = survey_statuses
+    except frappe.DoesNotExistError:
+        context.survey_statuses = []
+
+    query_filters = {"su_owner": user_company}
+    selected_status_name = frappe.request.args.get('status')
+
+    if selected_status_name:
+        status_id = frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": selected_status_name}, "name")
+        if status_id:
+            query_filters["su_status"] = status_id
+            context.selected_status = selected_status_name
+        else:
+            context.selected_status = "Todos"
+    else:
+        context.selected_status = "Todos"
+
+    try:
         surveys = frappe.get_all(
             "qp_IQ_Survey",
-            filters={"su_owner": user_company},
+            filters=query_filters,
             fields=["name", "su_name", "su_status", "su_start_date", "su_end_date"]
         )
     except frappe.DoesNotExistError:

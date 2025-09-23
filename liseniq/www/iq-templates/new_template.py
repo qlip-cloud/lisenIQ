@@ -43,7 +43,6 @@ def get_context(context):
     context.update({
         "is_navbar_custom": True,
         "no_cache": 1,
-        "question_categories": question_categories,
     })
 
     return context

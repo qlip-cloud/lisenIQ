@@ -32,9 +32,19 @@
     <section class="measurements-section">
         <div class="measurements-header">
             <h2 class="section-title">Mediciones</h2>
-            <button class="filter-button">
-                <i class="fa fa-filter"></i> Filtrar
-            </button>
+            <div class="filter-container">
+                <button class="filter-button">
+                    <i class="fa fa-filter"></i> 
+                    <span>Filtrar por: <strong>{{ selected_status }}</strong></span>
+                    <i class="fa fa-chevron-down filter-arrow"></i>
+                </button>
+                <div id="filter-dropdown" class="filter-dropdown d-none">
+                    <a href="/iq-home" class="filter-item">Todos</a>
+                    {% for status in survey_statuses %}
+                        <a href="/iq-home?status={{ status.se_status }}" class="filter-item">{{ status.se_status }}</a>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
 
         <div class="measurements-grid">

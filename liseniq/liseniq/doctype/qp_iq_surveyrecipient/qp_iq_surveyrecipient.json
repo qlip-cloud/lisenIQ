@@ -9,6 +9,7 @@
   "sr_contact",
   "sr_link",
   "sr_status",
+  "sr_token",
   "sr_sent_on",
   "sr_survey_response",
   "sr_reminder_send",
@@ -34,7 +35,7 @@
   },
   {
    "fieldname": "sr_link",
-   "fieldtype": "Data",
+   "fieldtype": "Long Text",
    "label": "Link"
   },
   {
@@ -70,11 +71,16 @@
    "fieldname": "sr_next_reminder",
    "fieldtype": "Datetime",
    "label": "Pr\u00f3ximo Recordatorio a Enviar"
+  },
+  {
+   "fieldname": "sr_token",
+   "fieldtype": "Long Text",
+   "label": "Token"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-21 11:17:20.913813",
+ "modified": "2025-09-23 11:32:34.139678",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

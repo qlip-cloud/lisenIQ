@@ -98,7 +98,7 @@ def launch_pending_surveys():
 						})
 					except Exception as e:
 						if "Data too long for column 'sr_link'" in str(e):
-							frappe.log_error("Columna 'sr_link' es muy corta. Guardando solo sr_token. Ejecute 'bench migrate' para aplicar el cambio a Long Text.", "launch_pending_surveys")
+							frappe.log_error("Columna 'sr_link' es muy corta. Guardando solo sr_token.", "launch_pending_surveys")
 							frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
 								"sr_token": token
 							})

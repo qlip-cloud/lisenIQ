@@ -2,8 +2,9 @@
 from __future__ import unicode_literals
 import frappe
 from frappe.utils import now
-import base64
 from frappe.utils.data import get_datetime, add_to_date
+import jwt
+from time import time
 
 def launch_pending_surveys():
 	frappe.log_error("Iniciando tarea launch_pending_surveys", "Survey Task Start")
@@ -74,13 +75,35 @@ def launch_pending_surveys():
 					contact_email = contact_details["email"]
 					contact_dni = contact_details["dni"]
 
-					timestamp = now()
-					payload = f"{contact_dni}|{timestamp}".encode('utf-8')
-					encoded_id = base64.b64encode(payload).decode('utf-8')
-					
+					secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
+					if not secret:
+						frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
+						continue
+					payload = {"rid": recipient_doc.name, "sur": survey.su_name, "iat": int(time())}
+					try:
+						token = jwt.encode(payload, secret, algorithm="HS256")
+						if isinstance(token, bytes):
+							token = token.decode("utf-8")
+					except Exception:
+						frappe.log_error(frappe.get_traceback(), "Error generando JWT para recipient")
+						continue
+
+					web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
 					base_url = frappe.utils.get_url(web_form_route)
-					unique_url = f"{base_url}?new=1&id={encoded_id}"
-					frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_link", unique_url)
+					unique_url = f"{base_url}?new=1&token={token}"
+					try:
+						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+							"sr_link": unique_url,
+							"sr_token": token
+						})
+					except Exception as e:
+						if "Data too long for column 'sr_link'" in str(e):
+							frappe.log_error("Columna 'sr_link' es muy corta. Guardando solo sr_token. Ejecute 'bench migrate' para aplicar el cambio a Long Text.", "launch_pending_surveys")
+							frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+								"sr_token": token
+							})
+						else:
+							raise
 
 					message = f"""
 <!DOCTYPE html>
@@ -238,7 +261,7 @@ def send_survey_reminders():
 					"sr_status": "Sent",
 					"sr_reminder_send": ["<", survey.su_reminder_max]
 				},
-				fields=["name", "sr_contact", "sr_link", "sr_reminder_send", "sr_last_reminder_send"]
+				fields=["name", "sr_contact", "sr_link", "sr_token", "sr_reminder_send", "sr_last_reminder_send"]
 			)
 
 			if not recipients_to_remind:
@@ -248,6 +271,9 @@ def send_survey_reminders():
 				c.name: c.get("first_name") or c.name
 				for c in frappe.get_all("Contact", filters={"name": ["in", [r.sr_contact for r in recipients_to_remind]]}, fields=["name", "first_name"])
 			}
+
+			web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
+			base_url = frappe.utils.get_url(web_form_route) if web_form_route else None
 
 			for recipient in recipients_to_remind:
 				try:
@@ -263,6 +289,11 @@ def send_survey_reminders():
 							send_reminder = True
 					
 					if send_reminder:
+						if not base_url:
+							frappe.log_error(f"No se encontró Web Form para la encuesta {survey.su_name}.", "send_survey_reminders")
+							continue
+
+						link = f"{base_url}?new=1&token={recipient.sr_token}"
 						contact_name = contact_names.get(recipient.sr_contact, "Participante")
 						
 						message = f"""
@@ -294,7 +325,7 @@ def send_survey_reminders():
         <li>Este enlace es <strong>personal e intransferible</strong>.</li>
       </ul>
     </div>
-    <p style="text-align:center;"><a href="{recipient.sr_link}" class="btn">Responder encuesta</a></p>
+    <p style="text-align:center;"><a href="{link}" class="btn">Responder encuesta</a></p>
     <p>Tu voz es clave en este proceso. ¡Gracias por tu tiempo y compromiso!</p>
     <div class="footer">Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a></div>
   </div>

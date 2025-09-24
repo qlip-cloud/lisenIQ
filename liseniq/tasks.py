@@ -67,45 +67,52 @@ def launch_pending_surveys():
 				subject = f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
 
 				for recipient_doc in recipients_docs:
-					contact_details = contact_details_map.get(recipient_doc.sr_contact)
-					if not contact_details:
-						frappe.log_error(f"Contacto {recipient_doc.sr_contact} no tiene email o DNI. Saltando.", "Survey Task Skip Contact")
-						continue
-
-					contact_email = contact_details["email"]
-					contact_dni = contact_details["dni"]
-
-					secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
-					if not secret:
-						frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
-						continue
-					payload = {"rid": recipient_doc.name, "sur": survey.su_name, "iat": int(time())}
 					try:
-						token = jwt.encode(payload, secret, algorithm="HS256")
-						if isinstance(token, bytes):
-							token = token.decode("utf-8")
-					except Exception:
-						frappe.log_error(frappe.get_traceback(), "Error generando JWT para recipient")
-						continue
+						contact_details = contact_details_map.get(recipient_doc.sr_contact)
+						if not contact_details:
+							# Exigir DNI en el contacto
+							frappe.throw(f"El contacto {recipient_doc.sr_contact} no tiene email o DNI (custom_document_number) configurado.")
 
-					web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
-					base_url = frappe.utils.get_url(web_form_route)
-					unique_url = f"{base_url}?new=1&token={token}"
-					try:
-						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
-							"sr_link": unique_url,
-							"sr_token": token
-						})
-					except Exception as e:
-						if "Data too long for column 'sr_link'" in str(e):
-							frappe.log_error("Columna 'sr_link' es muy corta. Guardando solo sr_token.", "launch_pending_surveys")
+						contact_email = contact_details["email"]
+						contact_dni = contact_details["dni"]
+
+						secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
+						if not secret:
+							frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
+							continue
+						# Incluir el DNI en el JWT
+						payload = {
+							"rid": recipient_doc.name,
+							"sur": survey.su_name,
+							"iat": int(time()),
+							"custom_document_number": contact_dni
+						}
+						try:
+							token = jwt.encode(payload, secret, algorithm="HS256")
+							if isinstance(token, bytes):
+								token = token.decode("utf-8")
+						except Exception:
+							frappe.log_error(frappe.get_traceback(), "Error generando JWT para recipient")
+							continue
+
+						web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
+						base_url = frappe.utils.get_url(web_form_route)
+						unique_url = f"{base_url}?new=1&token={token}"
+						try:
 							frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+								"sr_link": unique_url,
 								"sr_token": token
 							})
-						else:
-							raise
+						except Exception as e:
+							if "Data too long for column 'sr_link'" in str(e):
+								frappe.log_error("Columna 'sr_link' es muy corta. Guardando solo sr_token.", "launch_pending_surveys")
+								frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+									"sr_token": token
+								})
+							else:
+								raise
 
-					message = f"""
+						message = f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -193,39 +200,42 @@ def launch_pending_surveys():
 </html>
 					"""
 					
-					recipients = [contact_email]
-					if frappe.conf.get("send_emails_for_debug"):
-						debug_recipient = frappe.conf.get("debug_email_recipient")
-						if debug_recipient:
-							recipients = [debug_recipient]
-							frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo a: {recipients}", "Survey Task Debug Email")
-						else:
-							frappe.log_error("Modo debug de correo activo pero 'debug_email_recipient' no está configurado.", "launch_pending_surveys")
+						recipients = [contact_email]
+						if frappe.conf.get("send_emails_for_debug"):
+							debug_recipient = frappe.conf.get("debug_email_recipient")
+							if debug_recipient:
+								recipients = [debug_recipient]
+								frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo a: {recipients}", "Survey Task Debug Email")
+							else:
+								frappe.log_error("Modo debug de correo activo pero 'debug_email_recipient' no está configurado.", "launch_pending_surveys")
+								continue
+
+						sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id") or frappe.conf.get("debug_email_recipient")
+
+						if not sender_email:
+							frappe.log_error("No se ha configurado un remitente de correo por defecto (default_outgoing=1).", "launch_pending_surveys")
 							continue
-
-					sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id") or frappe.conf.get("debug_email_recipient")
-
-					if not sender_email:
-						frappe.log_error("No se ha configurado un remitente de correo por defecto (default_outgoing=1).", "launch_pending_surveys")
-						continue
 					
-					frappe.log_error(f"Intentando enviar correo. De: {sender_email}, Para: {recipients}", "Survey Task Sending Email")
+						frappe.log_error(f"Intentando enviar correo. De: {sender_email}, Para: {recipients}", "Survey Task Sending Email")
 
-					frappe.sendmail(
-						recipients=recipients,
-						sender=sender_email,
-						subject=subject,
-						message=message,
-						now=True
-					)
+						frappe.sendmail(
+							recipients=recipients,
+							sender=sender_email,
+							subject=subject,
+							message=message,
+							now=True
+						)
 
-					frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
-						"sr_status": "Sent",
-						"sr_sent_on": now()
-					})
+						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+							"sr_status": "Sent",
+							"sr_sent_on": now()
+						})
 
-					frappe.log_error(f"Correo para la encuesta {survey.name} enviado a {contact_email} (o encolado).", "Survey Task Email Sent")
-
+						frappe.log_error(f"Correo para la encuesta {survey.name} enviado a {contact_email} (o encolado).", "Survey Task Email Sent")
+					except Exception:
+						# Manejo por destinatario: log y continuar con el siguiente
+						frappe.log_error(f"Error con el destinatario {recipient_doc.name}: {frappe.get_traceback()}", "launch_pending_surveys")
+						continue
 				frappe.db.commit()
 			except Exception as e:
 				frappe.db.rollback()

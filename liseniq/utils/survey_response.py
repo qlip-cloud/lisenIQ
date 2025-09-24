@@ -56,13 +56,22 @@ def process_survey_response(doc, method):
             frappe.log_error(f"El destinatario {recipient.name} ya tiene estado 'Responded'. Abortando guardado.", "Survey Response Hook")
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
-        contact_user, contact_email = frappe.db.get_value(
-            "Contact", recipient.sr_contact, ["user", "email_id"]
-        ) or (None, None)
-        resolved_user = contact_user or contact_email or recipient.sr_contact
-        if resolved_user and len(resolved_user) > 140:
-            resolved_user = resolved_user[:140]
-        doc.user = resolved_user or "Anonimo"
+        # Resolver Contact por DNI desde el token (custom_document_number)
+        dni_from_token = payload.get("custom_document_number")
+        contact_name = None
+        if dni_from_token:
+            contact_name = frappe.db.get_value(
+                "Contact",
+                {"custom_document_number": dni_from_token},
+                "name"
+            )
+
+        if not contact_name:
+            contact_name = recipient.sr_contact  # respaldo por vínculo del recipient
+
+        if contact_name and len(contact_name) > 140:
+            contact_name = contact_name[:140]
+        doc.user = contact_name or "Anonimo"
 
         frappe.log_error(f"Actualizando destinatario {recipient.name} a 'Responded' y enlazando respuesta {doc.name}", "Survey Response Hook")
         frappe.db.set_value(

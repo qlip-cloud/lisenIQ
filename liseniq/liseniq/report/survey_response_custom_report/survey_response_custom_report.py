@@ -219,7 +219,7 @@ def get_bulk_demographics(users_list, demographics_map):
     query = f"""
         SELECT 
             c.name,
-            cad.name as cad_id,
+            cad.cad_demographic_type as cad_id,
             cad.cad_value
         FROM `tabContact` c
         INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name

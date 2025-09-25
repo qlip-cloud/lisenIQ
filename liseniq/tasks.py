@@ -45,6 +45,12 @@ def launch_pending_surveys():
 					frappe.log_error(f"No se encontró Web Form para la encuesta {survey.su_name}", "launch_pending_surveys")
 					continue
 
+				is_public_survey = frappe.db.get_value("qp_IQ_Survey", survey.name, "su_public_link")
+				if is_public_survey:
+					frappe.log_error(f"Encuesta {survey.name} es pública. Saltando envío de correos individuales.", "Survey Task Skip")
+					frappe.db.commit()
+					continue
+
 				recipients_docs = frappe.get_all(
 					"qp_IQ_SurveyRecipient",
 					filters={"sr_survey": survey.name, "sr_status": "Not Sent"},
@@ -70,7 +76,6 @@ def launch_pending_surveys():
 					try:
 						contact_details = contact_details_map.get(recipient_doc.sr_contact)
 						if not contact_details:
-							# Exigir DNI en el contacto
 							frappe.throw(f"El contacto {recipient_doc.sr_contact} no tiene email o DNI (custom_document_number) configurado.")
 
 						contact_email = contact_details["email"]
@@ -80,7 +85,7 @@ def launch_pending_surveys():
 						if not secret:
 							frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
 							continue
-						# Incluir el DNI en el JWT
+
 						payload = {
 							"rid": recipient_doc.name,
 							"sur": survey.su_name,
@@ -233,10 +238,10 @@ def launch_pending_surveys():
 
 						frappe.log_error(f"Correo para la encuesta {survey.name} enviado a {contact_email} (o encolado).", "Survey Task Email Sent")
 					except Exception:
-						# Manejo por destinatario: log y continuar con el siguiente
 						frappe.log_error(f"Error con el destinatario {recipient_doc.name}: {frappe.get_traceback()}", "launch_pending_surveys")
 						continue
 				frappe.db.commit()
+				
 			except Exception as e:
 				frappe.db.rollback()
 				frappe.log_error(f"Error procesando encuesta {survey.name}: {frappe.get_traceback()}", "launch_pending_surveys")

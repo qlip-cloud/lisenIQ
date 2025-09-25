@@ -32,7 +32,8 @@
   "su_public_link",
   "su_public_token",
   "su_public_link_created_on",
-  "su_public_link_created_by"
+  "su_public_link_created_by",
+  "custom_generate_public_link"
  ],
  "fields": [
   {
@@ -169,25 +170,37 @@
   {
    "fieldname": "su_public_link",
    "fieldtype": "Long Text",
-   "label": "Link Publico"
+   "label": "Link Publico",
+   "read_only": 1
   },
   {
    "fieldname": "su_public_token",
    "fieldtype": "Long Text",
+   "hidden": 1,
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Token Publico"
+   "label": "Token Publico",
+   "read_only": 1
   },
   {
    "fieldname": "su_public_link_created_on",
    "fieldtype": "Datetime",
-   "label": "Fecha de Creaci\u00f3n de Link Publico"
+   "label": "Fecha de Creaci\u00f3n de Link Publico",
+   "read_only": 1
   },
   {
    "fieldname": "su_public_link_created_by",
    "fieldtype": "Link",
    "label": "Creado Por",
-   "options": "User"
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_generate_public_link",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Custom Generate Public Link",
+   "no_copy": 1
   }
  ],
  "index_web_pages_for_search": 1,

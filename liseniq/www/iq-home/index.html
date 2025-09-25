@@ -53,6 +53,11 @@
                 <div class="measurement-card">
                     <div class="card-header">
                         <span class="status-badge status-{{ m.status.lower().replace(' ', '-') }}">{{ m.status }}</span>
+                        {% if m.public_link %}
+                        <a href="{{ m.public_link }}" target="_blank" class="btn-public-link" title="Ver enlace público">
+                            <i class="fa fa-link"></i>
+                        </a>
+                        {% endif %}
                     </div>
                     <div class="card-body">
                         <h3 class="card-title">{{ m.title }}</h3>

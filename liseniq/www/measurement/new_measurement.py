@@ -2,6 +2,7 @@ import frappe
 import json
 from frappe import _
 from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
+from liseniq.utils.api_survey import generate_public_link_for_survey
 
 def get_context(context):
 
@@ -326,8 +327,14 @@ def save_measurement(data):
         survey.su_end_date = data.get("endDate")
         survey.su_timezone = data.get("timezone")
         
-        has_contacts = bool(data.get("contacts", {}).get("list"))
-        survey.su_is_anonymous = 0 if has_contacts else 1
+        contacts_data = data.get("contacts", {})
+        survey_type = contacts_data.get("surveyType") # 'all' o 'selected'
+        response_type = contacts_data.get("responseType") # 'anonymous' o 'identified'
+
+        survey.su_is_anonymous = 1 if response_type == 'anonymous' else 0
+
+        if survey_type == 'all' and response_type == 'identified':
+            survey.custom_generate_public_link = 1
 
         survey.su_status = status_name
         if surveyjs_doc_name:
@@ -349,8 +356,13 @@ def save_measurement(data):
         survey.insert(ignore_permissions=True)
         frappe.db.commit()
 
-        if data.get("contacts", {}).get("list"):
-            contact_names = [c.get("name") for c in data["contacts"]["list"] if c.get("name")]
+        if survey_type == 'all' and response_type == 'identified':
+            if generate_public_link_for_survey(survey, "after_save"):
+                survey.save(ignore_permissions=True)
+                frappe.db.commit()
+
+        if survey_type == 'selected' and contacts_data.get("list"):
+            contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]
             if contact_names:
                 for contact_name in contact_names:
                     frappe.get_doc({

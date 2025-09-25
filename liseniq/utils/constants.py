@@ -16,12 +16,18 @@ frappe.web_form.after_load = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
 
+  if (!token) {
+    show_completed_message(__("El enlace a la encuesta no es válido o ha expirado."));
+    return;
+  }
+
   frappe
     .call({
       method: "liseniq.utils.api_survey.validate_survey_link",
       args: {
         survey_name: frappe.web_form.title,
         user: token || "Anonimo",
+        token: token,
       },
     })
     .then((r) => {
@@ -97,6 +103,7 @@ const submit_response = function (data) {
       args: {
         survey_name: frappe.web_form.title,
         user: token || "Anonimo",
+        token: token,
       },
     })
     .then((r) => {

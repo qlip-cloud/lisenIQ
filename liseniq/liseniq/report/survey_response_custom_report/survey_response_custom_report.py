@@ -217,16 +217,15 @@ def get_bulk_demographics(users_list, demographics_map):
     
     query = f"""
         SELECT 
-            c.user,
+            c.name,
             cad.cad_tag,
             cad.cad_value
         FROM `tabContact` c
         INNER JOIN `tabCustom Additional Details` cad ON cad.parent = c.name
-        WHERE c.user IN ({users_placeholder})
-        AND cad.cad_tag IN ({', '.join(['%s'] * len(demographics_map))})
+        WHERE c.name IN ({users_placeholder})
+        AND cad.cad_demographic_type IN ({', '.join(['%s'] * len(demographics_map))})
     """
     
-    # Preparar parámetros para la consulta
     params = users_list + list(demographics_map.keys())
     
     try:
@@ -237,7 +236,7 @@ def get_bulk_demographics(users_list, demographics_map):
 
     demographics_data = {}
     for result in results:
-        user = result.get('user')
+        user = result.get('name')
         tag = result.get('cad_tag')
         value = result.get('cad_value')
         

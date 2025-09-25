@@ -8,18 +8,19 @@ def process_survey_response(doc, method):
 
     try:
         token = None
-        if doc.user and doc.user != "Anonimo":
-            token = doc.user
-        else:
-            try:
-                resp = json.loads(doc.response_json or "{}")
-                token = resp.get("__token")
-            except Exception:
-                token = None
+
+        try:
+            resp = json.loads(doc.response_json or "{}")
+            token = resp.get("__token")
+        except Exception:
+            token = None
 
         if not token:
-            frappe.log_error("Respuesta sin token (anónima o inválida). Saltando enlace de recipient.", "Survey Response Hook")
-            return
+            if doc.user and doc.user != "Anonimo" and "." in doc.user:
+                 token = doc.user
+            else:
+                frappe.log_error("Respuesta sin token (anónima o inválida). Saltando enlace de recipient.", "Survey Response Hook")
+                return
 
         secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
         try:
@@ -30,8 +31,9 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         is_public = payload.get("public", False)
+        
         if is_public:
-            frappe.log_error(f"Respuesta de encuesta pública para {doc.survey}. No se requiere destinatario.", "Survey Response Hook")
+            frappe.log_error(f"Respuesta de encuesta pública para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
             return
 
         rid = payload.get("rid")
@@ -61,7 +63,6 @@ def process_survey_response(doc, method):
             frappe.log_error(f"El destinatario {recipient.name} ya tiene estado 'Responded'. Abortando guardado.", "Survey Response Hook")
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
-        # Resolver Contact por DNI desde el token (custom_document_number)
         dni_from_token = payload.get("custom_document_number")
         contact_name = None
         if dni_from_token:
@@ -72,7 +73,7 @@ def process_survey_response(doc, method):
             )
 
         if not contact_name:
-            contact_name = recipient.sr_contact  # respaldo por vínculo del recipient
+            contact_name = recipient.sr_contact
 
         if contact_name and len(contact_name) > 140:
             contact_name = contact_name[:140]

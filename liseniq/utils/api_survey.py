@@ -3,7 +3,7 @@ import json
 import jwt
 from time import time
 from frappe.utils import now
-from frappe.utils.data import get_datetime
+from frappe.utils.data import get_datetime, add_to_date
 
 @frappe.whitelist(allow_guest=True)
 def get_public_survey(survey_name):
@@ -53,6 +53,10 @@ def _get_jwt_secret():
 
 @frappe.whitelist(allow_guest=True)
 def validate_survey_link(survey_name, user, token):
+  frappe.log_error(
+      message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
+      title="validate_survey_link Trace"
+  )
   try:
     if not token or token == "Anonimo":
       return {"allow": True}
@@ -64,17 +68,24 @@ def validate_survey_link(survey_name, user, token):
       sur_claim = payload.get("sur")
       is_public = payload.get("public", False)
 
-      if is_public:
-        survey_doc_name = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
-        if sur_claim != survey_doc_name:
+      frappe.log_error(
+          message=f"Payload decodificado: sur_claim='{sur_claim}', is_public={is_public}",
+          title="validate_survey_link Trace"
+      )
+
+      if sur_claim != survey_name:
+          frappe.log_error(
+              message=f"Validación fallida: sur_claim ('{sur_claim}') != survey_name ('{survey_name}')",
+              title="validate_survey_link Trace"
+          )
           return {"allow": False, "message": "Enlace inválido o expirado."}
-      else:
-        if sur_claim and sur_claim != survey_name:
-          return {"allow": False, "message": "Enlace inválido o expirado."}
+
+      frappe.log_error(message="Validación de 'sur' exitosa.", title="validate_survey_link Trace")
 
       if is_public:
         return {"allow": True}
 
+      # Lógica para encuestas no públicas (con destinatarios)
       recipient = None
       if rid:
         recipient = frappe.db.get_value(
@@ -105,6 +116,27 @@ def validate_survey_link(survey_name, user, token):
   except jwt.InvalidTokenError:
     return {"allow": False, "message": "Enlace inválido o expirado."}
 
+@frappe.whitelist(allow_guest=True)
+def get_survey_route_for_public_link(token):
+    if not token:
+        frappe.throw("Token no proporcionado.")
+
+    secret = _get_jwt_secret()
+    try:
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        frappe.throw("El enlace ha expirado o no es válido.")
+
+    survey_name = payload.get("sur")
+    if not survey_name:
+        frappe.throw("Token de encuesta inválido.")
+
+    web_form_route = frappe.db.get_value("Web Form", {"title": survey_name}, "route")
+    if not web_form_route:
+        frappe.throw("No se encontró el formulario para la encuesta.")
+    
+    return {"route": web_form_route}
+
 def generate_public_link_for_survey(doc, method):
     modified = False
     if not doc.su_public_link:
@@ -119,7 +151,7 @@ def generate_public_link_for_survey(doc, method):
             return modified
 
         payload = {
-            "sur": doc.name,
+            "sur": doc.su_name,
             "iat": int(time()),
             "public": True
         }
@@ -136,8 +168,12 @@ def generate_public_link_for_survey(doc, method):
             frappe.log_error(frappe.get_traceback(), "Error generando JWT para enlace público")
             return modified
 
-        base_url = frappe.utils.get_url(web_form_route)
-        unique_url = f"{base_url}?new=1&token={token}"
+        if doc.su_is_anonymous:
+            base_url = frappe.utils.get_url(web_form_route)
+            unique_url = f"{base_url}?new=1&token={token}"
+        else:
+            base_url = frappe.utils.get_url('/iq-register')
+            unique_url = f"{base_url}?token={token}"
 
         doc.su_public_link = unique_url
         doc.su_public_token = token

@@ -328,13 +328,16 @@ def save_measurement(data):
         survey.su_timezone = data.get("timezone")
         
         contacts_data = data.get("contacts", {})
-        survey_type = contacts_data.get("surveyType") # 'all' o 'selected'
-        response_type = contacts_data.get("responseType") # 'anonymous' o 'identified'
+        survey_type = contacts_data.get("surveyType")
+        response_type = contacts_data.get("responseType")
 
         survey.su_is_anonymous = 1 if response_type == 'anonymous' else 0
 
         if survey_type == 'all' and response_type == 'identified':
             survey.custom_generate_public_link = 1
+        elif survey_type == 'all' and response_type == 'anonymous':
+            survey.custom_generate_public_link = 1
+
 
         survey.su_status = status_name
         if surveyjs_doc_name:

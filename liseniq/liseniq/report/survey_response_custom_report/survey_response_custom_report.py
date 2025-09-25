@@ -84,15 +84,16 @@ def get_survey_data(survey_name, question_map, demographics_map):
     """
     query = """
         SELECT 
-            sr.name as response_name,
+            sr.name,
             sr.user,
             sr.response_json,
             c.first_name,
             c.last_name,
             c.custom_dob,
-            c.custom_academic_level
+            a.al_title
         FROM `tabSurvey Response` sr
         LEFT JOIN `tabContact` c ON c.name = sr.user
+        LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
         WHERE sr.survey = %s
         ORDER BY sr.creation DESC
     """
@@ -221,7 +222,7 @@ def get_bulk_demographics(users_list, demographics_map):
             cad.cad_tag,
             cad.cad_value
         FROM `tabContact` c
-        INNER JOIN `tabCustom Additional Details` cad ON cad.parent = c.name
+        INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
         WHERE c.name IN ({users_placeholder})
         AND cad.cad_demographic_type IN ({', '.join(['%s'] * len(demographics_map))})
     """

@@ -125,7 +125,7 @@ def process_response_row(response, question_map, demographics_data):
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
         'custom_dob': response.get('custom_dob', ''),
-        'custom_academic_level': response.get('custom_academic_level', '')
+        'custom_academic_level': response.get('al_title', '')
     }
 
     response_json = response.get('response_json', '{}')
@@ -219,7 +219,7 @@ def get_bulk_demographics(users_list, demographics_map):
     query = f"""
         SELECT 
             c.name,
-            cad.cad_tag,
+            cad.name as cad_id,
             cad.cad_value
         FROM `tabContact` c
         INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
@@ -238,7 +238,7 @@ def get_bulk_demographics(users_list, demographics_map):
     demographics_data = {}
     for result in results:
         user = result.get('name')
-        tag = result.get('cad_tag')
+        tag = result.get('cad_id')
         value = result.get('cad_value')
         
         if user and tag and value:

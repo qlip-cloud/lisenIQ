@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Registro - Documento de Identidad</title>
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_register.css">
+</head>
+<body>
+    <main class="main-content-padding">
+        <section class="page-title-section">
+            <div class="breadcrumb-nav">
+                <a href="/">Inicio</a> / Registro
+            </div>
+            <div class="title-with-action">
+                <h1 class="page-main-title">Ingresa tu documento</h1>
+            </div>
+        </section>
+
+        <form id="identity-form" novalidate>
+            <div class="form-group">
+                <label for="doc_id">Documento de identidad</label>
+                <input 
+                    type="text" 
+                    id="doc_id" 
+                    name="doc_id" 
+                    class="form-control" 
+                    autocomplete="off" 
+                    inputmode="numeric" 
+                    placeholder="Ej: 12345678">
+                <small id="doc-id-error" class="form-error-message" style="display:none;"></small>
+            </div>
+
+            <div class="form-action-buttons">
+                <button type="submit" class="btn-purple-main" id="btn-submit">Continuar</button>
+            </div>
+        </form>
+    </main>
+
+    <script src="/assets/liseniq/js/iq_register.js"></script>
+</body>
+</html>

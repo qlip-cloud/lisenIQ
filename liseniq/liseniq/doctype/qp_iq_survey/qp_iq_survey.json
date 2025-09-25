@@ -27,7 +27,12 @@
   "su_timezone",
   "su_send_reminders",
   "su_reminder_frequency",
-  "su_reminder_max"
+  "su_reminder_max",
+  "secci\u00f3n_link_publico_section",
+  "su_public_link",
+  "su_public_token",
+  "su_public_link_created_on",
+  "su_public_link_created_by"
  ],
  "fields": [
   {
@@ -155,11 +160,39 @@
    "fieldtype": "Select",
    "label": "Zona Horaria",
    "options": "America/Caracas\nAmerica/Bogota"
+  },
+  {
+   "fieldname": "secci\u00f3n_link_publico_section",
+   "fieldtype": "Section Break",
+   "label": "Secci\u00f3n LInk Publico"
+  },
+  {
+   "fieldname": "su_public_link",
+   "fieldtype": "Long Text",
+   "label": "Link Publico"
+  },
+  {
+   "fieldname": "su_public_token",
+   "fieldtype": "Long Text",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Token Publico"
+  },
+  {
+   "fieldname": "su_public_link_created_on",
+   "fieldtype": "Datetime",
+   "label": "Fecha de Creaci\u00f3n de Link Publico"
+  },
+  {
+   "fieldname": "su_public_link_created_by",
+   "fieldtype": "Link",
+   "label": "Creado Por",
+   "options": "User"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-15 20:04:39.428765",
+ "modified": "2025-09-24 22:11:59.984012",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

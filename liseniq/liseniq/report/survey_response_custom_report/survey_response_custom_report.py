@@ -191,7 +191,7 @@ def get_demographics_labels():
     try:
         query = """
             SELECT dem.name, dem.dt_title
-            FROM `tabqp_IQ_DemographiqType` dem
+            FROM `tabqp_IQ_DemographicType` dem
             WHERE dem.dt_object_type = 'Contacto'
             ORDER BY dem.name
         """

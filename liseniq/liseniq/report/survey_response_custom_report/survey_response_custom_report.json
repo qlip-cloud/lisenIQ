@@ -6,20 +6,11 @@
  "disabled": 0,
  "docstatus": 0,
  "doctype": "Report",
- "filters": [
-  {
-   "fieldname": "survey",
-   "fieldtype": "Link",
-   "label": "Survey",
-   "mandatory": 0,
-   "options": "Survey",
-   "wildcard_filter": 0
-  }
- ],
+ "filters": [],
  "idx": 0,
  "is_standard": "Yes",
- "javascript": "frappe.query_reports[\"Survey Report\"] = {\r\n    \"filters\": [\r\n        {\r\n            \"fieldname\": \"survey\",\r\n            \"label\": __(\"Survey\"),\r\n            \"fieldtype\": \"Link\",\r\n            \"options\": \"Survey\",\r\n            \"reqd\": 1\r\n        }\r\n    ]\r\n};\r\n",
- "modified": "2025-09-23 17:23:09.050295",
+ "javascript": "",
+ "modified": "2025-09-25 09:45:38.667812",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "Survey Response Custom Report",
@@ -27,7 +18,7 @@
  "prepared_report": 0,
  "ref_doctype": "Survey Response",
  "report_name": "Survey Response Custom Report",
- "report_script": "\r\n\r\ndef execute(filters=None):\r\n    frappe.log_error(\"Ejecutando el reporte\", \"DEBUG Survey Report\")\r\n\r\n    filters = filters or {}\r\n    survey_name = filters.get('survey')\r\n    if not survey_name:\r\n        return [], []\r\n\r\n    try:\r\n        survey_doc = frappe.get_doc(\"Survey\", survey_name)\r\n    except Exception:\r\n        frappe.throw(f\"Encuesta no encontrada: {survey_name}\")\r\n\r\n    survey_json = getattr(survey_doc, \"survey_json\", \"{}\") or \"{}\"\r\n    question_map = get_question_labels(survey_json)\r\n\r\n    # 2) Columnas (din\u00e1micas)\r\n    columns = [\r\n        {\"label\": \"Usuario\", \"fieldname\": \"user\", \"fieldtype\": \"Data\", \"width\": 150},\r\n    ]\r\n    for qid, title in question_map.items():\r\n        columns.append({\r\n            \"label\": title,\r\n            \"fieldname\": qid,\r\n            \"fieldtype\": \"Data\",\r\n            \"width\": 300\r\n        })\r\n\r\n    responses = frappe.get_all(\r\n        \"Survey Response\",\r\n        filters={\"survey\": survey_name},\r\n        fields=[\"name\", \"owner\"]\r\n    )\r\n\r\n    data = []\r\n    for r in responses:\r\n        row = {\"user\": r.owner}\r\n        try:\r\n            doc = frappe.get_doc(\"Survey Response\", r.name)\r\n        except Exception:\r\n            doc = None\r\n\r\n        raw = {}\r\n        if doc:\r\n            if getattr(doc, \"response_json\", None):\r\n                raw = doc.response_json\r\n          \r\n\r\n        try:\r\n            if isinstance(raw, str):\r\n                parsed = json.loads(raw)\r\n            else:\r\n                parsed = raw or {}\r\n        except Exception:\r\n            parsed = {}\r\n\r\n        for qid in question_map.keys():\r\n            value = \"\"\r\n            if isinstance(parsed, dict):\r\n                value = parsed.get(qid, \"\")\r\n            row[qid] = value\r\n        data.append(row)\r\n\r\n    return columns, data\r\n\r\n\r\ndef get_question_labels(survey_json):\r\n    try:\r\n        data = json.loads(survey_json) if isinstance(survey_json, str) else survey_json\r\n    except Exception:\r\n        return {}\r\n\r\n    mapping = {}\r\n    for page in data.get(\"pages\", []):\r\n        for element in page.get(\"elements\", []):\r\n            name = element.get(\"name\") \r\n            title = element.get(\"title\") \r\n            if name:\r\n                mapping[name] = title\r\n    return mapping\r\n",
+ "report_script": "",
  "report_type": "Script Report",
  "roles": [
   {

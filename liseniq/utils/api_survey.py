@@ -3,6 +3,7 @@ import json
 import jwt
 from time import time
 from frappe.utils import now
+from frappe.utils.data import get_datetime
 
 @frappe.whitelist(allow_guest=True)
 def get_public_survey(survey_name):
@@ -64,10 +65,9 @@ def validate_survey_link(survey_name, user, token):
       is_public = payload.get("public", False)
 
       if is_public:
-        if sur_claim and sur_claim != survey_name:
-          survey_doc_name = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
-          if sur_claim != survey_doc_name:
-            return {"allow": False, "message": "Enlace inválido o expirado."}
+        survey_doc_name = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
+        if sur_claim != survey_doc_name:
+          return {"allow": False, "message": "Enlace inválido o expirado."}
       else:
         if sur_claim and sur_claim != survey_name:
           return {"allow": False, "message": "Enlace inválido o expirado."}
@@ -123,6 +123,10 @@ def generate_public_link_for_survey(doc, method):
             "iat": int(time()),
             "public": True
         }
+
+        if doc.su_end_date:
+            end_date_timestamp = int(get_datetime(doc.su_end_date).timestamp())
+            payload["exp"] = end_date_timestamp
 
         try:
             token = jwt.encode(payload, secret, algorithm="HS256")

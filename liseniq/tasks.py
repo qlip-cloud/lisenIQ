@@ -85,13 +85,19 @@ def launch_pending_surveys():
 						if not secret:
 							frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
 							continue
-
+						
+						survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
 						payload = {
 							"rid": recipient_doc.name,
 							"sur": survey.su_name,
 							"iat": int(time()),
 							"custom_document_number": contact_dni
 						}
+
+						if survey_doc.su_end_date:
+							end_date_timestamp = int(get_datetime(survey_doc.su_end_date).timestamp())
+							payload["exp"] = end_date_timestamp
+
 						try:
 							token = jwt.encode(payload, secret, algorithm="HS256")
 							if isinstance(token, bytes):

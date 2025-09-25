@@ -29,6 +29,11 @@ def process_survey_response(doc, method):
         except jwt.InvalidTokenError:
             frappe.throw("Enlace inválido o expirado.")
 
+        is_public = payload.get("public", False)
+        if is_public:
+            frappe.log_error(f"Respuesta de encuesta pública para {doc.survey}. No se requiere destinatario.", "Survey Response Hook")
+            return
+
         rid = payload.get("rid")
         token_sur = payload.get("sur")
 

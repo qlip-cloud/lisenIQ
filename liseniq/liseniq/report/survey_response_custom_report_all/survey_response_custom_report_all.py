@@ -42,7 +42,6 @@ def get_valid_surveys():
             FROM `tabSurvey` s
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
-            WHERE s.disabled = 0
             ORDER BY s.name
         """
         results = frappe.db.sql(query, as_dict=True)

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Registro - Documento de Identidad</title>
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_register.css">
+</head>
+<body>
+    <main class="main-content-padding">
+        <section class="page-title-section">
+            <div class="breadcrumb-nav">
+                <a href="/">Inicio</a> / Registro
+            </div>
+            <div class="title-with-action">
+                <h1 class="page-main-title">Ingresa tu documento</h1>
+            </div>
+        </section>
+
+        <form id="identity-form" novalidate>
+            <div class="form-group">
+                <label for="doc_id">Documento de identidad</label>
+                <input 
+                    type="text" 
+                    id="doc_id" 
+                    name="doc_id" 
+                    class="form-control" 
+                    autocomplete="off" 
+                    inputmode="numeric" 
+                    placeholder="Ej: 12345678">
+                <small id="doc-id-error" class="form-error-message" style="display:none;"></small>
+            </div>
+
+            <div class="form-action-buttons">
+                <button type="submit" class="btn-purple-main" id="btn-submit">Continuar</button>
+            </div>
+        </form>
+    </main>
+
+    <script>
+
+        var frappe = {
+            call: function(options) {
+                return new Promise(function(resolve, reject) {
+                    var xhr = new XMLHttpRequest();
+                    
+                    let url = '/api/method/' + options.method;
+                    let is_guest = true;
+                    
+                    if (is_guest) {
+                        if (options.args) {
+                            url += '?' + Object.keys(options.args).map(key => key + '=' + encodeURIComponent(options.args[key])).join('&');
+                        }
+                    }
+
+                    xhr.open(options.type || 'POST', url, true);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    
+                    if (!is_guest) {
+                        xhr.setRequestHeader('Content-Type', 'application/json');
+                        xhr.setRequestHeader('X-Frappe-CSRF-Token', frappe.csrf_token);
+                    }
+
+                    xhr.onload = function() {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            var response = JSON.parse(xhr.responseText);
+                            if (options.callback) options.callback(response);
+                            resolve(response);
+                        } else {
+                            var error_response = { 
+                                exc: xhr.responseText, 
+                                _server_messages: `[{"message": "Error: ${xhr.statusText}"}]`
+                            };
+                            if (options.error) options.error(error_response);
+                            reject(error_response);
+                        }
+                    };
+                    xhr.onerror = function() {
+                        var error_response = { exc: 'Network Error' };
+                        if (options.error) options.error(error_response);
+                        reject(error_response);
+                    };
+
+                    if (!is_guest) {
+                        xhr.send(JSON.stringify(options.args || {}));
+                    } else {
+                        xhr.send();
+                    }
+                });
+            }
+        };
+    </script>
+    <script src="/assets/liseniq/js/iq_register.js"></script>
+</body>
+</html>

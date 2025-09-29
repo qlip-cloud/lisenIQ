@@ -110,7 +110,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (question.options && question.options.length > 0) {
                     optionsHtml = `<div class="review-question-options">
-                        ${question.options.map(opt => `<div class="review-question-option">${frappe.utils.escape_html(opt)}</div>`).join('')}
+                        ${question.options.map(opt => {
+                            const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
+                            return `<div class="review-question-option">${frappe.utils.escape_html(optionText)}</div>`;
+                        }).join('')}
                     </div>`;
                 }
                 
@@ -154,7 +157,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     qn_demographic: q.demographic,
                 };
                 if (q.options) {
-                    questionDoc.qn_response_options = q.options.map(opt => ({ qo_option_text: opt }));
+                    if (q.typeName === 'Likert') {
+                        questionDoc.qn_response_options = q.options.map(opt => ({
+                            qo_option_text: opt.text,
+                            qo_option_value: opt.value
+                        }));
+                    } else {
+                        questionDoc.qn_response_options = q.options.map(opt => ({
+                            qo_option_text: opt,
+                            qo_option_value: opt
+                        }));
+                    }
                 }
                 
                 const result = await frappe.call({

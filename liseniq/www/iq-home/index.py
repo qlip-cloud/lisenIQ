@@ -47,7 +47,7 @@ def get_context(context):
         surveys = frappe.get_all(
             "qp_IQ_Survey",
             filters=query_filters,
-            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date"]
+            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link"]
         )
     except frappe.DoesNotExistError:
         surveys = []
@@ -75,19 +75,9 @@ def get_context(context):
             "end_date": end_date_formatted,
             "completed": total_responses,
             "total": total_recipients,
-            "percentage": percentage
+            "percentage": percentage,
+            "public_link": survey.su_public_link
         })
-
-    # measurements_data.append({
-    #     "name": "mock-data-card",
-    #     "title": "Medición de Clima Laboral",
-    #     "status": "En Proceso",
-    #     "start_date": "01 Sep 2024",
-    #     "end_date": "30 Sep 2024",
-    #     "completed": 50,
-    #     "total": 150,
-    #     "percentage": 33
-    # })
 
     context.measurements = measurements_data
     

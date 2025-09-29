@@ -16,12 +16,18 @@ frappe.web_form.after_load = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
 
+  if (!token) {
+    show_completed_message(__("El enlace a la encuesta no es válido o ha expirado."));
+    return;
+  }
+
   frappe
     .call({
       method: "liseniq.utils.api_survey.validate_survey_link",
       args: {
         survey_name: frappe.web_form.title,
         user: token || "Anonimo",
+        token: token,
       },
     })
     .then((r) => {
@@ -89,6 +95,7 @@ const submit_response = function (data) {
   
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
+  const doc_id = localStorage.getItem("liseniq_doc_id");
 
   // Validación antes de enviar: bloquear si ya fue respondida
   frappe
@@ -97,6 +104,7 @@ const submit_response = function (data) {
       args: {
         survey_name: frappe.web_form.title,
         user: token || "Anonimo",
+        token: token,
       },
     })
     .then((r) => {
@@ -116,7 +124,8 @@ const submit_response = function (data) {
       let args = {
         doctype: frappe.web_form.doc_type,
         survey: frappe.web_form.title,
-        response_json: JSON.stringify(payload)
+        response_json: JSON.stringify(payload),
+        user: doc_id || "Anonimo"
       };
       console.log(args);
       frappe.call({
@@ -129,6 +138,8 @@ const submit_response = function (data) {
         callback: (response) => {
           if (!response.exc) {
             console.log(response.message);
+            // Limpiar el doc_id del localStorage después de un envío exitoso
+            localStorage.removeItem("liseniq_doc_id");
           }
         },
         always: function () {

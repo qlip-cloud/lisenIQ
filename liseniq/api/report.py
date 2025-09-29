@@ -22,8 +22,10 @@ def custom_report(filters=None):
     
     # Obtener datos de todas las encuestas
     data = get_all_survey_data(valid_surveys, all_questions_map, demographics_map)
+    translated_data = translate_keys(data, all_questions_map, demographics_map)
 
-    return data
+    return translated_data
+
 
 
 def get_valid_surveys():
@@ -60,7 +62,7 @@ def get_all_unique_questions(valid_surveys):
         # Agregar preguntas que no existan ya
         for qid, title in questions.items():
             if qid not in all_questions:
-                all_questions[title] = title
+                all_questions[qid] = title
     
     return all_questions
 
@@ -120,6 +122,27 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
 
     return data
 
+def translate_keys(data, all_questions_map, demographics_map):
+    """
+    Traduce las claves de los datos a etiquetas legibles
+    """
+    if not data:
+        return []
+
+    translated_data = []
+    for row in data:
+        translated_row = {}
+        for key, value in row.items():
+            if key in all_questions_map:
+                translated_key = all_questions_map[key]
+            elif key in demographics_map:
+                translated_key = demographics_map[key]
+            else:
+                translated_key = key  
+            translated_row[translated_key] = value
+        translated_data.append(translated_row)
+
+    return translated_data
 
 def process_response_row(response, all_questions_map, demographics_data, survey_company_map):
     """
@@ -155,7 +178,6 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
     for qid, answer in parsed_responses.items():
         if qid in all_questions_map:
             row[qid] = answer
-
 
     return row
 
@@ -202,7 +224,7 @@ def get_question_labels(survey_json):
                 name = element.get("name")
                 title = element.get("title", name) 
                 if name:
-                    mapping[title] = title or name
+                    mapping[name] = title or name
 
     return mapping
 
@@ -222,7 +244,7 @@ def get_demographics_labels():
         
         mapping = {}
         for row in results:
-            mapping[row.dt_title] = row.dt_title or row.name
+            mapping[row.name] = row.dt_title or row.name
             
         return mapping
         
@@ -245,7 +267,6 @@ def get_bulk_demographics(users_list, demographics_map):
         SELECT 
             c.name,
             cad.cad_demographic_type as cad_id,
-            cad.cad_tag as cad_tag,
             cad.cad_value
         FROM `tabContact` c
         INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
@@ -265,7 +286,7 @@ def get_bulk_demographics(users_list, demographics_map):
     demographics_data = {}
     for result in results:
         user = result.get('name')
-        tag = result.get('cad_tag')
+        tag = result.get('cad_id')
         value = result.get('cad_value')
         
         if user and tag and value:

@@ -211,8 +211,15 @@ def save_measurement(data):
                             new_question.qn_demographic = demographic_name
 
                         if q.get("options"):
-                            for opt_text in q["options"]:
-                                new_question.append("qn_response_options", {"qo_option_text": opt_text, "qo_option_value": opt_text})
+                            if q.get("typeName") == "Likert" or (isinstance(q.get("options")[0], dict) and "value" in q["options"][0]):
+                                for opt in q["options"]:
+                                    new_question.append("qn_response_options", {
+                                        "qo_option_text": opt["text"] if isinstance(opt, dict) else opt,
+                                        "qo_option_value": opt["value"] if isinstance(opt, dict) and "value" in opt else opt
+                                    })
+                            else:
+                                for opt_text in q["options"]:
+                                    new_question.append("qn_response_options", {"qo_option_text": opt_text, "qo_option_value": opt_text})
                         
                         if q.get("negative_statement"): new_question.qn_statement_negative = q["negative_statement"]
                         if q.get("positive_statement"): new_question.qn_statement_positive = q["positive_statement"]
@@ -247,7 +254,14 @@ def save_measurement(data):
                     "isRequired": "true"
                 }
 
-                if question_type_title in ["Likert", "Selección Múltiple"] and q.get("options"):
+                if question_type_title == "Likert" and q.get("options"):
+                    element["choices"] = [
+                        {"text": opt["text"], "value": opt["value"]}
+                        if isinstance(opt, dict) and "value" in opt else
+                        {"text": opt, "value": idx+1}
+                        for idx, opt in enumerate(q["options"])
+                    ]
+                elif question_type_title == "Selección Múltiple" and q.get("options"):
                     element["choices"] = q["options"]
                 elif question_type_title == "NPS":
                     element["rateMin"] = q.get("nps_min", 1)

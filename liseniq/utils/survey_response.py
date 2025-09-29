@@ -63,6 +63,23 @@ def process_survey_response(doc, method):
             frappe.log_error(f"El destinatario {recipient.name} ya tiene estado 'Responded'. Abortando guardado.", "Survey Response Hook")
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
+        frappe.db.set_value(
+            "qp_IQ_SurveyRecipient",
+            recipient.name,
+            {"sr_status": "Responded", "sr_survey_response": doc.name}
+        )
+        frappe.log_error(f"Destinatario {recipient.name} actualizado a 'Responded'.", "Survey Response Hook")
+
+        survey_name = recipient.sr_survey
+        total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name})
+        responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name, "sr_status": "Responded"})
+
+        if total_recipients > 0 and total_recipients == responded_recipients:
+            status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+            if status_finished:
+                frappe.db.set_value("qp_IQ_Survey", survey_name, "su_status", status_finished)
+                frappe.log_error(f"Encuesta {survey_name} finalizada por completitud (100%).", "Survey Response Hook")
+
         dni_from_token = payload.get("custom_document_number")
         contact_name = None
         if dni_from_token:
@@ -87,6 +104,29 @@ def process_survey_response(doc, method):
         )
         frappe.db.commit()
         frappe.log_error(f"Destinatario {recipient.name} actualizado correctamente.", "Survey Response Hook")
+
+        # Procesar respuestas tipo Likert para almacenar valor numérico
+        try:
+            resp = json.loads(doc.response_json or "{}")
+            survey_doc = frappe.get_doc("qp_IQ_Survey", recipient.sr_survey)
+            likert_map = {}
+            for sq in survey_doc.su_questions:
+                q_doc = frappe.get_doc("qp_IQ_Question", sq.sq_question)
+                if q_doc.qn_type and frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, "qnt_type_name") == "Likert":
+                    likert_map[q_doc.name] = {opt.qo_option_text: opt.qo_option_value for opt in q_doc.qn_response_options}
+
+            for q_name, options_map in likert_map.items():
+                if q_name in resp:
+                    answer = resp[q_name]
+                    # Si la respuesta es texto y existe en el mapeo, reemplaza por valor
+                    if isinstance(answer, str) and answer in options_map:
+                        resp[q_name] = options_map[answer]
+                    # Si la respuesta es objeto con 'text', usa el valor
+                    elif isinstance(answer, dict) and "text" in answer and answer["text"] in options_map:
+                        resp[q_name] = options_map[answer["text"]]
+            doc.response_json = json.dumps(resp)
+        except Exception:
+            pass
 
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Error en process_survey_response")

@@ -3,11 +3,11 @@ const BIPOLAR_SCALE_TYPES = [];
 const NPS_SCALE_TYPES = ['NPS'];
 const LIKERT_TYPE_NAME = 'Likert';
 const DEFAULT_LIKERT_OPTIONS = [
-    'Totalmente de acuerdo',
-    'De acuerdo',
-    'Ni acuerdo ni desacuerdo',
-    'En desacuerdo',
-    'Totalmente en desacuerdo',
+    { text: 'Totalmente de acuerdo', value: 5 },
+    { text: 'De acuerdo', value: 4 },
+    { text: 'Ni acuerdo ni desacuerdo', value: 3 },
+    { text: 'En desacuerdo', value: 2 },
+    { text: 'Totalmente en desacuerdo', value: 1 },
 ];
 
 export class QuestionBuilder {
@@ -162,7 +162,10 @@ export class QuestionBuilder {
 
         if (OPTIONS_BASED_TYPES.includes(questionDisplayName) && Array.isArray(question.options) && question.options.length > 0) {
             additionalInfoHtml = `<div class="question-item-options-list">
-                ${question.options.map(opt => `<div class="question-option-item">${frappe.utils.escape_html(opt)}</div>`).join('')}
+                ${question.options.map(opt => {
+                    const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
+                    return `<div class="question-option-item">${frappe.utils.escape_html(optionText)}</div>`;
+                }).join('')}
             </div>`;
         }
         
@@ -338,6 +341,11 @@ export class QuestionBuilder {
             if (!this.questions.some(mainQ => mainQ.id === id)) {
                 const questionToAdd = this.bankState.questions.find(q => q.name === id);
                 if (questionToAdd) {
+                    let options = questionToAdd.options || [];
+                    if (questionToAdd.type_name === LIKERT_TYPE_NAME) {
+                        options = DEFAULT_LIKERT_OPTIONS.map(opt => ({ text: opt.text, value: opt.value }));
+                    }
+
                     this.questions.push({ 
                         id: questionToAdd.name,
                         text: questionToAdd.text,
@@ -345,7 +353,7 @@ export class QuestionBuilder {
                         typeName: questionToAdd.type_name,
                         category_name: questionToAdd.category_name,
                         demographic: questionToAdd.demographic_name,
-                        options: questionToAdd.options || []
+                        options: options
                     });
                 }
             }
@@ -455,7 +463,7 @@ export class QuestionBuilder {
         };
 
         if (questionTypeName === LIKERT_TYPE_NAME) {
-            newQuestion.options = DEFAULT_LIKERT_OPTIONS;
+            newQuestion.options = DEFAULT_LIKERT_OPTIONS.map(opt => ({ text: opt.text, value: opt.value }));
         } else if (OPTIONS_BASED_TYPES.includes(questionTypeName)) {
             newQuestion.options = Array.from(qf.optionsContainer.querySelectorAll('.option-input')).map(input => input.value.trim()).filter(Boolean);
         }
@@ -555,10 +563,10 @@ export class QuestionBuilder {
         if (!optionsContainer) return;
         
         optionsContainer.innerHTML = '';
-        DEFAULT_LIKERT_OPTIONS.forEach((text, index) => {
+        DEFAULT_LIKERT_OPTIONS.forEach((opt, index) => {
             const row = document.createElement('div');
             row.className = 'option-input-row is-readonly';
-            row.innerHTML = `<span class="option-number">${index + 1}</span><input type="text" class="form-control option-input" value="${frappe.utils.escape_html(text)}" readonly>`;
+            row.innerHTML = `<span class="option-number">${index + 1}</span><input type="text" class="form-control option-input" value="${frappe.utils.escape_html(opt.text)}" readonly data-value="${opt.value}">`;
             optionsContainer.appendChild(row);
         });
         

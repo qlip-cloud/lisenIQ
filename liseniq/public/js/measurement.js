@@ -436,7 +436,10 @@ class MeasurementCreator {
         let optionsHtml = '';
 
         if (question.options && question.options.length > 0) {
-            optionsHtml = `<div class="review-question-options">${question.options.map(opt => `<div class="review-question-option">${frappe.utils.escape_html(opt)}</div>`).join('')}</div>`;
+            optionsHtml = `<div class="review-question-options">${question.options.map(opt => {
+                const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
+                return `<div class="review-question-option">${frappe.utils.escape_html(optionText)}</div>`;
+            }).join('')}</div>`;
         }
 
         item.innerHTML = `

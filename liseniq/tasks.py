@@ -403,6 +403,56 @@ def send_survey_reminders():
 		frappe.log_error(frappe.get_traceback(), "Error en send_survey_reminders")
 
 @frappe.whitelist()
+def update_finished_surveys():
+	frappe.log_error("Iniciando tarea update_finished_surveys", "Survey Finish Task Start")
+	try:
+		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
+		if not status_in_progress:
+			frappe.log_error("No se encontró el estado 'En Progreso'.", "update_finished_surveys")
+			return
+
+		status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+		if not status_finished:
+			frappe.log_error("No se encontró el estado 'Finalizada'.", "update_finished_surveys")
+			return
+
+		surveys_to_check = frappe.get_all(
+			"qp_IQ_Survey",
+			filters={"su_status": status_in_progress},
+			fields=["name", "su_end_date"]
+		)
+
+		today = get_datetime(now()).date()
+
+		for survey in surveys_to_check:
+			try:
+				# Condición 1: Finalización por fecha de fin
+				if survey.su_end_date:
+					end_date = get_datetime(survey.su_end_date).date()
+					if today > end_date:
+						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
+						frappe.db.commit()
+						frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys")
+						continue # Si ya se finalizó, pasar a la siguiente
+
+				# Condición 2: Finalización por completitud (solo para encuestas con destinatarios)
+				total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
+				if total_recipients > 0:
+					responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": "Responded"})
+					if total_recipients == responded_recipients:
+						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
+						frappe.db.commit()
+						frappe.log_error(f"Encuesta {survey.name} finalizada por completitud (100%).", "update_finished_surveys")
+
+			except Exception:
+				frappe.db.rollback()
+				frappe.log_error(f"Error procesando finalización de encuesta {survey.name}: {frappe.get_traceback()}", "update_finished_surveys")
+
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Error en update_finished_surveys")
+
+
+@frappe.whitelist()
 def delete_iq_survey_fully(survey_name):
     try:
         web_form_title = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name")

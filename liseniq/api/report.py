@@ -202,7 +202,7 @@ def get_question_labels(survey_json):
                 name = element.get("name")
                 title = element.get("title", name) 
                 if name:
-                    mapping[name] = title or name
+                    mapping[title] = title or name
 
     return mapping
 
@@ -245,6 +245,7 @@ def get_bulk_demographics(users_list, demographics_map):
         SELECT 
             c.name,
             cad.cad_demographic_type as cad_id,
+            cad.cad_tag as cad_tag,
             cad.cad_value
         FROM `tabContact` c
         INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
@@ -264,7 +265,7 @@ def get_bulk_demographics(users_list, demographics_map):
     demographics_data = {}
     for result in results:
         user = result.get('name')
-        tag = result.get('cad_id')
+        tag = result.get('cad_tag')
         value = result.get('cad_value')
         
         if user and tag and value:

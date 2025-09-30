@@ -68,6 +68,8 @@ const load_survey = function (survey_name) {
     .then((r) => {
       build_survey(r.message);
       const survey = new Survey.Model(frappe.survey_json);
+      survey.locale = "es";
+      survey.completedHtml = "<h4>" + __("Gracias por completar la encuesta.") + "</h4>";
       survey.applyTheme(frappe.theme_json);
       survey.onComplete.add((sender, options) => {
         submit_response(sender.getAllValues());

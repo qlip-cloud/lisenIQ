@@ -71,7 +71,8 @@ def get_context(context):
         'Contact',
         filters={
             'custom_company': user_company,
-            'name': ['!=', user_contact_name]
+            'name': ['!=', user_contact_name],
+            'custom_is_liseniq_contact': 1
         },
         fields=[
             'name', 'custom_document_number', 'first_name', 'last_name',
@@ -218,6 +219,7 @@ def _map_contact_data(contact_doc, data):
     contact_doc.custom_document_number = data.get("docNumber")
     contact_doc.custom_academic_level = data.get("education") or None
     contact_doc.custom_entry_date = data.get("entryDate") or None
+    contact_doc.custom_is_liseniq_contact = data.get("custom_is_liseniq_contact")
 
     email = data.get("email")
     contact_doc.email_ids = []

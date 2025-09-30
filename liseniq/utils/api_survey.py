@@ -52,7 +52,7 @@ def _get_jwt_secret():
   return frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 
 @frappe.whitelist(allow_guest=True)
-def validate_survey_link(survey_name, user, token):
+def validate_survey_link(survey_name, user, token, dni=None):
   frappe.log_error(
       message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
       title="validate_survey_link Trace"
@@ -86,6 +86,18 @@ def validate_survey_link(survey_name, user, token):
         return {"allow": True}
 
       # Lógica para encuestas no públicas (con destinatarios)
+      if not rid and dni:
+          # Es un enlace genérico, validar si el DNI ya respondió
+          existing_response = frappe.db.exists(
+              "Survey Response",
+              {
+                  "survey": survey_name,
+                  "user": dni,
+              }
+          )
+          if existing_response:
+              return {"allow": False, "message": "Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación."}
+
       recipient = None
       if rid:
         recipient = frappe.db.get_value(
@@ -153,8 +165,10 @@ def generate_public_link_for_survey(doc, method):
         payload = {
             "sur": doc.su_name,
             "iat": int(time()),
-            "public": True
         }
+
+        if doc.su_is_anonymous:
+            payload["public"] = True
 
         if doc.su_end_date:
             end_date_timestamp = int(get_datetime(doc.su_end_date).timestamp())

@@ -15,6 +15,7 @@ frappe.web_form.after_load = () => {
   // Validación: si el link ya fue utilizado, mostrar mensaje y no cargar la encuesta
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
+  const dni = localStorage.getItem("liseniq_doc_id");
 
   if (!token) {
     show_completed_message(__("El enlace a la encuesta no es válido o ha expirado."));
@@ -28,6 +29,7 @@ frappe.web_form.after_load = () => {
         survey_name: frappe.web_form.title,
         user: token || "Anonimo",
         token: token,
+        dni: dni || null
       },
     })
     .then((r) => {

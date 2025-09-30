@@ -42,6 +42,24 @@ def process_survey_response(doc, method):
         if token_sur and token_sur != doc.survey:
             frappe.throw("Enlace inválido o expirado.")
 
+        if not rid:
+            frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
+            
+            # Validar que no exista otra respuesta para esta encuesta con el mismo DNI/user
+            if doc.user and doc.user != "Anonimo":
+                existing_response = frappe.db.exists(
+                    "Survey Response",
+                    {
+                        "survey": doc.survey,
+                        "user": doc.user,
+                        "name": ["!=", doc.name] # Excluir el documento actual
+                    }
+                )
+                if existing_response:
+                    frappe.throw("Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación.")
+            
+            return
+
         recipient = None
         if rid:
             recipient = frappe.db.get_value(

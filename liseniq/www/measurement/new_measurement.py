@@ -347,9 +347,11 @@ def save_measurement(data):
 
         survey.su_is_anonymous = 1 if response_type == 'anonymous' else 0
 
-        if survey_type == 'all' and response_type == 'identified':
-            survey.custom_generate_public_link = 1
-        elif survey_type == 'all' and response_type == 'anonymous':
+        # Por ahora, no se genera link público para encuestas de tipo 'all' (Público Externo)
+        if survey_type == 'all':
+            survey.custom_generate_public_link = 0
+        # Se genera un link genérico para encuestas con contactos seleccionados
+        elif survey_type == 'selected':
             survey.custom_generate_public_link = 1
 
 
@@ -373,7 +375,7 @@ def save_measurement(data):
         survey.insert(ignore_permissions=True)
         frappe.db.commit()
 
-        if survey_type == 'all' and response_type == 'identified':
+        if survey.custom_generate_public_link:
             if generate_public_link_for_survey(survey, "after_save"):
                 survey.save(ignore_permissions=True)
                 frappe.db.commit()

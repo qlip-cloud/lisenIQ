@@ -52,7 +52,7 @@ def _get_jwt_secret():
   return frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 
 @frappe.whitelist(allow_guest=True)
-def validate_survey_link(survey_name, user, token):
+def validate_survey_link(survey_name, user, token, dni=None):
   frappe.log_error(
       message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
       title="validate_survey_link Trace"
@@ -86,6 +86,18 @@ def validate_survey_link(survey_name, user, token):
         return {"allow": True}
 
       # Lógica para encuestas no públicas (con destinatarios)
+      if not rid and dni:
+          # Es un enlace genérico, validar si el DNI ya respondió
+          existing_response = frappe.db.exists(
+              "Survey Response",
+              {
+                  "survey": survey_name,
+                  "user": dni,
+              }
+          )
+          if existing_response:
+              return {"allow": False, "message": "Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación."}
+
       recipient = None
       if rid:
         recipient = frappe.db.get_value(
@@ -155,9 +167,6 @@ def generate_public_link_for_survey(doc, method):
             "iat": int(time()),
         }
 
-        # El flag 'public' solo se añade si la encuesta es anónima.
-        # Para encuestas de contactos con link genérico, no debe ser público
-        # para que las respuestas se procesen correctamente.
         if doc.su_is_anonymous:
             payload["public"] = True
 
@@ -173,10 +182,6 @@ def generate_public_link_for_survey(doc, method):
             frappe.log_error(frappe.get_traceback(), "Error generando JWT para enlace público")
             return modified
 
-        # Si la encuesta es anónima, el enlace va directo al formulario.
-        # Si no es anónima (identificada), el enlace va a la página de registro
-        # para que el usuario ingrese su DNI. Esto aplica tanto para "público externo identificado"
-        # como para el "enlace genérico" de una encuesta a contactos seleccionados.
         if doc.su_is_anonymous:
             base_url = frappe.utils.get_url(web_form_route)
             unique_url = f"{base_url}?new=1&token={token}"

@@ -153,8 +153,13 @@ def generate_public_link_for_survey(doc, method):
         payload = {
             "sur": doc.su_name,
             "iat": int(time()),
-            "public": True
         }
+
+        # El flag 'public' solo se añade si la encuesta es anónima.
+        # Para encuestas de contactos con link genérico, no debe ser público
+        # para que las respuestas se procesen correctamente.
+        if doc.su_is_anonymous:
+            payload["public"] = True
 
         if doc.su_end_date:
             end_date_timestamp = int(get_datetime(doc.su_end_date).timestamp())
@@ -168,6 +173,10 @@ def generate_public_link_for_survey(doc, method):
             frappe.log_error(frappe.get_traceback(), "Error generando JWT para enlace público")
             return modified
 
+        # Si la encuesta es anónima, el enlace va directo al formulario.
+        # Si no es anónima (identificada), el enlace va a la página de registro
+        # para que el usuario ingrese su DNI. Esto aplica tanto para "público externo identificado"
+        # como para el "enlace genérico" de una encuesta a contactos seleccionados.
         if doc.su_is_anonymous:
             base_url = frappe.utils.get_url(web_form_route)
             unique_url = f"{base_url}?new=1&token={token}"

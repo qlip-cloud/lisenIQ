@@ -95,13 +95,28 @@ def check_measurement_name(name):
 def get_filtered_contacts_count(filters='[]'):
     filters = json.loads(filters)
     user_contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
 
-    base_filters = {'status': ["in", ["Enabled", "Passive"]]}
+    base_filters = [
+        ["status", "in", ["Enabled", "Passive"]],
+        ["Contact", "custom_is_liseniq_contact", "=", 1]
+    ]
+    if user_company:
+        base_filters.append(["Contact", "custom_company", "=", user_company])
+
     if user_contact_name:
-        base_filters['name'] = ["!=", user_contact_name]
+        base_filters.append(["name", "!=", user_contact_name])
 
     if not filters:
-        all_contacts = frappe.get_list("Contact", filters=base_filters, fields=["name", "first_name", "last_name"])
+        all_contacts = frappe.get_list(
+            "Contact", 
+            filters=base_filters, 
+            fields=["name", "first_name", "last_name"],
+            or_filters=[
+                ["Contact", "custom_is_liseniq_contact", "=", 1],
+                ["Contact", "custom_company", "=", user_company]
+            ] if user_company else [["Contact", "custom_is_liseniq_contact", "=", 1]]
+        )
         contacts_for_modal = [{"name": c.name, "Nombre": f"{c.first_name} {c.last_name or ''}".strip()} for c in all_contacts]
         return {
             "count": len(all_contacts),
@@ -140,14 +155,28 @@ def get_filtered_contacts_count(filters='[]'):
     if not matching_contact_names:
         return {"count": 0, "headers": ["Nombre"], "contacts": []}
 
-    contact_filters = {"name": ["in", matching_contact_names], "status": ["in", ["Enabled", "Passive"]]}
+    contact_filters = {
+        "name": ["in", matching_contact_names], 
+        "status": ["in", ["Enabled", "Passive"]]
+    }
     if user_contact_name:
         contact_filters["name"] = ["in", [name for name in matching_contact_names if name != user_contact_name]]
+
+    contact_or_filters = []
+    if user_company:
+        contact_or_filters = [
+            ["custom_is_liseniq_contact", "=", 1],
+            ["custom_company", "=", user_company]
+        ]
+    else:
+        contact_or_filters = [["custom_is_liseniq_contact", "=", 1]]
+
 
     contact_docs = frappe.get_all(
         "Contact",
         filters=contact_filters,
-        fields=["name", "first_name", "last_name"]
+        fields=["name", "first_name", "last_name"],
+        or_filters=contact_or_filters
     )
     
     demographic_map_docs = frappe.get_all(

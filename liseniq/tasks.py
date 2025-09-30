@@ -45,11 +45,12 @@ def launch_pending_surveys():
 					frappe.log_error(f"No se encontró Web Form para la encuesta {survey.su_name}", "launch_pending_surveys")
 					continue
 
-				is_public_survey = frappe.db.get_value("qp_IQ_Survey", survey.name, "su_public_link")
-				if is_public_survey:
-					frappe.log_error(f"Encuesta {survey.name} es pública. Saltando envío de correos individuales.", "Survey Task Skip")
-					frappe.db.commit()
-					continue
+				# Se comenta, cuando tengamos proceso de link de publico abierto, sin ingreso de DNI
+				# is_public_survey = frappe.db.get_value("qp_IQ_Survey", survey.name, "su_public_link")
+				# if is_public_survey:
+				# 	frappe.log_error(f"Encuesta {survey.name} es pública. Saltando envío de correos individuales.", "Survey Task Skip")
+				# 	frappe.db.commit()
+				# 	continue
 
 				recipients_docs = frappe.get_all(
 					"qp_IQ_SurveyRecipient",

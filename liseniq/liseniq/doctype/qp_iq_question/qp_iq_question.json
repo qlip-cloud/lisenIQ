@@ -7,6 +7,8 @@
  "field_order": [
   "qn_type",
   "qn_statement",
+  "qn_creator",
+  "qn_owner",
   "bipolar_scale_section",
   "qn_statement_positive",
   "qn_statement_negative",
@@ -17,8 +19,6 @@
   "qn_demographic",
   "qn_status",
   "qn_helper_text",
-  "qn_creator",
-  "qn_owner",
   "qn_positive_statement",
   "qn_negative_statement",
   "qn_nps_min",
@@ -28,7 +28,6 @@
   {
    "fieldname": "qn_type",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "label": "Tipo de Pregunta",
    "options": "qp_IQ_QuestionType",
    "reqd": 1
@@ -36,6 +35,8 @@
   {
    "fieldname": "qn_statement",
    "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "in_preview": 1,
    "label": "Texto de la Pregunta / Enunciado Principal",
    "reqd": 1
   },
@@ -146,7 +147,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-30 14:08:49.670723",
+ "modified": "2025-09-30 15:40:29.474400",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

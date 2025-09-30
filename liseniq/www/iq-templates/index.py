@@ -24,10 +24,10 @@ def get_context(context):
             ['custom_company', '=', user_company]
         ],
         or_filters=[
-            ['tp_owner', '=', frappe.session.user],
-            ['tp_owner', 'is', 'not set']
+            ['tp_is_private', '=', 0],
+            ['tp_owner', '=', frappe.session.user]
         ],
-        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner"],
+        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private"],
         order_by="creation desc"
     )
     

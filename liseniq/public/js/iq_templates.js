@@ -217,7 +217,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 tp_category: formStep1.category.value,
                 tp_description: formStep1.description.value.trim(),
                 tp_status: 'Borrador',
-                tp_owner: isPrivate ? frappe.session.user : null,
+                tp_is_private: isPrivate ? 1 : 0,
+                tp_owner: frappe.session.user,
                 custom_company: userCompany,
                 tp_questions: allQuestionNames.map(q_name => ({ doctype: 'qp_IQ_TemplateQuestion', tq_question: q_name }))
             };

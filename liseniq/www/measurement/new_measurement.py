@@ -87,6 +87,11 @@ def get_demographic_values_for_contacts(demographic_type):
     })
 
 @frappe.whitelist()
+def check_measurement_name(name):
+    exists = frappe.db.exists("qp_IQ_Survey", {"su_name": name})
+    return {"exists": bool(exists)}
+
+@frappe.whitelist()
 def get_filtered_contacts_count(filters='[]'):
     filters = json.loads(filters)
     user_contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")

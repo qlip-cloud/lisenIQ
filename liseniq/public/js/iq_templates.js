@@ -76,8 +76,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    const validateStep1 = () => {
+    const validateStep1 = async () => {
         let isValid = true;
+        const templateNameField = formStep1.name;
+
         step1.querySelectorAll('[data-required="true"]').forEach(field => clearValidationError(field.id));
         step1.querySelectorAll('[data-required="true"]').forEach(field => {
             if (!field.value.trim()) {
@@ -85,6 +87,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 showValidationError(field.id, 'Este campo es obligatorio.');
             }
         });
+
+        if (isValid && templateNameField.value.trim()) {
+            btnStep1.disabled = true;
+            btnStep1.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Validando...`;
+            try {
+                const response = await frappe.call({
+                    method: 'liseniq.www.iq-templates.new_template.check_template_name',
+                    args: { name: templateNameField.value.trim() }
+                });
+
+                if (response.message.exists) {
+                    showValidationError(templateNameField.id, 'Ya existe una plantilla con este nombre.');
+                    isValid = false;
+                }
+            } catch (error) {
+                console.error("Error al validar el nombre de la plantilla:", error);
+                showValidationError(templateNameField.id, 'No se pudo validar el nombre. Intente de nuevo.');
+                isValid = false;
+            } finally {
+                btnStep1.disabled = false;
+                btnStep1.textContent = 'Siguiente';
+            }
+        }
+
         return isValid;
     };
 
@@ -230,8 +256,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function initializeEventListeners() {
-        btnStep1?.addEventListener('click', () => {
-            if (validateStep1()) {
+        btnStep1?.addEventListener('click', async () => {
+            if (await validateStep1()) {
                 const templateName = formStep1.name.value.trim();
                 templateNameBreadcrumb.textContent = templateName;
                 if (templateNameBreadcrumbRev) templateNameBreadcrumbRev.textContent = templateName;

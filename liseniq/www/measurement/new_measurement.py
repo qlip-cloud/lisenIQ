@@ -191,12 +191,15 @@ def save_measurement(data):
         
         question_types_map = {qt.name: qt.qnt_type_name for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name"])}
         
+        user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+
         manual_question_map = {}
         if data.get("questions"):
             for q in data["questions"]:
                 if q.get("id", "").startswith("manual-"):
                     question_text = q["text"]
-                    existing_question = frappe.db.exists("qp_IQ_Question", {"qn_statement": question_text})
+                    existing_question = frappe.db.exists("qp_IQ_Question", {"qn_statement": question_text, "qn_owner": user_company})
 
                     if existing_question:
                         manual_question_map[q["id"]] = existing_question
@@ -204,6 +207,8 @@ def save_measurement(data):
                         new_question = frappe.new_doc("qp_IQ_Question")
                         new_question.qn_statement = question_text
                         new_question.qn_type = q["type"]
+                        new_question.qn_creator = user_contact
+                        new_question.qn_owner = user_company
                         
                         if q.get("demographic"):
                             demographic_name = frappe.db.exists("qp_IQ_DemographicType", {"dt_title": q["demographic"]})

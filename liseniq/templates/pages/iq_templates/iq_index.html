@@ -46,8 +46,8 @@
                                             <span class="material-symbols-outlined">article</span>
                                         {% endif %}
                                     </div>
-                                    {% if template.tp_owner %}
-                                    <i class="fa fa-lock text-muted" title="Plantilla Privada"></i>
+                                    {% if template.tp_is_private %}
+                                    <i class="fa fa-lock text-muted" title="Plantilla Privada" style="color: #7B24FF !important;"></i>
                                     {% endif %}
                                 </div>
                                 <h5 class="card-title font-weight-bold mb-2">{{ template.tp_name }}</h5>

@@ -46,3 +46,8 @@ def get_context(context):
     })
 
     return context
+
+@frappe.whitelist()
+def check_template_name(name):
+    exists = frappe.db.exists("qp_IQ_Template", {"tp_name": name})
+    return {"exists": bool(exists)}

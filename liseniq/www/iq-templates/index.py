@@ -24,10 +24,10 @@ def get_context(context):
             ['custom_company', '=', user_company]
         ],
         or_filters=[
-            ['tp_owner', '=', frappe.session.user],
-            ['tp_owner', 'is', 'not set']
+            ['tp_is_private', '=', 0],
+            ['tp_owner', '=', frappe.session.user]
         ],
-        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner"],
+        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private"],
         order_by="creation desc"
     )
     
@@ -138,6 +138,12 @@ def create_question_from_template_wizard(question_data):
     try:
         data = frappe.parse_json(question_data)
         
+        user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+
+        if not user_contact or not user_company:
+            frappe.throw("No se pudo encontrar el contacto o la compañía para el usuario actual.")
+
         question_doc = frappe.new_doc("qp_IQ_Question")
         
         question_doc.qn_statement = data.get("qn_statement")
@@ -146,6 +152,8 @@ def create_question_from_template_wizard(question_data):
         question_doc.qn_status = data.get("qn_status", "Activa")
         question_doc.qn_negative_statement = data.get("qn_negative_statement")
         question_doc.qn_positive_statement = data.get("qn_positive_statement")
+        question_doc.qn_creator = user_contact
+        question_doc.qn_owner = user_company
         
         demographic_title = data.get("qn_demographic")
         if demographic_title:
@@ -193,7 +201,14 @@ def get_bank_data(keyword=None, demographic=None):
         'Ranking (Calificación o Prioridad)'
     ]
 
-    question_filters = {'qn_status': 'Activa'}
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    if not user_company:
+        frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
+
+    question_filters = {
+        'qn_status': 'Activa',
+        'qn_owner': user_company
+    }
     if keyword:
         question_filters['qn_statement'] = ['like', f'%{keyword}%']
     if demographic:

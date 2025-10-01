@@ -182,7 +182,8 @@ document.addEventListener('DOMContentLoaded', function () {
             birthdate: document.getElementById('contact-birthdate').value,
             education: document.getElementById('contact-education').value,
             entryDate: document.getElementById('contact-entrydate').value,
-            demographics: demographics
+            demographics: demographics,
+            custom_is_liseniq_contact: true
         };
     };
 

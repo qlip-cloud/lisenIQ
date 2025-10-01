@@ -10,6 +10,7 @@
   "tp_category",
   "tp_owner",
   "custom_company",
+  "tp_is_private",
   "tp_status",
   "tp_logo",
   "column_break_1",
@@ -71,11 +72,18 @@
    "label": "Company",
    "options": "qp_IQ_Company",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "tp_is_private",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Es privada"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-11 16:58:58.667353",
+ "modified": "2025-09-30 15:37:22.942799",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Template",

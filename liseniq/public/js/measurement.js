@@ -132,8 +132,8 @@ class MeasurementCreator {
     initializeEventListeners() {
         const { navButtons, contactsStep, step1Form, contactsModal, reviewStep } = this.ui;
 
-        navButtons.next1?.addEventListener('click', () => {
-            if (this.validateStep1()) {
+        navButtons.next1?.addEventListener('click', async () => {
+            if (await this.validateStep1()) {
                 this.state.measurementData.name = step1Form.name.value.trim();
                 this.updateBreadcrumbs();
                 this.showStep(2);
@@ -191,9 +191,10 @@ class MeasurementCreator {
         });
     }
 
-    validateStep1() {
+    async validateStep1() {
         let isValid = true;
         const { name, startDate, endDate, timezone } = this.ui.step1Form;
+        const { next1 } = this.ui.navButtons;
         
         [name, startDate, timezone].forEach(field => this.clearValidationError(field));
         this.clearValidationError(endDate);
@@ -221,6 +222,29 @@ class MeasurementCreator {
         if (startDate.value && endDate.value && endDate.value < startDate.value) {
             isValid = false;
             this.showValidationError(endDate, 'La fecha de finalización no puede ser anterior a la fecha de inicio.');
+        }
+
+        if (isValid && name.value.trim()) {
+            next1.disabled = true;
+            next1.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Validando...`;
+            try {
+                const response = await frappe.call({
+                    method: 'liseniq.www.measurement.new_measurement.check_measurement_name',
+                    args: { name: name.value.trim() }
+                });
+
+                if (response.message.exists) {
+                    this.showValidationError(name, 'Ya existe una medición con este nombre.');
+                    isValid = false;
+                }
+            } catch (error) {
+                console.error("Error al validar el nombre de la medición:", error);
+                this.showValidationError(name, 'No se pudo validar el nombre. Intente de nuevo.');
+                isValid = false;
+            } finally {
+                next1.disabled = false;
+                next1.textContent = 'Siguiente';
+            }
         }
 
         return isValid;

@@ -116,14 +116,28 @@ def validate_survey_link(survey_name, user, token, dni=None):
       recipient = None
       if rid:
         recipient = frappe.db.get_value(
-          "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey"], as_dict=True
+          "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey", "sr_contact"], as_dict=True
         )
       if not recipient:
         recipient = frappe.db.get_value(
-          "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey"], as_dict=True
+          "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact"], as_dict=True
         )
 
       if recipient:
+        # Validar si el contacto ya respondió con enlace genérico (usando su DNI)
+        if recipient.get("sr_contact"):
+            dni_from_contact = frappe.db.get_value("Contact", recipient.sr_contact, "custom_document_number")
+            if dni_from_contact:
+                existing_response = frappe.db.exists(
+                    "Survey Response",
+                    {
+                        "survey": survey_name,
+                        "user": dni_from_contact,
+                    }
+                )
+                if existing_response:
+                    return {"allow": False, "message": "Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación."}
+
         su_name_of_recipient = frappe.db.get_value("qp_IQ_Survey", recipient.sr_survey, "su_name")
         if su_name_of_recipient != survey_name:
           return {"allow": False, "message": "Enlace inválido o expirado."}

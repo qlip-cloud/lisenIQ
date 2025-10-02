@@ -93,6 +93,21 @@ def process_survey_response(doc, method):
         if not recipient:
             frappe.throw("Enlace inválido o expirado.")
 
+        # Validar si el contacto ya respondió con enlace genérico (usando su DNI)
+        if recipient.sr_contact:
+            dni = frappe.db.get_value("Contact", recipient.sr_contact, "custom_document_number")
+            if dni:
+                existing_response = frappe.db.exists(
+                    "Survey Response",
+                    {
+                        "survey": doc.survey,
+                        "user": dni,
+                        "name": ["!=", doc.name]
+                    }
+                )
+                if existing_response:
+                    frappe.throw("Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación.")
+
         su_name_of_recipient = frappe.db.get_value("qp_IQ_Survey", recipient.sr_survey, "su_name")
         if su_name_of_recipient != doc.survey:
             frappe.throw("Enlace inválido o expirado.")

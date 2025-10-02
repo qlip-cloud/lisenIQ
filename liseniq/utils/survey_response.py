@@ -45,17 +45,13 @@ def process_survey_response(doc, method):
         if not rid:
             frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
             
-            # Validar que no exista otra respuesta para esta encuesta con el mismo DNI/user
             if doc.user and doc.user != "Anonimo":
-                # Primero, verificar si el DNI corresponde a un contacto
                 contact_name = frappe.db.get_value("Contact", {"custom_document_number": doc.user}, "name")
 
                 if contact_name:
-                    # doc.survey es el título (su_name), necesitamos el 'name' (ID) de la encuesta.
                     survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
                     
                     if survey_name_id:
-                        # Si el contacto existe, verificar si ya respondió a través de un enlace particular
                         existing_recipient = frappe.db.exists(
                             "qp_IQ_SurveyRecipient",
                             {
@@ -72,7 +68,7 @@ def process_survey_response(doc, method):
                     {
                         "survey": doc.survey,
                         "user": doc.user,
-                        "name": ["!=", doc.name] # Excluir el documento actual
+                        "name": ["!=", doc.name]
                     }
                 )
                 if existing_response:
@@ -93,7 +89,6 @@ def process_survey_response(doc, method):
         if not recipient:
             frappe.throw("Enlace inválido o expirado.")
 
-        # Validar si el contacto ya respondió con enlace genérico (usando su DNI)
         if recipient.sr_contact:
             dni = frappe.db.get_value("Contact", recipient.sr_contact, "custom_document_number")
             if dni:
@@ -158,7 +153,6 @@ def process_survey_response(doc, method):
         frappe.db.commit()
         frappe.log_error(f"Destinatario {recipient.name} actualizado correctamente.", "Survey Response Hook")
 
-        # Procesar respuestas tipo Likert para almacenar valor numérico
         try:
             resp = json.loads(doc.response_json or "{}")
             survey_doc = frappe.get_doc("qp_IQ_Survey", recipient.sr_survey)
@@ -171,10 +165,8 @@ def process_survey_response(doc, method):
             for q_name, options_map in likert_map.items():
                 if q_name in resp:
                     answer = resp[q_name]
-                    # Si la respuesta es texto y existe en el mapeo, reemplaza por valor
                     if isinstance(answer, str) and answer in options_map:
                         resp[q_name] = options_map[answer]
-                    # Si la respuesta es objeto con 'text', usa el valor
                     elif isinstance(answer, dict) and "text" in answer and answer["text"] in options_map:
                         resp[q_name] = options_map[answer["text"]]
             doc.response_json = json.dumps(resp)

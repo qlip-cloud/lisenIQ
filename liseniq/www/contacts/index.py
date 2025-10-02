@@ -20,8 +20,8 @@ def get_context(context):
     try:
         user_doc = frappe.get_doc("User", frappe.session.user)
         context.user = user_doc
-        
-        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, ["name", "custom_company"], as_dict=True)
+
+        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, ["name", "custom_company"], as_dict=True)
 
         if not contact_info or not contact_info.custom_company:
             frappe.throw(_("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador."), title=_("Error de Configuración"))

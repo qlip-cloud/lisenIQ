@@ -15,14 +15,13 @@ def get_context(context):
 
     context.show_summary_section = False
 
-    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
 
-    if not user_contact_info:
+
+    if not user_company:
         context.measurements = []
         frappe.log_error("El usuario actual no tiene una compañía asignada.", "Error en iq-home/index.py")
         return context
-    
-    user_company = user_contact_info
 
     try:
         survey_statuses = frappe.get_all("qp_IQ_SurveyStatus", fields=["name", "se_status"], order_by="se_status")
@@ -44,6 +43,9 @@ def get_context(context):
         context.selected_status = "Todos"
 
     try:
+
+        frappe.log_error(f"Query Filters Used: {query_filters}", "Debug Info")
+        frappe.log_error(f"User Company: {user_company}", "Debug Info")
         surveys = frappe.get_all(
             "qp_IQ_Survey",
             filters=query_filters,

@@ -29,7 +29,7 @@ def get_context(context):
     except frappe.DoesNotExistError:
         context.survey_statuses = []
 
-    query_filters = {"su_owner": user_company}
+    query_filters = query_filters["su_owner"] = user_company # {"su_owner": user_company}
     selected_status_name = frappe.request.args.get('status')
 
     if selected_status_name:
@@ -89,9 +89,9 @@ def get_context(context):
         {"status": "En Proceso", "bar1_height": 60, "bar2_height": 45}
     ]
 
-    context.update({
-        "is_navbar_custom": True,
-        "no_cache": 1
-    })
+    # context.update({
+    #     "is_navbar_custom": True,
+    #     "no_cache": 1
+    # })
      
     return context

@@ -15,7 +15,7 @@ def get_context(context):
 
     context.show_summary_section = False
 
-    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
 
     if not user_company:
@@ -43,9 +43,6 @@ def get_context(context):
         context.selected_status = "Todos"
 
     try:
-
-        frappe.log_error(f"Query Filters Used: {query_filters}", "Debug Info")
-        frappe.log_error(f"User Company: {user_company}", "Debug Info")
         surveys = frappe.get_all(
             "qp_IQ_Survey",
             filters=query_filters,

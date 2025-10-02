@@ -12,7 +12,8 @@ frappe.web_form.after_load = () => {
   $(".frappe-control[data-fieldname='user']").hide();
   $(".frappe-control[data-fieldname='survey']").hide();
   
-  // Validación: si el link ya fue utilizado, mostrar mensaje y no cargar la encuesta
+  $('.web-form-actions button[type="submit"]').hide();
+
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
   const dni = localStorage.getItem("liseniq_doc_id");
@@ -38,13 +39,52 @@ frappe.web_form.after_load = () => {
         show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
         return;
       }
+
+      $('.web-form-actions button[type="submit"]').show();
       load_survey(frappe.web_form.title);
     });
 };
 
 frappe.ready(function() {
   $('<style>.survey-completed { pointer-events: none; opacity: 0.7; }</style>').appendTo('head');
+  
+  const dni_field = frappe.web_form.fields_dict.custom_document_number;
+  if (dni_field) {
+    $(dni_field.input).on('blur', function() {
+      validate_dni_on_input(this.value);
+    });
+  }
 });
+
+const validate_dni_on_input = function(dni) {
+    if (!dni) {
+        return;
+    }
+
+    frappe.call({
+        method: "liseniq.utils.api_survey.validate_survey_link",
+        args: {
+            survey_name: frappe.web_form.title,
+            dni: dni
+        },
+    }).then((r) => {
+        const res = r.message || {};
+        const dni_field = frappe.web_form.fields_dict.custom_document_number;
+        const $submit_btn = $('.web-form-actions button[type="submit"]');
+
+        $(dni_field.input).removeClass('is-invalid');
+        $(dni_field.wrapper).find('.invalid-feedback').remove();
+
+        if (res.allow === false) {
+            const error_msg = res.message || __("Esta encuesta ya fue completada.");
+            $(dni_field.input).addClass('is-invalid');
+            $(dni_field.wrapper).append(`<div class="invalid-feedback">${error_msg}</div>`);
+            $submit_btn.prop('disabled', true);
+        } else {
+            $submit_btn.prop('disabled', false);
+        }
+    });
+};
 
 const show_completed_message = function (msg) {
   $(".web-form-container").toggle(false);
@@ -101,7 +141,6 @@ const submit_response = function (data) {
   const token = urlParams.get("token");
   const doc_id = localStorage.getItem("liseniq_doc_id");
 
-  // Validación antes de enviar: bloquear si ya fue respondida
   frappe
     .call({
       method: "liseniq.utils.api_survey.validate_survey_link",
@@ -119,7 +158,6 @@ const submit_response = function (data) {
         return;
       }
 
-      // Adjuntar el token dentro del JSON de respuestas para que el backend lo procese
       const payload = Object.assign({}, data);
       if (token) {
         payload.__token = token;
@@ -131,7 +169,7 @@ const submit_response = function (data) {
         response_json: JSON.stringify(payload),
         user: doc_id || "Anonimo"
       };
-      console.log(args);
+      // console.log(args);
       frappe.call({
         type: "POST",
         method: "frappe.website.doctype.web_form.web_form.accept",
@@ -141,8 +179,7 @@ const submit_response = function (data) {
         },
         callback: (response) => {
           if (!response.exc) {
-            console.log(response.message);
-            // Limpiar el doc_id del localStorage después de un envío exitoso
+            // console.log(response.message);
             localStorage.removeItem("liseniq_doc_id");
           }
         },

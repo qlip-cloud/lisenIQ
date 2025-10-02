@@ -94,8 +94,8 @@ def check_measurement_name(name):
 @frappe.whitelist()
 def get_filtered_contacts_count(filters='[]'):
     filters = json.loads(filters)
-    user_contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
-    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    user_contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
     base_filters = [
         ["status", "in", ["Enabled", "Passive"]],
@@ -220,8 +220,8 @@ def save_measurement(data):
         
         question_types_map = {qt.name: qt.qnt_type_name for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name"])}
         
-        user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
-        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
         manual_question_map = {}
         if data.get("questions"):
@@ -357,7 +357,7 @@ def save_measurement(data):
 
             web_form.insert(ignore_permissions=True)
 
-        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
         if not user_contact_info:
             message = "El usuario actual no tiene una compañía asignada para definir la propiedad de la medición."
             frappe.log_error(message, "Error en save_measurement")

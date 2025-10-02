@@ -13,7 +13,7 @@ def get_context(context):
     context.is_navbar_custom = True
     context.no_cache = 1
 
-    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
     if not user_contact_info:
         frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
     user_company = user_contact_info
@@ -138,8 +138,8 @@ def create_question_from_template_wizard(question_data):
     try:
         data = frappe.parse_json(question_data)
         
-        user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
-        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
         if not user_contact or not user_company:
             frappe.throw("No se pudo encontrar el contacto o la compañía para el usuario actual.")

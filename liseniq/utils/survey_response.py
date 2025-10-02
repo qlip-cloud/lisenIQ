@@ -47,6 +47,26 @@ def process_survey_response(doc, method):
             
             # Validar que no exista otra respuesta para esta encuesta con el mismo DNI/user
             if doc.user and doc.user != "Anonimo":
+                # Primero, verificar si el DNI corresponde a un contacto
+                contact_name = frappe.db.get_value("Contact", {"custom_document_number": doc.user}, "name")
+
+                if contact_name:
+                    # doc.survey es el título (su_name), necesitamos el 'name' (ID) de la encuesta.
+                    survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
+                    
+                    if survey_name_id:
+                        # Si el contacto existe, verificar si ya respondió a través de un enlace particular
+                        existing_recipient = frappe.db.exists(
+                            "qp_IQ_SurveyRecipient",
+                            {
+                                "sr_survey": survey_name_id,
+                                "sr_contact": contact_name,
+                                "sr_status": "Responded"
+                            }
+                        )
+                        if existing_recipient:
+                            frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
+
                 existing_response = frappe.db.exists(
                     "Survey Response",
                     {

@@ -87,7 +87,22 @@ def validate_survey_link(survey_name, user, token, dni=None):
 
       # Lógica para encuestas no públicas (con destinatarios)
       if not rid and dni:
-          # Es un enlace genérico, validar si el DNI ya respondió
+          # Es un enlace genérico, validar si el DNI ya respondió como contacto
+          contact_name = frappe.db.get_value("Contact", {"custom_document_number": dni}, "name")
+          if contact_name:
+              survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
+              if survey_name_id:
+                  existing_recipient = frappe.db.exists(
+                      "qp_IQ_SurveyRecipient",
+                      {
+                          "sr_survey": survey_name_id,
+                          "sr_contact": contact_name,
+                          "sr_status": "Responded"
+                      }
+                  )
+                  if existing_recipient:
+                      return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
+          # Validar también si ya existe una respuesta con ese DNI
           existing_response = frappe.db.exists(
               "Survey Response",
               {

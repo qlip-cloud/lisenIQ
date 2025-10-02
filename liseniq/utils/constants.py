@@ -12,6 +12,9 @@ frappe.web_form.after_load = () => {
   $(".frappe-control[data-fieldname='user']").hide();
   $(".frappe-control[data-fieldname='survey']").hide();
   
+  // Ocultar el botón de envío inicialmente
+  $('.web-form-actions button[type="submit"]').hide();
+
   // Validación: si el link ya fue utilizado, mostrar mensaje y no cargar la encuesta
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
@@ -38,13 +41,56 @@ frappe.web_form.after_load = () => {
         show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
         return;
       }
+      // Si la validación inicial es exitosa, mostrar el botón de envío
+      $('.web-form-actions button[type="submit"]').show();
       load_survey(frappe.web_form.title);
     });
 };
 
 frappe.ready(function() {
   $('<style>.survey-completed { pointer-events: none; opacity: 0.7; }</style>').appendTo('head');
+  
+  // Añadir listener al campo de DNI si existe
+  const dni_field = frappe.web_form.fields_dict.custom_document_number;
+  if (dni_field) {
+    $(dni_field.input).on('blur', function() {
+      validate_dni_on_input(this.value);
+    });
+  }
 });
+
+const validate_dni_on_input = function(dni) {
+    if (!dni) {
+        return;
+    }
+
+    frappe.call({
+        method: "liseniq.utils.api_survey.validate_survey_link",
+        args: {
+            survey_name: frappe.web_form.title,
+            dni: dni
+        },
+    }).then((r) => {
+        const res = r.message || {};
+        const dni_field = frappe.web_form.fields_dict.custom_document_number;
+        const $submit_btn = $('.web-form-actions button[type="submit"]');
+
+        // Limpiar validación anterior
+        $(dni_field.input).removeClass('is-invalid');
+        $(dni_field.wrapper).find('.invalid-feedback').remove();
+
+        if (res.allow === false) {
+            // Mostrar error y deshabilitar envío
+            const error_msg = res.message || __("Esta encuesta ya fue completada.");
+            $(dni_field.input).addClass('is-invalid');
+            $(dni_field.wrapper).append(`<div class="invalid-feedback">${error_msg}</div>`);
+            $submit_btn.prop('disabled', true);
+        } else {
+            // Habilitar envío
+            $submit_btn.prop('disabled', false);
+        }
+    });
+};
 
 const show_completed_message = function (msg) {
   $(".web-form-container").toggle(false);

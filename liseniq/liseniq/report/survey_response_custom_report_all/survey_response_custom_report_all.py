@@ -159,6 +159,7 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             c.first_name,
             c.last_name,
             c.custom_dob,
+            c.gender,
             a.al_title
         FROM `tabSurvey Response` sr
         LEFT JOIN `tabContact` c ON c.name = sr.user
@@ -203,6 +204,7 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
         'custom_dob': response.get('custom_dob', ''),
+        'gender': response.get('gender', ''),
         'custom_academic_level': response.get('al_title', '')
     }
 
@@ -333,7 +335,7 @@ def get_bulk_demographics(users_list, demographics_map):
         user = result.get('name')
         tag = result.get('cad_id')
         value = result.get('cad_value')
-        
+
         if user and tag and value:
             if user not in demographics_data:
                 demographics_data[user] = {}

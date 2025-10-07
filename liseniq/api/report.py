@@ -93,6 +93,7 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             c.first_name,
             c.last_name,
             c.custom_dob,
+            c.gender,
             c.custom_entry_date,
             c.custom_country,
             a.al_title
@@ -160,6 +161,7 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
         'custom_dob': response.get('custom_dob', ''),
+        'gender': response.get('gender', ''),
         'custom_academic_level': response.get('al_title', ''),
         'entry_date': response.get('custom_entry_date', ''),
         'country': response.get('custom_country', ''),

@@ -87,10 +87,31 @@ def validate_survey_link(survey_name, user, token, dni=None):
 
       # Lógica para encuestas no públicas (con destinatarios)
       if not rid and dni:
-          contact_name = frappe.db.get_value("Contact", {"custom_document_number": dni}, "name")
+          survey_owner_company = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_owner")
+          if not survey_owner_company:
+              return {"allow": False, "message": "No se pudo determinar la empresa propietaria de la encuesta."}
+
+          contact_info = frappe.db.get_value("Contact", {"custom_document_number": dni}, ["name", "custom_company"], as_dict=True)
+          if not contact_info:
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado."}
+          
+          if contact_info.custom_company != survey_owner_company:
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta."}
+
+          contact_name = contact_info.name
           if contact_name:
               survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
               if survey_name_id:
+                  existing_response_by_contact = frappe.db.exists(
+                      "Survey Response",
+                      {
+                          "survey": survey_name,
+                          "user": contact_name,
+                      }
+                  )
+                  if existing_response_by_contact:
+                      return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
+
                   existing_recipient = frappe.db.exists(
                       "qp_IQ_SurveyRecipient",
                       {

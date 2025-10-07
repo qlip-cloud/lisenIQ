@@ -93,7 +93,7 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 
 doc_events = {
 	"Survey Response": {
-		"validate": "liseniq.utils.survey_response.process_survey_response"
+		"before_insert": "liseniq.utils.survey_response.process_survey_response"
 	}
 }
 

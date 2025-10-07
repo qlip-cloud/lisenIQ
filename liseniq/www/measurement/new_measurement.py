@@ -98,24 +98,20 @@ def get_filtered_contacts_count(filters='[]'):
     user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
     base_filters = [
-        ["status", "in", ["Enabled", "Passive"]],
+        ["Contact", "status", "in", ["Enabled", "Passive"]],
         ["Contact", "custom_is_liseniq_contact", "=", 1]
     ]
     if user_company:
         base_filters.append(["Contact", "custom_company", "=", user_company])
 
     if user_contact_name:
-        base_filters.append(["name", "!=", user_contact_name])
+        base_filters.append(["Contact", "name", "!=", user_contact_name])
 
     if not filters:
         all_contacts = frappe.get_list(
             "Contact", 
             filters=base_filters, 
-            fields=["name", "first_name", "last_name"],
-            or_filters=[
-                ["Contact", "custom_is_liseniq_contact", "=", 1],
-                ["Contact", "custom_company", "=", user_company]
-            ] if user_company else [["Contact", "custom_is_liseniq_contact", "=", 1]]
+            fields=["name", "first_name", "last_name"]
         )
         contacts_for_modal = [{"name": c.name, "Nombre": f"{c.first_name} {c.last_name or ''}".strip()} for c in all_contacts]
         return {
@@ -157,26 +153,20 @@ def get_filtered_contacts_count(filters='[]'):
 
     contact_filters = {
         "name": ["in", matching_contact_names], 
-        "status": ["in", ["Enabled", "Passive"]]
+        "status": ["in", ["Enabled", "Passive"]],
+        "custom_is_liseniq_contact": 1
     }
     if user_contact_name:
         contact_filters["name"] = ["in", [name for name in matching_contact_names if name != user_contact_name]]
 
-    contact_or_filters = []
     if user_company:
-        contact_or_filters = [
-            ["custom_is_liseniq_contact", "=", 1],
-            ["custom_company", "=", user_company]
-        ]
-    else:
-        contact_or_filters = [["custom_is_liseniq_contact", "=", 1]]
+        contact_filters["custom_company"] = user_company
 
 
     contact_docs = frappe.get_all(
         "Contact",
         filters=contact_filters,
-        fields=["name", "first_name", "last_name"],
-        or_filters=contact_or_filters
+        fields=["name", "first_name", "last_name"]
     )
     
     demographic_map_docs = frappe.get_all(

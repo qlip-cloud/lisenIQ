@@ -5,20 +5,23 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "qn_type",
-  "qn_statement",
   "qn_creator",
+  "qp_sec_question",
+  "qn_statement",
+  "qn_helper_text",
+  "qn_type",
+  "qp_col_1",
   "qn_owner",
-  "bipolar_scale_section",
+  "qn_status",
+  "qn_category",
+  "qn_optional",
+  "qp_sec_od",
+  "qn_demographic",
+  "qn_is_demographic",
   "qn_statement_positive",
   "qn_statement_negative",
   "qn_response_options",
-  "qn_optional",
-  "qn_category",
-  "qn_is_demographic",
-  "qn_demographic",
-  "qn_status",
-  "qn_helper_text",
+  "qp_col_2",
   "qn_positive_statement",
   "qn_negative_statement",
   "qn_nps_min",
@@ -69,8 +72,6 @@
   {
    "fieldname": "qn_demographic",
    "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_preview": 1,
    "label": "Dato Demogr\u00e1fico",
    "options": "qp_IQ_DemographicType"
   },
@@ -96,12 +97,6 @@
    "label": "Pertene a Compa\u00f1ia",
    "options": "qp_IQ_Company",
    "reqd": 1
-  },
-  {
-   "depends_on": "eval: doc.qn_type === '(-4 a 4) Anunciado Positivo y Negativo'",
-   "fieldname": "bipolar_scale_section",
-   "fieldtype": "Section Break",
-   "label": "Configuraci\u00f3n de Escala Bipolar"
   },
   {
    "fieldname": "qn_statement_positive",
@@ -143,11 +138,28 @@
    "label": "Creador",
    "options": "Contact",
    "reqd": 1
+  },
+  {
+   "fieldname": "qp_sec_question",
+   "fieldtype": "Section Break",
+   "label": "Pregunta"
+  },
+  {
+   "fieldname": "qp_sec_od",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "qp_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qp_col_2",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-30 15:40:29.474400",
+ "modified": "2025-10-08 12:33:00.662391",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

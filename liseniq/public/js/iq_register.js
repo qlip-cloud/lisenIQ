@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     showError(r.message || 'Ocurrió un error al procesar tu solicitud.');
                     submitButton.disabled = false;
-                    submitButton.textContent = 'Continuar';
+                    submitButton.textContent = 'Iniciar';
                     localStorage.removeItem('liseniq_doc_id'); // Limpiar en caso de error
                 }
             },
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 showError(message);
                 submitButton.disabled = false;
-                submitButton.textContent = 'Continuar';
+                submitButton.textContent = 'Iniciar';
                 localStorage.removeItem('liseniq_doc_id'); // Limpiar en caso de error
             }
         });
@@ -65,6 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function validateInput(docId) {
         if (!docId) {
             showError('Por favor, ingresa tu documento de identidad.');
+            return false;
+        }
+        if (!/^[a-zA-Z0-9]{1,20}$/.test(docId)) {
+            showError('El documento solo puede contener letras y números (máximo 20 caracteres).');
             return false;
         }
         hideError();

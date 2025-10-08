@@ -147,22 +147,33 @@ class MeasurementCreator {
                 this.questionBuilder.setQuestions(data.questions);
             }
             if (this.questionBuilder.setEditMode) {
-                this.questionBuilder.setEditMode(true); // si existe, bloquear edición
+                this.questionBuilder.setEditMode(true);
             } else if (this.questionBuilder.setReadOnly) {
                 this.questionBuilder.setReadOnly(true);
             }
 
             // Participantes (solo visual)
             if (data.contacts) {
-                const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber, viewContactsBtn } = this.ui.contactsStep;
+                const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber /*, viewContactsBtn*/ } = this.ui.contactsStep;
                 if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'all';
                 if (responseTypeSelect) responseTypeSelect.value = data.contacts.responseType || 'anonymous';
                 if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                     selectedContactsSection?.classList.remove('d-none');
                 }
-                if (contactCountNumber) contactCountNumber.textContent = data.contacts.contactCount ?? 0;
-                // No mostrar listado en modal (no editable)
-                viewContactsBtn?.classList.add('d-none');
+
+                this.state.measurementData.contacts.headers = Array.isArray(data.contacts.headers) && data.contacts.headers.length > 0
+                    ? data.contacts.headers
+                    : ['Nombre'];
+                this.state.measurementData.contacts.list = Array.isArray(data.contacts.list)
+                    ? data.contacts.list
+                    : [];
+
+                if (contactCountNumber) {
+                    const safeCount = this.state.measurementData.contacts.list.length;
+                    contactCountNumber.textContent = String(safeCount);
+                }
+                // Ya no ocultamos el ícono en edición: permitir ver contactos
+                // viewContactsBtn?.classList.add('d-none');  // eliminado
             }
 
             // Recordatorios
@@ -312,15 +323,14 @@ class MeasurementCreator {
             this.showValidationError(endDate, 'La fecha de finalización no puede ser anterior a la fecha de inicio.');
         }
 
-        // Validar unicidad también en edición (evitar nombres repetidos en la empresa)
+        // Evitar nombres repetidos en la empresa
         if (isValid && name.value.trim()) {
             next1.disabled = true;
             next1.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Validando...`;
             try {
                 const args = { name: name.value.trim() };
                 if (this.state.isEditMode) {
-                    args.exclude_doc = this.state.docName; // validar contra toda la empresa, excluyendo el doc actual
-                    // sin only_open: aplica a cualquier estatus
+                    args.exclude_doc = this.state.docName;
                 }
                 const response = await frappe.call({
                     method: 'liseniq.www.measurement.new_measurement.check_measurement_name',
@@ -487,20 +497,21 @@ class MeasurementCreator {
     }
 
     renderReviewStep() {
-        const { measurementName, surveyType, responseType, questionsCount, contactCount, questionsList } = this.ui.reviewStep;
+        const { measurementName, surveyType, responseType, questionsCount, contactCount, questionsList, viewContactsBtn } = this.ui.reviewStep;
         const { surveyTypeSelect, responseTypeSelect } = this.ui.contactsStep;
 
         measurementName.textContent = this.state.measurementData.name;
 
-        // Mostrar datos según modo edición o creación
         if (this.state.isEditMode) {
             const dataEl = document.getElementById('measurement-data');
             const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
             surveyType.textContent = data?.contacts?.surveyType === 'selected' ? 'Contactos Cargados Previamente' : 'Público Externo';
             responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
             questionsCount.textContent = (data?.questions || []).length;
-            contactCount.textContent = data?.contacts?.contactCount ?? 0;
-            this.ui.reviewStep.viewContactsBtn.style.display = 'none';
+
+            const listLen = this.state.measurementData.contacts.list?.length || 0;
+            contactCount.textContent = listLen;
+            if (viewContactsBtn) viewContactsBtn.style.display = listLen > 0 ? 'inline-block' : 'none';
         } else {
             surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
             responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
@@ -609,6 +620,7 @@ class MeasurementCreator {
         tableHead.innerHTML = '';
         tableBody.innerHTML = '';
 
+        // Encabezados dinámicos
         if (headers && headers.length > 0) {
             const headerRow = tableHead.insertRow();
             headers.forEach(h => {
@@ -618,6 +630,7 @@ class MeasurementCreator {
             });
         }
 
+        // Filas con datos
         if (contacts && contacts.length > 0) {
             contacts.forEach(c => {
                 const row = tableBody.insertRow();

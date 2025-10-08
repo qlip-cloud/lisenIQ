@@ -46,6 +46,20 @@ def get_context(context):
             survey_type = "selected" if recipients_count > 0 else "all"
             response_type = "anonymous" if doc.su_is_anonymous else "identified"
 
+            # Construir lista de contactos para el modal en edición
+            contacts_headers = ["Nombre"]
+            contacts_list = []
+            if recipients_count > 0:
+                recipient_rows = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": doc.name}, fields=["sr_contact"])
+                contact_names = [r.sr_contact for r in recipient_rows if r.sr_contact]
+                if contact_names:
+                    contact_docs = frappe.get_all("Contact", filters={"name": ["in", contact_names]}, fields=["name", "first_name", "last_name"])
+                    for c in contact_docs:
+                        contacts_list.append({
+                            "name": c.name,
+                            "Nombre": f"{(c.first_name or '').strip()} {(c.last_name or '').strip()}".strip()
+                        })
+
             measurement_data = {
                 "name": doc.su_name,
                 "startDate": doc.su_start_date,
@@ -60,7 +74,9 @@ def get_context(context):
                 "contacts": {
                     "surveyType": survey_type,
                     "responseType": response_type,
-                    "contactCount": recipients_count
+                    "contactCount": recipients_count,
+                    "headers": contacts_headers,
+                    "list": contacts_list
                 }
             }
             context.measurement_data_json = frappe.as_json(measurement_data)
@@ -288,7 +304,7 @@ def save_measurement(data):
         if data.get("is_edit_mode") and data.get("doc_name"):
             survey = frappe.get_doc("qp_IQ_Survey", data["doc_name"])
 
-            # Validación de nombre único por compañía (excluyendo el mismo documento)
+            # Validación de nombre único por compañía
             new_name = data.get("name")
             if new_name:
                 exists = frappe.get_all(

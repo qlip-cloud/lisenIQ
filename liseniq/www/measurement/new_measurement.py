@@ -14,6 +14,76 @@ def get_context(context):
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
 
+    measurement_name = frappe.request.args.get('name')
+    context.is_edit_mode = bool(measurement_name)
+    context.page_title = "Editar Medición" if context.is_edit_mode else "Crear Medición"
+    context.measurement_data_json = "null"
+
+    # Modo edición: cargar datos existentes
+    if context.is_edit_mode:
+        try:
+            doc = frappe.get_doc("qp_IQ_Survey", measurement_name)
+            # Construir preguntas
+            questions = []
+            for q_link in (doc.su_questions or []):
+                q_doc = frappe.get_doc("qp_IQ_Question", q_link.sq_question)
+                type_name = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, "qnt_type_name")
+                demo_title = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else None
+                options = [opt.qo_option_text for opt in (q_doc.qn_response_options or [])]
+                questions.append({
+                    "id": q_doc.name,
+                    "text": q_doc.qn_statement,
+                    "type": q_doc.qn_type,
+                    "typeName": type_name,
+                    "demographic": demo_title,
+                    "options": options,
+                    "nps_min": q_doc.qn_nps_min,
+                    "nps_max": q_doc.qn_nps_max
+                })
+
+            # Datos de participantes
+            recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": doc.name})
+            survey_type = "selected" if recipients_count > 0 else "all"
+            response_type = "anonymous" if doc.su_is_anonymous else "identified"
+
+            # Construir lista de contactos para el modal en edición
+            contacts_headers = ["Nombre"]
+            contacts_list = []
+            if recipients_count > 0:
+                recipient_rows = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": doc.name}, fields=["sr_contact"])
+                contact_names = [r.sr_contact for r in recipient_rows if r.sr_contact]
+                if contact_names:
+                    contact_docs = frappe.get_all("Contact", filters={"name": ["in", contact_names]}, fields=["name", "first_name", "last_name"])
+                    for c in contact_docs:
+                        contacts_list.append({
+                            "name": c.name,
+                            "Nombre": f"{(c.first_name or '').strip()} {(c.last_name or '').strip()}".strip()
+                        })
+
+            measurement_data = {
+                "name": doc.su_name,
+                "startDate": doc.su_start_date,
+                "endDate": doc.su_end_date,
+                "timezone": doc.su_timezone,
+                "reminders": {
+                    "send": True if doc.su_send_reminders else False,
+                    "frequency": doc.su_reminder_frequency,
+                    "max": doc.su_reminder_max
+                },
+                "questions": questions,
+                "contacts": {
+                    "surveyType": survey_type,
+                    "responseType": response_type,
+                    "contactCount": recipients_count,
+                    "headers": contacts_headers,
+                    "list": contacts_list
+                }
+            }
+            context.measurement_data_json = frappe.as_json(measurement_data)
+        except Exception as e:
+            frappe.log_error(f"Error cargando medición para editar: {e}", "new_measurement.get_context")
+            frappe.throw(_("Medición no encontrada."), frappe.DoesNotExistError)
+
     try:
         context.contact_demographics = frappe.get_all(
             "qp_IQ_DemographicType",
@@ -67,6 +137,33 @@ def get_context(context):
     return context
 
 @frappe.whitelist()
+def check_measurement_name(name, exclude_doc=None, only_open=False):
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    if not user_company:
+        exists = frappe.db.exists("qp_IQ_Survey", {"su_name": name})
+        return {"exists": bool(exists)}
+
+    conditions = [
+        ["qp_IQ_Survey", "su_owner", "=", user_company],
+        ["qp_IQ_Survey", "su_name", "=", name],
+    ]
+    if exclude_doc:
+        conditions.append(["qp_IQ_Survey", "name", "!=", exclude_doc])
+
+    if only_open:
+        open_status_docs = frappe.get_all(
+            "qp_IQ_SurveyStatus",
+            filters={"se_status": ["in", ["Programada", "En Progreso", "Borrador"]]},
+            fields=["name"]
+        )
+        open_status_ids = [d.name for d in open_status_docs]
+        if open_status_ids:
+            conditions.append(["qp_IQ_Survey", "su_status", "in", open_status_ids])
+
+    rows = frappe.get_all("qp_IQ_Survey", filters=conditions, fields=["name"], limit_page_length=1)
+    return {"exists": bool(rows)}
+
+@frappe.whitelist()
 def get_demographic_values_for_contacts(demographic_type):
     if not demographic_type:
         return frappe._dict({"values": [], "color": None})
@@ -85,11 +182,6 @@ def get_demographic_values_for_contacts(demographic_type):
         "values": [d.get("cad_value") for d in values if d.get("cad_value")],
         "color": color
     })
-
-@frappe.whitelist()
-def check_measurement_name(name):
-    exists = frappe.db.exists("qp_IQ_Survey", {"su_name": name})
-    return {"exists": bool(exists)}
 
 @frappe.whitelist()
 def get_filtered_contacts_count(filters='[]'):
@@ -207,7 +299,46 @@ def get_filtered_contacts_count(filters='[]'):
 def save_measurement(data):
     try:
         data = json.loads(data)
-        
+
+        # Modo edición: actualizar solo nombre, fecha de cierre y recordatorios
+        if data.get("is_edit_mode") and data.get("doc_name"):
+            survey = frappe.get_doc("qp_IQ_Survey", data["doc_name"])
+
+            # Validación de nombre único por compañía
+            new_name = data.get("name")
+            if new_name:
+                exists = frappe.get_all(
+                    "qp_IQ_Survey",
+                    filters=[
+                        ["qp_IQ_Survey", "su_owner", "=", survey.su_owner],
+                        ["qp_IQ_Survey", "su_name", "=", new_name],
+                        ["qp_IQ_Survey", "name", "!=", survey.name],
+                    ],
+                    fields=["name"],
+                    limit_page_length=1
+                )
+                if exists:
+                    return {"status": "error", "message": _("Ya existe una medición con ese nombre para su empresa.")}
+
+                survey.su_name = new_name
+
+            survey.su_end_date = data.get("endDate")
+
+            reminders = data.get("reminders")
+            if reminders:
+                survey.su_send_reminders = 1
+                survey.su_reminder_frequency = reminders.get("frequency")
+                survey.su_reminder_max = reminders.get("max")
+            else:
+                survey.su_send_reminders = 0
+                survey.su_reminder_frequency = None
+                survey.su_reminder_max = None
+
+            survey.save(ignore_permissions=True)
+            frappe.db.commit()
+            return {"status": "success", "message": f"Medición '{survey.su_name}' actualizada exitosamente.", "docname": survey.name}
+
+        # Modo nueva encuesta o creación
         question_types_map = {qt.name: qt.qnt_type_name for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name"])}
         
         user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")

@@ -5,36 +5,45 @@
     <title>Registro - Documento de Identidad</title>
     <link rel="stylesheet" href="/assets/liseniq/css/main.css">
     <link rel="stylesheet" href="/assets/liseniq/css/iq_register.css">
+    <link href="https://fonts.googleapis.com/css?family=Rubik:400,500,600,700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <main class="main-content-padding">
-        <section class="page-title-section">
-            <div class="breadcrumb-nav">
-                <a href="/">Inicio</a> / Registro
+    <main class="iq-register-main">
+        <div class="iq-register-card">
+            <div class="iq-register-card-content">
+                <div class="iq-register-logo">
+                    <!-- <img src="/assets/liseniq/images/occ.png" alt="Logo"> -->
+                </div>
+                <div class="iq-register-title-group">
+                    <div class="iq-register-firstline">Medición</div>
+                    <div class="iq-register-main-title">{{ survey_name }}</div>
+                    <div class="iq-register-description">
+                        Mide la cultura actual en la organización y apoya la definición de la cultura requerida para alinearla con la estrategia.<br>
+                        Reportes con análisis de brechas, subculturas y tendencias.
+                    </div>
+                </div>
+                <form id="identity-form" novalidate style="width:100%;">
+                    <div class="iq-register-form-group" style="width:100%;">
+                        <div class="iq-register-label-medium">Ingrese su número de documento</div>
+                        <div class="iq-register-label-bold">Documento de identidad</div>
+                        <input 
+                            type="text" 
+                            id="doc_id" 
+                            name="doc_id" 
+                            class="iq-register-input iq-register-input-full" 
+                            autocomplete="off" 
+                            inputmode="text"
+                            placeholder=""
+                            maxlength="20">
+                        <small id="doc-id-error" class="form-error-message" style="display:none;"></small>
+                        <div class="iq-register-hint-medium">Sólo se permiten letras y números</div>
+                    </div>
+                    <div class="iq-register-form-action-center" style="width:100%;">
+                        <button type="submit" class="iq-register-btn" id="btn-submit">Iniciar</button>
+                    </div>
+                </form>
             </div>
-            <div class="title-with-action">
-                <h1 class="page-main-title">Ingresa tu documento</h1>
-            </div>
-        </section>
-
-        <form id="identity-form" novalidate>
-            <div class="form-group">
-                <label for="doc_id">Documento de identidad</label>
-                <input 
-                    type="text" 
-                    id="doc_id" 
-                    name="doc_id" 
-                    class="form-control" 
-                    autocomplete="off" 
-                    inputmode="numeric" 
-                    placeholder="Ej: 12345678">
-                <small id="doc-id-error" class="form-error-message" style="display:none;"></small>
-            </div>
-
-            <div class="form-action-buttons">
-                <button type="submit" class="btn-purple-main" id="btn-submit">Continuar</button>
-            </div>
-        </form>
+        </div>
     </main>
 
     <script>

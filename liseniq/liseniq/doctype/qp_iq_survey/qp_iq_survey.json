@@ -160,7 +160,8 @@
    "fieldname": "su_timezone",
    "fieldtype": "Select",
    "label": "Zona Horaria",
-   "options": "America/Caracas\nAmerica/Bogota"
+   "options": "America/Bogota\nAmerica/Caracas",
+   "default": "America/Bogota"
   },
   {
    "fieldname": "secci\u00f3n_link_publico_section",

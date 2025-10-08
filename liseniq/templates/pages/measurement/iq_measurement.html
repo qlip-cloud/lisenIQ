@@ -1,6 +1,7 @@
 <div class="main-content-padding">
 
     <div id="preloaded-questions-data" data-questions='{{ preloaded_questions_json | e if preloaded_questions_json else "[]" }}' style="display: none;"></div>
+    <div id="measurement-data" data-measurement='{{ measurement_data_json | e if measurement_data_json else "null" }}' style="display: none;"></div>
 
     <div id="measurement-stepper-container" class="mb-5"></div>
 
@@ -9,7 +10,7 @@
         <div id="step-1-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
-                    <a href="#">Mediciones</a> / <span>Crear Medición</span>
+                    <a href="/iq-home">Mediciones</a> / <span>{{ "Editar Medición" if is_edit_mode else "Crear Medición" }}</span>
                 </div>
                 <div class="title-with-action">
                     <h3 class="page-main-title">Nombre de la medición</h3>
@@ -21,12 +22,12 @@
                 <div class="measurement-form-grid">
                     <div class="form-group">
                         <label for="measurement-name">Nombre de la medición</label>
-                        <input type="text" id="measurement-name" class="form-control" data-required="true" maxlength="75">
+                        <input type="text" id="measurement-name" class="form-control" data-required="true" maxlength="75" {{ "disabled" if is_edit_mode }}>
                         <small id="measurement-name-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
                         <label for="measurement-start-date">Fecha y Hora de Inicio</label>
-                        <input type="datetime-local" id="measurement-start-date" class="form-control" data-required="true">
+                        <input type="datetime-local" id="measurement-start-date" class="form-control" data-required="true" {{ "disabled" if is_edit_mode }}>
                         <small id="measurement-start-date-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
@@ -36,9 +37,9 @@
                     </div>
                     <div class="form-group">
                         <label for="measurement-timezone">Zona Horaria</label>
-                        <select id="measurement-timezone" class="form-control form-select" data-required="true">
+                        <select id="measurement-timezone" class="form-control form-select" data-required="true" {{ "disabled" if is_edit_mode }}>
                             {% for tz in timezones %}
-                            <option value="{{ tz }}" {% if tz == 'America/Caracas' %}selected{% endif %}>{{ tz }}</option>
+                            <option value="{{ tz }}" {% if tz == 'America/Bogota' %}selected{% endif %}>{{ tz }}</option>
                             {% endfor %}
                         </select>
                         <small id="measurement-timezone-error" class="form-error-message d-none"></small>
@@ -50,7 +51,7 @@
         <div id="step-2-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
-                    <a href="#">Mediciones</a> / 
+                    <a href="/iq-home">Mediciones</a> / 
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
@@ -67,7 +68,7 @@
         <div id="step-3-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
-                    <a href="#">Mediciones</a> / 
+                    <a href="/iq-home">Mediciones</a> / 
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
@@ -83,7 +84,7 @@
                     <div class="col-md-5">
                         <div class="form-group">
                             <label for="survey-type-select">Público a participar</label>
-                            <select id="survey-type-select" class="form-control form-select">
+                            <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
                                 <option value="all">Público Externo</option>
                                 <option value="selected">Contactos Cargados Previamente</option>
                             </select>
@@ -92,7 +93,7 @@
                     <div class="col-md-5">
                         <div class="form-group">
                             <label for="response-type-select">¿Quiere saber los detalles de quien respondió?</label>
-                            <select id="response-type-select" class="form-control form-select">
+                            <select id="response-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
                                 <!-- <option value="anonymous">Anónima</option> -->
                                 <option value="identified">No Anónima</option>
                             </select>
@@ -101,19 +102,22 @@
                 </div>
 
                 <div id="selected-contacts-section" class="mt-4 d-none">
+                    {% if not is_edit_mode %}
                     <div class="form-check mb-4">
-                        <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check">
+                        <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check" {{ "disabled" if is_edit_mode }}>
                         <label class="form-check-label" for="send-all-contacts-check">
                             Enviar a todos mis contactos
                         </label>
                     </div>
+                    {% endif %}
                     
                     <div class="row align-items-start">
+                        {% if not is_edit_mode %}
                         <div class="col-md-10">
                             <div class="contacts-filter-section">
                                 <div class="form-group">
                                     <label for="field-type-select">Tipo de Segmentación</label>
-                                    <select id="field-type-select" class="form-control form-select">
+                                    <select id="field-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
                                         <option value="" selected>Seleccionar tipo de segmentación...</option>
                                         {% for demo in contact_demographics %}
                                         <option value="{{ demo.name }}">{{ demo.dt_title }}</option>
@@ -137,6 +141,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         <div class="col-md-2">
                             <div class="contact-count-card">
                                 <span class="count-label">Número de contactos a enviar</span>
@@ -154,7 +159,7 @@
         <div id="step-4-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
-                    <a href="#">Mediciones</a> / 
+                    <a href="/iq-home">Mediciones</a> / 
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">

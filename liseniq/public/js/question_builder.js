@@ -23,11 +23,49 @@ export class QuestionBuilder {
         this.searchDebounceTimer = null;
         this.demographicDebounceTimer = null;
         this.onQuestionsUpdate = onQuestionsUpdate;
+        this.isReadOnly = false;
 
         this.ui = this._mapUI();
         this._initializeEventListeners();
         this.renderQuestions();
-        this.resetAddQuestionForm();
+
+        if (this.ui.questionForm && this.ui.questionForm.text) {
+            this.resetAddQuestionForm();
+        }
+    }
+
+    // Permite que el contenedor externo active modo edición como solo lectura
+    setEditMode(isEditMode) {
+        this.isReadOnly = !!isEditMode;
+        this._applyReadOnlyUI();
+        this.renderQuestions();
+    }
+
+    // Alias compatible por si se llama setReadOnly
+    setReadOnly(flag) {
+        this.isReadOnly = !!flag;
+        this._applyReadOnlyUI();
+        this.renderQuestions();
+    }
+
+    _applyReadOnlyUI() {
+        const { buttons, questionForm, bankModal } = this.ui;
+
+        [buttons.openQuestionBank, buttons.addQuestion, buttons.addOption].forEach(btn => {
+            if (btn) btn.disabled = this.isReadOnly;
+        });
+
+        if (this.isReadOnly) {
+            if (questionForm.demographicResults) questionForm.demographicResults.style.display = 'none';
+        }
+
+        if (questionForm.listContainer) {
+            // pass
+        }
+
+        if (this.isReadOnly && bankModal?.modal) {
+            bankModal.modal.classList.add('d-none');
+        }
     }
 
     _mapUI() {
@@ -67,12 +105,19 @@ export class QuestionBuilder {
     _initializeEventListeners() {
         const { buttons, questionForm, bankModal } = this.ui;
 
-        buttons.openQuestionBank?.addEventListener('click', () => this.openModal());
+        buttons.openQuestionBank?.addEventListener('click', () => {
+            if (this.isReadOnly) return;
+            this.openModal();
+        });
         bankModal.closeBtn?.addEventListener('click', () => this.closeModal());
         bankModal.modal?.addEventListener('click', (e) => { if (e.target === bankModal.modal) this.closeModal(); });
-        bankModal.addSelectedBtn?.addEventListener('click', () => this.addSelectedQuestions());
+        bankModal.addSelectedBtn?.addEventListener('click', () => {
+            if (this.isReadOnly) return;
+            this.addSelectedQuestions();
+        });
 
         bankModal.searchInput?.addEventListener('input', (e) => {
+            if (this.isReadOnly) return;
             clearTimeout(this.searchDebounceTimer);
             this.searchDebounceTimer = setTimeout(() => {
                 this.bankState.searchKeyword = e.target.value.trim();
@@ -81,6 +126,7 @@ export class QuestionBuilder {
         });
 
         bankModal.categoryList?.addEventListener('click', (e) => {
+            if (this.isReadOnly) return;
             const target = e.target.closest('.category-filter-item');
             if (!target) return;
             
@@ -93,6 +139,7 @@ export class QuestionBuilder {
         });
 
         bankModal.questionsContainer?.addEventListener('click', (e) => {
+            if (this.isReadOnly) return;
             const addIcon = e.target.closest('.add-icon');
             if (!addIcon) return;
             const card = addIcon.closest('.bank-question-card');
@@ -108,18 +155,30 @@ export class QuestionBuilder {
             this.renderModalSelectedQuestions();
         });
 
-        buttons.addQuestion?.addEventListener('click', () => this.addManualQuestion());
+        buttons.addQuestion?.addEventListener('click', () => {
+            if (this.isReadOnly) return;
+            this.addManualQuestion();
+        });
         questionForm.listContainer?.addEventListener('click', (e) => this.handleQuestionListActions(e));
         questionForm.text?.addEventListener('input', () => this._clearValidationError(questionForm.text));
         questionForm.type?.addEventListener('change', () => this.handleQuestionTypeChange());
-        buttons.addOption?.addEventListener('click', () => this.addOptionRow());
+        buttons.addOption?.addEventListener('click', () => {
+            if (this.isReadOnly) return;
+            this.addOptionRow();
+        });
         questionForm.optionsContainer?.addEventListener('click', (e) => this.handleOptionsActions(e));
 
-        questionForm.demographic?.addEventListener('input', () => this.onDemographicInput());
-        questionForm.demographicResults?.addEventListener('click', (e) => this.onDemographicSelect(e));
+        questionForm.demographic?.addEventListener('input', () => {
+            if (this.isReadOnly) return;
+            this.onDemographicInput();
+        });
+        questionForm.demographicResults?.addEventListener('click', (e) => {
+            if (this.isReadOnly) return;
+            this.onDemographicSelect(e);
+        });
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.form-group')) {
-                if(questionForm.demographicResults) questionForm.demographicResults.style.display = 'none';
+                if(this.ui.questionForm.demographicResults) this.ui.questionForm.demographicResults.style.display = 'none';
             }
         });
     }
@@ -170,8 +229,10 @@ export class QuestionBuilder {
         }
         
         if (NPS_SCALE_TYPES.includes(questionDisplayName)) {
+            const npsMin = (question.nps_min ?? question.npsMin ?? 1);
+            const npsMax = (question.nps_max ?? question.npsMax ?? 10);
             additionalInfoHtml = `<div class="question-nps-scale">
-                <p><strong>Escala:</strong> de ${frappe.utils.escape_html(question.nps_min)} a ${frappe.utils.escape_html(question.nps_max)}</p>
+                <p><strong>Escala:</strong> de ${frappe.utils.escape_html(npsMin)} a ${frappe.utils.escape_html(npsMax)}</p>
             </div>`;
         }
         
@@ -186,7 +247,7 @@ export class QuestionBuilder {
                 </div>
                 <div class="question-item-actions">
                     <div class="action-icons">
-                        <i class="fa fa-trash-o delete-question" title="Eliminar pregunta"></i>
+                        ${this.isReadOnly ? '' : '<i class="fa fa-trash-o delete-question" title="Eliminar pregunta"></i>'}
                     </div>
                     <div class="question-item-tags">
                         <span>Tag: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
@@ -200,6 +261,7 @@ export class QuestionBuilder {
     }
 
     async fetchBankData() {
+        if (this.isReadOnly) return;
         this.ui.bankModal.questionsContainer.innerHTML = `<div class="text-center p-5"><i class="fa fa-spinner fa-spin"></i> Cargando...</div>`;
         try {
             const response = await frappe.call({
@@ -225,6 +287,7 @@ export class QuestionBuilder {
     }
 
     openModal() {
+        if (this.isReadOnly) return;
         this.bankState.selectedIds.clear();
         this.bankState.activeDemographic = null;
         this.bankState.searchKeyword = '';
@@ -337,6 +400,7 @@ export class QuestionBuilder {
     }
     
     addSelectedQuestions() {
+        if (this.isReadOnly) return;
         this.bankState.selectedIds.forEach(id => {
             if (!this.questions.some(mainQ => mainQ.id === id)) {
                 const questionToAdd = this.bankState.questions.find(q => q.name === id);
@@ -364,25 +428,31 @@ export class QuestionBuilder {
 
     resetAddQuestionForm() {
         const qf = this.ui.questionForm;
+
+        if (!qf || !qf.text) return;
+
         qf.text.value = '';
-        qf.type.value = '';
-        qf.demographic.value = '';
+        if (qf.type) qf.type.value = '';
+        if (qf.demographic) qf.demographic.value = '';
         
         this._setEditableOptions();
         
-        if(qf.negativeStatement) qf.negativeStatement.value = '';
-        if(qf.positiveStatement) qf.positiveStatement.value = '';
-        if(qf.npsMin) qf.npsMin.value = '';
-        if(qf.npsMax) qf.npsMax.value = '';
+        if (qf.negativeStatement) qf.negativeStatement.value = '';
+        if (qf.positiveStatement) qf.positiveStatement.value = '';
+        if (qf.npsMin) qf.npsMin.value = '';
+        if (qf.npsMax) qf.npsMax.value = '';
 
-        if(qf.optionsSection) qf.optionsSection.classList.add('d-none');
-        if(qf.bipolarSection) qf.bipolarSection.classList.add('d-none');
-        if(qf.npsSection) qf.npsSection.classList.add('d-none');
+        if (qf.optionsSection) qf.optionsSection.classList.add('d-none');
+        if (qf.bipolarSection) qf.bipolarSection.classList.add('d-none');
+        if (qf.npsSection) qf.npsSection.classList.add('d-none');
         
-        [qf.text, qf.type, qf.demographic, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax].forEach(field => this._clearValidationError(field));
+        [qf.text, qf.type, qf.demographic, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax]
+            .filter(Boolean)
+            .forEach(field => this._clearValidationError(field));
     }
 
     validateQuestionForm() {
+        if (this.isReadOnly) return false;
         let isValid = true;
         const qf = this.ui.questionForm;
         const selectedOption = qf.type.options[qf.type.selectedIndex];
@@ -437,6 +507,7 @@ export class QuestionBuilder {
     }
 
     addOptionRow() {
+        if (this.isReadOnly) return;
         const { optionsContainer } = this.ui.questionForm;
         if (!optionsContainer) return;
         const newRow = document.createElement('div');
@@ -447,7 +518,7 @@ export class QuestionBuilder {
     }
     
     addManualQuestion() {
-        if (!this.validateQuestionForm()) return;
+        if (this.isReadOnly) return;
 
         const qf = this.ui.questionForm;
         const questionTypeOption = qf.type.options[qf.type.selectedIndex];
@@ -479,6 +550,7 @@ export class QuestionBuilder {
     }
 
     handleQuestionListActions(e) {
+        if (this.isReadOnly) return;
         const questionItem = e.target.closest('.question-item');
         if (!questionItem) return;
         const index = parseInt(questionItem.getAttribute('data-index'), 10);
@@ -489,6 +561,7 @@ export class QuestionBuilder {
     }
 
     handleQuestionTypeChange() {
+        if (this.isReadOnly) return;
         const qf = this.ui.questionForm;
         if (qf.type.value) this._clearValidationError(qf.type);
         
@@ -507,6 +580,7 @@ export class QuestionBuilder {
     }
 
     handleOptionsActions(e) {
+        if (this.isReadOnly) return;
         if (e.target.classList.contains('delete-option')) {
             const { optionsContainer } = this.ui.questionForm;
             if (optionsContainer.querySelectorAll('.option-input-row').length > 1) {

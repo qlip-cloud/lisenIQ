@@ -2,6 +2,37 @@ import json
 import frappe
 from frappe import _
 
+
+CATEGORIES = {
+    "Sentido de propósito": "MI INSPIRACIÓN",
+    "Trabajo trascendental": "MI INSPIRACIÓN",
+    "Me Conocen": "MI INSPIRACIÓN",
+    "Mi lider": "LOS LÍDERES",
+    "Apoyo": "LOS LÍDERES",
+    "Nuestros lideres": "LOS LÍDERES",
+    "Oportunidades de crecimiento en mi Rol": "MI DESARROLLO Y APRENDIZAJE",
+    "Oportunidades de desarrollo en la Organización": "MI DESARROLLO Y APRENDIZAJE",
+    "Cultura de Aprendizaje": "MI DESARROLLO Y APRENDIZAJE",
+    "Dinámicas de Equipo": "MI EQUIPO",
+    "Comunicación y Coordinación": "MI EQUIPO",
+    "Agilidad y Toma de Decisiones": "MI EQUIPO",
+    "Calidad de las relaciones": "AMBIENTE LABORAL POSITIVO",
+    "Trato de la Gente": "AMBIENTE LABORAL POSITIVO",
+    "Equidad y transparencia": "AMBIENTE LABORAL POSITIVO",
+    "Reputación de la Organización": "MI TRABAJO",
+    "Reputación de mi área": "MI TRABAJO",
+    "Entorno de trabajo": "MI TRABAJO",
+    "Principios": "RESPONSABLE",
+    "Sostenibilidad": "RESPONSABLE",
+    "Clientes": "RESPONSABLE",
+    "Talento": "HUMANISTA",
+    "Relaciones": "HUMANISTA",
+    "Comunicación": "HUMANISTA",
+    "Innovación": "Competitiva",
+    "Logros": "Competitiva",
+    "Liderazgo": "Competitiva"
+}
+
 @frappe.whitelist()
 def custom_report(filters=None):
     """
@@ -26,6 +57,32 @@ def custom_report(filters=None):
 
     return translated_data
 
+@frappe.whitelist()
+def custom_report_by_question(filters=None):
+    """
+    Reporte de todas las encuestas donde cada pregunta está en un objeto separado
+    con los datos demográficos repetidos
+    """
+    filters = filters or {}
+    
+    # Obtener todas las encuestas válidas
+    valid_surveys = get_valid_surveys()
+    
+    if not valid_surveys:
+        frappe.throw(_("No se encontraron encuestas válidas en qp_IQ_Survey"))
+
+    # Obtener todas las preguntas únicas de todas las encuestas
+    all_questions_map = get_all_unique_questions(valid_surveys)
+    demographics_map = get_demographics_labels()
+
+    # Obtener datos de todas las encuestas
+    data = get_all_survey_data(valid_surveys, all_questions_map, demographics_map)
+    translated_data = translate_keys(data, all_questions_map, demographics_map)
+    
+    # Transformar los datos para que cada pregunta esté en un objeto separado
+    transformed_data = transform_data_by_question(translated_data, all_questions_map, demographics_map)
+
+    return transformed_data
 
 
 def get_valid_surveys():
@@ -259,6 +316,41 @@ def get_demographics_labels():
         return {}
 
 
+def get_question_variables_map():
+    """
+    Obtiene el mapeo de preguntas a sus variables (tags) y temas
+    """
+    try:
+        query = """
+            SELECT 
+                a.qn_statement as question_text,
+                b.dt_title as variable,
+                b.dt_title as tag
+            FROM `tabqp_IQ_Question` a
+            INNER JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            WHERE b.dt_object_type = 'Pregunta'
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        
+        mapping = {}
+        for row in results:
+            question_text = row.get('question_text', '')
+            variable = row.get('variable', '')
+            
+            if question_text:
+                tema = CATEGORIES.get(variable, '')
+                mapping[question_text] = {
+                    'variable': variable,
+                    'tema': tema
+                }
+                
+        return mapping
+        
+    except Exception as e:
+        frappe.log_error(f"Error getting question variables map: {str(e)}")
+        return {}
+
+
 def get_bulk_demographics(users_list, demographics_map):
     """
     Obtiene datos demográficos adicionales para múltiples usuarios de manera optimizada
@@ -301,3 +393,45 @@ def get_bulk_demographics(users_list, demographics_map):
             demographics_data[user][tag] = value
 
     return demographics_data
+
+
+def transform_data_by_question(data, all_questions_map, demographics_map):
+    """
+    Transforma los datos para que cada pregunta esté en un objeto separado
+    con los datos demográficos repetidos, incluyendo variable y tema
+    """
+    if not data:
+        return []
+
+    transformed_data = []
+    
+    # Obtener las claves que son preguntas (traducidas)
+    question_labels = set(all_questions_map.values())
+    
+    # Obtener el mapeo de preguntas a variables y temas
+    question_variables_map = get_question_variables_map()
+    
+    for row in data:
+        # Extraer datos demográficos (todo lo que no es pregunta)
+        demographic_data = {}
+        question_responses = {}
+        
+        for key, value in row.items():
+            if key in question_labels and value is not None and value != '':
+                question_responses[key] = value
+            else:
+                demographic_data[key] = value
+        
+        # Crear un objeto separado por cada pregunta que tiene respuesta
+        for question, answer in question_responses.items():
+            question_object = demographic_data.copy()
+            question_object[question] = answer
+            
+            # Agregar variable y tema basado en la pregunta
+            question_info = question_variables_map.get(question, {})
+            question_object['variable'] = question_info.get('variable', '')
+            question_object['tema'] = question_info.get('tema', '')
+            
+            transformed_data.append(question_object)
+    
+    return transformed_data

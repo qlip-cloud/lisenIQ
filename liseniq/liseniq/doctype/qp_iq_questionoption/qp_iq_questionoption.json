@@ -12,6 +12,8 @@
   {
    "fieldname": "qo_option_text",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
    "label": "Texto de la Opci\u00f3n"
   },
   {
@@ -23,7 +25,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-06-11 17:19:04.710413",
+ "modified": "2025-10-08 12:31:09.845739",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_QuestionOption",

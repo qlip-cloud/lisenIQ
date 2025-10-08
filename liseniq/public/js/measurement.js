@@ -63,6 +63,8 @@ class MeasurementCreator {
 
         this.state = {
             currentStep: 1,
+            isEditMode: false,
+            docName: null,
             contactCountDebounceTimer: null,
             measurementData: {
                 name: '',
@@ -90,14 +92,16 @@ class MeasurementCreator {
             this.initializeEventListeners();
             this.initializeDefaults();
             this.loadPreloadedQuestions();
+            this.loadMeasurementForEdit();
             this.stepper.render();
             this.showStep(1);
-            this.updateContactCount();
+            if (!this.state.isEditMode) {
+                this.updateContactCount();
+            }
         }
     }
 
-    initializeDefaults() {
-    }
+    initializeDefaults() {}
 
     loadPreloadedQuestions() {
         const dataEl = document.getElementById('preloaded-questions-data');
@@ -114,6 +118,91 @@ class MeasurementCreator {
                 console.error("Error al parsear las preguntas precargadas:", e);
             }
         }
+    }
+
+    loadMeasurementForEdit() {
+        const dataEl = document.getElementById('measurement-data');
+        if (!dataEl || !dataEl.dataset.measurement || dataEl.dataset.measurement === 'null') return;
+
+        try {
+            const data = JSON.parse(dataEl.dataset.measurement);
+            const urlParams = new URLSearchParams(window.location.search);
+            this.state.isEditMode = true;
+            this.state.docName = urlParams.get('name');
+
+            // Poblar datos del paso 1
+            this.ui.step1Form.name.value = data.name || '';
+            if (data.startDate) this.ui.step1Form.startDate.value = String(data.startDate).slice(0, 16);
+            if (data.endDate) this.ui.step1Form.endDate.value = String(data.endDate).slice(0, 16);
+            if (data.timezone) this.ui.step1Form.timezone.value = data.timezone;
+
+            this.state.measurementData.name = data.name || '';
+            this.state.measurementData.startDate = this.ui.step1Form.startDate.value;
+            this.state.measurementData.endDate = this.ui.step1Form.endDate.value;
+            this.state.measurementData.timezone = this.ui.step1Form.timezone.value;
+            this.updateBreadcrumbs();
+
+            // Preguntas (visualización)
+            if (data.questions) {
+                this.questionBuilder.setQuestions(data.questions);
+            }
+            if (this.questionBuilder.setEditMode) {
+                this.questionBuilder.setEditMode(true); // si existe, bloquear edición
+            } else if (this.questionBuilder.setReadOnly) {
+                this.questionBuilder.setReadOnly(true);
+            }
+
+            // Participantes (solo visual)
+            if (data.contacts) {
+                const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber, viewContactsBtn } = this.ui.contactsStep;
+                if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'all';
+                if (responseTypeSelect) responseTypeSelect.value = data.contacts.responseType || 'anonymous';
+                if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
+                    selectedContactsSection?.classList.remove('d-none');
+                }
+                if (contactCountNumber) contactCountNumber.textContent = data.contacts.contactCount ?? 0;
+                // No mostrar listado en modal (no editable)
+                viewContactsBtn?.classList.add('d-none');
+            }
+
+            // Recordatorios
+            if (data.reminders && data.reminders.send) {
+                this.ui.reviewStep.sendRemindersCheck.checked = true;
+                this.ui.reviewStep.remindersSection.classList.remove('d-none');
+                if (data.reminders.frequency) this.ui.reviewStep.reminderFrequency.value = data.reminders.frequency;
+                if (data.reminders.max) this.ui.reviewStep.reminderMax.value = data.reminders.max;
+            } else {
+                this.ui.reviewStep.sendRemindersCheck.checked = false;
+                this.ui.reviewStep.remindersSection.classList.add('d-none');
+            }
+
+            // Bloquear campos no editables (ya hay disabled en HTML para varios)
+            this.disableNonEditableFields();
+
+            // Cambiar texto del botón final
+            if (this.ui.navButtons.next4) this.ui.navButtons.next4.textContent = 'Guardar Cambios';
+        } catch (e) {
+            console.error("Error al cargar datos de la medición para editar:", e);
+            showGlobalNotification("No se pudieron cargar los datos de la medición.", "error");
+        }
+    }
+
+    disableNonEditableFields() {
+        const step2 = this.ui.steps.step2;
+        if (step2) {
+            step2.querySelectorAll('input, textarea, select, button').forEach(el => {
+                if (!['btn-back-step-2', 'btn-next-step-2'].includes(el.id)) {
+                    el.disabled = true;
+                }
+            });
+        }
+
+        const { surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect, availableCategories, selectedCategories } = this.ui.contactsStep;
+        [surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect].forEach(el => el && (el.disabled = true));
+
+        [availableCategories, selectedCategories].forEach(box => {
+            if (box) box.style.pointerEvents = 'none';
+        });
     }
 
     showStep(stepNumber) {
@@ -151,23 +240,26 @@ class MeasurementCreator {
         navButtons.back4?.addEventListener('click', () => this.showStep(3));
         navButtons.next4?.addEventListener('click', () => this.saveMeasurement());
         
-        contactsStep.surveyTypeSelect?.addEventListener('change', () => this.handleSurveyTypeChange());
-        contactsStep.sendAllContactsCheck?.addEventListener('change', () => this.handleSendAllCheckChange());
-        contactsStep.fieldTypeSelect?.addEventListener('change', () => this.handleFieldTypeChange());
-        
-        const triggerUpdate = () => {
-            clearTimeout(this.state.contactCountDebounceTimer);
-            this.state.contactCountDebounceTimer = setTimeout(() => this.updateContactCount(), 400);
-        };
+        // Solo habilitar listeners de participantes en modo creación
+        if (!this.state.isEditMode) {
+            contactsStep.surveyTypeSelect?.addEventListener('change', () => this.handleSurveyTypeChange());
+            contactsStep.sendAllContactsCheck?.addEventListener('change', () => this.handleSendAllCheckChange());
+            contactsStep.fieldTypeSelect?.addEventListener('change', () => this.handleFieldTypeChange());
+            
+            const triggerUpdate = () => {
+                clearTimeout(this.state.contactCountDebounceTimer);
+                this.state.contactCountDebounceTimer = setTimeout(() => this.updateContactCount(), 400);
+            };
 
-        contactsStep.availableCategories?.addEventListener('click', (e) => {
-            this.moveCategoryItem(e.target, contactsStep.availableCategories, contactsStep.selectedCategories);
-            triggerUpdate();
-        });
-        contactsStep.selectedCategories?.addEventListener('click', (e) => {
-            this.moveCategoryItem(e.target, contactsStep.selectedCategories, contactsStep.availableCategories);
-            triggerUpdate();
-        });
+            contactsStep.availableCategories?.addEventListener('click', (e) => {
+                this.moveCategoryItem(e.target, contactsStep.availableCategories, contactsStep.selectedCategories);
+                triggerUpdate();
+            });
+            contactsStep.selectedCategories?.addEventListener('click', (e) => {
+                this.moveCategoryItem(e.target, contactsStep.selectedCategories, contactsStep.availableCategories);
+                triggerUpdate();
+            });
+        }
     
         contactsStep.viewContactsBtn?.addEventListener('click', () => this.showContactsModal());
         reviewStep.viewContactsBtn?.addEventListener('click', () => this.showContactsModal());
@@ -203,38 +295,42 @@ class MeasurementCreator {
             isValid = false;
             this.showValidationError(name, 'Este campo es obligatorio.');
         }
-
         if (name && name.value.trim().length > 75) {
             isValid = false;
             this.showValidationError(name, 'El nombre no puede exceder los 75 caracteres.');
         }
-
         if (startDate && startDate.dataset.required === 'true' && !startDate.value) {
             isValid = false;
             this.showValidationError(startDate, 'Este campo es obligatorio.');
         }
-        
         if (timezone && timezone.dataset.required === 'true' && !timezone.value) {
             isValid = false;
             this.showValidationError(timezone, 'Este campo es obligatorio.');
         }
-
         if (startDate.value && endDate.value && endDate.value < startDate.value) {
             isValid = false;
             this.showValidationError(endDate, 'La fecha de finalización no puede ser anterior a la fecha de inicio.');
         }
 
+        // Validar unicidad también en edición (evitar nombres repetidos en la empresa)
         if (isValid && name.value.trim()) {
             next1.disabled = true;
             next1.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Validando...`;
             try {
+                const args = { name: name.value.trim() };
+                if (this.state.isEditMode) {
+                    args.exclude_doc = this.state.docName; // validar contra toda la empresa, excluyendo el doc actual
+                    // sin only_open: aplica a cualquier estatus
+                }
                 const response = await frappe.call({
                     method: 'liseniq.www.measurement.new_measurement.check_measurement_name',
-                    args: { name: name.value.trim() }
+                    args
                 });
-
-                if (response.message.exists) {
-                    this.showValidationError(name, 'Ya existe una medición con este nombre.');
+                if (response.message && response.message.exists) {
+                    const msg = this.state.isEditMode
+                        ? 'Ya existe una medición con este nombre en tu empresa.'
+                        : 'Ya existe una medición con este nombre.';
+                    this.showValidationError(name, msg);
                     isValid = false;
                 }
             } catch (error) {
@@ -251,6 +347,7 @@ class MeasurementCreator {
     }
     
     validateStep3() {
+        if (this.state.isEditMode) return true;
         const { surveyTypeSelect } = this.ui.contactsStep;
         const { list: contactsList } = this.state.measurementData.contacts;
 
@@ -347,6 +444,7 @@ class MeasurementCreator {
     }
 
     async updateContactCount() {
+        if (this.state.isEditMode) return;
         const { sendAllContactsCheck, selectedCategories, contactCountNumber } = this.ui.contactsStep;
         
         contactCountNumber.innerHTML = `<i class="fa fa-spinner fa-spin"></i>`;
@@ -393,16 +491,33 @@ class MeasurementCreator {
         const { surveyTypeSelect, responseTypeSelect } = this.ui.contactsStep;
 
         measurementName.textContent = this.state.measurementData.name;
-        surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
-        responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
-        questionsCount.textContent = this.state.measurementData.questions.length;
-        contactCount.textContent = this.state.measurementData.contacts.list.length;
+
+        // Mostrar datos según modo edición o creación
+        if (this.state.isEditMode) {
+            const dataEl = document.getElementById('measurement-data');
+            const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
+            surveyType.textContent = data?.contacts?.surveyType === 'selected' ? 'Contactos Cargados Previamente' : 'Público Externo';
+            responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
+            questionsCount.textContent = (data?.questions || []).length;
+            contactCount.textContent = data?.contacts?.contactCount ?? 0;
+            this.ui.reviewStep.viewContactsBtn.style.display = 'none';
+        } else {
+            surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
+            responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
+            questionsCount.textContent = this.state.measurementData.questions.length;
+            contactCount.textContent = this.state.measurementData.contacts.list.length;
+            this.ui.reviewStep.viewContactsBtn.style.display = 'inline-block';
+        }
 
         questionsList.innerHTML = '';
-        if (this.state.measurementData.questions.length === 0) {
+        const questions = this.state.isEditMode
+            ? (JSON.parse(document.getElementById('measurement-data')?.dataset?.measurement || '{}').questions || [])
+            : this.state.measurementData.questions;
+
+        if (questions.length === 0) {
             questionsList.innerHTML = `<div class="text-center text-muted p-4">No se han añadido preguntas.</div>`;
         } else {
-            this.state.measurementData.questions.forEach((q, i) => questionsList.appendChild(this.createReviewQuestionItem(q, i)));
+            questions.forEach((q, i) => questionsList.appendChild(this.createReviewQuestionItem(q, i)));
         }
     }
 
@@ -411,27 +526,35 @@ class MeasurementCreator {
         const saveButton = navButtons.next4;
 
         saveButton.disabled = true;
-        saveButton.innerHTML = `<i class="fa fa-spinner fa-spin"> </i> Enviando...`;
+        saveButton.innerHTML = this.state.isEditMode
+            ? `<i class="fa fa-spinner fa-spin"> </i> Guardando...`
+            : `<i class="fa fa-spinner fa-spin"> </i> Enviando...`;
 
-        const measurementPayload = {
+        const basePayload = {
             name: this.state.measurementData.name,
-            startDate: step1Form.startDate.value,
-            endDate: step1Form.endDate.value,
-            timezone: step1Form.timezone.value,
-            questions: this.state.measurementData.questions,
-            contacts: {
-                surveyType: contactsStep.surveyTypeSelect.value,
-                responseType: contactsStep.responseTypeSelect.value,
-                list: this.state.measurementData.contacts.list 
-            }
+            endDate: step1Form.endDate.value
         };
 
         if (reviewStep.sendRemindersCheck.checked) {
-            measurementPayload.reminders = {
+            basePayload.reminders = {
                 frequency: reviewStep.reminderFrequency.value,
                 max: reviewStep.reminderMax.value,
             };
         }
+
+        const measurementPayload = this.state.isEditMode
+            ? { ...basePayload, is_edit_mode: true, doc_name: this.state.docName }
+            : {
+                ...basePayload,
+                startDate: step1Form.startDate.value,
+                timezone: step1Form.timezone.value,
+                questions: this.state.measurementData.questions,
+                contacts: {
+                    surveyType: contactsStep.surveyTypeSelect.value,
+                    responseType: contactsStep.responseTypeSelect.value,
+                    list: this.state.measurementData.contacts.list 
+                }
+            };
 
         try {
             const response = await frappe.call({
@@ -441,7 +564,7 @@ class MeasurementCreator {
 
             if (response.message && response.message.status === 'success') {
                 showGlobalNotification(response.message.message, 'success');
-                setTimeout(() => window.location.href = `/iq-home`, 2000);
+                setTimeout(() => window.location.href = `/iq-home`, 1500);
             } else {
                 throw new Error(response.message.message || 'Ocurrió un error al guardar la medición.');
             }
@@ -449,7 +572,7 @@ class MeasurementCreator {
             console.error("Error al guardar la medición:", error);
             showGlobalNotification(error.message, 'error');
             saveButton.disabled = false;
-            saveButton.textContent = 'Enviar';
+            saveButton.textContent = this.state.isEditMode ? 'Guardar Cambios' : 'Enviar';
         }
     }
 

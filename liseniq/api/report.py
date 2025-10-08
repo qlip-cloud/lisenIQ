@@ -398,7 +398,7 @@ def get_bulk_demographics(users_list, demographics_map):
 def transform_data_by_question(data, all_questions_map, demographics_map):
     """
     Transforma los datos para que cada pregunta esté en un objeto separado
-    con los datos demográficos repetidos, incluyendo variable y tema
+    con los datos demográficos repetidos, usando claves 'question' y 'answer'
     """
     if not data:
         return []
@@ -423,12 +423,15 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
                 demographic_data[key] = value
         
         # Crear un objeto separado por cada pregunta que tiene respuesta
-        for question, answer in question_responses.items():
+        for question_text, answer in question_responses.items():
             question_object = demographic_data.copy()
-            question_object[question] = answer
+            
+            # Usar 'question' y 'answer' como claves separadas
+            question_object['question'] = question_text
+            question_object['answer'] = answer
             
             # Agregar variable y tema basado en la pregunta
-            question_info = question_variables_map.get(question, {})
+            question_info = question_variables_map.get(question_text, {})
             question_object['variable'] = question_info.get('variable', '')
             question_object['tema'] = question_info.get('tema', '')
             

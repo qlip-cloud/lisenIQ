@@ -45,6 +45,18 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = '/measurement/new_measurement';
         });
     }
+
+    // Obtener y mostrar el nombre de la empresa
+    fetch('/api/method/liseniq.utils.login_util.get_user_company_name')
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                const companyDiv = document.querySelector('#app-sidebar div[style*="#7B24FF"]');
+                if (companyDiv) {
+                    companyDiv.textContent = data.message;
+                }
+            }
+        });
 });
 
 function showGlobalNotification(message, type, duration = 5000) {

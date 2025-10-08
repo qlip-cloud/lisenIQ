@@ -102,14 +102,17 @@
                 </div>
 
                 <div id="selected-contacts-section" class="mt-4 d-none">
+                    {% if not is_edit_mode %}
                     <div class="form-check mb-4">
                         <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check" {{ "disabled" if is_edit_mode }}>
                         <label class="form-check-label" for="send-all-contacts-check">
                             Enviar a todos mis contactos
                         </label>
                     </div>
+                    {% endif %}
                     
                     <div class="row align-items-start">
+                        {% if not is_edit_mode %}
                         <div class="col-md-10">
                             <div class="contacts-filter-section">
                                 <div class="form-group">
@@ -138,6 +141,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         <div class="col-md-2">
                             <div class="contact-count-card">
                                 <span class="count-label">Número de contactos a enviar</span>

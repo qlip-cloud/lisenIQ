@@ -42,7 +42,7 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 # ----------
 
 # application home page (will override Website Settings)
-# home_page = "iq-home"
+home_page = "iq-home"
 
 # website user home page (by Role)
 # role_home_page = {
@@ -113,11 +113,14 @@ scheduler_events = {
 		"*/2 * * * *": [
 			"liseniq.tasks.launch_pending_surveys",
 			"liseniq.tasks.update_finished_surveys"
+		],
+		"0 9 * * *": [
+			"liseniq.tasks.send_survey_reminders"
 		]
 	},
-	"hourly": [
-		"liseniq.tasks.send_survey_reminders"
-	],
+	# "hourly": [
+	# 	"liseniq.tasks.send_survey_reminders"
+	# ],
 # 	"daily": [
 # 		"liseniq.tasks.daily"
 # 	],

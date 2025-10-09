@@ -75,14 +75,13 @@ def custom_report_by_question(filters=None):
     all_questions_map = get_all_unique_questions(valid_surveys)
     demographics_map = get_demographics_labels()
 
-    # Obtener datos de todas las encuestas
-    data = get_all_survey_data(valid_surveys, all_questions_map, demographics_map)
-    translated_data = translate_keys(data, all_questions_map, demographics_map)
-    
-    # Transformar los datos para que cada pregunta esté en un objeto separado
-    transformed_data = transform_data_by_question(translated_data, all_questions_map, demographics_map)
 
-    return transformed_data
+    data = get_all_survey_data(valid_surveys, all_questions_map, demographics_map)
+    transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+    translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
+
+
+    return translated_data
 
 
 def get_valid_surveys():
@@ -399,38 +398,38 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
     """
     Transforma los datos para que cada pregunta esté en un objeto separado
     con los datos demográficos repetidos, usando claves 'question' y 'answer'
+    (usa los IDs originales antes de traducir)
     """
     if not data:
         return []
 
     transformed_data = []
     
-    # Obtener las claves que son preguntas (traducidas)
-    question_labels = set(all_questions_map.values())
+
+    question_ids = set(all_questions_map.keys())
+    demographic_ids = set(demographics_map.keys())
     
-    # Obtener el mapeo de preguntas a variables y temas
     question_variables_map = get_question_variables_map()
     
     for row in data:
-        # Extraer datos demográficos (todo lo que no es pregunta)
         demographic_data = {}
         question_responses = {}
         
         for key, value in row.items():
-            if key in question_labels and value is not None and value != '':
+            if key in question_ids and value not in (None, ''):
                 question_responses[key] = value
             else:
                 demographic_data[key] = value
         
-        # Crear un objeto separado por cada pregunta que tiene respuesta
-        for question_text, answer in question_responses.items():
+
+        for qid, answer in question_responses.items():
             question_object = demographic_data.copy()
             
-            # Usar 'question' y 'answer' como claves separadas
+    
+            question_text = all_questions_map.get(qid, qid)
             question_object['question'] = question_text
             question_object['answer'] = answer
             
-            # Agregar variable y tema basado en la pregunta
             question_info = question_variables_map.get(question_text, {})
             question_object['variable'] = question_info.get('variable', '')
             question_object['tema'] = question_info.get('tema', '')

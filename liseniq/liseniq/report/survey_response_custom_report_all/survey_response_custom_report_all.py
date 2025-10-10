@@ -179,7 +179,7 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             c.custom_dob,
             c.gender,
             c.custom_entry_date,
-            c.country,
+            c.custom_country,
             a.al_title
         FROM `tabSurvey Response` sr
         LEFT JOIN `tabContact` c ON c.name = sr.user
@@ -225,7 +225,7 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
         'last_name': response.get('last_name', ''),
         'gender': response.get('gender', ''),
         'custom_dob': response.get('custom_dob', ''),
-        'country': response.get('country', ''),
+        'country': response.get('custom_country', ''),
         'custom_academic_level': response.get('al_title', ''),
         'entry_date': response.get('custom_entry_date', ''),
     }

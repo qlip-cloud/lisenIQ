@@ -45,9 +45,21 @@ def build_columns(question_map, demographics_map):
             "width": 200
         },
         {
+            "label": _("Género"),
+            "fieldname": "gender",
+            "fieldtype": "Data",
+            "width": 100
+        },
+        {
             "label": _("Fecha de Nacimiento"),
             "fieldname": "custom_dob",
             "fieldtype": "Date",
+            "width": 150
+        },
+        {
+            "label": _("País"),
+            "fieldname": "country",
+            "fieldtype": "Data",
             "width": 150
         },
         {
@@ -55,7 +67,13 @@ def build_columns(question_map, demographics_map):
             "fieldname": "custom_academic_level",
             "fieldtype": "Data",
             "width": 200
-        }
+        },
+        {
+            "label": _("Fecha de Ingreso"),
+            "fieldname": "entry_date",
+            "fieldtype": "Date",
+            "width": 150
+        },
     ]
 
     for did, dtitle in demographics_map.items():
@@ -90,6 +108,9 @@ def get_survey_data(survey_name, question_map, demographics_map):
             c.first_name,
             c.last_name,
             c.custom_dob,
+            c.entry_date,
+            c.country,
+            c.gender
             a.al_title
         FROM `tabSurvey Response` sr
         LEFT JOIN `tabContact` c ON c.name = sr.user
@@ -124,8 +145,11 @@ def process_response_row(response, question_map, demographics_data):
     row = {
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
+        'gender': response.get('gender', ''),
         'custom_dob': response.get('custom_dob', ''),
-        'custom_academic_level': response.get('al_title', '')
+        'country': response.get('country', ''),
+        'custom_academic_level': response.get('al_title', ''),
+        'entry_date': response.get('custom_entry_date', ''),
     }
 
     response_json = response.get('response_json', '{}')

@@ -301,12 +301,19 @@ def get_question_labels(survey_json):
 def get_demographics_labels():
     """
     Obtiene las etiquetas de los campos demográficos
+    que tienen al menos un valor en ContactAdditionalDetail.
     """
     try:
         query = """
             SELECT dem.name, dem.dt_title
             FROM `tabqp_IQ_DemographicType` dem
             WHERE dem.dt_object_type = 'Contacto'
+            AND EXISTS (
+                SELECT 1
+                FROM `tabqp_IQ_ContactAdditionalDetail` cad
+                WHERE cad.cad_demographic_type = dem.name
+                LIMIT 1
+            )
             ORDER BY dem.name
         """
         results = frappe.db.sql(query, as_dict=True)
@@ -316,7 +323,7 @@ def get_demographics_labels():
             mapping[row.name] = row.dt_title or row.name
             
         return mapping
-        
+
     except Exception as e:
         frappe.log_error(f"Error getting demographics labels: {str(e)}")
         return {}

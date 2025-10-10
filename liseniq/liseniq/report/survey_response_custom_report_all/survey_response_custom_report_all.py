@@ -99,9 +99,21 @@ def build_columns(all_questions_map, demographics_map):
             "width": 200
         },
         {
+            "label": _("Género"),
+            "fieldname": "gender",
+            "fieldtype": "Data",
+            "width": 100
+        },
+        {
             "label": _("Fecha de Nacimiento"),
             "fieldname": "custom_dob",
             "fieldtype": "Date",
+            "width": 150
+        },
+        {
+            "label": _("País"),
+            "fieldname": "country",
+            "fieldtype": "Data",
             "width": 150
         },
         {
@@ -109,7 +121,13 @@ def build_columns(all_questions_map, demographics_map):
             "fieldname": "custom_academic_level",
             "fieldtype": "Data",
             "width": 200
-        }
+        },
+        {
+            "label": _("Fecha de Ingreso"),
+            "fieldname": "entry_date",
+            "fieldtype": "Date",
+            "width": 150
+        },
     ]
 
     # Agregar columnas demográficas
@@ -160,6 +178,8 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             c.last_name,
             c.custom_dob,
             c.gender,
+            c.custom_entry_date,
+            c.country,
             a.al_title
         FROM `tabSurvey Response` sr
         LEFT JOIN `tabContact` c ON c.name = sr.user
@@ -203,9 +223,11 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
         'company_name': survey_company_map.get(survey_name, ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
-        'custom_dob': response.get('custom_dob', ''),
         'gender': response.get('gender', ''),
-        'custom_academic_level': response.get('al_title', '')
+        'custom_dob': response.get('custom_dob', ''),
+        'country': response.get('country', ''),
+        'custom_academic_level': response.get('al_title', ''),
+        'entry_date': response.get('custom_entry_date', ''),
     }
 
     # Procesar respuestas de la encuesta

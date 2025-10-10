@@ -409,31 +409,46 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
     question_ids = set(all_questions_map.keys())
     demographic_ids = set(demographics_map.keys())
     
+    # campos demográficos base que siempre deberían aparecer
+    core_demographic_keys = [
+        'survey_name', 'company_name', 'first_name', 'last_name',
+        'custom_dob', 'gender', 'custom_academic_level', 'entry_date', 'country'
+    ]
+
     question_variables_map = get_question_variables_map()
-    
+
+    # conjunto total de claves demográficas (ids sin traducir)
+    required_demographic_keys = set(core_demographic_keys) | set(demographic_ids)
+
     for row in data:
         demographic_data = {}
         question_responses = {}
-        
+
+        # separar respuestas de preguntas del resto
         for key, value in row.items():
             if key in question_ids and value not in (None, ''):
                 question_responses[key] = value
             else:
                 demographic_data[key] = value
-        
+
+        # Asegurar que todas las claves demográficas estén presentes (aunque sean None)
+        for dem_key in required_demographic_keys:
+            if dem_key not in demographic_data:
+                demographic_data[dem_key] = None
 
         for qid, answer in question_responses.items():
             question_object = demographic_data.copy()
-            
-    
+
+            # usar el texto de la pregunta para 'question'
             question_text = all_questions_map.get(qid, qid)
             question_object['question'] = question_text
             question_object['answer'] = answer
-            
+
+            # Agregar variable y tema basado en la pregunta
             question_info = question_variables_map.get(question_text, {})
             question_object['variable'] = question_info.get('variable', '')
             question_object['tema'] = question_info.get('tema', '')
-            
+
             transformed_data.append(question_object)
     
     return transformed_data

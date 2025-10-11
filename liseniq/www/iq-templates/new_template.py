@@ -22,7 +22,8 @@ def get_context(context):
         question_categories = frappe.get_all(
             "qp_IQ_QuestionCategory",
             fields=["name", "qnc_category"],
-            order_by="qnc_category"
+            order_by="qnc_category",
+            ignore_permissions=True
         )
         context.question_categories = question_categories
     except frappe.DoesNotExistError:
@@ -34,7 +35,8 @@ def get_context(context):
             "qp_IQ_QuestionType",
             filters={"qnt_type_name": ["in", allowed_question_types]},
             fields=["name", "qnt_type_name"],
-            order_by="qnt_type_name"
+            order_by="qnt_type_name",
+            ignore_permissions=True
         )
         context.question_types = question_types
     except frappe.DoesNotExistError:

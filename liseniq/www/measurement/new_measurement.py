@@ -203,7 +203,8 @@ def get_filtered_contacts_count(filters='[]'):
         all_contacts = frappe.get_list(
             "Contact", 
             filters=base_filters, 
-            fields=["name", "first_name", "last_name"]
+            fields=["name", "first_name", "last_name"],
+            ignore_permissions=True
         )
         contacts_for_modal = [{"name": c.name, "Nombre": f"{c.first_name} {c.last_name or ''}".strip()} for c in all_contacts]
         return {
@@ -258,7 +259,8 @@ def get_filtered_contacts_count(filters='[]'):
     contact_docs = frappe.get_all(
         "Contact",
         filters=contact_filters,
-        fields=["name", "first_name", "last_name"]
+        fields=["name", "first_name", "last_name"],
+        ignore_permissions=True
     )
     
     demographic_map_docs = frappe.get_all(

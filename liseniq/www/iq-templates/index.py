@@ -28,7 +28,8 @@ def get_context(context):
             ['tp_owner', '=', frappe.session.user]
         ],
         fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private"],
-        order_by="creation desc"
+        order_by="creation desc",
+        ignore_permissions=True
     )
     
     processed_templates = []
@@ -72,7 +73,8 @@ def get_context(context):
         categories_from_db = frappe.get_all(
             "qp_IQ_QuestionCategory",
             fields=["name", "qnc_category", "qnc_is_popular"],
-            order_by="qnc_category"
+            order_by="qnc_category",
+            ignore_permissions=True
         )
         context.categories = categories_from_db
     except frappe.DoesNotExistError:
@@ -130,7 +132,8 @@ def get_demographic_suggestions_for_questions(search_term):
             'dt_object_type': 'Pregunta'
         },
         fields=['dt_title'],
-        limit=10
+        limit=10,
+        ignore_permissions=True
     )
 
 @frappe.whitelist()
@@ -220,7 +223,8 @@ def get_bank_data(keyword=None, demographic=None):
         fields=[
             "name", "qn_statement as text", "qn_category", "qn_type", "qn_nps_min",
             "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic"
-        ]
+        ],
+        ignore_permissions=True
     )
 
     for q in questions:
@@ -244,7 +248,8 @@ def get_bank_data(keyword=None, demographic=None):
                 "qp_IQ_QuestionOption",
                 filters={'parent': q.name, 'parenttype': 'qp_IQ_Question'},
                 fields=['qo_option_text'],
-                order_by='idx'
+                order_by='idx',
+                ignore_permissions=True
             )
             q['options'] = [opt['qo_option_text'] for opt in options]
 
@@ -252,7 +257,8 @@ def get_bank_data(keyword=None, demographic=None):
         "qp_IQ_DemographicType",
         filters={"dt_object_type": "Pregunta"},
         fields=["name", "dt_title"],
-        order_by="dt_title"
+        order_by="dt_title",
+        ignore_permissions=True
     )
 
     return {

@@ -93,6 +93,9 @@ get_website_user_home_page = "liseniq.liseniq.uses_cases.login.redirects.get_hom
 # ---------------
 # Hook on document methods and events
 
+# on_login hook
+on_login = "liseniq.liseniq.uses_cases.login.redirects.handle_login_redirect"
+
 doc_events = {
 	"Survey Response": {
 		"before_insert": "liseniq.utils.survey_response.process_survey_response"

@@ -16,7 +16,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-11 16:08:19.969046",
+ "modified": "2025-10-09 18:58:35.511020",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Sector",
@@ -31,6 +31,18 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
    "share": 1,
    "write": 1
   }

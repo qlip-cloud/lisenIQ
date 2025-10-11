@@ -32,8 +32,7 @@
   "su_public_link",
   "su_public_token",
   "su_public_link_created_on",
-  "su_public_link_created_by",
-  "custom_generate_public_link"
+  "su_public_link_created_by"
  ],
  "fields": [
   {
@@ -160,8 +159,7 @@
    "fieldname": "su_timezone",
    "fieldtype": "Select",
    "label": "Zona Horaria",
-   "options": "America/Bogota\nAmerica/Caracas",
-   "default": "America/Bogota"
+   "options": "America/Caracas\nAmerica/Bogota"
   },
   {
    "fieldname": "secci\u00f3n_link_publico_section",
@@ -171,42 +169,30 @@
   {
    "fieldname": "su_public_link",
    "fieldtype": "Long Text",
-   "label": "Link Publico",
-   "read_only": 1
+   "label": "Link Publico"
   },
   {
    "fieldname": "su_public_token",
    "fieldtype": "Long Text",
-   "hidden": 1,
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Token Publico",
-   "read_only": 1
+   "label": "Token Publico"
   },
   {
    "fieldname": "su_public_link_created_on",
    "fieldtype": "Datetime",
-   "label": "Fecha de Creaci\u00f3n de Link Publico",
-   "read_only": 1
+   "label": "Fecha de Creaci\u00f3n de Link Publico"
   },
   {
    "fieldname": "su_public_link_created_by",
    "fieldtype": "Link",
    "label": "Creado Por",
-   "options": "User",
-   "read_only": 1
-  },
-  {
-   "fieldname": "custom_generate_public_link",
-   "fieldtype": "Check",
-   "hidden": 1,
-   "label": "Custom Generate Public Link",
-   "no_copy": 1
+   "options": "User"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-24 22:11:59.984012",
+ "modified": "2025-10-09 18:58:51.592030",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",
@@ -221,6 +207,18 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
    "share": 1,
    "write": 1
   }

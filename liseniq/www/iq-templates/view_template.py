@@ -13,6 +13,7 @@ def get_context(context):
 
     try:
         template_doc = frappe.get_doc("qp_IQ_Template", template_name)
+        template_doc.has_permission("read")
 
         if template_doc.tp_category:
             category_name = frappe.db.get_value("qp_IQ_QuestionCategory", template_doc.tp_category, "qnc_category")

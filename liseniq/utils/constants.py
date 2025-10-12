@@ -14,14 +14,14 @@ frappe.web_form.after_load = () => {
   
   $('.web-form-actions button[type="submit"]').hide();
 
+  // Validar si ya hay respuestas guardadas en localStorage
+  const surveyCacheKey = "liseniq_survey_cache_" + frappe.web_form.title;
+  const cachedResponses = localStorage.getItem(surveyCacheKey);
+
+  // Validar si la encuesta ya fue respondida
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
   const dni = localStorage.getItem("liseniq_doc_id");
-
-  if (!token) {
-    show_completed_message(__("El enlace a la encuesta no es válido o ha expirado."));
-    return;
-  }
 
   frappe
     .call({
@@ -37,11 +37,14 @@ frappe.web_form.after_load = () => {
       const res = r.message || {};
       if (res.allow === false) {
         show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
+        // Limpiar cache si ya fue respondida
+        localStorage.removeItem(surveyCacheKey);
+        localStorage.removeItem("liseniq_doc_id");
         return;
       }
 
       $('.web-form-actions button[type="submit"]').show();
-      load_survey(frappe.web_form.title);
+      load_survey(frappe.web_form.title, cachedResponses);
     });
 };
 
@@ -54,6 +57,12 @@ frappe.ready(function() {
       validate_dni_on_input(this.value);
     });
   }
+
+  // Eliminar dni y cache al cerrar navegador
+  window.addEventListener("unload", function() {
+    localStorage.removeItem("liseniq_doc_id");
+    localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
+  });
 });
 
 const validate_dni_on_input = function(dni) {
@@ -104,7 +113,7 @@ const show_completed_message = function (msg) {
     .appendTo($wrap);
 };
 
-const load_survey = function (survey_name) {
+const load_survey = function (survey_name, cachedResponses) {
   $(".web-form-container").toggle(false);
   $('<div id="surveyElement"></div>').appendTo($(".page_content"));
   frappe
@@ -120,12 +129,29 @@ const load_survey = function (survey_name) {
       survey.locale = "es";
       survey.completedHtml = "<h4>" + __("Gracias por completar la encuesta.") + "</h4>";
       survey.applyTheme(frappe.theme_json);
+
+      // Precargar respuestas si existen en cache
+      if (cachedResponses) {
+        try {
+          survey.data = JSON.parse(cachedResponses);
+        } catch (e) {}
+      }
+
+      survey.onValueChanged.add((sender, options) => {
+        // Guardar respuestas en cache cada vez que cambie una respuesta
+        localStorage.setItem(
+          "liseniq_survey_cache_" + frappe.web_form.title,
+          JSON.stringify(sender.data)
+        );
+      });
+
       survey.onComplete.add((sender, options) => {
         submit_response(sender.getAllValues());
-        
         $(".web-form-footer").hide();
-        
         $("#surveyElement").addClass("survey-completed");
+        // Limpiar cache y dni solo cuando se envía la encuesta
+        localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
+        localStorage.removeItem("liseniq_doc_id");
       });
       $("#surveyElement").Survey({ model: survey });
     });

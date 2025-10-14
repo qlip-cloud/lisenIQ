@@ -1,0 +1,229 @@
+{
+ "actions": [],
+ "creation": "2025-06-09 09:41:44.371769",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "su_name",
+  "section_break_3",
+  "su_template",
+  "column_break_1",
+  "su_template_to_add",
+  "section_break_1",
+  "su_questions",
+  "section_break_2",
+  "su_owner",
+  "su_status",
+  "su_type",
+  "su_is_anonymous",
+  "column_break_2",
+  "su_message",
+  "section_break_4",
+  "su_recipients",
+  "su_respondents_template",
+  "su_start_date",
+  "su_end_date",
+  "su_timezone",
+  "su_send_reminders",
+  "su_reminder_frequency",
+  "su_reminder_max",
+  "secci\u00f3n_link_publico_section",
+  "su_public_link",
+  "su_public_token",
+  "su_public_link_created_on",
+  "su_public_link_created_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "su_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Nombre de la Encuesta"
+  },
+  {
+   "fieldname": "su_questions",
+   "fieldtype": "Table",
+   "label": "Pregunta",
+   "options": "qp_IQ_SurveyQuestion"
+  },
+  {
+   "fieldname": "su_owner",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Due\u00f1o",
+   "options": "qp_IQ_Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "su_status",
+   "fieldtype": "Link",
+   "label": "Estado de Encuesta",
+   "options": "qp_IQ_SurveyStatus"
+  },
+  {
+   "fieldname": "su_type",
+   "fieldtype": "Data",
+   "label": "Tipo de Encuesta"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_is_anonymous",
+   "fieldtype": "Check",
+   "label": "Es An\u00f3nima"
+  },
+  {
+   "fieldname": "su_respondents_template",
+   "fieldtype": "Data",
+   "label": "Plantilla de Encuestados"
+  },
+  {
+   "fieldname": "su_message",
+   "fieldtype": "Data",
+   "label": "Mensaje de Encuesta"
+  },
+  {
+   "fieldname": "su_template",
+   "fieldtype": "Link",
+   "label": "Plantilla",
+   "options": "qp_IQ_Template"
+  },
+  {
+   "fieldname": "su_template_to_add",
+   "fieldtype": "Button",
+   "label": "Agregar Pregunta"
+  },
+  {
+   "fieldname": "section_break_1",
+   "fieldtype": "Section Break",
+   "label": "Secci\u00f3n de Preguntas"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Informaci\u00f3n de la Encuesta"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Secci\u00f3n de Plantillas"
+  },
+  {
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break",
+   "label": "Encuestados"
+  },
+  {
+   "fieldname": "su_start_date",
+   "fieldtype": "Datetime",
+   "label": "Fecha de Inicio"
+  },
+  {
+   "fieldname": "su_end_date",
+   "fieldtype": "Datetime",
+   "label": "Fecha de Finalizaci\u00f3n"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_send_reminders",
+   "fieldtype": "Check",
+   "label": "Enviar Recordatorios"
+  },
+  {
+   "fieldname": "su_reminder_frequency",
+   "fieldtype": "Select",
+   "label": "Frecuencia de Recordatorios",
+   "options": "Diaria\nSemanal"
+  },
+  {
+   "fieldname": "su_reminder_max",
+   "fieldtype": "Int",
+   "label": "M\u00e1ximo de Recordatorios"
+  },
+  {
+   "fieldname": "su_recipients",
+   "fieldtype": "Link",
+   "label": "Destinatarios",
+   "options": "qp_IQ_SurveyRecipient"
+  },
+  {
+   "fieldname": "su_timezone",
+   "fieldtype": "Select",
+   "label": "Zona Horaria",
+   "options": "America/Caracas\nAmerica/Bogota"
+  },
+  {
+   "fieldname": "secci\u00f3n_link_publico_section",
+   "fieldtype": "Section Break",
+   "label": "Secci\u00f3n LInk Publico"
+  },
+  {
+   "fieldname": "su_public_link",
+   "fieldtype": "Long Text",
+   "label": "Link Publico"
+  },
+  {
+   "fieldname": "su_public_token",
+   "fieldtype": "Long Text",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Token Publico"
+  },
+  {
+   "fieldname": "su_public_link_created_on",
+   "fieldtype": "Datetime",
+   "label": "Fecha de Creaci\u00f3n de Link Publico"
+  },
+  {
+   "fieldname": "su_public_link_created_by",
+   "fieldtype": "Link",
+   "label": "Creado Por",
+   "options": "User"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 18:58:51.592030",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Survey",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

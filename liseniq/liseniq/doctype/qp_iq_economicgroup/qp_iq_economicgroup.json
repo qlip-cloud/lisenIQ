@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "creation": "2025-06-11 14:26:17.289458",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "eg_group_name",
+  "eg_group_id_type",
+  "eg_group_id",
+  "eg_country",
+  "eg_description"
+ ],
+ "fields": [
+  {
+   "fieldname": "eg_group_name",
+   "fieldtype": "Data",
+   "label": "Nombre del Grupo"
+  },
+  {
+   "fieldname": "eg_group_id_type",
+   "fieldtype": "Link",
+   "label": "Tipo de Identificaci\u00f3n del Grupo",
+   "options": "qp_IQ_DocumentType"
+  },
+  {
+   "fieldname": "eg_group_id",
+   "fieldtype": "Data",
+   "label": "Identificaci\u00f3n del Grupo"
+  },
+  {
+   "fieldname": "eg_country",
+   "fieldtype": "Link",
+   "label": "Pa\u00eds de Origen",
+   "options": "Country"
+  },
+  {
+   "fieldname": "eg_description",
+   "fieldtype": "Data",
+   "label": "Descripci\u00f3n"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 18:56:54.674051",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_EconomicGroup",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

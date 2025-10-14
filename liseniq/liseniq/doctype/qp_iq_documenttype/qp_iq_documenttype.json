@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "creation": "2025-06-11 14:40:14.855043",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "dt_name",
+  "dt_country",
+  "dt_abbreviation",
+  "dt_status",
+  "dt_regex_validation"
+ ],
+ "fields": [
+  {
+   "fieldname": "dt_name",
+   "fieldtype": "Data",
+   "label": "Nombre del Documento"
+  },
+  {
+   "fieldname": "dt_country",
+   "fieldtype": "Link",
+   "label": "Pa\u00eds",
+   "options": "Country"
+  },
+  {
+   "fieldname": "dt_abbreviation",
+   "fieldtype": "Data",
+   "label": "Abreviatura"
+  },
+  {
+   "fieldname": "dt_status",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Activo\nInactivo"
+  },
+  {
+   "fieldname": "dt_regex_validation",
+   "fieldtype": "Data",
+   "label": "Regla de Validaci\u00f3n (Regex)"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 18:56:39.642041",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_DocumentType",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "dt_name",
+ "track_changes": 1
+}

@@ -1,0 +1,177 @@
+{
+ "actions": [],
+ "creation": "2025-06-11 14:28:47.242396",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "co_name",
+  "co_logo",
+  "co_economic_group",
+  "co_section_break_1",
+  "column_break_2",
+  "co_sector",
+  "co_country",
+  "co_headquarters",
+  "co_address",
+  "co_company_size",
+  "admin_details_sb",
+  "co_id_document_type",
+  "co_id_document",
+  "column_break_1",
+  "co_admin_name",
+  "co_admin_email",
+  "co_admin_phone",
+  "co_legal_agreements_sb",
+  "co_accept_terms",
+  "co_accept_privacy_policy"
+ ],
+ "fields": [
+  {
+   "fieldname": "co_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Nombre de la Compa\u00f1ia"
+  },
+  {
+   "fieldname": "co_logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo"
+  },
+  {
+   "fieldname": "co_economic_group",
+   "fieldtype": "Link",
+   "label": "Grupo Econ\u00f3mico",
+   "options": "qp_IQ_EconomicGroup"
+  },
+  {
+   "fieldname": "co_sector",
+   "fieldtype": "Link",
+   "label": "Sector",
+   "options": "qp_IQ_Sector"
+  },
+  {
+   "fieldname": "co_country",
+   "fieldtype": "Link",
+   "label": "Pa\u00eds",
+   "options": "Country"
+  },
+  {
+   "fieldname": "co_headquarters",
+   "fieldtype": "Data",
+   "label": "Sede (Ciudad/Estado)"
+  },
+  {
+   "fieldname": "co_address",
+   "fieldtype": "Link",
+   "label": "Direcci\u00f3n",
+   "options": "Address"
+  },
+  {
+   "fieldname": "co_company_size",
+   "fieldtype": "Select",
+   "label": "Tama\u00f1o de la Empresa",
+   "options": "1-10 empleados\n11-50 empleados\n51-200 empleados\n201+ empleados"
+  },
+  {
+   "fieldname": "admin_details_sb",
+   "fieldtype": "Section Break",
+   "label": "Datos del Administrador"
+  },
+  {
+   "fieldname": "co_id_document_type",
+   "fieldtype": "Link",
+   "label": "Tipo de Doc. Identidad",
+   "options": "qp_IQ_DocumentType"
+  },
+  {
+   "fieldname": "co_id_document",
+   "fieldtype": "Data",
+   "label": "Documento de Identidad"
+  },
+  {
+   "fieldname": "co_admin_name",
+   "fieldtype": "Data",
+   "label": "Nombre del Administrador"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break",
+   "label": "Contacto"
+  },
+  {
+   "fieldname": "co_admin_email",
+   "fieldtype": "Data",
+   "label": "Correo Electr\u00f3nico"
+  },
+  {
+   "fieldname": "co_admin_phone",
+   "fieldtype": "Data",
+   "label": "N\u00famero de Tel\u00e9fono"
+  },
+  {
+   "fieldname": "co_section_break_1",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "co_legal_agreements_sb",
+   "fieldtype": "Section Break",
+   "label": "Acuerdos Legales"
+  },
+  {
+   "default": "0",
+   "fieldname": "co_accept_terms",
+   "fieldtype": "Check",
+   "label": "Acepto T\u00e9rminos y Condiciones"
+  },
+  {
+   "default": "0",
+   "fieldname": "co_accept_privacy_policy",
+   "fieldtype": "Check",
+   "label": "Acepto Pol\u00edticas de Protecci\u00f3n de Datos"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break",
+   "label": "Informaci\u00f3n de la Empresa"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 18:53:54.801763",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Company",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "co_name",
+ "track_changes": 1
+}

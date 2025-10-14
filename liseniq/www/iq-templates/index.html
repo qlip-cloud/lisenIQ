@@ -1,0 +1,21 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Plantillas") }}
+{% endblock %}
+
+{% block page_main_content %}
+    {% include "templates/pages/iq_templates/iq_index.html" %}
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_templates.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script src="/assets/liseniq/js/iq_template_list.js"></script>
+{% endblock %}

@@ -1,0 +1,133 @@
+{
+ "actions": [],
+ "autoname": "TEMP.00000000000",
+ "creation": "2025-06-09 12:08:20.111008",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "tp_name",
+  "tp_category",
+  "tp_owner",
+  "custom_company",
+  "tp_is_private",
+  "tp_status",
+  "tp_logo",
+  "column_break_1",
+  "tp_description",
+  "section_break_1",
+  "tp_questions"
+ ],
+ "fields": [
+  {
+   "fieldname": "tp_name",
+   "fieldtype": "Data",
+   "label": "Template Name"
+  },
+  {
+   "fieldname": "tp_category",
+   "fieldtype": "Data",
+   "label": "Category"
+  },
+  {
+   "fieldname": "tp_owner",
+   "fieldtype": "Link",
+   "label": "Owner",
+   "options": "User"
+  },
+  {
+   "fieldname": "tp_status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Activa\nInactiva\nBorrador"
+  },
+  {
+   "fieldname": "tp_questions",
+   "fieldtype": "Table",
+   "label": "Questions",
+   "options": "qp_IQ_TemplateQuestion"
+  },
+  {
+   "fieldname": "tp_logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo"
+  },
+  {
+   "fieldname": "tp_description",
+   "fieldtype": "Small Text",
+   "label": "Description of the template"
+  },
+  {
+   "fieldname": "section_break_1",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "custom_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "qp_IQ_Company",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "tp_is_private",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Es privada"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 19:11:59.112206",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Template",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "tp_name",
+ "track_changes": 1
+}

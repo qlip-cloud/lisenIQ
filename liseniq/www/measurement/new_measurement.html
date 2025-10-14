@@ -1,0 +1,24 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title=page_title) }}
+{% endblock %}
+
+{% block page_main_content %}
+    {% include "templates/pages/measurement/iq_measurement.html" %}
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_templates.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/measurement.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script type="module" src="/assets/liseniq/js/utils/stepper.js"></script>
+    <script type="module" src="/assets/liseniq/js/question_builder.js"></script>
+    <script type="module" src="/assets/liseniq/js/measurement.js"></script>
+{% endblock %}

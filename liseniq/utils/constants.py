@@ -1,0 +1,241 @@
+WEB_FORM_CLIENT_SCRIPT = """
+frappe.web_form.after_load = () => {
+  $(".page-header-actions-block").hide();
+  $(".page-header").hide();
+  $(".web-form-container").hide();
+  $(".web-form-footer").hide();
+  
+  $(".breadcrumb-container").hide();
+  
+  $(".frappe-control[data-fieldname='responses']").hide();
+  $(".frappe-control[data-fieldname='response_json']").hide();
+  $(".frappe-control[data-fieldname='user']").hide();
+  $(".frappe-control[data-fieldname='survey']").hide();
+  
+  $('.web-form-actions button[type="submit"]').hide();
+
+  // Validar si ya hay respuestas guardadas en localStorage
+  const surveyCacheKey = "liseniq_survey_cache_" + frappe.web_form.title;
+  const cachedResponses = localStorage.getItem(surveyCacheKey);
+
+  // Validar si la encuesta ya fue respondida
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get("token");
+  const dni = localStorage.getItem("liseniq_doc_id");
+
+  frappe
+    .call({
+      method: "liseniq.utils.api_survey.validate_survey_link",
+      args: {
+        survey_name: frappe.web_form.title,
+        user: token || "Anonimo",
+        token: token,
+        dni: dni || null
+      },
+    })
+    .then((r) => {
+      const res = r.message || {};
+      if (res.allow === false) {
+        show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
+        // Limpiar cache si ya fue respondida
+        localStorage.removeItem(surveyCacheKey);
+        localStorage.removeItem("liseniq_doc_id");
+        return;
+      }
+
+      $('.web-form-actions button[type="submit"]').show();
+      load_survey(frappe.web_form.title, cachedResponses);
+    });
+};
+
+frappe.ready(function() {
+  $('<style>.survey-completed { pointer-events: none; opacity: 0.7; }</style>').appendTo('head');
+  
+  const dni_field = frappe.web_form.fields_dict.custom_document_number;
+  if (dni_field) {
+    $(dni_field.input).on('blur', function() {
+      validate_dni_on_input(this.value);
+    });
+  }
+
+  // Eliminar dni y cache al cerrar navegador
+  window.addEventListener("unload", function() {
+    localStorage.removeItem("liseniq_doc_id");
+    localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
+  });
+});
+
+const validate_dni_on_input = function(dni) {
+    if (!dni) {
+        return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
+
+    frappe.call({
+        method: "liseniq.utils.api_survey.validate_survey_link",
+        args: {
+            survey_name: frappe.web_form.title,
+            dni: dni,
+            token: token || null
+        },
+    }).then((r) => {
+        const res = r.message || {};
+        const dni_field = frappe.web_form.fields_dict.custom_document_number;
+        const $submit_btn = $('.web-form-actions button[type="submit"]');
+
+        $(dni_field.input).removeClass('is-invalid');
+        $(dni_field.wrapper).find('.invalid-feedback').remove();
+
+        if (res.allow === false) {
+            const error_msg = res.message || __("Esta encuesta ya fue completada.");
+            $(dni_field.input).addClass('is-invalid');
+            $(dni_field.wrapper).append(`<div class="invalid-feedback">${error_msg}</div>`);
+            $submit_btn.prop('disabled', true);
+        } else if (res.valid_dni === false) {
+            const error_msg = res.message || __("El DNI proporcionado no corresponde a un contacto válido para esta encuesta.");
+            $(dni_field.input).addClass('is-invalid');
+            $(dni_field.wrapper).append(`<div class="invalid-feedback">${error_msg}</div>`);
+            $submit_btn.prop('disabled', true);
+        } else {
+            $submit_btn.prop('disabled', false);
+        }
+    });
+};
+
+const show_completed_message = function (msg) {
+  $(".web-form-container").toggle(false);
+  const $wrap = $(".page_content");
+  $wrap.empty();
+  $('<div class="alert alert-info" role="alert"></div>')
+    .text(msg || "Esta encuesta ya fue completada. Gracias por tu participación.")
+    .appendTo($wrap);
+};
+
+const load_survey = function (survey_name, cachedResponses) {
+  $(".web-form-container").toggle(false);
+  $('<div id="surveyElement"></div>').appendTo($(".page_content"));
+  frappe
+    .call({
+      method: "liseniq.utils.api_survey.get_public_survey",
+      args: {
+        survey_name: frappe.web_form.title,
+      },
+    })
+    .then((r) => {
+      build_survey(r.message);
+      const survey = new Survey.Model(frappe.survey_json);
+      survey.locale = "es";
+      survey.completedHtml = "<h4>" + __("Gracias por completar la encuesta.") + "</h4>";
+      survey.applyTheme(frappe.theme_json);
+
+      // Precargar respuestas si existen en cache
+      if (cachedResponses) {
+        try {
+          survey.data = JSON.parse(cachedResponses);
+        } catch (e) {}
+      }
+
+      survey.onValueChanged.add((sender, options) => {
+        // Guardar respuestas en cache cada vez que cambie una respuesta
+        localStorage.setItem(
+          "liseniq_survey_cache_" + frappe.web_form.title,
+          JSON.stringify(sender.data)
+        );
+      });
+
+      survey.onComplete.add((sender, options) => {
+        submit_response(sender.getAllValues());
+        $(".web-form-footer").hide();
+        $("#surveyElement").addClass("survey-completed");
+        // Limpiar cache y dni solo cuando se envía la encuesta
+        localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
+        localStorage.removeItem("liseniq_doc_id");
+      });
+      $("#surveyElement").Survey({ model: survey });
+    });
+};
+
+const build_survey = function (data) {
+  frappe.survey_json = JSON.parse(data.survey_json.replaceAll("\\n", ""));
+  frappe.theme_json = data.theme_json
+    ? JSON.parse(data.theme_json)
+    : {
+        themeName: "plain",
+        colorPalette: "dark",
+        isPanelless: true,
+      };
+};
+
+const submit_response = function (data) {
+  window.saving = true;
+  frappe.form_dirty = false;
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get("token");
+  const doc_id = localStorage.getItem("liseniq_doc_id");
+
+  frappe
+    .call({
+      method: "liseniq.utils.api_survey.validate_survey_link",
+      args: {
+        survey_name: frappe.web_form.title,
+        user: token || "Anonimo",
+        token: token,
+      },
+    })
+    .then((r) => {
+      const res = r.message || {};
+      if (res.allow === false) {
+        show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
+        window.saving = false;
+        return;
+      }
+
+      const payload = Object.assign({}, data);
+      if (token) {
+        payload.__token = token;
+      }
+
+      let args = {
+        doctype: frappe.web_form.doc_type,
+        survey: frappe.web_form.title,
+        response_json: JSON.stringify(payload),
+        user: doc_id || "Anonimo"
+      };
+      // console.log(args);
+      frappe.call({
+        type: "POST",
+        method: "frappe.website.doctype.web_form.web_form.accept",
+        args: {
+          web_form: frappe.web_form.name,
+          data: args,
+        },
+        callback: (response) => {
+          if (!response.exc) {
+            // console.log(response.message);
+            localStorage.removeItem("liseniq_doc_id");
+          }
+        },
+        always: function () {
+          window.saving = false;
+        },
+      });
+    });
+};
+"""
+
+WEB_FORM_CUSTOM_CSS = """
+.navbar {
+    display: none !important;
+}
+
+.page-head {
+    display: none !important;
+}
+
+.web-form-container, .page-container {
+    padding-top: 15px !important;
+}
+"""

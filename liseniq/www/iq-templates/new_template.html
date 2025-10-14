@@ -1,0 +1,23 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Crear Plantilla") }}
+{% endblock %}
+
+{% block page_main_content %}
+    {% include "templates/pages/iq_templates/iq_new_template.html" %}
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_templates.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script type="module" src="/assets/liseniq/js/utils/stepper.js"></script>
+    <script type="module" src="/assets/liseniq/js/question_builder.js"></script>
+    <script type="module" src="/assets/liseniq/js/iq_templates.js"></script>
+{% endblock %}

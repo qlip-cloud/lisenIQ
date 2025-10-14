@@ -1,0 +1,118 @@
+{% if not is_edit_mode %}
+<div class="mt-4 mb-5">
+    <button id="btn-open-question-bank" class="btn btn-outline-dark">Ver Biblioteca de preguntas</button>
+</div>
+{% endif %}
+
+<div id="questions-list" class="questions-list"></div>
+
+{% if not is_edit_mode %}
+<div class="add-question-form mt-4">
+    <div class="row">
+        <div class="col-md-4">
+            <label for="new_question_text" class="small text-muted">Ingresa tu pregunta</label>
+            <input type="text" class="form-control" id="new_question_text" placeholder="Ingresa el enunciado de la pregunta...">
+            <small id="new_question_text_error" class="form-error-message d-none">Este campo es requerido.</small>
+        </div>
+        <div class="col-md-4">
+            <label for="new_question_type" class="small text-muted">Tipo de respuesta</label>
+            <select class="form-control form-select" id="new_question_type">
+                <option selected value="">Selecciona el tipo de respuesta</option>
+                {% for type in question_types %}
+                <option value="{{ type.name }}">{{ type.qnt_type_name }}</option>
+                {% endfor %}
+            </select>
+             <small id="new_question_type_error" class="form-error-message d-none">Este campo es requerido.</small>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group" style="position: relative;">
+                <label for="new_question_demographic" class="small text-muted">Tema</label>
+                <input type="text" class="form-control" id="new_question_demographic" placeholder="Buscar o crear tema..." autocomplete="off">
+                <div class="autocomplete-results"></div>
+                <small id="new_question_demographic_error" class="form-error-message d-none"></small>
+            </div>
+        </div>
+    </div>
+
+    <div id="options-based-section" class="mt-4 d-none">
+        <label class="small text-muted">Opciones de respuesta</label>
+        <div id="options-container">
+            <div class="option-input-row">
+                <span class="option-number">1</span>
+                <input type="text" class="form-control option-input" placeholder="Escribe tu opción aqui">
+                <i class="fa fa-trash-o text-danger delete-option" style="cursor: pointer;"></i>
+            </div>
+        </div>
+        <button id="btn-add-option" class="btn btn-sm btn-add-option mt-3">
+            <i class="fa fa-plus-circle"></i>
+        </button>
+    </div>
+
+    <div id="bipolar-scale-section" class="bipolar-scale-section d-none">
+        <label class="small text-muted">Enunciados de la escala</label>
+        <div class="row">
+            <div class="col-md-6">
+                <label for="negative_statement_input" class="small">Extremo Negativo (ej: Totalmente en desacuerdo)</label>
+                <input type="text" class="form-control" id="negative_statement_input" placeholder="Enunciado para el valor -4">
+                <small id="negative_statement_error" class="form-error-message d-none"></small>
+            </div>
+            <div class="col-md-6">
+                <label for="positive_statement_input" class="small">Extremo Positivo (ej: Totalmente de acuerdo)</label>
+                <input type="text" class="form-control" id="positive_statement_input" placeholder="Enunciado para el valor 4">
+                <small id="positive_statement_error" class="form-error-message d-none"></small>
+            </div>
+        </div>
+    </div>
+
+    <div id="nps-scale-section" class="nps-scale-section d-none">
+        <label class="small text-muted">Rango de la Escala NPS</label>
+        <div class="row">
+            <div class="col-md-6">
+                <label for="nps_min_input" class="small">Valor Mínimo</label>
+                <input type="number" class="form-control" id="nps_min_input" placeholder="Ej: 1">
+                <small id="nps_min_error" class="form-error-message d-none"></small>
+            </div>
+            <div class="col-md-6">
+                <label for="nps_max_input" class="small">Valor Máximo</label>
+                <input type="number" class="form-control" id="nps_max_input" placeholder="Ej: 10">
+                <small id="nps_max_error" class="form-error-message d-none"></small>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="text-center mt-5">
+    <button id="btn-add-question" class="btn btn-outline-purple">Agregar Pregunta</button>
+</div>
+
+<div id="question-bank-modal" class="question-bank-modal-overlay d-none">
+    <div class="question-bank-modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Banco de preguntas</h5>
+            <button type="button" class="close" id="btn-close-modal" aria-label="Cerrar">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-sidebar">
+                <ul id="bank-category-filter-list" class="list-unstyled bank-category-list"></ul>
+            </div>
+            <div class="modal-questions-list">
+                <div class="search-bar">
+                    <h6 class="search-bar-title"># Buscar Pregunta</h6>
+                    <input type="text" id="bank-search-input" class="form-control" placeholder="Escribe para buscar...">
+                </div>
+                <div id="bank-questions-container" class="questions-container"></div>
+            </div>
+            <div class="modal-selected-questions">
+                <div class="selected-questions-header">
+                    <h6 class="font-weight-bold">Preguntas seleccionadas</h6>
+                </div>
+                <div id="modal-selected-questions-container" class="selected-questions-container"></div>
+                <div class="modal-footer">
+                    <button id="btn-add-selected-questions" class="btn btn-purple-main" disabled>Agregar preguntas</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

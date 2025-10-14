@@ -1,0 +1,40 @@
+{
+ "actions": [],
+ "creation": "2025-06-09 12:56:58.863930",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sq_question",
+  "sq_template"
+ ],
+ "fields": [
+  {
+   "fieldname": "sq_question",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Pregunta",
+   "options": "qp_IQ_Question",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sq_template",
+   "fieldtype": "Link",
+   "label": "Plantilla",
+   "options": "qp_IQ_Template",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-06-11 21:25:14.585946",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_SurveyQuestion",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,0 +1,199 @@
+:root {
+    --brand-primary: #7B24FF;
+    --brand-primary-light: #f3e8ff;
+    --brand-light-gray: #FAF9F8;
+    --brand-border-color: #dee2e6;
+    --text-color-primary: #212529;
+    --text-color-secondary: #6c757d;
+}
+
+body {
+    font-family: 'Rubik', sans-serif;
+    background-color: #fff;
+    font-weight: 500;
+    color: var(--text-color-primary);
+}
+
+.main-content {
+    padding: 0;
+}
+
+
+.form-control,
+.form-select {
+    border: none;
+    border-bottom: 1px solid var(--brand-primary);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    padding-left: 0.25rem;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: #fdfaff;
+    border-bottom-width: 2px;
+}
+
+.search-wrapper .form-control {
+    background-color: #EEEDEC;
+    border-radius: 9px;
+    height: 56px;
+    border: 1px solid transparent;
+    padding-left: 2.75rem;
+    padding-right: 1rem;
+    font-size: 0.875rem;
+    box-shadow: none;
+    width: 100%;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.search-wrapper .form-control:focus {
+    background-color: #fff;
+    border: 1.5px solid var(--brand-primary);
+    box-shadow: none;
+}
+
+
+.page-header-container {
+    background-color: var(--brand-light-gray);
+    padding: 1.6rem 2rem;
+    margin-bottom: 2rem;
+}
+
+.page-header-container h5 {
+    font-size: 0.8125rem;
+}
+
+.sidebar-container {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    background-color: var(--brand-light-gray);
+    border-right: 1px solid var(--brand-border-color);
+}
+
+
+.sidebar-header {
+    margin-bottom: 3.5rem;
+}
+
+.sidebar-container h6.text-muted.small {
+    font-size: 0.8125rem;
+    text-transform: none;
+    font-weight: 600;
+    padding-left: 0;
+    margin-bottom: 1.8rem;
+}
+
+.sidebar-container .nav-pills {
+    padding-left: 0;
+}
+
+.sidebar-container .nav-item {
+    margin-bottom: 0.8rem;
+}
+
+.sidebar-container .nav-link {
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    border-radius: 0.5rem;
+    color: var(--text-color-secondary);
+    font-size: 0.8125rem;
+}
+
+.sidebar-container .nav-link.active-link,
+.sidebar-container .nav-link:not(.active-link):hover {
+    background-color: var(--brand-primary-light);
+    color: var(--brand-primary);
+}
+
+.search-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.search-wrapper .search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--text-color-secondary);
+    z-index: 10;
+}
+
+.search-wrapper .form-control::placeholder {
+    color: var(--text-color-secondary);
+    font-weight: 500;
+}
+
+.sidebar-footer {
+    padding-top: 1rem;
+    border-top: none;
+}
+
+.sidebar-footer .text-muted {
+    opacity: 0.6;
+}
+
+
+@media (max-width: 991.98px) {
+    .mobile-header {
+        position: sticky;
+        top: 0;
+        background-color: #fff;
+        border-bottom: 1px solid var(--brand-border-color);
+        z-index: 1030;
+    }
+
+    .sidebar-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 280px;
+        z-index: 1040;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-in-out;
+        box-shadow: 0 0 25px rgba(0,0,0,0.1);
+    }
+
+    .sidebar-visible {
+        transform: translateX(0);
+    }
+
+    #sidebar-close-btn {
+        display: block;
+        font-size: 1.75rem;
+        line-height: 1;
+        padding: 0.5rem 1rem;
+    }
+
+    #sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 1035;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0s linear 0.3s;
+    }
+
+    #sidebar-overlay.active {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    .sidebar-footer {
+        text-align: center;
+    }
+}

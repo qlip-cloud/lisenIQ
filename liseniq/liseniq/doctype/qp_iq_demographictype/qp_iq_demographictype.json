@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "creation": "2025-07-05 22:44:14.986345",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "dt_title",
+  "dt_description",
+  "dt_object_type",
+  "dt_tag_color"
+ ],
+ "fields": [
+  {
+   "fieldname": "dt_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "dt_description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "dt_object_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tipo de Objeto",
+   "options": "Contacto\nPregunta\nPlantilla\nRespuesta"
+  },
+  {
+   "fieldname": "dt_tag_color",
+   "fieldtype": "Color",
+   "label": "Color de Etiqueta"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 18:56:24.345014",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_DemographicType",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "dt_title",
+ "track_changes": 1
+}

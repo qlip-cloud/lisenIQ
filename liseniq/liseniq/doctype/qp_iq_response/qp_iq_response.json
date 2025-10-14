@@ -1,0 +1,133 @@
+{
+ "actions": [],
+ "creation": "2025-06-11 16:46:29.903520",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "rs_survey",
+  "rs_questio",
+  "rs_respondent",
+  "rs_anonymous_id",
+  "rs_owner_company",
+  "column_break_1",
+  "rs_response_date",
+  "rs_section_response",
+  "rs_text_response",
+  "rs_option_response",
+  "rs_numeric_response",
+  "rs_section_category",
+  "rs_question_category"
+ ],
+ "fields": [
+  {
+   "fieldname": "rs_survey",
+   "fieldtype": "Link",
+   "label": "Encuesta",
+   "options": "qp_IQ_Survey"
+  },
+  {
+   "fieldname": "rs_questio",
+   "fieldtype": "Link",
+   "label": "Pregunta",
+   "options": "qp_IQ_Question"
+  },
+  {
+   "fieldname": "rs_respondent",
+   "fieldtype": "Link",
+   "label": "Encuestado",
+   "options": "qp_IQ_Respondents"
+  },
+  {
+   "depends_on": "eval:!doc.rs_respondent",
+   "fieldname": "rs_anonymous_id",
+   "fieldtype": "Data",
+   "label": "ID An\u00f3nimo",
+   "search_index": 1
+  },
+  {
+   "fieldname": "rs_owner_company",
+   "fieldtype": "Link",
+   "label": "Compa\u00f1\u00eda Due\u00f1a",
+   "options": "qp_IQ_Company"
+  },
+  {
+   "default": "Now",
+   "fieldname": "rs_response_date",
+   "fieldtype": "Datetime",
+   "label": "Fecha de Respuesta"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rs_section_response",
+   "fieldtype": "Section Break",
+   "label": "Respuesta del Usuario"
+  },
+  {
+   "fieldname": "rs_text_response",
+   "fieldtype": "Text",
+   "label": "Respuesta (Texto Libre)"
+  },
+  {
+   "fieldname": "rs_option_response",
+   "fieldtype": "Link",
+   "label": "Respuesta (Opci\u00f3n \u00danica)",
+   "options": "qp_IQ_QuestionOption"
+  },
+  {
+   "fieldname": "rs_numeric_response",
+   "fieldtype": "Float",
+   "label": "Respuesta (Num\u00e9rica)"
+  },
+  {
+   "fieldname": "rs_section_category",
+   "fieldtype": "Section Break",
+   "label": "Categor\u00edas"
+  },
+  {
+   "fieldname": "rs_question_category",
+   "fieldtype": "Link",
+   "label": "Categor\u00eda de Pregunta",
+   "options": "qp_IQ_QuestionCategory"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-09 18:58:24.763622",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Response",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

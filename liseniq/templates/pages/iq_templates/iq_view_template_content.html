@@ -1,0 +1,67 @@
+<div class="main-content-padding">
+    <div class="form-section-wrapper">
+        <div>
+            <div class="page-title-section">
+                 <div class="breadcrumb-nav">
+                    <a href="/iq-templates">Plantillas</a> / 
+                    <span>{{ template_data.tp_name }}</span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Revisión del Modelo</h3>
+                    <div class="form-action-buttons">
+                        <a href="/iq-templates" class="btn btn-outline-purple">Atrás</a>
+                        <button id="btn-create-measurement" class="btn btn-purple-main">Crear Medición</button>
+                    </div>
+                </div>
+            </div>
+            <div class="review-layout-grid">
+                <div class="review-info-container">
+                    <p class="review-section-title">Plantilla</p>
+                    <h4 class="review-template-title">{{ template_data.tp_name }}</h4>
+                    
+                    <p class="review-section-title mt-4">Descripción</p>
+                    <p class="review-template-description">{{ template_data.tp_description }}</p>
+                    
+                    <div class="review-details-grid">
+                        <div>
+                            <p class="review-section-title">Categoría</p>
+                            <p class="review-detail-value">{{ template_data.category_name }}</p>
+                        </div>
+                        <div>
+                            <p class="review-section-title">Preguntas</p>
+                            <p class="review-detail-value">{{ questions_count }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="review-questions-container">
+                     <p class="review-section-title">Preguntas</p>
+                     <div class="review-questions-list">
+                        {% if questions %}
+                            {% for question in questions %}
+                            <div class="review-question-item">
+                                <div class="review-question-header">
+                                    <span class="review-question-number">{{ loop.index }}</span>
+                                    <p class="review-question-text">{{ question.text }}</p>
+                                </div>
+                                <div class="review-question-details">
+                                    <span>tipo: {{ question.type_name }}</span>
+                                    <span class="review-question-tag">Tag: {{ question.category_name }}</span>
+                                </div>
+                                {% if question.options %}
+                                <div class="review-question-options">
+                                    {% for option in question.options %}
+                                    <div class="review-question-option">{{ option }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center text-muted p-4">Esta plantilla no tiene preguntas.</div>
+                        {% endif %}
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

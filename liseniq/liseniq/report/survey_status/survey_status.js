@@ -5,7 +5,7 @@
 frappe.query_reports["Survey Status"] = {
 	"filters": [
 		{
-			"fieldname": su_owner,
+			"fieldname": "su_owner",
 			"label": "Compañía",
 			"fieldtype": "Link",
 			"options": "qp_IQ_Company",

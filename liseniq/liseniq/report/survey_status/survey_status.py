@@ -64,7 +64,9 @@ def get_data(filters):
 
     conditions = []
     if filters and filters.get("company"):
-        conditions.append("s.su_owner = %(company)s")
+      conditions.append("s.su_owner = %(company)s")
+    if filters and filters.get("survey"):
+        conditions.append("s.su_name = %(survey)s")
 
     query = query.format(conditions=("WHERE " + " AND ".join(conditions)) if conditions else "")
 

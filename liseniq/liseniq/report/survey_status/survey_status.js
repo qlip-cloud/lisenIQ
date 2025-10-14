@@ -9,7 +9,14 @@ frappe.query_reports["Survey Status"] = {
 			"label": "Compañía",
 			"fieldtype": "Link",
 			"options": "qp_IQ_Company",
-			"required": 0,
+			"reqd": 0,
+		},
+		{
+			"fieldname": "survey",
+			"label": "Medición",
+			"fieldtype": "Link",
+			"options": "qp_IQ_Survey",
+			"reqd": 0,
 		}
 	]
 };

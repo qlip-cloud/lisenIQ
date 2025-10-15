@@ -41,7 +41,7 @@ def get_columns(filters):
 				"width": 150,
 		})
 
-		columns += [
+	columns += [
 		{
 			"fieldname": "expected_responses",
 			"label": "Respuestas Esperadas",

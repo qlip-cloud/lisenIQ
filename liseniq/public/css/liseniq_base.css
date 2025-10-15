@@ -141,6 +141,38 @@ body {
     opacity: 0.6;
 }
 
+.user-menu-container {
+    position: relative;
+    display: inline-block;
+}
+
+.user-menu-dropdown {
+    min-width: 140px;
+    background: #fff;
+    border: 1px solid var(--brand-border-color, #dee2e6);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    position: absolute;
+    top: 110%;
+    right: 0;
+    z-index: 100;
+    padding: 0.5rem 0;
+}
+
+.user-menu-dropdown .dropdown-item {
+    display: block;
+    padding: 0.75rem 1.2rem;
+    color: var(--text-color-primary, #212529);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+    cursor: pointer;
+}
+
+.user-menu-dropdown .dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
 
 @media (max-width: 991.98px) {
     .mobile-header {

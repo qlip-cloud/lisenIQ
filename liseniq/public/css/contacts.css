@@ -11,6 +11,11 @@
     padding: 0;
 }
 
+.contacts-table-scroll {
+    max-height: 480px;
+    overflow-y: auto;
+}
+
 .contacts-table {
     border-collapse: collapse;
     width: 100%;
@@ -191,4 +196,17 @@
 @media (max-width: 768px) {
     .contact-form-container { max-width: 95%; }
     .contact-form-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+
+.contacts-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+
+.contacts-pagination .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }

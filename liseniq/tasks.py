@@ -95,9 +95,9 @@ def launch_pending_surveys():
 							"custom_document_number": contact_dni
 						}
 
-						if survey_doc.su_end_date:
-							end_date_timestamp = int(get_datetime(survey_doc.su_end_date).timestamp())
-							payload["exp"] = end_date_timestamp
+						# if survey_doc.su_end_date:
+						# 	end_date_timestamp = int(get_datetime(survey_doc.su_end_date).timestamp())
+						# 	payload["exp"] = end_date_timestamp
 
 						try:
 							token = jwt.encode(payload, secret, algorithm="HS256")

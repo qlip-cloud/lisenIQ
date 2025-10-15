@@ -37,9 +37,9 @@
                             <input type="text" class="form-control" placeholder="Buscar...">
                         </div>
 
-                        <div style="color: #7B24FF; font-family: 'Rubik', sans-serif; font-weight: 500; font-size: 18px; margin: 16px 0;" id="company-name">
+                        <!-- <div style="color: #7B24FF; font-family: 'Rubik', sans-serif; font-weight: 500; font-size: 18px; margin: 16px 0;" id="company-name">
                             {{ frappe.session.data.liseniq_company_name or "" }}
-                        </div>
+                        </div> -->
 
                         <h6 class="text-muted small">Menú Principal</h6>
                         <ul class="nav nav-pills flex-column">
@@ -48,6 +48,11 @@
                             <!-- <li class="nav-item"><a href="/resultados" class="nav-link {% if frappe.request.path == '/resultados' %}active-link{% endif %}"><i class="fa fa-bar-chart fa-fw mr-3"></i>Resultados</a></li> -->
                             <li class="nav-item"><a href="/contacts" class="nav-link {% if frappe.request.path == '/contacts' %}active-link{% endif %}"><i class="fa fa-users fa-fw mr-3"></i>Contactos</a></li>
                             <!-- <li class="nav-item"><a href="/configuracion" class="nav-link"><i class="fa fa-cog fa-fw mr-3"></i>Configuración</a></li> -->
+                            <li class="nav-item">
+                                <a href="#" id="sidebar-logout-link" class="nav-link">
+                                    <i class="fa fa-sign-out fa-fw mr-3"></i>Salir
+                                </a>
+                            </li>
                         </ul>
 
                         <div class="mt-auto sidebar-footer">

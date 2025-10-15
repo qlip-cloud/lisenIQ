@@ -102,6 +102,9 @@ on_session_creation = "liseniq.utils.login_util.set_company_name_on_session_crea
 doc_events = {
 	"Survey Response": {
 		"before_insert": "liseniq.utils.survey_response.process_survey_response"
+	},
+	"qp_IQ_Survey": {
+		"on_update": "liseniq.utils.api_survey.generate_public_link_for_survey_hook"
 	}
 }
 

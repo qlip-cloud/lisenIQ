@@ -22,7 +22,7 @@ frappe.query_reports["Survey Status"] = {
 			"fieldname": "demographic1",
 			"label": "Demográfico 1",
 			"fieldtype": "Link",
-			"options": "qp_IQ_Demographic",
+			"options": "qp_IQ_DemographicType",
 			"get_query": () => ({ filters: { dt_object_type: "Contacto" } }),
 			"reqd": 0,
 		},
@@ -30,7 +30,7 @@ frappe.query_reports["Survey Status"] = {
 			"fieldname": "demographic2",
 			"label": "Demográfico 2",
 			"fieldtype": "Link",
-			"options": "qp_IQ_Demographic",
+			"options": "qp_IQ_DemographicType",
 			"get_query": () => ({ filters: { dt_object_type: "Contacto" } }),
 			"reqd": 0
 		}

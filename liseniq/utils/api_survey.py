@@ -203,15 +203,15 @@ def get_survey_route_for_public_link(token):
     return {"route": web_form_route}
 
 def generate_public_link_for_survey_hook(doc, method):
-    frappe.log_error(
-        message=f"Hook 'generate_public_link_for_survey_hook' ejecutado para {doc.name}. Flag 'su_custom_generate_public_link' es: {doc.su_custom_generate_public_link}",
-        title="Link Generation Hook"
-    )
+    # frappe.log_error(
+    #     message=f"Hook 'generate_public_link_for_survey_hook' ejecutado para {doc.name}. Flag 'su_custom_generate_public_link' es: {doc.su_custom_generate_public_link}",
+    #     title="Link Generation Hook"
+    # )
     if doc.su_custom_generate_public_link:
-        frappe.log_error(
-            message=f"Intentando generar enlace genérico para la encuesta {doc.name}.",
-            title="Link Generation Hook"
-        )
+        # frappe.log_error(
+        #     message=f"Intentando generar enlace genérico para la encuesta {doc.name}.",
+        #     title="Link Generation Hook"
+        # )
 
         original_ignore_permissions = frappe.flags.ignore_permissions
         frappe.flags.ignore_permissions = True

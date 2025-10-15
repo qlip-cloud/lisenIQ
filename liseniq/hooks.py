@@ -96,6 +96,9 @@ get_website_user_home_page = "liseniq.liseniq.uses_cases.login.redirects.get_hom
 # on_login hook
 on_login = "liseniq.liseniq.uses_cases.login.redirects.handle_login_redirect"
 
+# Inicializa variables de sesión al crearla
+on_session_creation = "liseniq.utils.login_util.set_company_name_on_session_creation"
+
 doc_events = {
 	"Survey Response": {
 		"before_insert": "liseniq.utils.survey_response.process_survey_response"

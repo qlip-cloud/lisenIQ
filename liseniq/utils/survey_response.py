@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 import frappe
 import jwt
 import json
+from frappe.utils import get_datetime, now
 
 def process_survey_response(doc, method):
     frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
@@ -41,6 +42,11 @@ def process_survey_response(doc, method):
 
         if token_sur and token_sur != doc.survey:
             frappe.throw("Enlace inválido o expirado.")
+
+        # Verificar expiración de la encuesta
+        survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_end_date")
+        if survey_end_date and get_datetime(survey_end_date) < get_datetime(now()):
+            frappe.throw("El enlace ha expirado.")
 
         if not rid:
             frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
@@ -93,7 +99,6 @@ def process_survey_response(doc, method):
                                 {"sr_status": "Responded", "sr_survey_response": doc.name}
                             )
                         else:
-                            # Si no es un destinatario pre-cargado, podría ser de un enlace público
                             pass
 
                 existing_response = frappe.db.exists(

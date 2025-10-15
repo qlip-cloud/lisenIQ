@@ -104,6 +104,7 @@ def get_context(context):
             'status': contact.get('custom_status', 'Inactivo')
         })
     context.contacts = processed_contacts
+    context.contacts_json = frappe.as_json(processed_contacts or [])
 
     context.update({
         "is_navbar_custom": True,

@@ -82,6 +82,11 @@ def validate_survey_link(survey_name, user, token, dni=None):
 
       frappe.log_error(message="Validación de 'sur' exitosa.", title="validate_survey_link Trace")
 
+      # Verificar expiración de la encuesta
+      survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_end_date")
+      if survey_end_date and get_datetime(survey_end_date) < get_datetime(now()):
+          return {"allow": False, "message": "El enlace ha expirado."}
+
       if is_public:
         return {"allow": True}
 
@@ -218,9 +223,10 @@ def generate_public_link_for_survey(doc, method):
         if doc.su_is_anonymous:
             payload["public"] = True
 
-        if doc.su_end_date:
-            end_date_timestamp = int(get_datetime(doc.su_end_date).timestamp())
-            payload["exp"] = end_date_timestamp
+        # Se elimina la adición de 'exp' al payload del token.
+        # if doc.su_end_date:
+        #     end_date_timestamp = int(get_datetime(doc.su_end_date).timestamp())
+        #     payload["exp"] = end_date_timestamp
 
         try:
             token = jwt.encode(payload, secret, algorithm="HS256")

@@ -4,7 +4,7 @@
         <div class="page-actions-header">
             <button id="btn-new-contact" class="btn btn-purple-main">Nuevo Contacto</button>
         </div>
-        <div class="contacts-table-container">
+        <div class="contacts-table-container contacts-table-scroll">
             <table class="table contacts-table">
                 <thead>
                     <tr>
@@ -48,6 +48,11 @@
                     {% endif %}
                 </tbody>
             </table>
+        </div>
+        <div class="contacts-pagination">
+            <button id="contacts-prev-page" type="button" class="btn btn-outline-purple">Anterior</button>
+            <span id="contacts-page-info"></span>
+            <button id="contacts-next-page" type="button" class="btn btn-outline-purple">Siguiente</button>
         </div>
     </div>
 
@@ -230,4 +235,7 @@
 
 <script id="demographic-data" type="application/json">
     {{ demographic_types_json | safe }}
+</script>
+<script id="contacts-data" type="application/json">
+    {{ contacts_json | safe }}
 </script>

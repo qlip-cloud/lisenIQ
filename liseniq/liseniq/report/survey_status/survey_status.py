@@ -78,7 +78,7 @@ def get_data(filters):
                 ON cad1.parent = c.name 
                 AND cad1.cad_demographic_type = '{demographic1}'
         """
-        select_extra += ", cad1.cad_value AS demographic1_value"
+        select_extra += ", cad1.cad_value AS demographic1"
         group_extra += ", cad1.cad_value"
 
     if demographic2:
@@ -87,7 +87,7 @@ def get_data(filters):
                 ON cad2.parent = c.name 
                 AND cad2.cad_demographic_type = '{demographic2}'
         """
-        select_extra += ", cad2.cad_value AS demographic2_value"
+        select_extra += ", cad2.cad_value AS demographic2"
         group_extra += ", cad2.cad_value"
 
 

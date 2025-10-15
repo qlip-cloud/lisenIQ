@@ -90,6 +90,7 @@ def get_valid_surveys():
             SELECT 
                 s.name as survey_name,
                 s.survey_json,
+                iq.name as id,
                 iq.su_name,
                 iq.su_owner,
                 c.co_name as company_name
@@ -130,14 +131,19 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     if not valid_surveys:
         return []
     
-    # Crear mapeo de survey_name a company_name
+    # Crear mapeo de survey_name a company_name e id
     survey_company_map = {
         survey['survey_name']: survey['company_name'] or ''
+        for survey in valid_surveys
+    }
+    survey_id_map = {
+        survey['survey_name']: survey['id']
         for survey in valid_surveys
     }
     
     # Obtener nombres de encuestas válidas
     survey_names = [survey['survey_name'] for survey in valid_surveys]
+    survey_ids = [survey['id'] for survey in valid_surveys]
     survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
     
     query = f"""
@@ -175,7 +181,8 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             response, 
             all_questions_map, 
             demographics_data,
-            survey_company_map
+            survey_company_map,
+            survey_id_map
         )
         data.append(row)
 
@@ -203,7 +210,7 @@ def translate_keys(data, all_questions_map, demographics_map):
 
     return translated_data
 
-def process_response_row(response, all_questions_map, demographics_data, survey_company_map):
+def process_response_row(response, all_questions_map, demographics_data, survey_company_map, survey_id_map):
     """
     Procesa una fila individual de respuesta
     """
@@ -212,6 +219,7 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
     
     # Datos básicos
     row = {
+        'survey_id': survey_id_map.get(survey_name, ''),
         'survey_name': survey_name,
         'company_name': survey_company_map.get(survey_name, ''),
         'first_name': response.get('first_name', ''),
@@ -418,7 +426,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
     
     # campos demográficos base que siempre deberían aparecer
     core_demographic_keys = [
-        'survey_name', 'company_name', 'first_name', 'last_name',
+        'survey_id', 'survey_name', 'company_name', 'first_name', 'last_name',
         'custom_dob', 'gender', 'custom_academic_level', 'entry_date', 'country'
     ]
 

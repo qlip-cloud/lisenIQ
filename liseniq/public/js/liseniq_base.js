@@ -77,9 +77,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            fetch('/api/method/logout', { method: 'POST' })
+            fetch('/api/method/logout', { method: 'GET' })
                 .then(() => {
-                    window.location.href = '/login#login';
+                    window.location.href = '/login';
                 });
         });
     }
@@ -88,9 +88,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (sidebarLogoutLink) {
         sidebarLogoutLink.addEventListener('click', function(e) {
             e.preventDefault();
-            fetch('/api/method/logout', { method: 'POST' })
+            fetch('/api/method/logout', { method: 'GET' })
                 .then(() => {
-                    window.location.href = '/login#login';
+                    window.location.href = '/login';
                 });
         });
     }

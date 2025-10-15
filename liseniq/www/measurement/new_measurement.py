@@ -511,10 +511,10 @@ def save_measurement(data):
 
         # Por ahora, no se genera link público para encuestas de tipo 'all' (Público Externo)
         if survey_type == 'all':
-            survey.custom_generate_public_link = 0
+            survey.su_custom_generate_public_link = 0
         # Se genera un link genérico para encuestas con contactos seleccionados
         elif survey_type == 'selected':
-            survey.custom_generate_public_link = 1
+            survey.su_custom_generate_public_link = 1
 
 
         survey.su_status = status_name
@@ -537,10 +537,11 @@ def save_measurement(data):
         survey.insert(ignore_permissions=True)
         frappe.db.commit()
 
-        if survey.custom_generate_public_link:
-            if generate_public_link_for_survey(survey, "after_save"):
-                survey.save(ignore_permissions=True)
-                frappe.db.commit()
+        # Se elimina la llamada directa, ahora se gestiona por el hook 'on_update'
+        # if survey.custom_generate_public_link:
+        #     if generate_public_link_for_survey(survey, "after_save"):
+        #         survey.save(ignore_permissions=True)
+        #         frappe.db.commit()
 
         if survey_type == 'selected' and contacts_data.get("list"):
             contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]

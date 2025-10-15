@@ -7,7 +7,7 @@ import jwt
 from time import time
 
 def launch_pending_surveys():
-	frappe.log_error("Iniciando tarea launch_pending_surveys", "Survey Task Start")
+	# frappe.log_error("Iniciando tarea launch_pending_surveys", "Survey Task Start")
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:
@@ -19,7 +19,7 @@ def launch_pending_surveys():
 			frappe.log_error("No se encontró el estado 'Programada' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
 			return
 
-		frappe.log_error(f"Estados: En Progreso='{status_in_progress}', Programada='{status_scheduled}'", "Survey Task Status")
+		# frappe.log_error(f"Estados: En Progreso='{status_in_progress}', Programada='{status_scheduled}'", "Survey Task Status")
 
 		pending_surveys = frappe.get_all(
 			"qp_IQ_Survey",
@@ -228,7 +228,7 @@ def launch_pending_surveys():
 							frappe.log_error("No se ha configurado un remitente de correo por defecto (default_outgoing=1).", "launch_pending_surveys")
 							continue
 					
-						frappe.log_error(f"Intentando enviar correo. De: {sender_email}, Para: {recipients}", "Survey Task Sending Email")
+						# frappe.log_error(f"Intentando enviar correo. De: {sender_email}, Para: {recipients}", "Survey Task Sending Email")
 
 						frappe.sendmail(
 							recipients=recipients,
@@ -243,7 +243,7 @@ def launch_pending_surveys():
 							"sr_sent_on": now()
 						})
 
-						frappe.log_error(f"Correo para la encuesta {survey.name} enviado a {contact_email} (o encolado).", "Survey Task Email Sent")
+						# frappe.log_error(f"Correo para la encuesta {survey.name} enviado a {contact_email} (o encolado).", "Survey Task Email Sent")
 					except Exception:
 						frappe.log_error(f"Error con el destinatario {recipient_doc.name}: {frappe.get_traceback()}", "launch_pending_surveys")
 						continue
@@ -436,7 +436,7 @@ def send_survey_reminders():
 		frappe.log_error(frappe.get_traceback(), "Error en send_survey_reminders")
 
 def update_finished_surveys():
-	frappe.log_error("Iniciando tarea update_finished_surveys", "Survey Finish Task Start")
+	# frappe.log_error("Iniciando tarea update_finished_surveys", "Survey Finish Task Start")
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:

@@ -149,9 +149,6 @@ const load_survey = function (survey_name, cachedResponses) {
         submit_response(sender.getAllValues());
         $(".web-form-footer").hide();
         $("#surveyElement").addClass("survey-completed");
-        // Limpiar cache y dni solo cuando se envía la encuesta
-        localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
-        localStorage.removeItem("liseniq_doc_id");
       });
       $("#surveyElement").Survey({ model: survey });
     });
@@ -215,6 +212,8 @@ const submit_response = function (data) {
         callback: (response) => {
           if (!response.exc) {
             // console.log(response.message);
+            // Limpiar cache y dni solo cuando se ha guardado exitosamente en el servidor.
+            localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
             localStorage.removeItem("liseniq_doc_id");
           }
         },

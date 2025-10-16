@@ -298,6 +298,76 @@ def get_filtered_contacts_count(filters='[]'):
     return {"count": len(contact_docs), "headers": headers, "contacts": contacts_for_modal}
 
 @frappe.whitelist()
+def delete_measurement_contacts(survey_name, contact_names):
+    try:
+        if isinstance(contact_names, str):
+            try:
+                contact_names = json.loads(contact_names)
+            except Exception:
+                contact_names = [contact_names]
+        if not isinstance(contact_names, (list, tuple)) or not contact_names:
+            return {"status": "error", "message": _("Lista de contactos inválida.")}
+
+        survey = frappe.get_doc("qp_IQ_Survey", survey_name)
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        if not user_company or survey.su_owner != user_company:
+            return {"status": "error", "message": _("No tiene permisos para modificar esta medición.")}
+
+        removed_no_response = []
+        removed_with_response = []
+        not_found = []
+        errors = []
+
+        for contact_name in contact_names:
+            try:
+                rec = frappe.db.get_value(
+                    "qp_IQ_SurveyRecipient",
+                    {"sr_survey": survey.name, "sr_contact": contact_name},
+                    ["name", "sr_status"],
+                    as_dict=True
+                )
+
+                if not rec:
+                    not_found.append(contact_name)
+                    continue
+
+                responded = (rec.get("sr_status") == "Responded")
+                if responded:
+                    found_responses = frappe.get_all(
+                        "Survey Response",
+                        filters={"survey": survey.su_name, "user": contact_name},
+                        fields=["name"]
+                    )
+                    for r in found_responses:
+                        try:
+                            frappe.delete_doc("Survey Response", r.name, ignore_permissions=True)
+                        except Exception as e_del_resp:
+                            errors.append(f"Contacto {contact_name}: no se pudo eliminar Survey Response {r.name}: {e_del_resp}")
+
+                    frappe.delete_doc("qp_IQ_SurveyRecipient", rec.name, ignore_permissions=True)
+                    removed_with_response.append(contact_name)
+                else:
+                    frappe.delete_doc("qp_IQ_SurveyRecipient", rec.name, ignore_permissions=True)
+                    removed_no_response.append(contact_name)
+
+            except Exception as e_item:
+                errors.append(f"{contact_name}: {e_item}")
+
+        frappe.db.commit()
+        return {
+            "status": "success",
+            "removed_without_response": removed_no_response,
+            "removed_with_response": removed_with_response,
+            "not_found": not_found,
+            "errors": errors
+        }
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "delete_measurement_contacts")
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
 def save_measurement(data):
     try:
         data = json.loads(data)
@@ -518,9 +588,6 @@ def save_measurement(data):
 
 
         survey.su_status = status_name
-        if surveyjs_doc_name:
-            survey.su_surveyjs_survey = surveyjs_doc_name
-
         if data.get("reminders"):
             survey.su_send_reminders = 1
             survey.su_reminder_frequency = data["reminders"]["frequency"]

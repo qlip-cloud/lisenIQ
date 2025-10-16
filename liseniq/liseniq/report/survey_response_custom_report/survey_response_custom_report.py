@@ -111,7 +111,6 @@ def get_survey_data(survey_name, question_map, demographics_map):
             c.custom_entry_date,
             c.custom_country,
             c.gender,
-            c.custom_document_number,
             a.al_title
         FROM `tabSurvey Response` sr
         LEFT JOIN `tabContact` c ON c.name = sr.user
@@ -144,7 +143,6 @@ def process_response_row(response, question_map, demographics_data):
     user = response.get('user', '')
     
     row = {
-        'id_user': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
         'gender': response.get('gender', ''),

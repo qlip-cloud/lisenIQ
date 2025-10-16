@@ -11,12 +11,12 @@ def launch_pending_surveys():
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:
-			frappe.log_error("No se encontró el estado 'En Progreso' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
+			# frappe.log_error("No se encontró el estado 'En Progreso' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
 			return
 
 		status_scheduled = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Programada"}, "name")
 		if not status_scheduled:
-			frappe.log_error("No se encontró el estado 'Programada' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
+			# frappe.log_error("No se encontró el estado 'Programada' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
 			return
 
 		# frappe.log_error(f"Estados: En Progreso='{status_in_progress}', Programada='{status_scheduled}'", "Survey Task Status")
@@ -30,19 +30,19 @@ def launch_pending_surveys():
 			fields=["name", "su_name"]
 		)
 
-		frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
+		# frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
 
 		if not pending_surveys:
 			return
 
 		for survey in pending_surveys:
 			try:
-				frappe.log_error(f"Procesando encuesta: {survey.name} ({survey.su_name})", "Survey Task Processing")
+				# frappe.log_error(f"Procesando encuesta: {survey.name} ({survey.su_name})", "Survey Task Processing")
 				frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_in_progress)
 
 				web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
 				if not web_form_route:
-					frappe.log_error(f"No se encontró Web Form para la encuesta {survey.su_name}", "launch_pending_surveys")
+					# frappe.log_error(f"No se encontró Web Form para la encuesta {survey.su_name}", "launch_pending_surveys")
 					continue
 
 				# Se comenta, cuando tengamos proceso de link de publico abierto, sin ingreso de DNI
@@ -59,7 +59,7 @@ def launch_pending_surveys():
 				)
 
 				if not recipients_docs:
-					frappe.log_error(f"Encuesta {survey.name} no tiene destinatarios pendientes. Saltando.", "Survey Task Skip")
+					# frappe.log_error(f"Encuesta {survey.name} no tiene destinatarios pendientes. Saltando.", "Survey Task Skip")
 					continue
 				
 				contact_details_map = {
@@ -84,7 +84,7 @@ def launch_pending_surveys():
 
 						secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 						if not secret:
-							frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
+							# frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
 							continue
 						
 						survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
@@ -217,15 +217,15 @@ def launch_pending_surveys():
 							debug_recipient = frappe.conf.get("debug_email_recipient")
 							if debug_recipient:
 								recipients = [debug_recipient]
-								frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo a: {recipients}", "Survey Task Debug Email")
+								# frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo a: {recipients}", "Survey Task Debug Email")
 							else:
-								frappe.log_error("Modo debug de correo activo pero 'debug_email_recipient' no está configurado.", "launch_pending_surveys")
+								# frappe.log_error("Modo debug de correo activo pero 'debug_email_recipient' no está configurado.", "launch_pending_surveys")
 								continue
 
 						sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id") or frappe.conf.get("debug_email_recipient")
 
 						if not sender_email:
-							frappe.log_error("No se ha configurado un remitente de correo por defecto (default_outgoing=1).", "launch_pending_surveys")
+							# frappe.log_error("No se ha configurado un remitente de correo por defecto (default_outgoing=1).", "launch_pending_surveys")
 							continue
 					
 						# frappe.log_error(f"Intentando enviar correo. De: {sender_email}, Para: {recipients}", "Survey Task Sending Email")
@@ -258,14 +258,14 @@ def launch_pending_surveys():
 
 @frappe.whitelist()
 def send_survey_reminders():
-	frappe.log_error("Iniciando tarea send_survey_reminders", "Reminder Task Start")
+	# frappe.log_error("Iniciando tarea send_survey_reminders", "Reminder Task Start")
 	try:
 		now_dt = get_datetime(now())
 		today_date = now_dt.date()
 
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:
-			frappe.log_error("No se encontró el estado 'En Progreso'.", "send_survey_reminders")
+			# frappe.log_error("No se encontró el estado 'En Progreso'.", "send_survey_reminders")
 			return
 
 		surveys_in_progress = frappe.get_all(
@@ -327,7 +327,7 @@ def send_survey_reminders():
 			web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
 			base_url = frappe.utils.get_url(web_form_route) if web_form_route else None
 			if not base_url:
-				frappe.log_error(f"No se encontró Web Form para la encuesta {survey.su_name}.", "send_survey_reminders")
+				# frappe.log_error(f"No se encontró Web Form para la encuesta {survey.su_name}.", "send_survey_reminders")
 				continue
 
 			contact_names = {
@@ -384,7 +384,7 @@ def send_survey_reminders():
 
 					contact_email = frappe.db.get_value("Contact", recipient.sr_contact, "email_id")
 					if not contact_email:
-						frappe.log_error(f"Contacto {recipient.sr_contact} no tiene email. Saltando recordatorio.", "send_survey_reminders")
+						# frappe.log_error(f"Contacto {recipient.sr_contact} no tiene email. Saltando recordatorio.", "send_survey_reminders")
 						continue
 
 					recipients_list = [contact_email]
@@ -392,14 +392,14 @@ def send_survey_reminders():
 						debug_recipient = frappe.conf.get("debug_email_recipient")
 						if debug_recipient:
 							recipients_list = [debug_recipient]
-							frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo de recordatorio a: {recipients_list}", "send_survey_reminders")
+							# frappe.log_error(f"Modo DEBUG activo. Redirigiendo correo de recordatorio a: {recipients_list}", "send_survey_reminders")
 						else:
-							frappe.log_error("Modo debug de correo activo pero 'debug_email_recipient' no está configurado.", "send_survey_reminders")
+							# frappe.log_error("Modo debug de correo activo pero 'debug_email_recipient' no está configurado.", "send_survey_reminders")
 							continue
 
 					sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id") or frappe.conf.get("debug_email_recipient")
 					if not sender_email:
-						frappe.log_error("No se ha configurado un remitente de correo por defecto.", "send_survey_reminders")
+						# frappe.log_error("No se ha configurado un remitente de correo por defecto.", "send_survey_reminders")
 						continue
 
 					frappe.sendmail(
@@ -426,7 +426,7 @@ def send_survey_reminders():
 						"sr_next_reminder": next_reminder_date
 					})
 					frappe.db.commit()
-					frappe.log_error(f"Recordatorio para encuesta {survey.name} enviado a {recipients_list[0]}.", "send_survey_reminders")
+					# frappe.log_error(f"Recordatorio para encuesta {survey.name} enviado a {recipients_list[0]}.", "send_survey_reminders")
 
 				except Exception:
 					frappe.db.rollback()
@@ -440,12 +440,12 @@ def update_finished_surveys():
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:
-			frappe.log_error("No se encontró el estado 'En Progreso'.", "update_finished_surveys")
+			# frappe.log_error("No se encontró el estado 'En Progreso'.", "update_finished_surveys")
 			return
 
 		status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
 		if not status_finished:
-			frappe.log_error("No se encontró el estado 'Finalizada'.", "update_finished_surveys")
+			# frappe.log_error("No se encontró el estado 'Finalizada'.", "update_finished_surveys")
 			return
 
 		surveys_to_check = frappe.get_all(
@@ -463,7 +463,7 @@ def update_finished_surveys():
 					if today > end_date:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
 						frappe.db.commit()
-						frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys")
+						# frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys")
 						continue
 
 				total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
@@ -472,7 +472,7 @@ def update_finished_surveys():
 					if total_recipients == responded_recipients:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
 						frappe.db.commit()
-						frappe.log_error(f"Encuesta {survey.name} finalizada por completitud (100%).", "update_finished_surveys")
+						# frappe.log_error(f"Encuesta {survey.name} finalizada por completitud (100%).", "update_finished_surveys")
 
 			except Exception:
 				frappe.db.rollback()
@@ -487,13 +487,13 @@ def delete_iq_survey_fully(survey_name):
     try:
         web_form_title = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name")
         if not web_form_title:
-            frappe.log_error(f"No se encontró la encuesta de IQ: {survey_name}", "delete_iq_survey_fully")
+            # frappe.log_error(f"No se encontró la encuesta de IQ: {survey_name}", "delete_iq_survey_fully")
             return f"Error: No se encontró la encuesta de IQ: {survey_name}"
 
         recipient_names = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": survey_name}, pluck="name")
         for recipient_name in recipient_names:
             frappe.delete_doc("qp_IQ_SurveyRecipient", recipient_name, force=1, ignore_permissions=True)
-        frappe.log_error(f"Eliminados {len(recipient_names)} destinatarios para {survey_name}", "delete_iq_survey_fully")
+        # frappe.log_error(f"Eliminados {len(recipient_names)} destinatarios para {survey_name}", "delete_iq_survey_fully")
 
         web_form_name = frappe.db.get_value("Web Form", {"title": web_form_title}, "name")
         if web_form_name:
@@ -502,16 +502,16 @@ def delete_iq_survey_fully(survey_name):
                 response_names = frappe.get_all("Survey Response", filters={"survey": survey_doc_name}, pluck="name")
                 for response_name in response_names:
                     frappe.delete_doc("Survey Response", response_name, force=1, ignore_permissions=True)
-                frappe.log_error(f"Eliminadas {len(response_names)} respuestas para la encuesta {survey_doc_name}", "delete_iq_survey_fully")
+                # frappe.log_error(f"Eliminadas {len(response_names)} respuestas para la encuesta {survey_doc_name}", "delete_iq_survey_fully")
                 
                 frappe.delete_doc("Survey", survey_doc_name, force=1, ignore_permissions=True)
-                frappe.log_error(f"Eliminado el doctype Survey: {survey_doc_name}", "delete_iq_survey_fully")
+                # frappe.log_error(f"Eliminado el doctype Survey: {survey_doc_name}", "delete_iq_survey_fully")
 
             frappe.delete_doc("Web Form", web_form_name, force=1, ignore_permissions=True)
-            frappe.log_error(f"Eliminado Web Form: {web_form_name}", "delete_iq_survey_fully")
+            # frappe.log_error(f"Eliminado Web Form: {web_form_name}", "delete_iq_survey_fully")
 
         frappe.delete_doc("qp_IQ_Survey", survey_name, force=1, ignore_permissions=True)
-        frappe.log_error(f"Eliminada encuesta de IQ: {survey_name}", "delete_iq_survey_fully")
+        # frappe.log_error(f"Eliminada encuesta de IQ: {survey_name}", "delete_iq_survey_fully")
 
         frappe.db.commit()
         return f"Encuesta {survey_name} eliminada exitosamente."
@@ -527,21 +527,21 @@ def delete_all_iq_surveys():
         all_surveys = frappe.get_all("qp_IQ_Survey", pluck="name")
         if not all_surveys:
             message = "No se encontraron encuestas de IQ para eliminar."
-            frappe.log_error(message, "delete_all_iq_surveys")
+            # frappe.log_error(message, "delete_all_iq_surveys")
             return message
 
         total_surveys = len(all_surveys)
-        frappe.log_error(f"Se encontraron {total_surveys} encuestas de IQ para eliminar. Iniciando proceso...", "delete_all_iq_surveys")
+        # frappe.log_error(f"Se encontraron {total_surveys} encuestas de IQ para eliminar. Iniciando proceso...", "delete_all_iq_surveys")
 
         for i, survey_name in enumerate(all_surveys):
             delete_iq_survey_fully(survey_name)
         
         success_message = f"Proceso completado. Se eliminaron {total_surveys} encuestas de IQ."
-        frappe.log_error(success_message, "delete_all_iq_surveys")
+        # frappe.log_error(success_message, "delete_all_iq_surveys")
         return success_message
 
     except Exception as e:
         frappe.db.rollback()
         error_message = f"Ocurrió un error durante la eliminación masiva: {frappe.get_traceback()}"
-        frappe.log_error(error_message, "delete_all_iq_surveys")
+        # frappe.log_error(error_message, "delete_all_iq_surveys")
         return f"Error durante la eliminación masiva: {e}"

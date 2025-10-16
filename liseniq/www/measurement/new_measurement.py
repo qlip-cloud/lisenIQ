@@ -486,13 +486,21 @@ def save_measurement(data):
                     "isRequired": "true"
                 }
 
-                if question_type_title == "Likert" and q.get("options"):
-                    element["choices"] = [
-                        {"text": opt["text"], "value": opt["value"]}
-                        if isinstance(opt, dict) and "value" in opt else
-                        {"text": opt, "value": idx+1}
-                        for idx, opt in enumerate(q["options"])
-                    ]
+                if question_type_title == "Likert":
+                    # Siempre buscar las opciones en DB para asegurar el value correcto
+                    choices = []
+                    try:
+                        if question_name:
+                            q_doc = frappe.get_doc("qp_IQ_Question", question_name)
+                            if q_doc and q_doc.qn_response_options:
+                                choices = [
+                                    {"text": opt.qo_option_text, "value": opt.qo_option_value}
+                                    for opt in q_doc.qn_response_options
+                                ]
+                    except Exception:
+                        choices = []
+                    element["choices"] = choices
+
                 elif question_type_title == "Selección Múltiple" and q.get("options"):
                     element["choices"] = q["options"]
                 elif question_type_title == "NPS":

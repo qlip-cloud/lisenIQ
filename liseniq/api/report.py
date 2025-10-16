@@ -28,9 +28,15 @@ CATEGORIES = {
     "Talento": "HUMANISTA",
     "Relaciones": "HUMANISTA",
     "Comunicación": "HUMANISTA",
-    "Innovación": "Competitiva",
-    "Logros": "Competitiva",
-    "Liderazgo": "Competitiva"
+    "Innovación": "COMPETITIVA",
+    "Logros": "COMPETITIVA",
+    "Liderazgo": "COMPETITIVA",
+    "Integridad": "CULTURA CARVAJAL",
+    "Respeto": "CULTURA CARVAJAL",
+    "Orientación al cliente": "CULTURA CARVAJAL",
+    "Compromiso social": "CULTURA CARVAJAL",
+    "Protección y cuidado de la vida": "CULTURA CARVAJAL",
+    "Compromiso con los resultados": "CULTURA CARVAJAL"
 }
 
 @frappe.whitelist()

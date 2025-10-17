@@ -130,6 +130,22 @@ def get_all_unique_questions(valid_surveys):
     return all_questions
 
 
+def get_surveys_expected_responses():
+    query_survey = f"""
+        SELECT
+            s.su_name AS name,
+            COUNT(DISTINCT c.name) AS expected_responses
+
+        FROM `tabqp_IQ_Survey` s
+        LEFT JOIN `tabqp_IQ_Company` co ON co.name = s.su_owner
+        LEFT JOIN `tabContact` c ON c.custom_company = s.su_owner
+        GROUP BY s.su_name, s.su_owner 
+        ORDER BY co.co_name, s.su_name
+    """
+
+    return frappe.db.sql(query_survey, as_dict=True)
+
+
 def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     """
     Obtiene los datos de todas las encuestas válidas
@@ -145,6 +161,11 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     survey_id_map = {
         survey['survey_name']: survey['id']
         for survey in valid_surveys
+    }
+
+    survey_expected_responses_map = {
+        survey['name']: survey['expected_responses']
+        for survey in get_surveys_expected_responses()
     }
     
     # Obtener nombres de encuestas válidas
@@ -189,7 +210,8 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             all_questions_map, 
             demographics_data,
             survey_company_map,
-            survey_id_map
+            survey_id_map,
+            survey_expected_responses_map
         )
         data.append(row)
 
@@ -217,7 +239,7 @@ def translate_keys(data, all_questions_map, demographics_map):
 
     return translated_data
 
-def process_response_row(response, all_questions_map, demographics_data, survey_company_map, survey_id_map):
+def process_response_row(response, all_questions_map, demographics_data, survey_company_map, survey_id_map, survey_expected_responses_map):
     """
     Procesa una fila individual de respuesta
     """
@@ -229,6 +251,7 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
         'survey_id': survey_id_map.get(survey_name, ''),
         'survey_name': survey_name,
         'company_name': survey_company_map.get(survey_name, ''),
+        'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
         'user_id': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),

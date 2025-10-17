@@ -601,7 +601,16 @@ class MeasurementCreator {
         }
 
         const measurementPayload = this.state.isEditMode
-            ? { ...basePayload, is_edit_mode: true, doc_name: this.state.docName }
+            ? { 
+                ...basePayload, 
+                is_edit_mode: true, 
+                doc_name: this.state.docName,
+                contacts: {
+                    surveyType: this.ui.contactsStep.surveyTypeSelect?.value || 'selected',
+                    responseType: this.ui.contactsStep.responseTypeSelect?.value || 'identified',
+                    list: this.state.measurementData.contacts.list
+                }
+            }
             : {
                 ...basePayload,
                 startDate: step1Form.startDate.value,

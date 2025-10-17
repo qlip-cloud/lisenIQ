@@ -408,6 +408,45 @@ def save_measurement(data):
 
             survey.save(ignore_permissions=True)
             frappe.db.commit()
+
+            contacts_data = data.get("contacts", {})
+            new_contacts = contacts_data.get("list", [])
+            if new_contacts:
+                # Obtener contactos ya existentes en la medición
+                existing_recipients = frappe.get_all(
+                    "qp_IQ_SurveyRecipient",
+                    filters={"sr_survey": survey.name},
+                    fields=["sr_contact"]
+                )
+                existing_contact_names = set(r["sr_contact"] for r in existing_recipients if r["sr_contact"])
+
+                for contact in new_contacts:
+                    contact_name = contact.get("name")
+                    if not contact_name or contact_name in existing_contact_names:
+                        continue
+
+                    # Validar si ya respondió la encuesta (por cualquier medio)
+                    has_responded = frappe.db.exists(
+                        "Survey Response",
+                        {"survey": survey.su_name, "user": contact_name}
+                    )
+                    if has_responded:
+                        continue
+
+                    frappe.get_doc({
+                        "doctype": "qp_IQ_SurveyRecipient",
+                        "sr_survey": survey.name,
+                        "sr_contact": contact_name,
+                        "sr_status": "Not Sent"
+                    }).insert(ignore_permissions=True)
+            frappe.db.commit()
+
+            # Enviar de inmediato links a pendientes si la medición ya fue lanzada
+            try:
+                frappe.call("liseniq.tasks.send_pending_links_for_survey", survey_name=survey.name)
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), "save_measurement.send_pending_links_on_edit")
+
             return {"status": "success", "message": f"Medición '{survey.su_name}' actualizada exitosamente.", "docname": survey.name}
 
         # Modo nueva encuesta o creación
@@ -628,11 +667,11 @@ def save_measurement(data):
                         "sr_contact": contact_name,
                         "sr_status": "Not Sent"
                     }).insert(ignore_permissions=True)
-        
-        frappe.db.commit()
-        
-        return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}
+            frappe.db.commit()
 
+        frappe.db.commit()
+        return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}
+    
     except Exception as e:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Error en save_measurement")

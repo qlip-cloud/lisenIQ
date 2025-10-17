@@ -186,7 +186,7 @@ def process_survey_response(doc, method):
         #     contact_name = contact_name[:140]
         # doc.user = contact_name or "Anonimo"
 
-        frappe.log_error(f"Actualizando destinatario {recipient.name} a 'Responded' y enlazando respuesta {doc.name}", "Survey Response Hook")
+        # frappe.log_error(f"Actualizando destinatario {recipient.name} a 'Responded' y enlazando respuesta {doc.name}", "Survey Response Hook")
         # frappe.db.set_value(
         #     "qp_IQ_SurveyRecipient",
         #     recipient.name,

@@ -626,9 +626,7 @@ def send_pending_links_for_survey(survey_name: str):
 						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {"sr_token": token})
 					else:
 						omitidos += 1
-						continue
-
-				# Reemplazo: usar el mismo formato de correo que launch_pending_surveys
+												
 				message = f"""
 <!DOCTYPE html>
 <html lang="es">

@@ -7,7 +7,8 @@ def get_home_page(user):
 
     if "Administrator" in frappe.get_roles(user):
         redirect_to = "/app"
-    else:
+    
+    if user != "Guest" and user != "Administrator":
         redirect_to = "/iq-home"
 
     if cache.get_value('b2c_login') == frappe.session.user:

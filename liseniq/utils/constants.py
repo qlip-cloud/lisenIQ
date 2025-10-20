@@ -93,12 +93,18 @@ const validate_dni_on_input = function(dni) {
             $(dni_field.input).addClass('is-invalid');
             $(dni_field.wrapper).append(`<div class="invalid-feedback">${error_msg}</div>`);
             $submit_btn.prop('disabled', true);
+            // El DNI no es válido para esta encuesta; eliminarlo del storage
+            localStorage.removeItem("liseniq_doc_id");
         } else if (res.valid_dni === false) {
             const error_msg = res.message || __("El DNI proporcionado no corresponde a un contacto válido para esta encuesta.");
             $(dni_field.input).addClass('is-invalid');
             $(dni_field.wrapper).append(`<div class="invalid-feedback">${error_msg}</div>`);
             $submit_btn.prop('disabled', true);
+            // El DNI no es válido; eliminarlo del storage
+            localStorage.removeItem("liseniq_doc_id");
         } else {
+            // DNI válido: persistirlo para futuras validaciones y envío
+            localStorage.setItem("liseniq_doc_id", dni);
             $submit_btn.prop('disabled', false);
         }
     });
@@ -180,6 +186,7 @@ const submit_response = function (data) {
         survey_name: frappe.web_form.title,
         user: token || "Anonimo",
         token: token,
+        dni: doc_id || null
       },
     })
     .then((r) => {

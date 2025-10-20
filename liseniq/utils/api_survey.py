@@ -52,7 +52,7 @@ def _get_jwt_secret():
   return frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 
 @frappe.whitelist(allow_guest=True)
-def validate_survey_link(survey_name, user, token, dni=None):
+def validate_survey_link(survey_name, user=None, token=None, dni=None):
   # frappe.log_error(
   #     message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
   #     title="validate_survey_link Trace"
@@ -87,7 +87,54 @@ def validate_survey_link(survey_name, user, token, dni=None):
       if survey_end_date and get_datetime(survey_end_date) < get_datetime(now()):
           return {"allow": False, "message": "El enlace ha expirado."}
 
+      # Obtener ID interno y cantidad de destinatarios
+      survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
+      recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name_id}) if survey_name_id else 0
+
+      # Enlace público (genérico)
       if is_public:
+        # Si hay destinatarios definidos para la medición, exigir validación por DNI
+        if recipients_count > 0 and dni:
+          survey_owner_company = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_owner")
+          if not survey_owner_company:
+              return {"allow": False, "message": "No se pudo determinar la empresa propietaria de la encuesta."}
+
+          contact_info = frappe.db.get_value(
+              "Contact",
+              {"custom_document_number": dni},
+              ["name", "custom_company", "status"],
+              as_dict=True
+          )
+          if not contact_info:
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado."}
+          if contact_info.custom_company != survey_owner_company:
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta."}
+          if contact_info.status not in ("Enabled", "Passive"):
+              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta."}
+
+          recipient_exists = frappe.db.exists(
+              "qp_IQ_SurveyRecipient",
+              {"sr_survey": survey_name_id, "sr_contact": contact_info.name}
+          )
+          if not recipient_exists:
+              return {"allow": False, "valid_dni": False, "message": "No está habilitado para responder esta encuesta."}
+
+          # Validaciones de duplicidad
+          existing_response_by_contact = frappe.db.exists(
+              "Survey Response",
+              {"survey": survey_name, "user": contact_info.name}
+          )
+          if existing_response_by_contact:
+              return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
+
+          existing_recipient_responded = frappe.db.exists(
+              "qp_IQ_SurveyRecipient",
+              {"sr_survey": survey_name_id, "sr_contact": contact_info.name, "sr_status": "Responded"}
+          )
+          if existing_recipient_responded:
+              return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
+
+        # Si aún no hay DNI ingresado, permitir continuar. Se bloqueará al validar el DNI.
         return {"allow": True}
 
       # Lógica para encuestas no públicas (con destinatarios)
@@ -96,44 +143,45 @@ def validate_survey_link(survey_name, user, token, dni=None):
           if not survey_owner_company:
               return {"allow": False, "message": "No se pudo determinar la empresa propietaria de la encuesta."}
 
-          contact_info = frappe.db.get_value("Contact", {"custom_document_number": dni}, ["name", "custom_company"], as_dict=True)
+          contact_info = frappe.db.get_value(
+              "Contact",
+              {"custom_document_number": dni},
+              ["name", "custom_company", "status"],
+              as_dict=True
+          )
           if not contact_info:
               return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado."}
-          
           if contact_info.custom_company != survey_owner_company:
               return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta."}
+          if contact_info.status not in ("Enabled", "Passive"):
+              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta."}
 
           contact_name = contact_info.name
-          if contact_name:
-              survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
-              if survey_name_id:
-                  existing_response_by_contact = frappe.db.exists(
-                      "Survey Response",
-                      {
-                          "survey": survey_name,
-                          "user": contact_name,
-                      }
-                  )
-                  if existing_response_by_contact:
-                      return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
+          if contact_name and survey_name_id:
+              recipient_exists = frappe.db.exists(
+                  "qp_IQ_SurveyRecipient",
+                  {"sr_survey": survey_name_id, "sr_contact": contact_name}
+              )
+              if not recipient_exists:
+                  return {"allow": False, "valid_dni": False, "message": "No está habilitado para responder esta encuesta."}
 
-                  existing_recipient = frappe.db.exists(
-                      "qp_IQ_SurveyRecipient",
-                      {
-                          "sr_survey": survey_name_id,
-                          "sr_contact": contact_name,
-                          "sr_status": "Responded"
-                      }
-                  )
-                  if existing_recipient:
-                      return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
+              existing_response_by_contact = frappe.db.exists(
+                  "Survey Response",
+                  {"survey": survey_name, "user": contact_name}
+              )
+              if existing_response_by_contact:
+                  return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
+
+              existing_recipient = frappe.db.exists(
+                  "qp_IQ_SurveyRecipient",
+                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_status": "Responded"}
+              )
+              if existing_recipient:
+                  return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
 
           existing_response = frappe.db.exists(
               "Survey Response",
-              {
-                  "survey": survey_name,
-                  "user": dni,
-              }
+              {"survey": survey_name, "user": dni}
           )
           if existing_response:
               return {"allow": False, "message": "Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación."}
@@ -148,16 +196,22 @@ def validate_survey_link(survey_name, user, token, dni=None):
           "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact"], as_dict=True
         )
 
+      # Si el enlace es personal pero el destinatario fue eliminado, bloquear
+      if rid and not recipient:
+        return {"allow": False, "message": "Este enlace ya no es válido. El destinatario fue removido de la medición."}
+
       if recipient:
+        # Verificar que el contacto asociado esté activo
         if recipient.get("sr_contact"):
+            contact_status = frappe.db.get_value("Contact", recipient.sr_contact, "status")
+            if contact_status and contact_status not in ("Enabled", "Passive"):
+                return {"allow": False, "message": "El contacto no está activo para responder esta encuesta."}
+
             dni_from_contact = frappe.db.get_value("Contact", recipient.sr_contact, "custom_document_number")
             if dni_from_contact:
                 existing_response = frappe.db.exists(
                     "Survey Response",
-                    {
-                        "survey": survey_name,
-                        "user": dni_from_contact,
-                    }
+                    {"survey": survey_name, "user": dni_from_contact}
                 )
                 if existing_response:
                     return {"allow": False, "message": "Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación."}

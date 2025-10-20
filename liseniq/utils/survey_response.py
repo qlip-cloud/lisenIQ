@@ -34,7 +34,27 @@ def process_survey_response(doc, method):
         is_public = payload.get("public", False)
         
         if is_public:
-            # frappe.log_error(f"Respuesta de encuesta pública para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
+            # Si la medición tiene destinatarios, exigir que el DNI pertenezca a un destinatario válido
+            survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
+            recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name_id}) if survey_name_id else 0
+            if recipients_count > 0:
+                if not (doc.user and doc.user != "Anonimo"):
+                    frappe.throw("Debe ingresar su DNI para responder esta encuesta.")
+                survey_owner_company = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_owner")
+                contact_info = frappe.db.get_value(
+                    "Contact",
+                    {"custom_document_number": doc.user},
+                    ["name", "custom_company"],
+                    as_dict=True
+                )
+                if not contact_info or contact_info.custom_company != survey_owner_company:
+                    frappe.throw("No está habilitado para responder esta encuesta.")
+                recipient_exists = frappe.db.exists(
+                    "qp_IQ_SurveyRecipient",
+                    {"sr_survey": survey_name_id, "sr_contact": contact_info.name}
+                )
+                if not recipient_exists:
+                    frappe.throw("No está habilitado para responder esta encuesta.")
             return
 
         rid = payload.get("rid")

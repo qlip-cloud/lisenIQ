@@ -46,7 +46,8 @@ def get_context(context):
         surveys = frappe.get_all(
             "qp_IQ_Survey",
             filters=query_filters,
-            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link"]
+            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link", "modified", "creation"],
+            order_by="modified desc"
         )
     except frappe.DoesNotExistError:
         surveys = []

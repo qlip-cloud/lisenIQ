@@ -53,10 +53,10 @@ def _get_jwt_secret():
 
 @frappe.whitelist(allow_guest=True)
 def validate_survey_link(survey_name, user, token, dni=None):
-  frappe.log_error(
-      message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
-      title="validate_survey_link Trace"
-  )
+  # frappe.log_error(
+  #     message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
+  #     title="validate_survey_link Trace"
+  # )
   try:
     if not token or token == "Anonimo":
       return {"allow": True}
@@ -68,19 +68,24 @@ def validate_survey_link(survey_name, user, token, dni=None):
       sur_claim = payload.get("sur")
       is_public = payload.get("public", False)
 
-      frappe.log_error(
-          message=f"Payload decodificado: sur_claim='{sur_claim}', is_public={is_public}",
-          title="validate_survey_link Trace"
-      )
+      # frappe.log_error(
+      #     message=f"Payload decodificado: sur_claim='{sur_claim}', is_public={is_public}",
+      #     title="validate_survey_link Trace"
+      # )
 
       if sur_claim != survey_name:
-          frappe.log_error(
-              message=f"Validación fallida: sur_claim ('{sur_claim}') != survey_name ('{survey_name}')",
-              title="validate_survey_link Trace"
-          )
+          # frappe.log_error(
+          #     message=f"Validación fallida: sur_claim ('{sur_claim}') != survey_name ('{survey_name}')",
+          #     title="validate_survey_link Trace"
+          # )
           return {"allow": False, "message": "Enlace inválido o expirado."}
 
-      frappe.log_error(message="Validación de 'sur' exitosa.", title="validate_survey_link Trace")
+      # frappe.log_error(message="Validación de 'sur' exitosa.", title="validate_survey_link Trace")
+
+      # Verificar expiración de la encuesta
+      survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_end_date")
+      if survey_end_date and get_datetime(survey_end_date) < get_datetime(now()):
+          return {"allow": False, "message": "El enlace ha expirado."}
 
       if is_public:
         return {"allow": True}
@@ -197,6 +202,47 @@ def get_survey_route_for_public_link(token):
     
     return {"route": web_form_route}
 
+def generate_public_link_for_survey_hook(doc, method):
+    # frappe.log_error(
+    #     message=f"Hook 'generate_public_link_for_survey_hook' ejecutado para {doc.name}. Flag 'su_custom_generate_public_link' es: {doc.su_custom_generate_public_link}",
+    #     title="Link Generation Hook"
+    # )
+    if doc.su_custom_generate_public_link:
+        # frappe.log_error(
+        #     message=f"Intentando generar enlace genérico para la encuesta {doc.name}.",
+        #     title="Link Generation Hook"
+        # )
+
+        original_ignore_permissions = frappe.flags.ignore_permissions
+        frappe.flags.ignore_permissions = True
+        try:
+            if generate_public_link_for_survey(doc, method):
+                frappe.db.set_value(doc.doctype, doc.name, {
+                    "su_public_link": doc.su_public_link,
+                    "su_public_token": doc.su_public_token,
+                    "su_public_link_created_on": doc.su_public_link_created_on,
+                    "su_public_link_created_by": doc.su_public_link_created_by,
+                    "su_custom_generate_public_link": 0
+                })
+                # frappe.log_error(
+                #     message=f"Enlace genérico generado y guardado exitosamente para {doc.name}.",
+                #     title="Link Generation Hook"
+                # )
+            else:
+                # frappe.log_error(
+                #     message=f"La función generate_public_link_for_survey retornó False. No se generó enlace para {doc.name}.",
+                #     title="Link Generation Hook"
+                # )
+                pass
+        finally:
+            frappe.flags.ignore_permissions = original_ignore_permissions
+    else:
+        # frappe.log_error(
+        #     message=f"No se requiere generar enlace genérico para {doc.name}. Saltando.",
+        #     title="Link Generation Hook"
+        # )
+        pass
+
 def generate_public_link_for_survey(doc, method):
     modified = False
     if not doc.su_public_link:
@@ -218,9 +264,9 @@ def generate_public_link_for_survey(doc, method):
         if doc.su_is_anonymous:
             payload["public"] = True
 
-        if doc.su_end_date:
-            end_date_timestamp = int(get_datetime(doc.su_end_date).timestamp())
-            payload["exp"] = end_date_timestamp
+        # if doc.su_end_date:
+        #     end_date_timestamp = int(get_datetime(doc.su_end_date).timestamp())
+        #     payload["exp"] = end_date_timestamp
 
         try:
             token = jwt.encode(payload, secret, algorithm="HS256")
@@ -242,8 +288,8 @@ def generate_public_link_for_survey(doc, method):
         doc.su_public_link_created_on = now()
         doc.su_public_link_created_by = frappe.session.user
         
-        if hasattr(doc, 'custom_generate_public_link'):
-            doc.custom_generate_public_link = 0
+        if hasattr(doc, 'su_custom_generate_public_link'):
+            doc.su_custom_generate_public_link = 0
         
         modified = True
     

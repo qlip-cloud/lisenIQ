@@ -130,7 +130,6 @@ class MeasurementCreator {
             this.state.isEditMode = true;
             this.state.docName = urlParams.get('name');
 
-            // Poblar datos del paso 1
             this.ui.step1Form.name.value = data.name || '';
             if (data.startDate) this.ui.step1Form.startDate.value = String(data.startDate).slice(0, 16);
             if (data.endDate) this.ui.step1Form.endDate.value = String(data.endDate).slice(0, 16);
@@ -152,11 +151,12 @@ class MeasurementCreator {
                 this.questionBuilder.setReadOnly(true);
             }
 
-            // Participantes (solo visual)
+            // Participantes
             if (data.contacts) {
                 const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber /*, viewContactsBtn*/ } = this.ui.contactsStep;
                 if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'all';
                 if (responseTypeSelect) responseTypeSelect.value = data.contacts.responseType || 'anonymous';
+                
                 if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                     selectedContactsSection?.classList.remove('d-none');
                 }
@@ -172,8 +172,7 @@ class MeasurementCreator {
                     const safeCount = this.state.measurementData.contacts.list.length;
                     contactCountNumber.textContent = String(safeCount);
                 }
-                // Ya no ocultamos el ícono en edición: permitir ver contactos
-                // viewContactsBtn?.classList.add('d-none');  // eliminado
+                // viewContactsBtn?.classList.add('d-none'); 
             }
 
             // Recordatorios
@@ -187,7 +186,7 @@ class MeasurementCreator {
                 this.ui.reviewStep.remindersSection.classList.add('d-none');
             }
 
-            // Bloquear campos no editables (ya hay disabled en HTML para varios)
+            // Bloquear campos no editables
             this.disableNonEditableFields();
 
             // Cambiar texto del botón final
@@ -209,11 +208,13 @@ class MeasurementCreator {
         }
 
         const { surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect, availableCategories, selectedCategories } = this.ui.contactsStep;
-        [surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect].forEach(el => el && (el.disabled = true));
+        [surveyTypeSelect, responseTypeSelect, /* sendAllContactsCheck, */ /* fieldTypeSelect */].forEach(el => el && (el.disabled = true));
 
+        /*
         [availableCategories, selectedCategories].forEach(box => {
             if (box) box.style.pointerEvents = 'none';
         });
+        */
     }
 
     showStep(stepNumber) {
@@ -226,6 +227,14 @@ class MeasurementCreator {
 
         if (stepNumber === 2) {
             this.ui.navButtons.next2.disabled = this.state.measurementData.questions.length === 0;
+        }
+        
+        // Sincronizar la UI de contactos al entrar al paso 3 en modo edición
+        if (stepNumber === 3 && this.state.isEditMode) {
+            const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
+            if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
+                selectedContactsSection?.classList.remove('d-none');
+            }
         }
     }
 
@@ -251,25 +260,27 @@ class MeasurementCreator {
         navButtons.back4?.addEventListener('click', () => this.showStep(3));
         navButtons.next4?.addEventListener('click', () => this.saveMeasurement());
         
+        // Listeners que deben funcionar en ambos modos (creación y edición)
+        contactsStep.sendAllContactsCheck?.addEventListener('change', () => this.handleSendAllCheckChange());
+        contactsStep.fieldTypeSelect?.addEventListener('change', () => this.handleFieldTypeChange());
+
+        const triggerUpdate = () => {
+            clearTimeout(this.state.contactCountDebounceTimer);
+            this.state.contactCountDebounceTimer = setTimeout(() => this.updateContactCount(), 400);
+        };
+
+        contactsStep.availableCategories?.addEventListener('click', (e) => {
+            this.moveCategoryItem(e.target, contactsStep.availableCategories, contactsStep.selectedCategories);
+            triggerUpdate();
+        });
+        contactsStep.selectedCategories?.addEventListener('click', (e) => {
+            this.moveCategoryItem(e.target, contactsStep.selectedCategories, contactsStep.availableCategories);
+            triggerUpdate();
+        });
+
         // Solo habilitar listeners de participantes en modo creación
         if (!this.state.isEditMode) {
             contactsStep.surveyTypeSelect?.addEventListener('change', () => this.handleSurveyTypeChange());
-            contactsStep.sendAllContactsCheck?.addEventListener('change', () => this.handleSendAllCheckChange());
-            contactsStep.fieldTypeSelect?.addEventListener('change', () => this.handleFieldTypeChange());
-            
-            const triggerUpdate = () => {
-                clearTimeout(this.state.contactCountDebounceTimer);
-                this.state.contactCountDebounceTimer = setTimeout(() => this.updateContactCount(), 400);
-            };
-
-            contactsStep.availableCategories?.addEventListener('click', (e) => {
-                this.moveCategoryItem(e.target, contactsStep.availableCategories, contactsStep.selectedCategories);
-                triggerUpdate();
-            });
-            contactsStep.selectedCategories?.addEventListener('click', (e) => {
-                this.moveCategoryItem(e.target, contactsStep.selectedCategories, contactsStep.availableCategories);
-                triggerUpdate();
-            });
         }
     
         contactsStep.viewContactsBtn?.addEventListener('click', () => this.showContactsModal());
@@ -277,6 +288,38 @@ class MeasurementCreator {
         contactsModal.closeBtn?.addEventListener('click', () => this.hideContactsModal());
         contactsModal.modal?.addEventListener('click', (e) => {
             if (e.target === contactsModal.modal) this.hideContactsModal();
+        });
+
+        // Delegación: eliminar contacto (solo modo edición)
+        contactsModal.tableBody?.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.btn-delete-contact');
+            if (!btn) return;
+            if (!this.state.isEditMode) return;
+
+            const contactName = btn.dataset.contactName;
+            const displayName = btn.dataset.displayName || contactName;
+            const confirmed = window.confirm(`¿Desea eliminar el contacto "${displayName}" de esta medición?` +
+                `\nSi el contacto respondió, también se eliminará su respuesta asociada a esta medición.`);
+            if (!confirmed) return;
+
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i>`;
+
+            try {
+                await this.deleteContactFromMeasurement(contactName);
+                // Actualizar estado y UI localmente
+                this.state.measurementData.contacts.list = this.state.measurementData.contacts.list.filter(c => c.name !== contactName);
+                this.updateContactsCountersUI();
+                this.showContactsModal(); // re-render modal
+                showGlobalNotification('Contacto eliminado correctamente.', 'success');
+            } catch (err) {
+                console.error(err);
+                showGlobalNotification(err.message || 'No se pudo eliminar el contacto.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         });
 
         reviewStep.sendRemindersCheck?.addEventListener('change', (e) => {
@@ -454,12 +497,14 @@ class MeasurementCreator {
     }
 
     async updateContactCount() {
-        if (this.state.isEditMode) return;
         const { sendAllContactsCheck, selectedCategories, contactCountNumber } = this.ui.contactsStep;
         
         contactCountNumber.innerHTML = `<i class="fa fa-spinner fa-spin"></i>`;
-        this.state.measurementData.contacts.list = [];
-        this.state.measurementData.contacts.headers = [];
+        
+        if (!this.state.isEditMode) {
+            this.state.measurementData.contacts.list = [];
+            this.state.measurementData.contacts.headers = [];
+        }
 
         let filters = [];
         if (this.ui.contactsStep.surveyTypeSelect.value === 'selected' && !sendAllContactsCheck.checked) {
@@ -489,6 +534,8 @@ class MeasurementCreator {
                 this.state.measurementData.contacts.headers = response.message.headers;
             } else {
                 contactCountNumber.textContent = '0';
+                this.state.measurementData.contacts.list = [];
+                this.state.measurementData.contacts.headers = ['Nombre'];
             }
         } catch (error) {
             console.error("Error al filtrar contactos:", error);
@@ -554,7 +601,16 @@ class MeasurementCreator {
         }
 
         const measurementPayload = this.state.isEditMode
-            ? { ...basePayload, is_edit_mode: true, doc_name: this.state.docName }
+            ? { 
+                ...basePayload, 
+                is_edit_mode: true, 
+                doc_name: this.state.docName,
+                contacts: {
+                    surveyType: this.ui.contactsStep.surveyTypeSelect?.value || 'selected',
+                    responseType: this.ui.contactsStep.responseTypeSelect?.value || 'identified',
+                    list: this.state.measurementData.contacts.list
+                }
+            }
             : {
                 ...basePayload,
                 startDate: step1Form.startDate.value,
@@ -628,19 +684,37 @@ class MeasurementCreator {
                 th.textContent = frappe.utils.escape_html(h);
                 headerRow.appendChild(th);
             });
+            // Agregar columna de acciones en modo edición
+            if (this.state.isEditMode) {
+                const th = document.createElement('th');
+                th.textContent = 'Acciones';
+                headerRow.appendChild(th);
+            }
         }
 
         // Filas con datos
         if (contacts && contacts.length > 0) {
             contacts.forEach(c => {
                 const row = tableBody.insertRow();
-                headers.forEach(h => {
+                (headers || ['Nombre']).forEach(h => {
                     const cell = row.insertCell();
                     cell.textContent = frappe.utils.escape_html(c[h] || 'N/A');
                 });
+
+                // Celda de acciones (solo modo edición)
+                if (this.state.isEditMode) {
+                    const cell = row.insertCell();
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-link text-danger btn-delete-contact';
+                    btn.dataset.contactName = c.name; // name es el ID interno del Contact
+                    btn.dataset.displayName = c['Nombre'] || '';
+                    btn.innerHTML = `<i class="fa fa-trash"></i> Eliminar`;
+                    cell.appendChild(btn);
+                }
             });
         } else {
-            tableBody.innerHTML = `<tr><td colspan="${headers.length || 1}" class="text-center text-muted p-4">No hay contactos que coincidan.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="${(headers?.length || 1) + (this.state.isEditMode ? 1 : 0)}" class="text-center text-muted p-4">No hay contactos que coincidan.</td></tr>`;
         }
         
         modal.classList.remove('d-none');
@@ -648,6 +722,40 @@ class MeasurementCreator {
 
     hideContactsModal() {
         this.ui.contactsModal.modal.classList.add('d-none');
+    }
+
+    async deleteContactFromMeasurement(contactName) {
+        try {
+            const response = await frappe.call({
+                method: 'liseniq.www.measurement.new_measurement.delete_measurement_contacts',
+                args: {
+                    survey_name: this.state.docName,
+                    contact_names: JSON.stringify([contactName])
+                }
+            });
+            const msg = response.message || {};
+            if (msg.status !== 'success') {
+                throw new Error(msg.message || 'No se pudo eliminar el contacto.');
+            }
+            return msg;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    updateContactsCountersUI() {
+        // Actualizar contador en Paso 3
+        const { contactCountNumber, viewContactsBtn } = this.ui.contactsStep;
+        const count = this.state.measurementData.contacts.list.length;
+        if (contactCountNumber) contactCountNumber.textContent = String(count);
+        if (viewContactsBtn) viewContactsBtn.style.display = count > 0 ? 'inline-block' : 'none';
+
+        // Actualizar contador en Revisión
+        const { contactCount, viewContactsBtn: reviewViewBtn } = this.ui.reviewStep;
+        if (contactCount) contactCount.textContent = String(count);
+        if (reviewViewBtn && this.state.isEditMode) {
+            reviewViewBtn.style.display = count > 0 ? 'inline-block' : 'none';
+        }
     }
 
     getContrastColor(hex) {

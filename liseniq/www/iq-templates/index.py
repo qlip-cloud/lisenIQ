@@ -112,7 +112,14 @@ def get_questions_from_template(template_name):
         }
 
         if q_doc.qn_response_options:
-            options = [opt.qo_option_text for opt in q_doc.qn_response_options]
+            if type_name == "Likert":
+                # En Likert devolver pares { text, value } desde DB
+                options = [
+                    {"text": opt.qo_option_text, "value": opt.qo_option_value}
+                    for opt in q_doc.qn_response_options
+                ]
+            else:
+                options = [opt.qo_option_text for opt in q_doc.qn_response_options]
             question_data["options"] = options
         
         questions.append(question_data)
@@ -183,8 +190,19 @@ def create_question_from_template_wizard(question_data):
         
         if data.get("qn_response_options"):
             for option in data.get("qn_response_options"):
+                # Asegura guardar tanto texto como valor
+                if isinstance(option, dict):
+                    text = option.get("qo_option_text") or option.get("text") or ""
+                    value = option.get("qo_option_value")
+                    if value is None:
+                        value = option.get("value", text)
+                else:
+                    text = str(option)
+                    value = text
+
                 question_doc.append("qn_response_options", {
-                    "qo_option_text": option.get("qo_option_text")
+                    "qo_option_text": text,
+                    "qo_option_value": value
                 })
         
         question_doc.insert(ignore_permissions=True)

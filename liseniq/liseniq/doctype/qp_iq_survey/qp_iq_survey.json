@@ -29,6 +29,7 @@
   "su_reminder_frequency",
   "su_reminder_max",
   "secci\u00f3n_link_publico_section",
+  "su_custom_generate_public_link",
   "su_public_link",
   "su_public_token",
   "su_public_link_created_on",
@@ -164,7 +165,7 @@
   {
    "fieldname": "secci\u00f3n_link_publico_section",
    "fieldtype": "Section Break",
-   "label": "Secci\u00f3n LInk Publico"
+   "label": "Secci\u00f3n Link Publico"
   },
   {
    "fieldname": "su_public_link",
@@ -188,11 +189,17 @@
    "fieldtype": "Link",
    "label": "Creado Por",
    "options": "User"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_custom_generate_public_link",
+   "fieldtype": "Check",
+   "label": " Generar Link Publico"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 18:58:51.592030",
+ "modified": "2025-10-15 15:07:06.214270",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

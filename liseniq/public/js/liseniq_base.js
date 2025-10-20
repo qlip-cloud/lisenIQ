@@ -46,7 +46,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Obtener y mostrar el nombre de la empresa
     fetch('/api/method/liseniq.utils.login_util.get_user_company_name')
         .then(response => response.json())
         .then(data => {
@@ -57,6 +56,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+
+    const avatar = document.getElementById('iq-header-avatar');
+    const userMenu = document.getElementById('iq-header-user-menu');
+    const logoutBtn = document.getElementById('iq-header-logout');
+
+    if (avatar && userMenu) {
+        avatar.addEventListener('click', function(e) {
+            e.stopPropagation();
+            userMenu.classList.toggle('d-none');
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!userMenu.classList.contains('d-none') && !avatar.contains(e.target) && !userMenu.contains(e.target)) {
+                userMenu.classList.add('d-none');
+            }
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            fetch('/api/method/logout', { method: 'GET' })
+                .then(() => {
+                    window.location.href = '/login';
+                });
+        });
+    }
+
+    const sidebarLogoutLink = document.getElementById('sidebar-logout-link');
+    if (sidebarLogoutLink) {
+        sidebarLogoutLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            fetch('/api/method/logout', { method: 'GET' })
+                .then(() => {
+                    window.location.href = '/login';
+                });
+        });
+    }
 });
 
 function showGlobalNotification(message, type, duration = 5000) {

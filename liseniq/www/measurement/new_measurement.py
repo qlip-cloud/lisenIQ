@@ -298,6 +298,76 @@ def get_filtered_contacts_count(filters='[]'):
     return {"count": len(contact_docs), "headers": headers, "contacts": contacts_for_modal}
 
 @frappe.whitelist()
+def delete_measurement_contacts(survey_name, contact_names):
+    try:
+        if isinstance(contact_names, str):
+            try:
+                contact_names = json.loads(contact_names)
+            except Exception:
+                contact_names = [contact_names]
+        if not isinstance(contact_names, (list, tuple)) or not contact_names:
+            return {"status": "error", "message": _("Lista de contactos inválida.")}
+
+        survey = frappe.get_doc("qp_IQ_Survey", survey_name)
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        if not user_company or survey.su_owner != user_company:
+            return {"status": "error", "message": _("No tiene permisos para modificar esta medición.")}
+
+        removed_no_response = []
+        removed_with_response = []
+        not_found = []
+        errors = []
+
+        for contact_name in contact_names:
+            try:
+                rec = frappe.db.get_value(
+                    "qp_IQ_SurveyRecipient",
+                    {"sr_survey": survey.name, "sr_contact": contact_name},
+                    ["name", "sr_status"],
+                    as_dict=True
+                )
+
+                if not rec:
+                    not_found.append(contact_name)
+                    continue
+
+                responded = (rec.get("sr_status") == "Responded")
+                if responded:
+                    found_responses = frappe.get_all(
+                        "Survey Response",
+                        filters={"survey": survey.su_name, "user": contact_name},
+                        fields=["name"]
+                    )
+                    for r in found_responses:
+                        try:
+                            frappe.delete_doc("Survey Response", r.name, ignore_permissions=True)
+                        except Exception as e_del_resp:
+                            errors.append(f"Contacto {contact_name}: no se pudo eliminar Survey Response {r.name}: {e_del_resp}")
+
+                    frappe.delete_doc("qp_IQ_SurveyRecipient", rec.name, ignore_permissions=True)
+                    removed_with_response.append(contact_name)
+                else:
+                    frappe.delete_doc("qp_IQ_SurveyRecipient", rec.name, ignore_permissions=True)
+                    removed_no_response.append(contact_name)
+
+            except Exception as e_item:
+                errors.append(f"{contact_name}: {e_item}")
+
+        frappe.db.commit()
+        return {
+            "status": "success",
+            "removed_without_response": removed_no_response,
+            "removed_with_response": removed_with_response,
+            "not_found": not_found,
+            "errors": errors
+        }
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "delete_measurement_contacts")
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
 def save_measurement(data):
     try:
         data = json.loads(data)
@@ -338,6 +408,45 @@ def save_measurement(data):
 
             survey.save(ignore_permissions=True)
             frappe.db.commit()
+
+            contacts_data = data.get("contacts", {})
+            new_contacts = contacts_data.get("list", [])
+            if new_contacts:
+                # Obtener contactos ya existentes en la medición
+                existing_recipients = frappe.get_all(
+                    "qp_IQ_SurveyRecipient",
+                    filters={"sr_survey": survey.name},
+                    fields=["sr_contact"]
+                )
+                existing_contact_names = set(r["sr_contact"] for r in existing_recipients if r["sr_contact"])
+
+                for contact in new_contacts:
+                    contact_name = contact.get("name")
+                    if not contact_name or contact_name in existing_contact_names:
+                        continue
+
+                    # Validar si ya respondió la encuesta (por cualquier medio)
+                    has_responded = frappe.db.exists(
+                        "Survey Response",
+                        {"survey": survey.su_name, "user": contact_name}
+                    )
+                    if has_responded:
+                        continue
+
+                    frappe.get_doc({
+                        "doctype": "qp_IQ_SurveyRecipient",
+                        "sr_survey": survey.name,
+                        "sr_contact": contact_name,
+                        "sr_status": "Not Sent"
+                    }).insert(ignore_permissions=True)
+            frappe.db.commit()
+
+            # Enviar de inmediato links a pendientes si la medición ya fue lanzada
+            try:
+                frappe.call("liseniq.tasks.send_pending_links_for_survey", survey_name=survey.name)
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), "save_measurement.send_pending_links_on_edit")
+
             return {"status": "success", "message": f"Medición '{survey.su_name}' actualizada exitosamente.", "docname": survey.name}
 
         # Modo nueva encuesta o creación
@@ -416,13 +525,21 @@ def save_measurement(data):
                     "isRequired": "true"
                 }
 
-                if question_type_title == "Likert" and q.get("options"):
-                    element["choices"] = [
-                        {"text": opt["text"], "value": opt["value"]}
-                        if isinstance(opt, dict) and "value" in opt else
-                        {"text": opt, "value": idx+1}
-                        for idx, opt in enumerate(q["options"])
-                    ]
+                if question_type_title == "Likert":
+                    # Siempre buscar las opciones en DB para asegurar el value correcto
+                    choices = []
+                    try:
+                        if question_name:
+                            q_doc = frappe.get_doc("qp_IQ_Question", question_name)
+                            if q_doc and q_doc.qn_response_options:
+                                choices = [
+                                    {"text": opt.qo_option_text, "value": opt.qo_option_value}
+                                    for opt in q_doc.qn_response_options
+                                ]
+                    except Exception:
+                        choices = []
+                    element["choices"] = choices
+
                 elif question_type_title == "Selección Múltiple" and q.get("options"):
                     element["choices"] = q["options"]
                 elif question_type_title == "NPS":
@@ -511,16 +628,13 @@ def save_measurement(data):
 
         # Por ahora, no se genera link público para encuestas de tipo 'all' (Público Externo)
         if survey_type == 'all':
-            survey.custom_generate_public_link = 0
+            survey.su_custom_generate_public_link = 0
         # Se genera un link genérico para encuestas con contactos seleccionados
         elif survey_type == 'selected':
-            survey.custom_generate_public_link = 1
+            survey.su_custom_generate_public_link = 1
 
 
         survey.su_status = status_name
-        if surveyjs_doc_name:
-            survey.su_surveyjs_survey = surveyjs_doc_name
-
         if data.get("reminders"):
             survey.su_send_reminders = 1
             survey.su_reminder_frequency = data["reminders"]["frequency"]
@@ -537,10 +651,11 @@ def save_measurement(data):
         survey.insert(ignore_permissions=True)
         frappe.db.commit()
 
-        if survey.custom_generate_public_link:
-            if generate_public_link_for_survey(survey, "after_save"):
-                survey.save(ignore_permissions=True)
-                frappe.db.commit()
+        # Se elimina la llamada directa, ahora se gestiona por el hook 'on_update'
+        # if survey.custom_generate_public_link:
+        #     if generate_public_link_for_survey(survey, "after_save"):
+        #         survey.save(ignore_permissions=True)
+        #         frappe.db.commit()
 
         if survey_type == 'selected' and contacts_data.get("list"):
             contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]
@@ -552,11 +667,11 @@ def save_measurement(data):
                         "sr_contact": contact_name,
                         "sr_status": "Not Sent"
                     }).insert(ignore_permissions=True)
-        
-        frappe.db.commit()
-        
-        return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}
+            frappe.db.commit()
 
+        frappe.db.commit()
+        return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}
+    
     except Exception as e:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Error en save_measurement")

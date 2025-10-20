@@ -2,9 +2,10 @@ from __future__ import unicode_literals
 import frappe
 import jwt
 import json
+from frappe.utils import get_datetime, now
 
 def process_survey_response(doc, method):
-    frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
+    # frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
 
     try:
         token = None
@@ -19,7 +20,7 @@ def process_survey_response(doc, method):
             if doc.user and doc.user != "Anonimo" and "." in doc.user:
                  token = doc.user
             else:
-                frappe.log_error("Respuesta sin token (anónima o inválida). Saltando enlace de recipient.", "Survey Response Hook")
+                # frappe.log_error("Respuesta sin token (anónima o inválida). Saltando enlace de recipient.", "Survey Response Hook")
                 return
 
         secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
@@ -33,7 +34,7 @@ def process_survey_response(doc, method):
         is_public = payload.get("public", False)
         
         if is_public:
-            frappe.log_error(f"Respuesta de encuesta pública para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
+            # frappe.log_error(f"Respuesta de encuesta pública para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
             return
 
         rid = payload.get("rid")
@@ -42,8 +43,13 @@ def process_survey_response(doc, method):
         if token_sur and token_sur != doc.survey:
             frappe.throw("Enlace inválido o expirado.")
 
+        # Verificar expiración de la encuesta
+        survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_end_date")
+        if survey_end_date and get_datetime(survey_end_date) < get_datetime(now()):
+            frappe.throw("El enlace ha expirado.")
+
         if not rid:
-            frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
+            # frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
             
             contact_name = None
             if doc.user and doc.user != "Anonimo":
@@ -93,7 +99,6 @@ def process_survey_response(doc, method):
                                 {"sr_status": "Responded", "sr_survey_response": doc.name}
                             )
                         else:
-                            # Si no es un destinatario pre-cargado, podría ser de un enlace público
                             pass
 
                 existing_response = frappe.db.exists(
@@ -145,7 +150,7 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         if recipient.sr_status == "Responded":
-            frappe.log_error(f"El destinatario {recipient.name} ya tiene estado 'Responded'. Abortando guardado.", "Survey Response Hook")
+            # frappe.log_error(f"El destinatario {recipient.name} ya tiene estado 'Responded'. Abortando guardado.", "Survey Response Hook")
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
         frappe.db.set_value(
@@ -153,7 +158,7 @@ def process_survey_response(doc, method):
             recipient.name,
             {"sr_status": "Responded", "sr_survey_response": doc.name}
         )
-        frappe.log_error(f"Destinatario {recipient.name} actualizado a 'Responded'.", "Survey Response Hook")
+        # frappe.log_error(f"Destinatario {recipient.name} actualizado a 'Responded'.", "Survey Response Hook")
 
         survey_name = recipient.sr_survey
         total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name})
@@ -181,14 +186,14 @@ def process_survey_response(doc, method):
         #     contact_name = contact_name[:140]
         # doc.user = contact_name or "Anonimo"
 
-        frappe.log_error(f"Actualizando destinatario {recipient.name} a 'Responded' y enlazando respuesta {doc.name}", "Survey Response Hook")
+        # frappe.log_error(f"Actualizando destinatario {recipient.name} a 'Responded' y enlazando respuesta {doc.name}", "Survey Response Hook")
         # frappe.db.set_value(
         #     "qp_IQ_SurveyRecipient",
         #     recipient.name,
         #     {"sr_status": "Responded", "sr_survey_response": doc.name}
         # )
         frappe.db.commit()
-        frappe.log_error(f"Destinatario {recipient.name} actualizado correctamente.", "Survey Response Hook")
+        # frappe.log_error(f"Destinatario {recipient.name} actualizado correctamente.", "Survey Response Hook")
 
         try:
             resp = json.loads(doc.response_json or "{}")

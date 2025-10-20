@@ -42,7 +42,7 @@ app_include_js = "/assets/liseniq/js/liseniq_base.js"
 # ----------
 
 # application home page (will override Website Settings)
-# home_page = "iq-home"
+home_page = "home"
 
 get_website_user_home_page = "liseniq.liseniq.uses_cases.login.redirects.get_home_page"
 
@@ -94,11 +94,17 @@ get_website_user_home_page = "liseniq.liseniq.uses_cases.login.redirects.get_hom
 # Hook on document methods and events
 
 # on_login hook
-on_login = "liseniq.liseniq.uses_cases.login.redirects.handle_login_redirect"
+# on_login = "liseniq.liseniq.uses_cases.login.redirects.handle_login_redirect"
+
+# Inicializa variables de sesión al crearla
+on_session_creation = "liseniq.utils.login_util.set_company_name_on_session_creation"
 
 doc_events = {
 	"Survey Response": {
 		"before_insert": "liseniq.utils.survey_response.process_survey_response"
+	},
+	"qp_IQ_Survey": {
+		"on_update": "liseniq.utils.api_survey.generate_public_link_for_survey_hook"
 	}
 }
 
@@ -195,12 +201,16 @@ user_data_fields = [
 # 	"liseniq.auth.validate"
 # ]
 
+# website_redirects = [
+#     {"source": "/login", "target": "/login-qlip"},
+# ]
+
 # Contexto Global y Reglas de Enrutamiento del Portal Web
 # ----------------------------------------------------
 
-website_context = {
-	"*": "liseniq.utils.global_website_context"
-}
+# website_context = {
+# 	"*": "liseniq.utils.global_website_context"
+# }
 
 page_css = {
     # "iq_templates/index": "public/css/iq_templates.css",

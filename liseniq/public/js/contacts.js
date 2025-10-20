@@ -8,7 +8,21 @@ document.addEventListener('DOMContentLoaded', function () {
         isEditMode: false,
         currentContactName: null,
         demographicTypes: JSON.parse(document.getElementById('demographic-data').textContent),
-        debounceTimer: null
+        debounceTimer: null,
+
+        contacts: (() => {
+            try {
+                const raw = document.getElementById('contacts-data')?.textContent || '[]';
+                const list = JSON.parse(raw) || [];
+                return list.map(normalizeContact);
+            } catch {
+                return [];
+            }
+        })(),
+        pagination: {
+            pageSize: 10,
+            currentPage: 1
+        }
     };
 
     const ui = {
@@ -32,11 +46,14 @@ document.addEventListener('DOMContentLoaded', function () {
             save: document.getElementById('btn-save-contact'),
             addDemographic: document.getElementById('btn-add-demographic'),
             closeModal: document.getElementById('btn-close-modal'),
-            manualContact: document.getElementById('btn-manual-contact')
+            manualContact: document.getElementById('btn-manual-contact'),
+            prevPage: document.getElementById('contacts-prev-page'),
+            nextPage: document.getElementById('contacts-next-page')
         },
         modal: document.getElementById('create-contact-modal'),
         demographicsTbody: document.getElementById('demographics-tbody'),
-        selectAllCheckbox: document.getElementById('select-all-contacts')
+        selectAllCheckbox: document.getElementById('select-all-contacts'),
+        pageInfo: document.getElementById('contacts-page-info')
     };
 
     const stepper = new Stepper(ui.stepperContainer, ['Datos Básicos', 'Datos Opcionales', 'Datos Demográficos']);
@@ -126,37 +143,100 @@ document.addEventListener('DOMContentLoaded', function () {
             <td class="action-cell"><i class="fa fa-trash-o delete-row" title="Eliminar fila"></i></td>
         `;
     };
-    
-    const updateContactInTable = (contact) => {
-        const row = ui.tableBody.querySelector(`tr[data-name="${contact.name}"]`);
-        if (row) row.innerHTML = getContactRowHTML(contact);
-    };
 
-    const addContactToTable = (contact) => {
-        const noContactsRow = ui.tableBody.querySelector('td[colspan="9"]');
-        if (noContactsRow) noContactsRow.parentElement.remove();
-        
-        const newRow = ui.tableBody.insertRow(0);
-        newRow.setAttribute('data-name', contact.name);
-        newRow.innerHTML = getContactRowHTML(contact);
-    };
+    function normalizeContact(c) {
+        return {
+            name: c.name,
+            docNumber: c.dni || c.docNumber || c.custom_document_number || '',
+            firstName: c.first_name || c.firstName || '',
+            lastName: c.last_name || c.lastName || '',
+            country: c.country || c.custom_country || '',
+            email: c.email || '',
+            language: c.language || c.custom_language || '',
+            status: c.status || c.custom_status || ''
+        };
+    }
+    
+    function getTotalPages() {
+        const size = appState.pagination.pageSize;
+        return Math.max(1, Math.ceil(appState.contacts.length / size) || 1);
+    }
+
+    function renderContactsTable() {
+        const size = appState.pagination.pageSize;
+        const totalPages = getTotalPages();
+        if (appState.pagination.currentPage > totalPages) {
+            appState.pagination.currentPage = totalPages;
+        }
+        const start = (appState.pagination.currentPage - 1) * size;
+        const slice = appState.contacts.slice(start, start + size);
+
+        if (slice.length === 0) {
+            ui.tableBody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center p-5">No se encontraron contactos.</td>
+                </tr>
+            `;
+        } else {
+            ui.tableBody.innerHTML = slice.map(getContactRowHTML).join('');
+        }
+
+        updatePaginationControls();
+        updateSelectAllCheckboxState();
+    }
+
+    function updatePaginationControls() {
+        const totalPages = getTotalPages();
+        ui.pageInfo.textContent = `Página ${appState.pagination.currentPage} de ${totalPages}`;
+        if (ui.buttons.prevPage) ui.buttons.prevPage.disabled = appState.pagination.currentPage <= 1;
+        if (ui.buttons.nextPage) ui.buttons.nextPage.disabled = appState.pagination.currentPage >= totalPages;
+    }
+
+    function goToPage(page) {
+        const total = getTotalPages();
+        appState.pagination.currentPage = Math.min(Math.max(1, page), total);
+        renderContactsTable();
+    }
 
     const getContactRowHTML = (contact) => {
         const statusHTML = contact.status ? `<span class="status-badge status-${contact.status.toLowerCase()}">${contact.status}</span>` : '';
         return `
-            <td class="contact-checkbox-cell"><input type="checkbox" class="contact-checkbox" data-name="${contact.name}"></td>
-            <td>${contact.custom_document_number || ''}</td>
-            <td>${contact.firstName || ''}</td>
-            <td>${contact.lastName || ''}</td>
-            <td>${contact.country || ''}</td>
-            <td>${contact.email || ''}</td>
-            <td>${contact.language || ''}</td>
-            <td>${statusHTML}</td>
-            <td class="contact-actions">
-                <i class="fa fa-pencil-square-o edit-contact-btn" title="Editar Contacto"></i>
-                <i class="fa fa-trash-o delete-contact-btn" title="Eliminar Contacto"></i>
-            </td>
+            <tr data-name="${contact.name}">
+                <td class="contact-checkbox-cell"><input type="checkbox" class="contact-checkbox" data-name="${contact.name}"></td>
+                <td>${contact.docNumber || ''}</td>
+                <td>${contact.firstName || ''}</td>
+                <td>${contact.lastName || ''}</td>
+                <td>${contact.country || ''}</td>
+                <td>${contact.email || ''}</td>
+                <td>${contact.language || ''}</td>
+                <td>${statusHTML}</td>
+                <td class="contact-actions">
+                    <i class="fa fa-pencil-square-o edit-contact-btn" title="Editar Contacto"></i>
+                    <i class="fa fa-trash-o delete-contact-btn" title="Eliminar Contacto"></i>
+                </td>
+            </tr>
         `;
+    };
+
+    const updateContactInList = (contact) => {
+        const normalized = normalizeContact(contact);
+        const idx = appState.contacts.findIndex(c => c.name === normalized.name);
+        if (idx !== -1) {
+            appState.contacts[idx] = normalized;
+        }
+        renderContactsTable();
+    };
+
+    const addContactToList = (contact) => {
+        const normalized = normalizeContact(contact);
+        appState.contacts.unshift(normalized);
+        appState.pagination.currentPage = 1;
+        renderContactsTable();
+    };
+
+    const removeContactFromList = (contactName) => {
+        appState.contacts = appState.contacts.filter(c => c.name !== contactName);
+        renderContactsTable();
     };
 
     const getContactFormData = () => {
@@ -278,9 +358,9 @@ document.addEventListener('DOMContentLoaded', function () {
             callback: function(r) {
                 if (r.message && r.message.status === 'success') {
                     if (appState.isEditMode) {
-                        updateContactInTable(r.message.updated_contact);
+                        updateContactInList(r.message.updated_contact);
                     } else {
-                        addContactToTable(r.message.new_contact);
+                        addContactToList(r.message.new_contact);
                     }
                     showView('list');
                     showGlobalNotification(`Contacto ${appState.isEditMode ? 'actualizado' : 'creado'} correctamente.`, 'success');
@@ -304,8 +384,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     args: { contact_name: contactName },
                     callback: (r) => {
                         if (r.message && r.message.status === 'success') {
-                            rowElement.remove();
-                            updateSelectAllCheckboxState();
+                            removeContactFromList(contactName);
                             showGlobalNotification('Contacto eliminado correctamente.', 'success');
                         } else {
                             showGlobalNotification(`Error al eliminar: ${r.message.message || 'Ocurrió un error inesperado.'}`, 'error');
@@ -421,6 +500,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ui.tableBody.querySelectorAll('.contact-checkbox').forEach(cb => {
                 cb.checked = e.target.checked;
             });
+            updateSelectAllCheckboxState();
         });
 
         ui.buttons.nextStep1?.addEventListener('click', () => {
@@ -449,13 +529,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('contact-firstname').addEventListener('input', sanitizeNameInput);
         document.getElementById('contact-lastname').addEventListener('input', sanitizeNameInput);
+
+        ui.buttons.prevPage?.addEventListener('click', () => goToPage(appState.pagination.currentPage - 1));
+        ui.buttons.nextPage?.addEventListener('click', () => goToPage(appState.pagination.currentPage + 1));
     }
     
     function init() {
         stepper.render();
         showView('list');
         initializeEventListeners();
-        updateSelectAllCheckboxState();
+        renderContactsTable();
     }
 
     init();

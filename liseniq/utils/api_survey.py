@@ -59,6 +59,16 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
   # )
   try:
     if not token or token == "Anonimo":
+      # Permitir acceso público si el DNI corresponde a un destinatario registrado
+      if dni:
+        survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
+        if survey_name_id:
+          recipient_exists = frappe.db.exists(
+            "qp_IQ_SurveyRecipient",
+            {"sr_survey": survey_name_id, "sr_contact": frappe.db.get_value("Contact", {"custom_document_number": dni}, "name")}
+          )
+          if recipient_exists:
+            return {"allow": True}
       return {"allow": True}
 
     secret = _get_jwt_secret()
@@ -116,23 +126,11 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
               "qp_IQ_SurveyRecipient",
               {"sr_survey": survey_name_id, "sr_contact": contact_info.name}
           )
-          if not recipient_exists:
+          if recipient_exists:
+              # Permitir acceso si el destinatario existe, sin requerir envío directo
+              return {"allow": True}
+          else:
               return {"allow": False, "valid_dni": False, "message": "No está habilitado para responder esta encuesta."}
-
-          # Validaciones de duplicidad
-          existing_response_by_contact = frappe.db.exists(
-              "Survey Response",
-              {"survey": survey_name, "user": contact_info.name}
-          )
-          if existing_response_by_contact:
-              return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
-
-          existing_recipient_responded = frappe.db.exists(
-              "qp_IQ_SurveyRecipient",
-              {"sr_survey": survey_name_id, "sr_contact": contact_info.name, "sr_status": "Responded"}
-          )
-          if existing_recipient_responded:
-              return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
 
         # Si aún no hay DNI ingresado, permitir continuar. Se bloqueará al validar el DNI.
         return {"allow": True}

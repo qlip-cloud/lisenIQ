@@ -2,6 +2,7 @@ const OPTIONS_BASED_TYPES = ['Selección Múltiple', 'Likert'];
 const BIPOLAR_SCALE_TYPES = [];
 const NPS_SCALE_TYPES = ['NPS'];
 const LIKERT_TYPE_NAME = 'Likert';
+const LIKERT_VISUAL_TYPE_NAME = 'Likert Visual';
 const DEFAULT_LIKERT_OPTIONS = [
     { text: 'Totalmente de acuerdo', value: 5 },
     { text: 'De acuerdo', value: 4 },
@@ -74,6 +75,7 @@ export class QuestionBuilder {
                 openQuestionBank: document.getElementById('btn-open-question-bank'),
                 addQuestion: document.getElementById('btn-add-question'),
                 addOption: document.getElementById('btn-add-option'),
+                addVisualOption: document.getElementById('btn-add-visual-option'),
             },
             questionForm: {
                 text: document.getElementById('new_question_text'),
@@ -82,6 +84,8 @@ export class QuestionBuilder {
                 demographicResults: document.querySelector('#new_question_demographic + .autocomplete-results'),
                 optionsSection: document.getElementById('options-based-section'),
                 optionsContainer: document.getElementById('options-container'),
+                visualOptionsSection: document.getElementById('visual-options-section'),
+                visualOptionsContainer: document.getElementById('visual-options-container'),
                 bipolarSection: document.getElementById('bipolar-scale-section'),
                 negativeStatement: document.getElementById('negative_statement_input'),
                 positiveStatement: document.getElementById('positive_statement_input'),
@@ -168,6 +172,41 @@ export class QuestionBuilder {
         });
         questionForm.optionsContainer?.addEventListener('click', (e) => this.handleOptionsActions(e));
 
+        // Eventos para Likert Visual
+        buttons.addVisualOption?.addEventListener('click', () => {
+            if (this.isReadOnly) return;
+            this.addVisualOptionRow();
+        });
+        questionForm.visualOptionsContainer?.addEventListener('click', (e) => this.handleVisualOptionsActions(e));
+        questionForm.visualOptionsContainer?.addEventListener('change', async (e) => {
+            if (this.isReadOnly) return;
+            const fileInput = e.target.closest('.visual-option-file');
+            if (!fileInput) return;
+            const row = e.target.closest('.visual-option-input-row');
+            const file = fileInput.files && fileInput.files[0];
+            if (!file || !row) return;
+
+            try {
+                this._setVisualUploadingState(row, true);
+                const fileUrl = await this._uploadVisualOptionFile(file);
+                const hiddenUrl = row.querySelector('.visual-option-url-input');
+                const preview = row.querySelector('.visual-file-preview');
+                const img = preview?.querySelector('img');
+                const nameSpan = preview?.querySelector('.file-name');
+                if (hiddenUrl) hiddenUrl.value = fileUrl || '';
+                if (img) img.src = fileUrl || '';
+                if (nameSpan) nameSpan.textContent = file.name;
+                if (preview) preview.classList.toggle('d-none', !fileUrl);
+            } catch (err) {
+                console.error('Error al subir la imagen de la opción:', err);
+                showGlobalNotification('No se pudo subir la imagen. Intenta nuevamente.', 'error', 4000);
+                // Limpia selección en caso de error
+                fileInput.value = '';
+            } finally {
+                this._setVisualUploadingState(row, false);
+            }
+        });
+
         questionForm.demographic?.addEventListener('input', () => {
             if (this.isReadOnly) return;
             this.onDemographicInput();
@@ -219,13 +258,26 @@ export class QuestionBuilder {
         const questionDisplayName = question.typeName || question.type;
         let additionalInfoHtml = '';
 
-        if (OPTIONS_BASED_TYPES.includes(questionDisplayName) && Array.isArray(question.options) && question.options.length > 0) {
-            additionalInfoHtml = `<div class="question-item-options-list">
-                ${question.options.map(opt => {
-                    const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
-                    return `<div class="question-option-item">${frappe.utils.escape_html(optionText)}</div>`;
-                }).join('')}
-            </div>`;
+        if (Array.isArray(question.options) && question.options.length > 0) {
+            if (questionDisplayName === LIKERT_VISUAL_TYPE_NAME) {
+                additionalInfoHtml = `<div class="question-item-options-list">
+                    ${question.options.map(opt => {
+                        const text = (typeof opt === 'object') ? (opt.text || '') : String(opt || '');
+                        const url = (typeof opt === 'object') ? (opt.url || '') : '';
+                        return `<div class="question-option-item">
+                            ${url ? `<img src="${frappe.utils.escape_html(url)}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">` : ''}
+                            ${frappe.utils.escape_html(text)}
+                        </div>`;
+                    }).join('')}
+                </div>`;
+            } else if (OPTIONS_BASED_TYPES.includes(questionDisplayName)) {
+                additionalInfoHtml = `<div class="question-item-options-list">
+                    ${question.options.map(opt => {
+                        const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
+                        return `<div class="question-option-item">${frappe.utils.escape_html(optionText)}</div>`;
+                    }).join('')}
+                </div>`;
+            }
         }
         
         if (NPS_SCALE_TYPES.includes(questionDisplayName)) {
@@ -443,6 +495,24 @@ export class QuestionBuilder {
         if (qf.npsMax) qf.npsMax.value = '';
 
         if (qf.optionsSection) qf.optionsSection.classList.add('d-none');
+        if (qf.visualOptionsSection) {
+            qf.visualOptionsSection.classList.add('d-none');
+            if (qf.visualOptionsContainer) qf.visualOptionsContainer.innerHTML = `
+                <div class="visual-option-input-row">
+                    <span class="option-number">1</span>
+                    <input type="text" class="form-control visual-option-value" placeholder="Valor (ej: 5)">
+                    <input type="text" class="form-control visual-option-text" placeholder="Texto (ej: Excelente)">
+                    <div class="visual-file-cell">
+                        <input type="file" accept="image/*" class="visual-option-file">
+                        <input type="hidden" class="visual-option-url-input" value="">
+                        <div class="visual-file-preview d-none">
+                            <img src="" alt="previsualización">
+                            <span class="file-name small text-muted"></span>
+                        </div>
+                    </div>
+                    <i class="fa fa-trash-o text-danger delete-visual-option" style="cursor: pointer;"></i>
+                </div>`;
+        }
         if (qf.bipolarSection) qf.bipolarSection.classList.add('d-none');
         if (qf.npsSection) qf.npsSection.classList.add('d-none');
         
@@ -486,6 +556,29 @@ export class QuestionBuilder {
             }
         }
 
+        // Validación para Likert Visual
+        if (questionTypeName === LIKERT_VISUAL_TYPE_NAME) {
+            const rows = Array.from(qf.visualOptionsContainer?.querySelectorAll('.visual-option-input-row') || []);
+            const parsed = rows.map(row => ({
+                value: row.querySelector('.visual-option-value')?.value.trim(),
+                text: row.querySelector('.visual-option-text')?.value.trim(),
+                // FIX: tomar el URL del input oculto correcto
+                url: row.querySelector('.visual-option-url-input')?.value.trim(),
+            }));
+            if (parsed.length < 1) {
+                showGlobalNotification('Debes agregar al menos 1 opción visual.', 'error', 3000);
+                isValid = false;
+            }
+            parsed.forEach((opt, i) => {
+                if (!opt.value || !opt.text || !opt.url) {
+                    // FIX: mensaje acorde a archivo adjunto
+                    showGlobalNotification(`La opción #${i + 1} debe incluir Valor, Texto y Archivo (imagen).`, 'error', 3000);
+                    isValid = false;
+                }
+            });
+        }
+
+        // Validación para opciones de texto (excluye Likert y Likert Visual)
         if (OPTIONS_BASED_TYPES.includes(questionTypeName) && questionTypeName !== LIKERT_TYPE_NAME) {
             const options = Array.from(qf.optionsContainer.querySelectorAll('.option-input')).map(input => input.value.trim()).filter(Boolean);
             if (options.length < 1) {
@@ -519,11 +612,12 @@ export class QuestionBuilder {
     
     addManualQuestion() {
         if (this.isReadOnly) return;
-
         const qf = this.ui.questionForm;
         const questionTypeOption = qf.type.options[qf.type.selectedIndex];
         const questionTypeName = questionTypeOption ? questionTypeOption.text.trim() : '';
-        
+
+        if (!this.validateQuestionForm()) return;
+
         const newQuestion = { 
             id: `manual-${Date.now()}`, 
             text: qf.text.value.trim(), 
@@ -536,7 +630,15 @@ export class QuestionBuilder {
         if (questionTypeName === LIKERT_TYPE_NAME) {
             newQuestion.options = DEFAULT_LIKERT_OPTIONS.map(opt => ({ text: opt.text, value: opt.value }));
         } else if (OPTIONS_BASED_TYPES.includes(questionTypeName)) {
-            newQuestion.options = Array.from(qf.optionsContainer.querySelectorAll('.option-input')).map(input => input.value.trim()).filter(Boolean);
+            newQuestion.options = Array.from(qf.optionsContainer.querySelectorAll('.option-input'))
+                .map(input => input.value.trim()).filter(Boolean);
+        } else if (questionTypeName === LIKERT_VISUAL_TYPE_NAME) {
+            const rows = Array.from(qf.visualOptionsContainer?.querySelectorAll('.visual-option-input-row') || []);
+            newQuestion.options = rows.map(row => ({
+                value: row.querySelector('.visual-option-value')?.value.trim(),
+                text: row.querySelector('.visual-option-text')?.value.trim(),
+                url: row.querySelector('.visual-option-url-input')?.value.trim(),
+            })).filter(opt => opt.value && opt.text && opt.url);
         }
 
         if (NPS_SCALE_TYPES.includes(questionTypeName)) {
@@ -568,17 +670,21 @@ export class QuestionBuilder {
         const selectedOption = qf.type.options[qf.type.selectedIndex];
         const questionTypeName = selectedOption ? selectedOption.text.trim() : '';
 
+        // Likert fijo
         if (questionTypeName === LIKERT_TYPE_NAME) {
             this._setLikertOptions();
-        } else {
+        } else if (OPTIONS_BASED_TYPES.includes(questionTypeName)) {
+            // Selección múltiple, etc.
             this._setEditableOptions();
         }
 
         if (qf.optionsSection) qf.optionsSection.classList.toggle('d-none', !OPTIONS_BASED_TYPES.includes(questionTypeName));
+        if (qf.visualOptionsSection) qf.visualOptionsSection.classList.toggle('d-none', questionTypeName !== LIKERT_VISUAL_TYPE_NAME);
         if (qf.bipolarSection) qf.bipolarSection.classList.toggle('d-none', !BIPOLAR_SCALE_TYPES.includes(questionTypeName));
         if (qf.npsSection) qf.npsSection.classList.toggle('d-none', !NPS_SCALE_TYPES.includes(questionTypeName));
     }
 
+    // Opciones de texto estándar
     handleOptionsActions(e) {
         if (this.isReadOnly) return;
         if (e.target.classList.contains('delete-option')) {
@@ -586,6 +692,52 @@ export class QuestionBuilder {
             if (optionsContainer.querySelectorAll('.option-input-row').length > 1) {
                 e.target.closest('.option-input-row').remove();
                 this.updateOptionNumbers();
+            } else {
+                showGlobalNotification('Debe haber al menos una opción.', 'error', 3000);
+            }
+        }
+    }
+
+    // Opciones Likert Visual
+    addVisualOptionRow() {
+        const { visualOptionsContainer } = this.ui.questionForm;
+        if (!visualOptionsContainer) return;
+        const row = document.createElement('div');
+        row.className = 'visual-option-input-row';
+        row.innerHTML = `
+            <span class="option-number"></span>
+            <input type="text" class="form-control visual-option-value" placeholder="Valor (ej: 4)">
+            <input type="text" class="form-control visual-option-text" placeholder="Texto (ej: Bueno)">
+            <div class="visual-file-cell">
+                <input type="file" accept="image/*" class="visual-option-file">
+                <input type="hidden" class="visual-option-url-input" value="">
+                <div class="visual-file-preview d-none">
+                    <img src="" alt="previsualización">
+                    <span class="file-name small text-muted"></span>
+                </div>
+            </div>
+            <i class="fa fa-trash-o text-danger delete-visual-option" style="cursor: pointer;"></i>`;
+        visualOptionsContainer.appendChild(row);
+        this.updateVisualOptionNumbers();
+    }
+
+    updateVisualOptionNumbers() {
+        const { visualOptionsContainer } = this.ui.questionForm;
+        if (!visualOptionsContainer) return;
+        visualOptionsContainer.querySelectorAll('.visual-option-input-row').forEach((row, idx) => {
+            const num = row.querySelector('.option-number');
+            if (num) num.textContent = idx + 1;
+        });
+    }
+
+    handleVisualOptionsActions(e) {
+        if (this.isReadOnly) return;
+        if (e.target.classList.contains('delete-visual-option')) {
+            const { visualOptionsContainer } = this.ui.questionForm;
+            const rows = visualOptionsContainer.querySelectorAll('.visual-option-input-row');
+            if (rows.length > 1) {
+                e.target.closest('.visual-option-input-row')?.remove();
+                this.updateVisualOptionNumbers();
             } else {
                 showGlobalNotification('Debe haber al menos una opción.', 'error', 3000);
             }
@@ -675,5 +827,34 @@ export class QuestionBuilder {
         if (errorElement) {
             errorElement.classList.add('d-none');
         }
+    }
+
+    // Sube archivo y devuelve file_url
+    async _uploadVisualOptionFile(file) {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        formData.append('is_private', 0);
+        formData.append('from_form', 1);
+        // No adjuntamos a un DocType todavía; guardamos el file_url y luego lo usamos en qo_url.
+
+        const res = await fetch('/api/method/upload_file', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Frappe-CSRF-Token': frappe.csrf_token },
+            body: formData
+        });
+        const json = await res.json();
+        if (!res.ok || json.exc) {
+            const msg = json._server_messages ? JSON.parse(json._server_messages)[0] : 'Error al subir archivo';
+            throw new Error(msg);
+        }
+        // En Frappe, message normalmente incluye "file_url"
+        const fileUrl = (json.message && (json.message.file_url || json.message.file_url)) || (json.message && json.message.file_url);
+        return fileUrl || (json.message && json.message.file) || '';
+    }
+
+    _setVisualUploadingState(row, uploading) {
+        const inputs = row.querySelectorAll('input');
+        inputs.forEach(inp => inp.disabled = uploading);
+        row.classList.toggle('is-uploading', uploading);
     }
 }

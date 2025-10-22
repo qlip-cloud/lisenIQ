@@ -34,6 +34,7 @@
         </div>
     </div>
 
+    <!-- Sección para opciones estándar -->
     <div id="options-based-section" class="mt-4 d-none">
         <label class="small text-muted">Opciones de respuesta</label>
         <div id="options-container">
@@ -44,6 +45,30 @@
             </div>
         </div>
         <button id="btn-add-option" class="btn btn-sm btn-add-option mt-3">
+            <i class="fa fa-plus-circle"></i>
+        </button>
+    </div>
+
+    <!-- Sección para Likert Visual (Valor, Texto, Archivo) -->
+    <div id="visual-options-section" class="mt-4 d-none">
+        <label class="small text-muted">Opciones de respuesta (Likert Visual)</label>
+        <div id="visual-options-container">
+            <div class="visual-option-input-row">
+                <span class="option-number">1</span>
+                <input type="text" class="form-control visual-option-value" placeholder="Valor (ej: 5)">
+                <input type="text" class="form-control visual-option-text" placeholder="Texto (ej: Excelente)">
+                <div class="visual-file-cell">
+                    <input type="file" accept="image/*" class="visual-option-file">
+                    <input type="hidden" class="visual-option-url-input" value="">
+                    <div class="visual-file-preview d-none">
+                        <img src="" alt="previsualización">
+                        <span class="file-name small text-muted"></span>
+                    </div>
+                </div>
+                <i class="fa fa-trash-o text-danger delete-visual-option" style="cursor: pointer;"></i>
+            </div>
+        </div>
+        <button id="btn-add-visual-option" class="btn btn-sm btn-add-option mt-3" title="Agregar opción visual">
             <i class="fa fa-plus-circle"></i>
         </button>
     </div>
@@ -79,6 +104,7 @@
             </div>
         </div>
     </div>
+
 </div>
 <div class="text-center mt-5">
     <button id="btn-add-question" class="btn btn-outline-purple">Agregar Pregunta</button>

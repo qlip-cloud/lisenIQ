@@ -61,7 +61,6 @@ export class QuestionBuilder {
         }
 
         if (questionForm.listContainer) {
-            // pass
         }
 
         if (this.isReadOnly && bankModal?.modal) {
@@ -562,7 +561,6 @@ export class QuestionBuilder {
             const parsed = rows.map(row => ({
                 value: row.querySelector('.visual-option-value')?.value.trim(),
                 text: row.querySelector('.visual-option-text')?.value.trim(),
-                // FIX: tomar el URL del input oculto correcto
                 url: row.querySelector('.visual-option-url-input')?.value.trim(),
             }));
             if (parsed.length < 1) {
@@ -571,7 +569,6 @@ export class QuestionBuilder {
             }
             parsed.forEach((opt, i) => {
                 if (!opt.value || !opt.text || !opt.url) {
-                    // FIX: mensaje acorde a archivo adjunto
                     showGlobalNotification(`La opción #${i + 1} debe incluir Valor, Texto y Archivo (imagen).`, 'error', 3000);
                     isValid = false;
                 }
@@ -670,11 +667,9 @@ export class QuestionBuilder {
         const selectedOption = qf.type.options[qf.type.selectedIndex];
         const questionTypeName = selectedOption ? selectedOption.text.trim() : '';
 
-        // Likert fijo
         if (questionTypeName === LIKERT_TYPE_NAME) {
             this._setLikertOptions();
         } else if (OPTIONS_BASED_TYPES.includes(questionTypeName)) {
-            // Selección múltiple, etc.
             this._setEditableOptions();
         }
 
@@ -835,7 +830,6 @@ export class QuestionBuilder {
         formData.append('file', file, file.name);
         formData.append('is_private', 0);
         formData.append('from_form', 1);
-        // No adjuntamos a un DocType todavía; guardamos el file_url y luego lo usamos en qo_url.
 
         const res = await fetch('/api/method/upload_file', {
             method: 'POST',
@@ -847,7 +841,7 @@ export class QuestionBuilder {
             const msg = json._server_messages ? JSON.parse(json._server_messages)[0] : 'Error al subir archivo';
             throw new Error(msg);
         }
-        // En Frappe, message normalmente incluye "file_url"
+
         const fileUrl = (json.message && (json.message.file_url || json.message.file_url)) || (json.message && json.message.file_url);
         return fileUrl || (json.message && json.message.file) || '';
     }

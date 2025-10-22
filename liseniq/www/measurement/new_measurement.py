@@ -486,7 +486,9 @@ def save_measurement(data):
                                 for opt in q["options"]:
                                     new_question.append("qn_response_options", {
                                         "qo_option_text": opt["text"] if isinstance(opt, dict) else opt,
-                                        "qo_option_value": opt["value"] if isinstance(opt, dict) and "value" in opt else opt
+                                        "qo_option_value": opt["value"] if isinstance(opt, dict) and "value" in opt else opt,
+                                        # Agrega la URL si existe (Likert Visual)
+                                        "qo_url": (opt.get("url") if isinstance(opt, dict) and "url" in opt else None)
                                     })
                             else:
                                 for opt_text in q["options"]:
@@ -517,6 +519,8 @@ def save_measurement(data):
                     surveyjs_type = "rating"
                 elif question_type_title == "Likert":
                     surveyjs_type = "radiogroup"
+                elif question_type_title == "Likert Visual":
+                    surveyjs_type = "imagepicker"
 
                 element = {
                     "type": surveyjs_type,
@@ -539,6 +543,32 @@ def save_measurement(data):
                     except Exception:
                         choices = []
                     element["choices"] = choices
+
+                elif question_type_title == "Likert Visual":
+                    choices = []
+                    try:
+                        if question_name:
+                            q_doc = frappe.get_doc("qp_IQ_Question", question_name)
+                            if q_doc and q_doc.qn_response_options:
+                                choices = [
+                                    {
+                                        "text": opt.qo_option_text,
+                                        "value": opt.qo_option_value,
+                                        "imageLink": opt.qo_url
+                                    }
+                                    for opt in q_doc.qn_response_options
+                                    if getattr(opt, "qo_url", None)
+                                ]
+                    except Exception:
+                        choices = []
+                    element["choices"] = choices
+                    # Ajustes visuales para imagepicker
+                    element["showLabel"] = True
+                    element["multiSelect"] = False
+                    element["imageFit"] = "contain"
+                    element["imageHeight"] = 32
+                    element["imageWidth"] = 32
+                    element["choicesOrder"] = "none"
 
                 elif question_type_title == "Selección Múltiple" and q.get("options"):
                     element["choices"] = q["options"]

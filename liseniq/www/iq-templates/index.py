@@ -113,7 +113,6 @@ def get_questions_from_template(template_name):
 
         if q_doc.qn_response_options:
             if type_name == "Likert":
-                # En Likert devolver pares { text, value } desde DB
                 options = [
                     {"text": opt.qo_option_text, "value": opt.qo_option_value}
                     for opt in q_doc.qn_response_options
@@ -195,7 +194,6 @@ def create_question_from_template_wizard(question_data):
         
         if data.get("qn_response_options"):
             for option in data.get("qn_response_options"):
-                # Asegura guardar texto, valor y url (si aplica)
                 if isinstance(option, dict):
                     text = option.get("qo_option_text") or option.get("text") or ""
                     value = option.get("qo_option_value")

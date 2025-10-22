@@ -191,7 +191,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (q.typeName === 'Likert') {
                         questionDoc.qn_response_options = q.options.map(opt => ({
                             qo_option_text: opt.text,
-                            qo_option_value: opt.value
+                            qo_option_value: opt.value,
+                            qo_url: opt.url
                         }));
                     } else if (q.typeName === 'Likert Visual') {
                         questionDoc.qn_response_options = q.options.map(opt => ({

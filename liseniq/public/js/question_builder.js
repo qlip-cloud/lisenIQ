@@ -3,6 +3,13 @@ const BIPOLAR_SCALE_TYPES = [];
 const NPS_SCALE_TYPES = ['NPS'];
 const LIKERT_TYPE_NAME = 'Likert';
 const LIKERT_VISUAL_TYPE_NAME = 'Likert Visual';
+const LIKERT_ICON_MAP = {
+    5: "/files/aiq - totalmente de acuerdo.png",
+    4: "/files/aiq - de acuerdo.png",
+    3: "/files/aiq - ni de acuerdo ni desacuerdo.png",
+    2: "/files/aiq - desacuerdo.png",
+    1: "/files/aiq - totalmente desacuerdo.png",
+};
 const DEFAULT_LIKERT_OPTIONS = [
     { text: 'Totalmente de acuerdo', value: 5 },
     { text: 'De acuerdo', value: 4 },
@@ -10,6 +17,8 @@ const DEFAULT_LIKERT_OPTIONS = [
     { text: 'En desacuerdo', value: 2 },
     { text: 'Totalmente en desacuerdo', value: 1 },
 ];
+
+const getLikertIconUrl = (val) => LIKERT_ICON_MAP[Number(val)] || '';
 
 export class QuestionBuilder {
     constructor(onQuestionsUpdate) {
@@ -258,7 +267,7 @@ export class QuestionBuilder {
         let additionalInfoHtml = '';
 
         if (Array.isArray(question.options) && question.options.length > 0) {
-            if (questionDisplayName === LIKERT_VISUAL_TYPE_NAME) {
+            if (questionDisplayName === LIKERT_VISUAL_TYPE_NAME || questionDisplayName === LIKERT_TYPE_NAME) {
                 additionalInfoHtml = `<div class="question-item-options-list">
                     ${question.options.map(opt => {
                         const text = (typeof opt === 'object') ? (opt.text || '') : String(opt || '');
@@ -389,11 +398,45 @@ export class QuestionBuilder {
             card.setAttribute('data-id', q.name);
 
             let optionsPreviewHtml = '';
+            // Preview para Selección Múltiple (texto plano)
             if (q.type_name === 'Selección Múltiple' && Array.isArray(q.options) && q.options.length > 0) {
                 optionsPreviewHtml = `
                     <div class="options-preview">
                         <strong>Opciones de respuesta</strong>
                         ${q.options.map(opt => `<div>- ${frappe.utils.escape_html(opt)}</div>`).join('')}
+                    </div>`;
+            }
+            // Preview para Likert (icono fijo + texto)
+            else if (q.type_name === LIKERT_TYPE_NAME) {
+                optionsPreviewHtml = `
+                    <div class="options-preview">
+                        <strong>Opciones de respuesta</strong>
+                        ${DEFAULT_LIKERT_OPTIONS.map(opt => {
+                            const url = getLikertIconUrl(opt.value);
+                            const safeUrl = frappe.utils.escape_html(url || '');
+                            const safeText = frappe.utils.escape_html(opt.text);
+                            return `<div>
+                                ${url ? `<img src="${safeUrl}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;vertical-align:middle;">` : ''}
+                                ${safeText}
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+            }
+            // Preview para Likert Visual (usar url por opción)
+            else if (q.type_name === LIKERT_VISUAL_TYPE_NAME && Array.isArray(q.options) && q.options.length > 0) {
+                optionsPreviewHtml = `
+                    <div class="options-preview">
+                        <strong>Opciones de respuesta</strong>
+                        ${q.options.map(opt => {
+                            const text = (opt && typeof opt === 'object') ? (opt.text || '') : String(opt || '');
+                            const url = (opt && typeof opt === 'object') ? (opt.url || '') : '';
+                            const safeUrl = frappe.utils.escape_html(url || '');
+                            const safeText = frappe.utils.escape_html(text);
+                            return `<div>
+                                ${url ? `<img src="${safeUrl}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;vertical-align:middle;">` : ''}
+                                ${safeText}
+                            </div>`;
+                        }).join('')}
                     </div>`;
             }
 
@@ -458,9 +501,10 @@ export class QuestionBuilder {
                 if (questionToAdd) {
                     let options = questionToAdd.options || [];
                     if (questionToAdd.type_name === LIKERT_TYPE_NAME) {
-                        options = DEFAULT_LIKERT_OPTIONS.map(opt => ({ text: opt.text, value: opt.value }));
+                        options = DEFAULT_LIKERT_OPTIONS.map(opt => ({
+                            text: opt.text, value: opt.value, url: getLikertIconUrl(opt.value)
+                        }));
                     }
-
                     this.questions.push({ 
                         id: questionToAdd.name,
                         text: questionToAdd.text,
@@ -625,7 +669,9 @@ export class QuestionBuilder {
         };
 
         if (questionTypeName === LIKERT_TYPE_NAME) {
-            newQuestion.options = DEFAULT_LIKERT_OPTIONS.map(opt => ({ text: opt.text, value: opt.value }));
+            newQuestion.options = DEFAULT_LIKERT_OPTIONS.map(opt => ({
+                text: opt.text, value: opt.value, url: getLikertIconUrl(opt.value)
+            }));
         } else if (OPTIONS_BASED_TYPES.includes(questionTypeName)) {
             newQuestion.options = Array.from(qf.optionsContainer.querySelectorAll('.option-input'))
                 .map(input => input.value.trim()).filter(Boolean);
@@ -782,7 +828,6 @@ export class QuestionBuilder {
         const { optionsContainer } = this.ui.questionForm;
         const { addOption } = this.ui.buttons;
         if (!optionsContainer) return;
-        
         optionsContainer.innerHTML = '';
         DEFAULT_LIKERT_OPTIONS.forEach((opt, index) => {
             const row = document.createElement('div');
@@ -790,7 +835,6 @@ export class QuestionBuilder {
             row.innerHTML = `<span class="option-number">${index + 1}</span><input type="text" class="form-control option-input" value="${frappe.utils.escape_html(opt.text)}" readonly data-value="${opt.value}">`;
             optionsContainer.appendChild(row);
         });
-        
         if (addOption) addOption.classList.add('d-none');
     }
 

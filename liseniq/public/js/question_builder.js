@@ -837,7 +837,15 @@ export class QuestionBuilder {
         DEFAULT_LIKERT_OPTIONS.forEach((opt, index) => {
             const row = document.createElement('div');
             row.className = 'option-input-row is-readonly';
-            row.innerHTML = `<span class="option-number">${index + 1}</span><input type="text" class="form-control option-input" value="${frappe.utils.escape_html(opt.text)}" readonly data-value="${opt.value}">`;
+            const iconUrl = frappe.utils.escape_html(getLikertIconUrl(opt.value));
+            const text = frappe.utils.escape_html(opt.text);
+            row.innerHTML = `
+                <span class="option-number">${index + 1}</span>
+                <div class="likert-option-display" style="display:flex;align-items:center;gap:8px;width:100%;">
+                    <img src="${iconUrl}" alt="" style="width:20px;height:20px;object-fit:contain;">
+                    <input type="text" class="form-control option-input" value="${text}" readonly data-value="${opt.value}">
+                </div>
+            `;
             optionsContainer.appendChild(row);
         });
         if (addOption) addOption.classList.add('d-none');

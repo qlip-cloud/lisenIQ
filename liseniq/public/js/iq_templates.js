@@ -137,6 +137,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (question.options && question.options.length > 0) {
                     optionsHtml = `<div class="review-question-options">
                         ${question.options.map(opt => {
+                            if (typeof opt === 'object' && (opt.url || opt.text)) {
+                                const url = opt.url ? `<img src="${frappe.utils.escape_html(opt.url)}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">` : '';
+                                const text = opt.text || '';
+                                return `<div class="review-question-option">${url}${frappe.utils.escape_html(text)}</div>`;
+                            }
                             const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
                             return `<div class="review-question-option">${frappe.utils.escape_html(optionText)}</div>`;
                         }).join('')}
@@ -186,7 +191,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (q.typeName === 'Likert') {
                         questionDoc.qn_response_options = q.options.map(opt => ({
                             qo_option_text: opt.text,
-                            qo_option_value: opt.value
+                            qo_option_value: opt.value,
+                            qo_url: opt.url
+                        }));
+                    } else if (q.typeName === 'Likert Visual') {
+                        questionDoc.qn_response_options = q.options.map(opt => ({
+                            qo_option_text: opt.text,
+                            qo_option_value: opt.value,
+                            qo_url: opt.url
                         }));
                     } else {
                         questionDoc.qn_response_options = q.options.map(opt => ({

@@ -244,4 +244,55 @@ WEB_FORM_CUSTOM_CSS = """
 .web-form-container, .page-container {
     padding-top: 15px !important;
 }
+
+/* --- Estilos para Likert Visual (SurveyJS imagepicker) --- */
+.sd-imagepicker, .sv-imagepicker {
+    --iq-img-size: 32px;
+}
+/* Imagen en versiones nuevas (sd-*) */
+.sd-imagepicker .sd-imagepicker__item img,
+.sd-imagepicker .sd-imagepicker__image,
+.sd-imagepicker .sd-imagepicker__image img {
+    width: var(--iq-img-size) !important;
+    height: var(--iq-img-size) !important;
+    max-width: var(--iq-img-size) !important;
+    max-height: var(--iq-img-size) !important;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+/* Imagen en versiones legacy (sv-*) */
+.sv-imagepicker .sv_q_imgsel img,
+.sv-imagepicker .sv_q_imgsel .sv_q_imgsel_image {
+    width: var(--iq-img-size) !important;
+    height: var(--iq-img-size) !important;
+    max-width: var(--iq-img-size) !important;
+    max-height: var(--iq-img-size) !important;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+
+/* Centrado de ícono y texto */
+.sd-imagepicker .sd-imagepicker__item,
+.sv-imagepicker .sv_q_imgsel_item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    text-align: center;
+}
+
+.sd-imagepicker .sd-imagepicker__item .sd-imagepicker__item-text,
+.sv-imagepicker .sv_q_imgsel_item span {
+    font-size: 0.9rem;
+    text-align: center;
+    margin-top: 4px;
+}
+
+/* Centrar la etiqueta (legacy) */
+.sv-imagepicker .sv_q_imgsel_label {
+    text-align: center !important;
+}
 """

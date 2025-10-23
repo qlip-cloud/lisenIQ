@@ -486,7 +486,8 @@ def save_measurement(data):
                                 for opt in q["options"]:
                                     new_question.append("qn_response_options", {
                                         "qo_option_text": opt["text"] if isinstance(opt, dict) else opt,
-                                        "qo_option_value": opt["value"] if isinstance(opt, dict) and "value" in opt else opt
+                                        "qo_option_value": opt["value"] if isinstance(opt, dict) and "value" in opt else opt,
+                                        "qo_url": (opt.get("url") if isinstance(opt, dict) and "url" in opt else None)
                                     })
                             else:
                                 for opt_text in q["options"]:
@@ -503,6 +504,14 @@ def save_measurement(data):
         surveyjs_doc_name = None
         if data.get("questions"):
             elements = []
+
+            LIKERT_ICON_MAP = {
+                5: "/files/aiq - totalmente de acuerdo.png",
+                4: "/files/aiq - de acuerdo.png",
+                3: "/files/aiq - ni de acuerdo ni desacuerdo.png",
+                2: "/files/aiq - desacuerdo.png",
+                1: "/files/aiq - totalmente desacuerdo.png",
+            }
             for q in data["questions"]:
                 question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
                 
@@ -516,7 +525,9 @@ def save_measurement(data):
                 elif question_type_title == "NPS":
                     surveyjs_type = "rating"
                 elif question_type_title == "Likert":
-                    surveyjs_type = "radiogroup"
+                    surveyjs_type = "imagepicker"
+                elif question_type_title == "Likert Visual":
+                    surveyjs_type = "imagepicker"
 
                 element = {
                     "type": surveyjs_type,
@@ -525,20 +536,59 @@ def save_measurement(data):
                     "isRequired": "true"
                 }
 
+                # Se mantienen separadas opciones, por si requieren personalizaciones distintas
                 if question_type_title == "Likert":
-                    # Siempre buscar las opciones en DB para asegurar el value correcto
+                    choices = []
+                    try:
+                        if question_name:
+                            q_doc = frappe.get_doc("qp_IQ_Question", question_name)
+                            if q_doc and q_doc.qn_response_options:
+                                for opt in q_doc.qn_response_options:
+                                    try:
+                                        val_int = int(opt.qo_option_value)
+                                    except Exception:
+                                        val_int = None
+                                    # Asignar URL personalizada si existe, sino usar el mapa por defecto doble check
+                                    image_url = getattr(opt, "qo_url", None) or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
+                                    choices.append({
+                                        "text": opt.qo_option_text,
+                                        "value": opt.qo_option_value,
+                                        "imageLink": image_url
+                                    })
+                    except Exception:
+                        choices = []
+                    element["choices"] = choices
+                    element["showLabel"] = True
+                    element["multiSelect"] = False
+                    element["imageFit"] = "contain"
+                    element["imageHeight"] = 32
+                    element["imageWidth"] = 32
+                    element["choicesOrder"] = "none"
+
+                elif question_type_title == "Likert Visual":
                     choices = []
                     try:
                         if question_name:
                             q_doc = frappe.get_doc("qp_IQ_Question", question_name)
                             if q_doc and q_doc.qn_response_options:
                                 choices = [
-                                    {"text": opt.qo_option_text, "value": opt.qo_option_value}
+                                    {
+                                        "text": opt.qo_option_text,
+                                        "value": opt.qo_option_value,
+                                        "imageLink": opt.qo_url
+                                    }
                                     for opt in q_doc.qn_response_options
+                                    if getattr(opt, "qo_url", None)
                                 ]
                     except Exception:
                         choices = []
                     element["choices"] = choices
+                    element["showLabel"] = True
+                    element["multiSelect"] = False
+                    element["imageFit"] = "contain"
+                    element["imageHeight"] = 32
+                    element["imageWidth"] = 32
+                    element["choicesOrder"] = "none"
 
                 elif question_type_title == "Selección Múltiple" and q.get("options"):
                     element["choices"] = q["options"]

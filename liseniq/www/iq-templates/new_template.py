@@ -30,7 +30,7 @@ def get_context(context):
         context.question_categories = []
 
     try:
-        allowed_question_types = ["Likert", "Abierta", "NPS", "Selección Múltiple"]
+        allowed_question_types = ["Likert", "Abierta", "NPS", "Selección Múltiple", "Likert Visual"]
         question_types = frappe.get_all(
             "qp_IQ_QuestionType",
             filters={"qnt_type_name": ["in", allowed_question_types]},

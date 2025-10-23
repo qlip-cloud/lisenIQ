@@ -641,3 +641,19 @@
         width: 100%;
     }
 }
+
+.visual-option-input-row {
+    display: grid;
+    grid-template-columns: 24px 140px 1fr 280px 24px;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.visual-option-input-row .option-number { text-align: center; }
+.visual-file-cell { display: flex; flex-direction: column; gap: 0.35rem; }
+.visual-file-cell input[type="file"] { font-size: 0.8rem; }
+.visual-file-preview img {
+    width: 28px; height: 28px; object-fit: cover; border-radius: 4px; margin-right: 6px;
+}
+.visual-file-preview { display: flex; align-items: center; gap: 0.5rem; }
+.visual-option-input-row.is-uploading { opacity: 0.6; pointer-events: none; }

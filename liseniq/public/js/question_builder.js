@@ -406,17 +406,20 @@ export class QuestionBuilder {
                         ${q.options.map(opt => `<div>- ${frappe.utils.escape_html(opt)}</div>`).join('')}
                     </div>`;
             }
-            // Preview para Likert (icono fijo + texto)
+            // Preview para Likert (preferir opciones con url del backend; fallback a íconos por defecto)
             else if (q.type_name === LIKERT_TYPE_NAME) {
+                const hasBackendOptions = Array.isArray(q.options) && q.options.length > 0;
+                const list = hasBackendOptions
+                    ? q.options
+                    : DEFAULT_LIKERT_OPTIONS.map(({ text, value }) => ({ text, value, url: getLikertIconUrl(value) }));
                 optionsPreviewHtml = `
                     <div class="options-preview">
                         <strong>Opciones de respuesta</strong>
-                        ${DEFAULT_LIKERT_OPTIONS.map(opt => {
-                            const url = getLikertIconUrl(opt.value);
-                            const safeUrl = frappe.utils.escape_html(url || '');
-                            const safeText = frappe.utils.escape_html(opt.text);
+                        ${list.map(opt => {
+                            const safeUrl = frappe.utils.escape_html((opt && opt.url) ? opt.url : '');
+                            const safeText = frappe.utils.escape_html((opt && opt.text) ? opt.text : '');
                             return `<div>
-                                ${url ? `<img src="${safeUrl}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;vertical-align:middle;">` : ''}
+                                ${opt && opt.url ? `<img src="${safeUrl}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;vertical-align:middle;">` : ''}
                                 ${safeText}
                             </div>`;
                         }).join('')}
@@ -501,9 +504,11 @@ export class QuestionBuilder {
                 if (questionToAdd) {
                     let options = questionToAdd.options || [];
                     if (questionToAdd.type_name === LIKERT_TYPE_NAME) {
-                        options = DEFAULT_LIKERT_OPTIONS.map(opt => ({
-                            text: opt.text, value: opt.value, url: getLikertIconUrl(opt.value)
-                        }));
+                        if (!Array.isArray(options) || options.length === 0) {
+                            options = DEFAULT_LIKERT_OPTIONS.map(opt => ({
+                                text: opt.text, value: opt.value, url: getLikertIconUrl(opt.value)
+                            }));
+                        }
                     }
                     this.questions.push({ 
                         id: questionToAdd.name,

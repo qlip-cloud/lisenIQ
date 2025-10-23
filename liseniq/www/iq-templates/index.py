@@ -114,7 +114,11 @@ def get_questions_from_template(template_name):
         if q_doc.qn_response_options:
             if type_name == "Likert":
                 options = [
-                    {"text": opt.qo_option_text, "value": opt.qo_option_value}
+                    {
+                        "text": opt.qo_option_text,
+                        "value": opt.qo_option_value,
+                        "url": getattr(opt, "qo_url", None)  # incluir URL si existe
+                    }
                     for opt in q_doc.qn_response_options
                 ]
             elif type_name == "Likert Visual":
@@ -272,7 +276,7 @@ def get_bank_data(keyword=None, demographic=None):
             q["demographic_name"] = None
 
         if q.get("type_name") in OPTIONS_BASED_TYPES:
-            if q.get("type_name") == "Likert Visual":
+            if q.get("type_name") in ("Likert Visual", "Likert"):
                 options = frappe.get_all(
                     "qp_IQ_QuestionOption",
                     filters={'parent': q.name, 'parenttype': 'qp_IQ_Question'},

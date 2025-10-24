@@ -233,14 +233,18 @@ const submit_response = function (data) {
 """
 
 WEB_FORM_CUSTOM_CSS = """
+
+/* Ocultar elementos innecesarios */
 .navbar {
     display: none !important;
 }
 
+/* Ocultar título de la página */
 .page-head {
     display: none !important;
 }
 
+/* Ajustar padding superior */
 .web-form-container, .page-container {
     padding-top: 15px !important;
 }
@@ -284,6 +288,7 @@ WEB_FORM_CUSTOM_CSS = """
     text-align: center;
 }
 
+/* Ajuste de tamaño y margen del texto */
 .sd-imagepicker .sd-imagepicker__item .sd-imagepicker__item-text,
 .sv-imagepicker .sv_q_imgsel_item span {
     font-size: 0.9rem;
@@ -291,8 +296,42 @@ WEB_FORM_CUSTOM_CSS = """
     margin-top: 4px;
 }
 
-/* Centrar la etiqueta (legacy) */
+/* Centrar la etiqueta */
 .sv-imagepicker .sv_q_imgsel_label {
     text-align: center !important;
+}
+
+/* Eliminar bordes y sombras */
+.sv_qstn .sv_q_imgsel label>div {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.sd-imagepicker .sd-imagepicker__item {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Centrar opciones inline */
+.sv_main .sv_p_root .sv_q .sv_q_checkbox_inline,
+.sv_main .sv_p_root .sv_q .sv_q_radiogroup_inline,
+.sv_main .sv_p_root .sv_q .sv_q_imagepicker_inline {
+    text-align: center !important;
+}
+
+/* Estilos para selección */
+.sv_qstn .sv_q_imgsel label > input:checked + div {
+    background-color: #d1f0ea !important;
+}
+
+/* Estilos para selección nueva (sd-*) */
+.sd-imagepicker .sd-imagepicker__item--selected,
+.sd-imagepicker .sd-imagepicker__item--checked {
+    background-color: #d1f0ea !important;
+}
+ /* Estilos para selección inline */
+.sv_main .sv_p_root .sv_q .sv_q_checkbox_inline label > input:checked + span,
+.sv_main .sv_p_root .sv_q .sv_q_radiogroup_inline label > input:checked + span {
+    background-color: #d1f0ea !important;
 }
 """

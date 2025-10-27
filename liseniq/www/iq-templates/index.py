@@ -113,9 +113,17 @@ def get_questions_from_template(template_name):
 
         if q_doc.qn_response_options:
             if type_name == "Likert":
-                # En Likert devolver pares { text, value } desde DB
                 options = [
-                    {"text": opt.qo_option_text, "value": opt.qo_option_value}
+                    {
+                        "text": opt.qo_option_text,
+                        "value": opt.qo_option_value,
+                        "url": getattr(opt, "qo_url", None)  # incluir URL si existe
+                    }
+                    for opt in q_doc.qn_response_options
+                ]
+            elif type_name == "Likert Visual":
+                options = [
+                    {"text": opt.qo_option_text, "value": opt.qo_option_value, "url": opt.qo_url}
                     for opt in q_doc.qn_response_options
                 ]
             else:
@@ -190,20 +198,25 @@ def create_question_from_template_wizard(question_data):
         
         if data.get("qn_response_options"):
             for option in data.get("qn_response_options"):
-                # Asegura guardar tanto texto como valor
                 if isinstance(option, dict):
                     text = option.get("qo_option_text") or option.get("text") or ""
                     value = option.get("qo_option_value")
                     if value is None:
                         value = option.get("value", text)
+                    url = option.get("qo_url") or option.get("url")
                 else:
                     text = str(option)
                     value = text
+                    url = None
 
-                question_doc.append("qn_response_options", {
+                row = {
                     "qo_option_text": text,
                     "qo_option_value": value
-                })
+                }
+                if url:
+                    row["qo_url"] = url
+
+                question_doc.append("qn_response_options", row)
         
         question_doc.insert(ignore_permissions=True)
         return question_doc.name
@@ -219,7 +232,8 @@ def get_bank_data(keyword=None, demographic=None):
         'Selección Única', 
         'Likert', 
         'Escala de frecuencia', 
-        'Ranking (Calificación o Prioridad)'
+        'Ranking (Calificación o Prioridad)',
+        'Likert Visual'
     ]
 
     user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
@@ -262,14 +276,27 @@ def get_bank_data(keyword=None, demographic=None):
             q["demographic_name"] = None
 
         if q.get("type_name") in OPTIONS_BASED_TYPES:
-            options = frappe.get_all(
-                "qp_IQ_QuestionOption",
-                filters={'parent': q.name, 'parenttype': 'qp_IQ_Question'},
-                fields=['qo_option_text'],
-                order_by='idx',
-                ignore_permissions=True
-            )
-            q['options'] = [opt['qo_option_text'] for opt in options]
+            if q.get("type_name") in ("Likert Visual", "Likert"):
+                options = frappe.get_all(
+                    "qp_IQ_QuestionOption",
+                    filters={'parent': q.name, 'parenttype': 'qp_IQ_Question'},
+                    fields=['qo_option_text', 'qo_option_value', 'qo_url'],
+                    order_by='idx',
+                    ignore_permissions=True
+                )
+                q['options'] = [
+                    {"text": opt.qo_option_text, "value": opt.qo_option_value, "url": opt.qo_url}
+                    for opt in options
+                ]
+            else:
+                options = frappe.get_all(
+                    "qp_IQ_QuestionOption",
+                    filters={'parent': q.name, 'parenttype': 'qp_IQ_Question'},
+                    fields=['qo_option_text'],
+                    order_by='idx',
+                    ignore_permissions=True
+                )
+                q['options'] = [opt['qo_option_text'] for opt in options]
 
     demographics = frappe.get_all(
         "qp_IQ_DemographicType",

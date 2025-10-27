@@ -7,7 +7,7 @@ import jwt
 from time import time
 
 def launch_pending_surveys():
-	# frappe.log_error("Iniciando tarea launch_pending_surveys", "Survey Task Start")
+	frappe.log_error("Iniciando tarea launch_pending_surveys, Hora: {}".format(now()), "Survey Task Start")
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:
@@ -30,7 +30,7 @@ def launch_pending_surveys():
 			fields=["name", "su_name"]
 		)
 
-		# frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
+		frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
 
 		if not pending_surveys:
 			return
@@ -436,7 +436,7 @@ def send_survey_reminders():
 		frappe.log_error(frappe.get_traceback(), "Error en send_survey_reminders")
 
 def update_finished_surveys():
-	# frappe.log_error("Iniciando tarea update_finished_surveys", "Survey Finish Task Start")
+	frappe.log_error("Iniciando tarea update_finished_surveys, Hora: {}".format(now()), "Survey Finish Task Start")
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:

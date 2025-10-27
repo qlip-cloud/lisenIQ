@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+# lisenIQ
+# lisenIQ
+=======
 ## Liseniq
 
 LisenIQ
@@ -5,3 +9,4 @@ LisenIQ
 #### License
 
 MIT
+>>>>>>> develop-ahernandez

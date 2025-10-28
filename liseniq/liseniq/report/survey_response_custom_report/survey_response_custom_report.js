@@ -10,6 +10,15 @@ frappe.query_reports["Survey Response Custom Report"] = {
 			"fieldtype": "Link",
 			"options": "Survey",
 			"reqd": 1
+		},
+		{
+			"fieldname": "company",
+			"label": __("Company"),
+			"fieldtype": "Link",
+			"options": "Company",
+			"hidden": 1,
+			"default": frappe.defaults.get_user_default("Company"),
+			"reqd": 0
 		}
 	]
 };

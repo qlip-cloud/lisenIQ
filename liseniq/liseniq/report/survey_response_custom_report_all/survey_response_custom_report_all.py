@@ -12,7 +12,7 @@ def execute(filters=None):
     filters = filters or {}
     
     # Obtener todas las encuestas válidas
-    valid_surveys = get_valid_surveys()
+    valid_surveys = get_valid_surveys(filters)
     
     if not valid_surveys:
         frappe.throw(_("No se encontraron encuestas válidas en qp_IQ_Survey"))
@@ -30,9 +30,13 @@ def execute(filters=None):
     return columns, data
 
 
-def get_valid_surveys():
+def get_valid_surveys(filters):
     try:
-        query = """
+        if filters.get("survey"):
+            survey_filter = f"WHERE iq.name = '{filters.get('survey')}'"
+        if filters.get("company"):
+            company_filter = f"AND iq.su_owner = '{filters.get('company')}'"
+        query = f"""
             SELECT 
                 s.name as survey_name,
                 s.survey_json,
@@ -42,6 +46,8 @@ def get_valid_surveys():
             FROM `tabSurvey` s
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
+            {survey_filter}
+            {company_filter}
             ORDER BY s.name
         """
         results = frappe.db.sql(query, as_dict=True)

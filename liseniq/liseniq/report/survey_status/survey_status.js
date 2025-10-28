@@ -17,6 +17,9 @@ frappe.query_reports["Survey Status"] = {
 			"fieldtype": "Link",
 			"options": "qp_IQ_Survey",
 			"reqd": 0,
+			"get_data": function(txt) {
+        return frappe.db.get_link_options("qp_IQ_Survey", txt, "survey_name");
+    	}
 		},
 		{
 			"fieldname": "demographic1",

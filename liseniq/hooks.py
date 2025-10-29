@@ -223,4 +223,10 @@ fixtures = [
 			["dt", "in", ["User", "Contact"]]
 		]
 	},
+	{
+		"doctype": "qp_IQ_Parameters",
+		"filters": [
+			["pa_abbreviation", "in", ["notification_sender_aiq"]]
+		]
+	},
 ]

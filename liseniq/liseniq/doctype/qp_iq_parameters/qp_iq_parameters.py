@@ -4,5 +4,5 @@
 # import frappe
 from frappe.model.document import Document
 
-class qp_IQ_SengridConfig(Document):
+class qp_IQ_Parameters(Document):
 	pass

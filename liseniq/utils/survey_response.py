@@ -3,6 +3,10 @@ import frappe
 import jwt
 import json
 from frappe.utils import get_datetime, now
+from datetime import datetime, timezone  # NUEVO
+
+def _now_utc_str():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 def process_survey_response(doc, method):
     # frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
@@ -30,6 +34,15 @@ def process_survey_response(doc, method):
             frappe.throw("El enlace ha expirado.")
         except jwt.InvalidTokenError:
             frappe.throw("Enlace inválido o expirado.")
+
+        status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+        su_status, su_end_date = frappe.db.get_value(
+            "qp_IQ_Survey", {"su_name": doc.survey}, ["su_status", "su_end_date"]
+        ) or (None, None)
+        if status_finished and su_status == status_finished:
+            frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
+        if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):  # CAMBIO: UTC
+            frappe.throw("El enlace ha expirado.")
 
         is_public = payload.get("public", False)
         
@@ -63,9 +76,8 @@ def process_survey_response(doc, method):
         if token_sur and token_sur != doc.survey:
             frappe.throw("Enlace inválido o expirado.")
 
-        # Verificar expiración de la encuesta
         survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_end_date")
-        if survey_end_date and get_datetime(survey_end_date) < get_datetime(now()):
+        if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):  # CAMBIO: UTC
             frappe.throw("El enlace ha expirado.")
 
         if not rid:

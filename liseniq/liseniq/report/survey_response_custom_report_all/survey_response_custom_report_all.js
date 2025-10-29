@@ -4,6 +4,5 @@
 
 frappe.query_reports["Survey Response Custom Report All"] = {
 	"filters": [
-
 	]
 };

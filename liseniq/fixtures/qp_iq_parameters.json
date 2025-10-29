@@ -1,0 +1,11 @@
+[
+  {
+    "doctype": "qp_IQ_Parameters",
+    "pa_abbreviation": "notification_sender_aiq",
+    "pa_title": "Remitente de Notificación Listen AIQ",
+    "pa_description": "Identifica la dirección de correo electrónico utilizada como remitente en las notificaciones automáticas generadas por el sistema Listen AIQ",
+    "pa_data_type": "Character",
+    "pa_data_character": "Mediciones Listen AIQ",
+    "pa_data_integer": 0
+  }
+]

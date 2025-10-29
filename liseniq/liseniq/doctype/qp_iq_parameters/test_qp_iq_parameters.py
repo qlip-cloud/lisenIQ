@@ -4,5 +4,5 @@
 # import frappe
 import unittest
 
-class Testqp_IQ_SengridConfig(unittest.TestCase):
+class Testqp_IQ_Parameters(unittest.TestCase):
 	pass

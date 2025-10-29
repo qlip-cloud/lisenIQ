@@ -13,7 +13,8 @@ def get_context(context):
     context.no_cache = 1
 
     try:
-        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        # contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
         if not contact_info:
             frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
         context.user_company = contact_info

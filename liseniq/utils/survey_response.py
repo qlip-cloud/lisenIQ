@@ -41,7 +41,7 @@ def process_survey_response(doc, method):
         ) or (None, None)
         if status_finished and su_status == status_finished:
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
-        if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):  # CAMBIO: UTC
+        if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):
             frappe.throw("El enlace ha expirado.")
 
         is_public = payload.get("public", False)
@@ -77,7 +77,7 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_end_date")
-        if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):  # CAMBIO: UTC
+        if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):
             frappe.throw("El enlace ha expirado.")
 
         if not rid:

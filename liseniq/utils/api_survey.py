@@ -68,7 +68,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
     ) or (None, None)
     if status_finished and su_status == status_finished:
       return {"allow": False, "message": "La medición ha finalizado."}
-    if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):  # CAMBIO: UTC
+    if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):
       return {"allow": False, "message": "El enlace ha expirado."}
 
     if not token or token == "Anonimo":
@@ -107,7 +107,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
 
       # Verificar expiración de la encuesta
       survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_end_date")
-      if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):  # CAMBIO: UTC
+      if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):
           return {"allow": False, "message": "El enlace ha expirado."}
 
       # Obtener ID interno y cantidad de destinatarios
@@ -266,7 +266,7 @@ def get_survey_route_for_public_link(token):
     ) or (None, None)
     if status_finished and su_status == status_finished:
         frappe.throw("El enlace ha expirado.")
-    if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):  # CAMBIO: UTC
+    if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):
         frappe.throw("El enlace ha expirado.")
 
     web_form_route = frappe.db.get_value("Web Form", {"title": survey_name}, "route")

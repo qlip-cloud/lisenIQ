@@ -6,10 +6,14 @@ from frappe.utils.data import get_datetime, add_to_date
 import jwt
 from time import time
 from email.utils import formataddr
+from datetime import datetime, timezone
 
 DEFAULT_SENDER_NAME = "Mediciones Listen AIQ"
 
-def get_notification_sender_name() -> str:
+def _now_utc_str() -> str:
+	return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+def _get_notification_sender_name() -> str:
 	try:
 		cache_key = "liseniq_notification_sender_aiq"
 		cached = None
@@ -36,35 +40,33 @@ def get_notification_sender_name() -> str:
 					pass
 				return value
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "get_notification_sender_name")
+		frappe.log_error(frappe.get_traceback(), "_get_notification_sender_name")
 
 	return DEFAULT_SENDER_NAME
 
 def launch_pending_surveys():
-	frappe.log_error("Iniciando tarea launch_pending_surveys, Hora: {}".format(now()), "Survey Task Start")
+	# frappe.log_error("Iniciando tarea launch_pending_surveys, Hora: {}".format(now()), "Survey Task Start")
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:
-			# frappe.log_error("No se encontró el estado 'En Progreso' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
+			frappe.log_error("No se encontró el estado 'En Progreso' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
 			return
 
 		status_scheduled = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Programada"}, "name")
 		if not status_scheduled:
-			# frappe.log_error("No se encontró el estado 'Programada' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
+			frappe.log_error("No se encontró el estado 'Programada' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
 			return
-
-		# frappe.log_error(f"Estados: En Progreso='{status_in_progress}', Programada='{status_scheduled}'", "Survey Task Status")
 
 		pending_surveys = frappe.get_all(
 			"qp_IQ_Survey",
 			filters={
-				"su_start_date": ["<", now()],
+				"su_start_date": ["<=", _now_utc_str()],
 				"su_status": status_scheduled
 			},
 			fields=["name", "su_name"]
 		)
 
-		frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
+		# frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
 
 		if not pending_surveys:
 			return
@@ -93,7 +95,7 @@ def launch_pending_surveys():
 				)
 
 				if not recipients_docs:
-					# frappe.log_error(f"Encuesta {survey.name} no tiene destinatarios pendientes. Saltando.", "Survey Task Skip")
+					frappe.log_error(f"Encuesta {survey.name} no tiene destinatarios pendientes. Saltando.", "Survey Task Skip")
 					continue
 				
 				contact_details_map = {
@@ -118,7 +120,7 @@ def launch_pending_surveys():
 
 						secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 						if not secret:
-							# frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
+							frappe.log_error("No se encontró 'liseniq_jwt_secret' ni 'encryption_key' para firmar JWT.", "launch_pending_surveys")
 							continue
 						
 						survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
@@ -252,7 +254,7 @@ def launch_pending_surveys():
 							# frappe.log_error("No se ha configurado un remitente de correo por defecto (default_outgoing=1).", "launch_pending_surveys")
 							continue
 
-						sender_name = get_notification_sender_name()
+						sender_name = _get_notification_sender_name()
 						sender_formatted = formataddr((sender_name, sender_email))
 						frappe.sendmail(
 							recipients=recipients,
@@ -419,7 +421,7 @@ def send_survey_reminders():
 						# frappe.log_error("No se ha configurado un remitente de correo por defecto.", "send_survey_reminders")
 						continue
 
-					sender_name = get_notification_sender_name()
+					sender_name = _get_notification_sender_name()
 					sender_formatted = formataddr((sender_name, sender_email))
 					frappe.sendmail(
 						recipients=recipients_list,
@@ -473,16 +475,17 @@ def update_finished_surveys():
 			fields=["name", "su_end_date"]
 		)
 
-		today = get_datetime(now()).date()
+		# CAMBIO: comparar con fecha/hora exacta en UTC, no solo por fecha
+		current_dt = get_datetime(_now_utc_str())
 
 		for survey in surveys_to_check:
 			try:
 				if survey.su_end_date:
-					end_date = get_datetime(survey.su_end_date).date()
-					if today > end_date:
+					end_dt = get_datetime(survey.su_end_date)
+					if current_dt >= end_dt:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
 						frappe.db.commit()
-						# frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys")
+						frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys")
 						continue
 
 				total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
@@ -491,12 +494,11 @@ def update_finished_surveys():
 					if total_recipients == responded_recipients:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
 						frappe.db.commit()
-						# frappe.log_error(f"Encuesta {survey.name} finalizada por completitud (100%).", "update_finished_surveys")
+						frappe.log_error(f"Encuesta {survey.name} finalizada por completitud (100%).", "update_finished_surveys")
 
 			except Exception:
 				frappe.db.rollback()
 				frappe.log_error(f"Error procesando finalización de encuesta {survey.name}: {frappe.get_traceback()}", "update_finished_surveys")
-
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Error en update_finished_surveys")
 
@@ -729,7 +731,7 @@ def send_pending_links_for_survey(survey_name: str):
 					omitidos += 1
 					continue
 
-				sender_name = get_notification_sender_name()
+				sender_name = _get_notification_sender_name()
 				sender_formatted = formataddr((sender_name, sender_email))
 				try:
 					frappe.sendmail(

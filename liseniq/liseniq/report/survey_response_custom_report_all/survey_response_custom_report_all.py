@@ -32,13 +32,10 @@ def execute(filters=None):
 
 def get_valid_surveys(filters):
     try:
-        conditions = []
         if filters.get("survey"):
-            conditions.append(f"iq.name = '{filters.get('survey')}'")
+            survey_filter = f"WHERE iq.name = '{filters.get('survey')}'"
         if filters.get("company"):
-            conditions.append(f"iq.su_owner = '{filters.get('company')}'")
-        
-        survey_filter = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            company_filter = f"AND iq.su_owner = '{filters.get('company')}'"
         query = f"""
             SELECT 
                 s.name as survey_name,
@@ -50,6 +47,7 @@ def get_valid_surveys(filters):
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
             {survey_filter}
+            {company_filter}
             ORDER BY s.name
         """
         results = frappe.db.sql(query, as_dict=True)

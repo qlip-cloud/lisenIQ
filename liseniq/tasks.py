@@ -23,7 +23,7 @@ def _get_survey_tz_name(survey_doc) -> str:
 		elif isinstance(survey_doc, dict):
 			tz_name = survey_doc.get("su_timezone")
 		tz_name = (tz_name or "UTC").strip()
-		_ = pytz.timezone(tz_name)  # valida
+		_ = pytz.timezone(tz_name)
 		return tz_name
 	except Exception:
 		return "UTC"
@@ -195,6 +195,10 @@ def launch_pending_surveys():
 							else:
 								raise
 
+						end_date_html = ""
+						if getattr(survey_doc, "su_end_date", None):
+							end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey_doc.su_end_date}</strong></p>'
+
 						message = f"""
 <!DOCTYPE html>
 <html lang="es">
@@ -227,6 +231,10 @@ def launch_pending_surveys():
       font-size: 22px;
       margin: 0;
     }}
+    p {{
+      margin-bottom: 20px;
+      text-align: justify;
+    }}
     .btn {{
       display: inline-block;
       background-color: #004aad;
@@ -256,28 +264,37 @@ def launch_pending_surveys():
     <div class="header">
       <h1> {survey.su_name} </h1>
     </div>
-    <p>Hola,</p>
-    <p>Te damos la bienvenida al <strong>proceso de Medición - {survey.su_name}</strong>, una iniciativa clave que nos permitirá obtener información valiosa acerca de nuestra compañía y avanzar en nuestro propósito de mejora continua.</p>
+    <p>Cordial saludo, </p>
+	<p>Te damos la bienvenida al proceso de <strong>Medición - {survey.su_name}</strong>, la cual, es de gran valor para nosotros, pues nos arroja información acerca de la percepción que tienes de la cultura actual y nos da claridad de las acciones que debemos implementar para continuar desarrollando una cultura sana y las mejores condiciones para asegurar que vivas la mejor experiencia en tu día a día.</p>
 
     <div class="info">
       <p><strong>Información importante sobre la encuesta:</strong></p>
       <ul>
-        <li>Completarla tomará menos de <strong>20 minutos</strong>.</li>
-        <li>Tus respuestas serán manejadas de forma <strong>confidencial</strong> y con fines estadísticos.</li>
-        <li>Usa <strong>Google Chrome</strong> y asegúrate de estar conectado a internet.</li>
-        <li>Este enlace es <strong>personal e intransferible</strong>.</li>
+        <li>La valoración te tomará menos de 20 minutos para realizarla</li>
+        <li>La información que compartas será manejada de manera confidencial y utilizada con fines estadísticos.</li>
+        <li>Te pedimos por favor contestar con total sinceridad.</li>
+        <li>Es necesario que uses <strong>Google Chrome</strong> para desarrollar la valoración, recuerda que debes estar conectado a internet.</li>
+		<li>Te recomendamos <strong>revisar permanentemente tu bandeja de correos</strong> no deseados, en caso de que no encuentres en tu carpeta de entrada los mails correspondientes a la medición.</li>
+		<li>Este enlace es <strong>personal e intransferible</strong>.</li>
       </ul>
     </div>
 
-    <p style="text-align:center;">
+	<p><strong>Recuerda que recibirás dos mails, este de cultura y otro de compromiso (engagement) que debe estar en tu bandeja de correo o de no deseados.</strong></p>
+
+	<p>Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a></p>
+
+	{end_date_html}
+
+    <p>De antemano, agradecemos por tu tiempo y tus valiosos aportes en este importante proceso que nos permitirá continuar trabajando por hacer las cosas bien.</p>
+
+	<p>Atentamente,</p>
+
+	<p>Equipo de Experiencia de Personas</p>
+	
+	<p style="text-align:center;">
       <a href="{unique_url}" class="btn">Iniciar encuesta</a>
     </p>
 
-    <p>Agradecemos de antemano tu tiempo y tus valiosos aportes en este importante proceso.</p>
-
-    <div class="footer">
-      Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>
-    </div>
   </div>
 </body>
 </html>
@@ -424,6 +441,7 @@ def send_survey_reminders():
     .container {{ max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 30px; }}
     .header {{ text-align: center; border-bottom: 2px solid #e67e22; padding-bottom: 15px; margin-bottom: 20px; }}
     .header h1 {{ color: #e67e22; font-size: 22px; margin: 0; }}
+    p {{ text-align: justify; }}
     .btn {{ display: inline-block; background-color: #e67e22; color: #ffffff !important; text-decoration: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; margin-top: 20px; }}
     .info {{ margin: 20px 0; padding: 15px; background-color: #fff7f0; border-left: 4px solid #e67e22; }}
     .footer {{ font-size: 12px; color: #777777; margin-top: 25px; text-align: center; }}
@@ -690,7 +708,11 @@ def send_pending_links_for_survey(survey_name: str):
 						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {"sr_token": token})
 					else:
 						omitidos += 1
-												
+
+				end_date_html = ""
+				if getattr(survey, "su_end_date", None):
+					end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey.su_end_date}</strong></p>'
+
 				message = f"""
 <!DOCTYPE html>
 <html lang="es">
@@ -723,6 +745,10 @@ def send_pending_links_for_survey(survey_name: str):
       font-size: 22px;
       margin: 0;
     }}
+    p {{
+      margin-bottom: 20px;
+      text-align: justify;
+    }}
     .btn {{
       display: inline-block;
       background-color: #004aad;
@@ -752,28 +778,37 @@ def send_pending_links_for_survey(survey_name: str):
     <div class="header">
       <h1> {survey.su_name} </h1>
     </div>
-    <p>Hola,</p>
-    <p>Te damos la bienvenida al <strong>proceso de Medición - {survey.su_name}</strong>, una iniciativa clave que nos permitirá obtener información valiosa acerca de nuestra compañía y avanzar en nuestro propósito de mejora continua.</p>
+    <p>Cordial saludo, </p>
+	<p>Te damos la bienvenida al proceso de <strong>Medición - {survey.su_name}</strong>, la cual, es de gran valor para nosotros, pues nos arroja información acerca de la percepción que tienes de la cultura actual y nos da claridad de las acciones que debemos implementar para continuar desarrollando una cultura sana y las mejores condiciones para asegurar que vivas la mejor experiencia en tu día a día.</p>
 
     <div class="info">
       <p><strong>Información importante sobre la encuesta:</strong></p>
       <ul>
-        <li>Completarla tomará menos de <strong>20 minutos</strong>.</li>
-        <li>Tus respuestas serán manejadas de forma <strong>confidencial</strong> y con fines estadísticos.</li>
-        <li>Usa <strong>Google Chrome</strong> y asegúrate de estar conectado a internet.</li>
-        <li>Este enlace es <strong>personal e intransferible</strong>.</li>
+        <li>La valoración te tomará menos de 20 minutos para realizarla</li>
+        <li>La información que compartas será manejada de manera confidencial y utilizada con fines estadísticos.</li>
+        <li>Te pedimos por favor contestar con total sinceridad.</li>
+        <li>Es necesario que uses <strong>Google Chrome</strong> para desarrollar la valoración, recuerda que debes estar conectado a internet.</li>
+		<li>Te recomendamos <strong>revisar permanentemente tu bandeja de correos</strong> no deseados, en caso de que no encuentres en tu carpeta de entrada los mails correspondientes a la medición.</li>
+		<li>Este enlace es <strong>personal e intransferible</strong>.</li>
       </ul>
     </div>
 
-    <p style="text-align:center;">
+	<p><strong>Recuerda que recibirás dos mails, este de cultura y otro de compromiso (engagement) que debe estar en tu bandeja de correo o de no deseados.</strong></p>
+
+	<p>Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a></p>
+
+	{end_date_html}
+
+    <p>De antemano, agradecemos por tu tiempo y tus valiosos aportes en este importante proceso que nos permitirá continuar trabajando por hacer las cosas bien.</p>
+
+	<p>Atentamente,</p>
+
+	<p>Equipo de Experiencia de Personas</p>
+	
+	<p style="text-align:center;">
       <a href="{unique_url}" class="btn">Iniciar encuesta</a>
     </p>
 
-    <p>Agradecemos de antemano tu tiempo y tus valiosos aportes en este importante proceso.</p>
-
-    <div class="footer">
-      Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>
-    </div>
   </div>
 </body>
 </html>

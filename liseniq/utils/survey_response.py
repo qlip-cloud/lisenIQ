@@ -3,10 +3,20 @@ import frappe
 import jwt
 import json
 from frappe.utils import get_datetime, now
-from datetime import datetime, timezone  # NUEVO
+from datetime import datetime, timezone
+import pytz
 
 def _now_utc_str():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
+    try:
+        tz_name = (frappe.db.get_value("qp_IQ_Survey", {"su_name": su_name}, "su_timezone") or "UTC").strip()
+        tz = pytz.timezone(tz_name)
+    except Exception:
+        tz = pytz.utc
+    return datetime.now(tz)
 
 def process_survey_response(doc, method):
     # frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
@@ -36,13 +46,17 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+        rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
         su_status, su_end_date = frappe.db.get_value(
             "qp_IQ_Survey", {"su_name": doc.survey}, ["su_status", "su_end_date"]
         ) or (None, None)
         if status_finished and su_status == status_finished:
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
-        if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):
-            frappe.throw("El enlace ha expirado.")
+
+        if su_end_date:
+            now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
+            if get_datetime(su_end_date) <= now_local:
+                frappe.throw("El enlace ha expirado.")
 
         is_public = payload.get("public", False)
         
@@ -77,8 +91,10 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_end_date")
-        if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):
-            frappe.throw("El enlace ha expirado.")
+        if survey_end_date:
+            now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
+            if get_datetime(survey_end_date) < now_local:
+                frappe.throw("El enlace ha expirado.")
 
         if not rid:
             # frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
@@ -101,7 +117,6 @@ def process_survey_response(doc, method):
 
                 if contact_name:
                     survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
-                    
                     if survey_name_id:
                         existing_response_by_contact = frappe.db.exists(
                             "Survey Response",
@@ -128,7 +143,7 @@ def process_survey_response(doc, method):
                                     "sr_survey": survey_name_id,
                                     "sr_contact": contact_name,
                                 },
-                                {"sr_status": "Responded", "sr_survey_response": doc.name}
+                                {"sr_status": rs_responded, "sr_survey_response": doc.name}
                             )
                         else:
                             pass
@@ -181,20 +196,23 @@ def process_survey_response(doc, method):
         if su_name_of_recipient != doc.survey:
             frappe.throw("Enlace inválido o expirado.")
 
-        if recipient.sr_status == "Responded":
+        if recipient.sr_status == rs_responded:
             # frappe.log_error(f"El destinatario {recipient.name} ya tiene estado 'Responded'. Abortando guardado.", "Survey Response Hook")
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
         frappe.db.set_value(
             "qp_IQ_SurveyRecipient",
             recipient.name,
-            {"sr_status": "Responded", "sr_survey_response": doc.name}
+            {"sr_status": rs_responded, "sr_survey_response": doc.name}
         )
         # frappe.log_error(f"Destinatario {recipient.name} actualizado a 'Responded'.", "Survey Response Hook")
 
         survey_name = recipient.sr_survey
         total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name})
-        responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name, "sr_status": "Responded"})
+        responded_recipients = frappe.db.count(
+            "qp_IQ_SurveyRecipient",
+            {"sr_survey": survey_name, "sr_status": rs_responded}
+        )
 
         if total_recipients > 0 and total_recipients == responded_recipients:
             status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")

@@ -419,6 +419,7 @@ def save_measurement(data):
                     fields=["sr_contact"]
                 )
                 existing_contact_names = set(r["sr_contact"] for r in existing_recipients if r["sr_contact"])
+                rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
 
                 for contact in new_contacts:
                     contact_name = contact.get("name")
@@ -437,7 +438,7 @@ def save_measurement(data):
                         "doctype": "qp_IQ_SurveyRecipient",
                         "sr_survey": survey.name,
                         "sr_contact": contact_name,
-                        "sr_status": "Not Sent"
+                        "sr_status": rs_not_sent
                     }).insert(ignore_permissions=True)
             frappe.db.commit()
 
@@ -710,12 +711,13 @@ def save_measurement(data):
         if survey_type == 'selected' and contacts_data.get("list"):
             contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]
             if contact_names:
+                rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
                 for contact_name in contact_names:
                     frappe.get_doc({
                         "doctype": "qp_IQ_SurveyRecipient",
                         "sr_survey": survey.name,
                         "sr_contact": contact_name,
-                        "sr_status": "Not Sent"
+                        "sr_status": rs_not_sent
                     }).insert(ignore_permissions=True)
             frappe.db.commit()
 

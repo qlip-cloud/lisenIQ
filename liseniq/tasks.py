@@ -7,11 +7,33 @@ import jwt
 from time import time
 from email.utils import formataddr
 from datetime import datetime, timezone
+import pytz
 
 DEFAULT_SENDER_NAME = "Mediciones Listen AIQ"
 
 def _now_utc_str() -> str:
 	return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _get_survey_tz_name(survey_doc) -> str:
+	try:
+		tz_name = None
+		if hasattr(survey_doc, "su_timezone"):
+			tz_name = getattr(survey_doc, "su_timezone")
+		elif isinstance(survey_doc, dict):
+			tz_name = survey_doc.get("su_timezone")
+		tz_name = (tz_name or "UTC").strip()
+		_ = pytz.timezone(tz_name)  # valida
+		return tz_name
+	except Exception:
+		return "UTC"
+
+def _now_in_survey_tz(survey_doc) -> datetime:
+	try:
+		tz = pytz.timezone(_get_survey_tz_name(survey_doc))
+		return datetime.now(tz)
+	except Exception:
+		return datetime.now(pytz.utc)
 
 def _get_notification_sender_name() -> str:
 	try:
@@ -57,13 +79,16 @@ def launch_pending_surveys():
 			frappe.log_error("No se encontró el estado 'Programada' en qp_IQ_SurveyStatus.", "launch_pending_surveys")
 			return
 
+		rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name")
+		rs_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Sent"}, "name")
+		if not rs_not_sent or not rs_sent:
+			frappe.log_error("No se encontraron estados de destinatario 'Not Sent' o 'Sent' en qp_IQ_RecipientStatus.", "launch_pending_surveys")
+			return
+
 		pending_surveys = frappe.get_all(
 			"qp_IQ_Survey",
-			filters={
-				"su_start_date": ["<=", _now_utc_str()],
-				"su_status": status_scheduled
-			},
-			fields=["name", "su_name"]
+			filters={"su_status": status_scheduled},
+			fields=["name", "su_name", "su_start_date"]
 		)
 
 		# frappe.log_error(f"Se encontraron {len(pending_surveys)} encuestas pendientes.", "Survey Task Found")
@@ -73,6 +98,16 @@ def launch_pending_surveys():
 
 		for survey in pending_surveys:
 			try:
+				survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
+				if not survey_doc.su_start_date:
+					# Si no hay fecha de inicio, no lanzar aún
+					continue
+				now_local = _now_in_survey_tz(survey_doc).replace(tzinfo=None)
+				start_dt = get_datetime(survey_doc.su_start_date)
+				if now_local < start_dt:
+					# Aún no inicia según su zona horaria
+					continue
+
 				# frappe.log_error(f"Procesando encuesta: {survey.name} ({survey.su_name})", "Survey Task Processing")
 				frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_in_progress)
 
@@ -90,7 +125,7 @@ def launch_pending_surveys():
 
 				recipients_docs = frappe.get_all(
 					"qp_IQ_SurveyRecipient",
-					filters={"sr_survey": survey.name, "sr_status": "Not Sent"},
+					filters={"sr_survey": survey.name, "sr_status": rs_not_sent},
 					fields=["name", "sr_contact"]
 				)
 
@@ -265,7 +300,7 @@ def launch_pending_surveys():
 						)
 
 						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
-							"sr_status": "Sent",
+							"sr_status": rs_sent,
 							"sr_sent_on": now()
 						})
 
@@ -294,6 +329,11 @@ def send_survey_reminders():
 			# frappe.log_error("No se encontró el estado 'En Progreso'.", "send_survey_reminders")
 			return
 
+		rs_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Sent"}, "name")
+		if not rs_sent:
+			frappe.log_error("No se encontró el estado 'Sent' en qp_IQ_RecipientStatus.", "send_survey_reminders")
+			return
+
 		surveys_in_progress = frappe.get_all(
 			"qp_IQ_Survey",
 			filters={"su_status": status_in_progress},
@@ -301,6 +341,10 @@ def send_survey_reminders():
 		)
 
 		for survey in surveys_in_progress:
+			survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
+			now_dt = _now_in_survey_tz(survey_doc)
+			today_date = now_dt.date()
+
 			if not survey.su_reminder_max or survey.su_reminder_max == 0:
 				continue
 
@@ -339,7 +383,7 @@ def send_survey_reminders():
 				"qp_IQ_SurveyRecipient",
 				filters={
 					"sr_survey": survey.name,
-					"sr_status": "Sent",
+					"sr_status": rs_sent,
 					"sr_reminder_send": ["<", survey.su_reminder_max]
 				},
 				fields=["name", "sr_contact", "sr_link", "sr_token", "sr_reminder_send", "sr_last_reminder_send"]
@@ -469,20 +513,25 @@ def update_finished_surveys():
 			frappe.log_error("No se encontró el estado 'Finalizada'.", "update_finished_surveys")
 			return
 
+		rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name")
+		if not rs_responded:
+			frappe.log_error("No se encontró el estado 'Responded' en qp_IQ_RecipientStatus.", "update_finished_surveys")
+			return
+
 		surveys_to_check = frappe.get_all(
 			"qp_IQ_Survey",
 			filters={"su_status": status_in_progress},
 			fields=["name", "su_end_date"]
 		)
 
-		# CAMBIO: comparar con fecha/hora exacta en UTC, no solo por fecha
-		current_dt = get_datetime(_now_utc_str())
-
 		for survey in surveys_to_check:
 			try:
+				survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
+				current_local = _now_in_survey_tz(survey_doc).replace(tzinfo=None)
+
 				if survey.su_end_date:
 					end_dt = get_datetime(survey.su_end_date)
-					if current_dt >= end_dt:
+					if current_local >= end_dt:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
 						frappe.db.commit()
 						frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys")
@@ -490,7 +539,7 @@ def update_finished_surveys():
 
 				total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
 				if total_recipients > 0:
-					responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": "Responded"})
+					responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
 					if total_recipients == responded_recipients:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
 						frappe.db.commit()
@@ -569,10 +618,15 @@ def send_pending_links_for_survey(survey_name: str):
 		if not status_in_progress or survey.su_status != status_in_progress:
 			return {"status": "skipped", "message": "La medición no está en progreso. Envío omitido."}
 
+		rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name")
+		rs_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Sent"}, "name")
+		if not rs_not_sent or not rs_sent:
+			return {"status": "error", "message": "No se encontraron estados 'Not Sent' o 'Sent' en qp_IQ_RecipientStatus."}
+
 		# Buscar destinatarios pendientes
 		recipients_docs = frappe.get_all(
 			"qp_IQ_SurveyRecipient",
-			filters={"sr_survey": survey.name, "sr_status": "Not Sent"},
+			filters={"sr_survey": survey.name, "sr_status": rs_not_sent},
 			fields=["name", "sr_contact"]
 		)
 		if not recipients_docs:
@@ -748,7 +802,7 @@ def send_pending_links_for_survey(survey_name: str):
 					continue
 
 				frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
-					"sr_status": "Sent",
+					"sr_status": rs_sent,
 					"sr_sent_on": now()
 				})
 				enviados += 1

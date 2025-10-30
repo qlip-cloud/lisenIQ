@@ -4,10 +4,19 @@ import jwt
 from time import time
 from frappe.utils import now
 from frappe.utils.data import get_datetime, add_to_date
-from datetime import datetime, timezone  # NUEVO
+from datetime import datetime, timezone
+import pytz
 
 def _now_utc_str():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
+    try:
+        tz_name = (frappe.db.get_value("qp_IQ_Survey", {"su_name": su_name}, "su_timezone") or "UTC").strip()
+        tz = pytz.timezone(tz_name)
+    except Exception:
+        tz = pytz.utc
+    return datetime.now(tz)
 
 @frappe.whitelist(allow_guest=True)
 def get_public_survey(survey_name):
@@ -63,13 +72,17 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
   # )
   try:
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+    rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
     su_status, su_end_date = frappe.db.get_value(
         "qp_IQ_Survey", {"su_name": survey_name}, ["su_status", "su_end_date"]
     ) or (None, None)
+
     if status_finished and su_status == status_finished:
       return {"allow": False, "message": "La medición ha finalizado."}
-    if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):
-      return {"allow": False, "message": "El enlace ha expirado."}
+    if su_end_date:
+      now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
+      if get_datetime(su_end_date) <= now_local:
+        return {"allow": False, "message": "El enlace ha expirado."}
 
     if not token or token == "Anonimo":
       # Permitir acceso público si el DNI corresponde a un destinatario registrado
@@ -91,24 +104,16 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
       sur_claim = payload.get("sur")
       is_public = payload.get("public", False)
 
-      # frappe.log_error(
-      #     message=f"Payload decodificado: sur_claim='{sur_claim}', is_public={is_public}",
-      #     title="validate_survey_link Trace"
-      # )
-
       if sur_claim != survey_name:
-          # frappe.log_error(
-          #     message=f"Validación fallida: sur_claim ('{sur_claim}') != survey_name ('{survey_name}')",
-          #     title="validate_survey_link Trace"
-          # )
           return {"allow": False, "message": "Enlace inválido o expirado."}
 
       # frappe.log_error(message="Validación de 'sur' exitosa.", title="validate_survey_link Trace")
 
-      # Verificar expiración de la encuesta
       survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_end_date")
-      if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):
-          return {"allow": False, "message": "El enlace ha expirado."}
+      if survey_end_date:
+          now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
+          if get_datetime(survey_end_date) < now_local:
+              return {"allow": False, "message": "El enlace ha expirado."}
 
       # Obtener ID interno y cantidad de destinatarios
       survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
@@ -185,7 +190,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
 
               existing_recipient = frappe.db.exists(
                   "qp_IQ_SurveyRecipient",
-                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_status": "Responded"}
+                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_status": rs_responded}
               )
               if existing_recipient:
                   return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
@@ -230,7 +235,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
         su_name_of_recipient = frappe.db.get_value("qp_IQ_Survey", recipient.sr_survey, "su_name")
         if su_name_of_recipient != survey_name:
           return {"allow": False, "message": "Enlace inválido o expirado."}
-        if recipient.sr_status == "Responded":
+        if recipient.sr_status == rs_responded:
           return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
 
       return {"allow": True}
@@ -266,8 +271,11 @@ def get_survey_route_for_public_link(token):
     ) or (None, None)
     if status_finished and su_status == status_finished:
         frappe.throw("El enlace ha expirado.")
-    if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):
-        frappe.throw("El enlace ha expirado.")
+
+    if su_end_date:
+        now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
+        if get_datetime(su_end_date) <= now_local:
+            frappe.throw("El enlace ha expirado.")
 
     web_form_route = frappe.db.get_value("Web Form", {"title": survey_name}, "route")
     if not web_form_route:
@@ -276,16 +284,8 @@ def get_survey_route_for_public_link(token):
     return {"route": web_form_route}
 
 def generate_public_link_for_survey_hook(doc, method):
-    # frappe.log_error(
-    #     message=f"Hook 'generate_public_link_for_survey_hook' ejecutado para {doc.name}. Flag 'su_custom_generate_public_link' es: {doc.su_custom_generate_public_link}",
-    #     title="Link Generation Hook"
-    # )
-    if doc.su_custom_generate_public_link:
-        # frappe.log_error(
-        #     message=f"Intentando generar enlace genérico para la encuesta {doc.name}.",
-        #     title="Link Generation Hook"
-        # )
 
+    if doc.su_custom_generate_public_link:
         original_ignore_permissions = frappe.flags.ignore_permissions
         frappe.flags.ignore_permissions = True
         try:
@@ -297,23 +297,11 @@ def generate_public_link_for_survey_hook(doc, method):
                     "su_public_link_created_by": doc.su_public_link_created_by,
                     "su_custom_generate_public_link": 0
                 })
-                # frappe.log_error(
-                #     message=f"Enlace genérico generado y guardado exitosamente para {doc.name}.",
-                #     title="Link Generation Hook"
-                # )
             else:
-                # frappe.log_error(
-                #     message=f"La función generate_public_link_for_survey retornó False. No se generó enlace para {doc.name}.",
-                #     title="Link Generation Hook"
-                # )
                 pass
         finally:
             frappe.flags.ignore_permissions = original_ignore_permissions
     else:
-        # frappe.log_error(
-        #     message=f"No se requiere generar enlace genérico para {doc.name}. Saltando.",
-        #     title="Link Generation Hook"
-        # )
         pass
 
 def generate_public_link_for_survey(doc, method):

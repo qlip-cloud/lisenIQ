@@ -3,10 +3,20 @@ import frappe
 import jwt
 import json
 from frappe.utils import get_datetime, now
-from datetime import datetime, timezone  # NUEVO
+from datetime import datetime, timezone
+import pytz
 
 def _now_utc_str():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
+    try:
+        tz_name = (frappe.db.get_value("qp_IQ_Survey", {"su_name": su_name}, "su_timezone") or "UTC").strip()
+        tz = pytz.timezone(tz_name)
+    except Exception:
+        tz = pytz.utc
+    return datetime.now(tz)
 
 def process_survey_response(doc, method):
     # frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
@@ -42,8 +52,11 @@ def process_survey_response(doc, method):
         ) or (None, None)
         if status_finished and su_status == status_finished:
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
-        if su_end_date and get_datetime(su_end_date) <= get_datetime(_now_utc_str()):
-            frappe.throw("El enlace ha expirado.")
+
+        if su_end_date:
+            now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
+            if get_datetime(su_end_date) <= now_local:
+                frappe.throw("El enlace ha expirado.")
 
         is_public = payload.get("public", False)
         
@@ -78,8 +91,10 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_end_date")
-        if survey_end_date and get_datetime(survey_end_date) < get_datetime(_now_utc_str()):
-            frappe.throw("El enlace ha expirado.")
+        if survey_end_date:
+            now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
+            if get_datetime(survey_end_date) < now_local:
+                frappe.throw("El enlace ha expirado.")
 
         if not rid:
             # frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")

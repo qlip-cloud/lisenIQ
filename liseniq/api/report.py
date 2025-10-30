@@ -36,7 +36,19 @@ CATEGORIES = {
     "Orientación al cliente": "CULTURA CARVAJAL",
     "Compromiso social": "CULTURA CARVAJAL",
     "Protección y cuidado de la vida": "CULTURA CARVAJAL",
-    "Compromiso con los resultados": "CULTURA CARVAJAL"
+    "Compromiso con los resultados": "CULTURA CARVAJAL",
+    "Innovación": "CULTURA CARVAJAL",
+}
+
+CARVAJAL_COMPANIES = {
+    "a570be58ba": "Carvajal Corporativo",
+    "a0567d22cc": "Carvajal Educación",
+    "5843de47eb": "Carvajal Soluciones de comunicación",
+    "9f2246bdd0": "Carvajal Pulpa y Papel",
+    "be89e11a86": "Carvajal Servicios Compartidos",
+    "510028895a": "Carvajal Empaques",
+    "5f58f986f1": "Carvajal Tecnología y Servicios",
+    "e34486d9ea": "Carvajal espacios"
 }
 
 @frappe.whitelist()
@@ -383,6 +395,10 @@ def get_question_variables_map():
             variable = row.get('variable', '')
             
             if question_text:
+                """
+                TODO: Para preguntas de mediciones de Carvajal, asignar tema "CULTURA CARVAJAL"
+                basado en el mapeo de CATEGORIES
+                """
                 tema = CATEGORIES.get(variable, '')
                 mapping[question_text] = {
                     'variable': variable,
@@ -493,7 +509,16 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
             # Agregar variable y tema basado en la pregunta
             question_info = question_variables_map.get(question_text, {})
             question_object['variable'] = question_info.get('variable', '')
-            question_object['tema'] = question_info.get('tema', '')
+            tema = question_info.get('tema', '')
+            try:
+                company_name_val = (demographic_data.get('company_name') or '').lower().strip()
+                carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
+                if company_name_val and company_name_val in carvajal_names:
+                    tema = "CULTURA CARVAJAL"
+            except Exception:
+                pass
+
+            question_object['tema'] = tema
 
             transformed_data.append(question_object)
     

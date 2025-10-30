@@ -63,6 +63,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
   # )
   try:
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+    rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
     su_status, su_end_date = frappe.db.get_value(
         "qp_IQ_Survey", {"su_name": survey_name}, ["su_status", "su_end_date"]
     ) or (None, None)
@@ -185,7 +186,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
 
               existing_recipient = frappe.db.exists(
                   "qp_IQ_SurveyRecipient",
-                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_status": "Responded"}
+                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_status": rs_responded}
               )
               if existing_recipient:
                   return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
@@ -230,7 +231,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
         su_name_of_recipient = frappe.db.get_value("qp_IQ_Survey", recipient.sr_survey, "su_name")
         if su_name_of_recipient != survey_name:
           return {"allow": False, "message": "Enlace inválido o expirado."}
-        if recipient.sr_status == "Responded":
+        if recipient.sr_status == rs_responded:
           return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
 
       return {"allow": True}

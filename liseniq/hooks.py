@@ -224,9 +224,9 @@ fixtures = [
 		]
 	},
 	{
-		"doctype": "qp_IQ_Parameters",
+		"doctype": "qp_IQ_RecipientStatus",
 		"filters": [
-			["pa_abbreviation", "in", ["notification_sender_aiq"]]
+			["rs_status", "in", ["Not Sent", "Sent", "Responded"]]
 		]
 	},
 ]

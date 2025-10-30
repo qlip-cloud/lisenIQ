@@ -52,10 +52,12 @@ def get_context(context):
     except frappe.DoesNotExistError:
         surveys = []
 
+    rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
+
     measurements_data = []
     for survey in surveys:
         total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
-        total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": "Responded"})
+        total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
 
         percentage = 0
         if total_recipients > 0:

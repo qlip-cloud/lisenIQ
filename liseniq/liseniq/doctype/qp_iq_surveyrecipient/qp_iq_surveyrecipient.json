@@ -40,11 +40,11 @@
   },
   {
    "fieldname": "sr_status",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
    "label": "Estatus Link",
-   "options": "Not Sent\nSent\nResponded"
+   "options": "qp_IQ_RecipientStatus"
   },
   {
    "fieldname": "sr_sent_on",
@@ -80,7 +80,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 18:55:08.736696",
+ "modified": "2025-10-30 10:58:33.839603",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

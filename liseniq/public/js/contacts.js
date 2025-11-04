@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 return [];
             }
         })(),
+        filteredContacts: [],
+        totalRegistered: 0,
+        filters: { dni: '', name: '', email: '' },
         pagination: {
             pageSize: 10,
             currentPage: 1
@@ -53,7 +56,13 @@ document.addEventListener('DOMContentLoaded', function () {
         modal: document.getElementById('create-contact-modal'),
         demographicsTbody: document.getElementById('demographics-tbody'),
         selectAllCheckbox: document.getElementById('select-all-contacts'),
-        pageInfo: document.getElementById('contacts-page-info')
+        pageInfo: document.getElementById('contacts-page-info'),
+        summary: document.getElementById('contacts-summary'),
+        filters: {
+            dni: document.getElementById('filter-dni'),
+            name: document.getElementById('filter-name'),
+            email: document.getElementById('filter-email')
+        }
     };
 
     const stepper = new Stepper(ui.stepperContainer, ['Datos Básicos', 'Datos Opcionales', 'Datos Demográficos']);
@@ -80,12 +89,74 @@ document.addEventListener('DOMContentLoaded', function () {
         ui.buttons.save.textContent = buttonText;
     };
     
-    const setupFormForCreate = () => {
+    // Filtro de contactos
+    const parseFilterValue = (val) => {
+        const v = (val || '').trim();
+        if (v.length >= 2 && v.startsWith('"') && v.endsWith('"')) {
+            return { term: v.slice(1, -1).trim(), exact: true };
+        }
+        return { term: v, exact: false };
+    };
+
+    const matchText = (haystack, needle, exact) => {
+        const h = (haystack || '').toLowerCase();
+        const n = (needle || '').toLowerCase();
+        if (!n) return true;
+        return exact ? h === n : h.includes(n);
+    };
+
+    const applyFilters = () => {
+        const dniFilter = parseFilterValue(appState.filters.dni);
+        const nameFilter = parseFilterValue(appState.filters.name);
+        const emailFilter = parseFilterValue(appState.filters.email);
+
+        appState.filteredContacts = appState.contacts.filter(c => {
+            // Filtro por DNI
+            const dniOk = matchText(c.docNumber, dniFilter.term, dniFilter.exact);
+
+            // Filtro por nombre
+            const fullName = `${c.firstName || ''} ${c.lastName || ''}`.trim();
+            let nameOk = true;
+            if (nameFilter.term) {
+                if (nameFilter.exact) {
+                    nameOk = matchText(fullName, nameFilter.term, true)
+                        || matchText(c.firstName, nameFilter.term, true)
+                        || matchText(c.lastName, nameFilter.term, true);
+                } else {
+                    nameOk = matchText(fullName, nameFilter.term, false)
+                        || matchText(c.firstName, nameFilter.term, false)
+                        || matchText(c.lastName, nameFilter.term, false);
+                }
+            }
+            const emailOk = matchText(c.email, emailFilter.term, emailFilter.exact);
+
+            return dniOk && nameOk && emailOk;
+        });
+
+        appState.pagination.currentPage = 1;
+    };
+
+    const updateSummary = (visibleCount) => {
+        const total = appState.totalRegistered;
+        ui.summary.textContent = `Mostrando ${visibleCount} de ${total} contactos`;
+    };
+
+    const stepperRenderAndInitState = () => {
+        appState.totalRegistered = appState.contacts.length;
+        appState.filteredContacts = [...appState.contacts];
+        updateSummary(0);
+    };
+
+    const showFormForCreate = () => {
         appState.currentContactName = null;
         updateFormUI('create');
         resetCreateForm();
         showView('form');
         showFormStep(1);
+    };
+
+    const setupFormForCreate = () => {
+        showFormForCreate();
     };
 
     const setupFormForEdit = (contactData) => {
@@ -100,9 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const resetCreateForm = () => {
         const form = ui.createView.querySelector('form');
         if (form) form.reset();
-        
         clearAllValidations();
-
         ui.demographicsTbody.innerHTML = '';
         addDemographicRow();
         const countrySelect = document.getElementById('contact-country');
@@ -159,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function getTotalPages() {
         const size = appState.pagination.pageSize;
-        return Math.max(1, Math.ceil(appState.contacts.length / size) || 1);
+        return Math.max(1, Math.ceil((appState.filteredContacts.length || 0) / size) || 1);
     }
 
     function renderContactsTable() {
@@ -169,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
             appState.pagination.currentPage = totalPages;
         }
         const start = (appState.pagination.currentPage - 1) * size;
-        const slice = appState.contacts.slice(start, start + size);
+        const slice = appState.filteredContacts.slice(start, start + size);
 
         if (slice.length === 0) {
             ui.tableBody.innerHTML = `
@@ -183,6 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         updatePaginationControls();
         updateSelectAllCheckboxState();
+        updateSummary(slice.length);
     }
 
     function updatePaginationControls() {
@@ -224,18 +294,24 @@ document.addEventListener('DOMContentLoaded', function () {
         if (idx !== -1) {
             appState.contacts[idx] = normalized;
         }
+        appState.totalRegistered = appState.contacts.length;
+        applyFilters();
         renderContactsTable();
     };
 
     const addContactToList = (contact) => {
         const normalized = normalizeContact(contact);
         appState.contacts.unshift(normalized);
+        appState.totalRegistered = appState.contacts.length;
+        applyFilters();
         appState.pagination.currentPage = 1;
         renderContactsTable();
     };
 
     const removeContactFromList = (contactName) => {
         appState.contacts = appState.contacts.filter(c => c.name !== contactName);
+        appState.totalRegistered = appState.contacts.length;
+        applyFilters();
         renderContactsTable();
     };
 
@@ -440,7 +516,20 @@ document.addEventListener('DOMContentLoaded', function () {
             ui.modal.classList.add('d-none');
             setTimeout(setupFormForCreate, 150);
         });
-        
+
+        const onFilterChange = () => {
+            appState.filters = {
+                dni: ui.filters.dni.value,
+                name: ui.filters.name.value,
+                email: ui.filters.email.value
+            };
+            applyFilters();
+            renderContactsTable();
+        };
+        ui.filters.dni?.addEventListener('input', onFilterChange);
+        ui.filters.name?.addEventListener('input', onFilterChange);
+        ui.filters.email?.addEventListener('input', onFilterChange);
+
         ui.buttons.save?.addEventListener('click', handleSave);
         ui.buttons.addDemographic?.addEventListener('click', () => addDemographicRow());
         
@@ -536,6 +625,8 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function init() {
         stepper.render();
+        stepperRenderAndInitState();
+        applyFilters();
         showView('list');
         initializeEventListeners();
         renderContactsTable();

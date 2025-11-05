@@ -198,6 +198,48 @@
     .contact-form-grid { grid-template-columns: 1fr; gap: 1.5rem; }
 }
 
+/* Filtros de contactos */
+.contacts-filters-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.contacts-summary {
+    font-size: 0.9rem;
+    color: var(--text-color-secondary, #737373);
+}
+
+.contacts-filters {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.contacts-filters .form-control {
+    width: 260px !important;
+    flex: 0 0 260px;
+    font-size: 0.8rem;
+}
+
+/* En pantallas pequeñas permitir que se apilen */
+@media (max-width: 768px) {
+    .contacts-filters {
+        flex-wrap: wrap;
+    }
+    .contacts-filters .form-control {
+        width: 100% !important;
+        flex: 1 1 100%;
+    }
+    .contacts-filters-bar {
+        align-items: stretch;
+    }
+}
+
 .contacts-pagination {
     display: flex;
     justify-content: center;

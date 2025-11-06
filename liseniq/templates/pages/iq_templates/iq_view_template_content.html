@@ -44,13 +44,23 @@
                                     <p class="review-question-text">{{ question.text }}</p>
                                 </div>
                                 <div class="review-question-details">
-                                    <span>tipo: {{ question.type_name }}</span>
-                                    <span class="review-question-tag">Tag: {{ question.category_name }}</span>
+                                    <span>Tipo: {{ question.type_name }}</span>
+                                    <span class="review-question-tag">Tag: {{ question.demographic_name or 'General' }}</span>
+                                    <!-- <span class="review-question-category">Categoría: {{ question.category_name }}</span> -->
                                 </div>
                                 {% if question.options %}
                                 <div class="review-question-options">
                                     {% for option in question.options %}
-                                    <div class="review-question-option">{{ option }}</div>
+                                        {% if option.url %}
+                                            <div class="review-question-option">
+                                                <img src="{{ option.url }}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">
+                                                {{ option.text }}
+                                            </div>
+                                        {% else %}
+                                            <div class="review-question-option">
+                                                {{ option.text if option.text else option }}
+                                            </div>
+                                        {% endif %}
                                     {% endfor %}
                                 </div>
                                 {% endif %}

@@ -18,19 +18,36 @@ def get_context(context):
         frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
     user_company = user_contact_info
 
-    templates_from_db = frappe.get_list(
+    # Obtener plantillas públicas (visibles para todos)
+    templates_public = frappe.get_list(
         "qp_IQ_Template",
-        filters=[
-            ['custom_company', '=', user_company]
-        ],
+        filters=[['tp_is_public', '=', 1]],
+        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private", "tp_is_public"],
+        order_by="creation desc",
+        ignore_permissions=True
+    )
+
+    # Obtener plantillas de la compañía del usuario (públicas y privadas del usuario)
+    templates_company_scoped = frappe.get_list(
+        "qp_IQ_Template",
+        filters=[['custom_company', '=', user_company]],
         or_filters=[
             ['tp_is_private', '=', 0],
             ['tp_owner', '=', frappe.session.user]
         ],
-        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private"],
+        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private", "tp_is_public"],
         order_by="creation desc",
         ignore_permissions=True
     )
+
+    # Agregar y deduplicar por nombre
+    templates_from_db = []
+    seen = set()
+    for t in templates_public + templates_company_scoped:
+        if t.name in seen:
+            continue
+        seen.add(t.name)
+        templates_from_db.append(t)
     
     processed_templates = []
     for template_data in templates_from_db:
@@ -117,7 +134,7 @@ def get_questions_from_template(template_name):
                     {
                         "text": opt.qo_option_text,
                         "value": opt.qo_option_value,
-                        "url": getattr(opt, "qo_url", None)  # incluir URL si existe
+                        "url": getattr(opt, "qo_url", None)
                     }
                     for opt in q_doc.qn_response_options
                 ]

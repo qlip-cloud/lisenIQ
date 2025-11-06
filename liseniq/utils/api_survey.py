@@ -129,7 +129,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
 
           contact_info = frappe.db.get_value(
               "Contact",
-              {"custom_document_number": dni},
+              {"custom_document_number": dni, "custom_company": survey_owner_company},
               ["name", "custom_company", "status"],
               as_dict=True
           )
@@ -161,7 +161,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
 
           contact_info = frappe.db.get_value(
               "Contact",
-              {"custom_document_number": dni},
+              {"custom_document_number": dni, "custom_company": survey_owner_company},
               ["name", "custom_company", "status"],
               as_dict=True
           )

@@ -70,7 +70,7 @@ def process_survey_response(doc, method):
                 survey_owner_company = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_owner")
                 contact_info = frappe.db.get_value(
                     "Contact",
-                    {"custom_document_number": doc.user},
+                    {"custom_document_number": doc.user, "custom_company": survey_owner_company},
                     ["name", "custom_company"],
                     as_dict=True
                 )
@@ -105,7 +105,7 @@ def process_survey_response(doc, method):
                 if not survey_owner_company:
                     frappe.throw("No se pudo determinar la empresa propietaria de la encuesta.")
 
-                contact_info = frappe.db.get_value("Contact", {"custom_document_number": doc.user}, ["name", "custom_company"], as_dict=True)
+                contact_info = frappe.db.get_value("Contact", {"custom_document_number": doc.user, "custom_company": survey_owner_company}, ["name", "custom_company"], as_dict=True)
 
                 if not contact_info:
                     frappe.throw("El DNI proporcionado no corresponde a un contacto registrado.")

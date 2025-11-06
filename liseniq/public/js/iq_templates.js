@@ -261,6 +261,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!response.ok || result.exc) throw new Error(result._server_messages ? JSON.parse(result._server_messages)[0] : 'La subida del archivo falló.');
             }
 
+            // Si la plantilla es pública, marcar sus preguntas como públicas
+            if (isPublic) {
+                await frappe.call({
+                    method: 'liseniq.www.iq-templates.index.mark_template_questions_public',
+                    args: { template_name: newTemplateName }
+                });
+            }
+
             showGlobalNotification('Se ha creado la Plantilla', 'success');
             setTimeout(() => { window.location.href = '/iq-templates'; }, 2000);
 

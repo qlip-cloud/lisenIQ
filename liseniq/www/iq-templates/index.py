@@ -258,8 +258,7 @@ def get_bank_data(keyword=None, demographic=None):
         frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
 
     question_filters = {
-        'qn_status': 'Activa',
-        'qn_owner': user_company
+        'qn_status': 'Activa'
     }
     if keyword:
         question_filters['qn_statement'] = ['like', f'%{keyword}%']
@@ -269,6 +268,10 @@ def get_bank_data(keyword=None, demographic=None):
     questions = frappe.get_list(
         "qp_IQ_Question",
         filters=question_filters,
+        or_filters=[
+            ['qn_owner', '=', user_company],
+            ['qp_is_public', '=', 1]
+        ],
         fields=[
             "name", "qn_statement as text", "qn_category", "qn_type", "qn_nps_min",
             "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic"
@@ -327,3 +330,27 @@ def get_bank_data(keyword=None, demographic=None):
         "questions": questions,
         "demographics": demographics
     }
+
+# Metodo para marcar preguntas de una plantilla como públicas
+@frappe.whitelist()
+def mark_template_questions_public(template_name: str):
+    if not template_name:
+        frappe.throw("Nombre de plantilla inválido.")
+
+    try:
+        # Obtener preguntas desde la tabla hija sin cargar el Doc completo
+        rows = frappe.get_all(
+            "qp_IQ_TemplateQuestion",
+            filters={"parent": template_name, "parenttype": "qp_IQ_Template"},
+            fields=["tq_question"],
+            ignore_permissions=True
+        )
+        question_names = [r.tq_question for r in rows if r.tq_question]
+
+        for qname in question_names:
+            frappe.db.set_value("qp_IQ_Question", qname, "qp_is_public", 1, update_modified=True)
+
+        return {"updated": len(question_names)}
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Error al marcar preguntas como públicas")
+        frappe.throw("No fue posible marcar las preguntas como públicas. Intenta nuevamente.")

@@ -1,6 +1,7 @@
 <div class="main-content-padding">
     
     <div id="template-wizard-data" data-user-company="{{ user_company or '' }}"></div>
+    <input type="hidden" id="tp_is_public_value" name="tp_is_public" value="0">
 
     <div id="template-stepper-container" class="mb-5"></div>
 
@@ -22,6 +23,15 @@
                             <input class="form-check-input" type="checkbox" value="" id="template_is_private_input">
                             <label class="form-check-label" for="template_is_private_input">
                                 Marcar si la plantilla solo debe ser visible para usted.
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="template_is_public_input">Es plantilla pública</label>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" value="" id="template_is_public_input">
+                            <label class="form-check-label" for="template_is_public_input">
+                                Marcar si la plantilla es pública.
                             </label>
                         </div>
                     </div>

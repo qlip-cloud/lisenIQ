@@ -519,7 +519,7 @@ def send_survey_reminders():
 		frappe.log_error(frappe.get_traceback(), "Error en send_survey_reminders")
 
 def update_finished_surveys():
-	frappe.log_error("Iniciando tarea update_finished_surveys, Hora: {}".format(now()), "Survey Finish Task Start")
+	# frappe.log_error("Iniciando tarea update_finished_surveys, Hora: {}".format(now()), "Survey Finish Task Start")
 	try:
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:

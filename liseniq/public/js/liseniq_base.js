@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.message) {
-                const companyDiv = document.querySelector('#app-sidebar div[style*="#7B24FF"]');
+                const companyDiv = document.getElementById('iq-header-company-name');
                 if (companyDiv) {
                     companyDiv.textContent = data.message;
                 }

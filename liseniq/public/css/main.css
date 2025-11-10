@@ -230,6 +230,17 @@
 .modal-choice-card i { color: var(--brand-primary, #7B24FF); font-size: 2rem; margin-bottom: 1rem; }
 .modal-choice-card span { font-weight: 500; font-size: 0.8rem; color: var(--text-color-primary, #000000); }
 
+.iq-header-company-name {
+    font-family: 'Rubik', sans-serif;
+    font-weight: 500;
+    font-size: 1rem;
+    color: #7B24FF;
+    text-align: center;
+    line-height: 1;
+    padding: 0 1rem;
+    white-space: nowrap;
+}
+
 
 @media (min-width: 1200px) {
     .col-xl-5-cols {

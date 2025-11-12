@@ -140,6 +140,28 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+}
+
+.measurements-grid::-webkit-scrollbar {
+    width: 8px;
+}
+
+.measurements-grid::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 8px;
+}
+
+.measurements-grid::-webkit-scrollbar-thumb {
+    background: var(--brand-primary, #7B24FF);
+    border-radius: 8px;
+}
+
+.measurements-grid::-webkit-scrollbar-thumb:hover {
+    background: #6920d6;
 }
 
 .no-measurements-message {
@@ -274,6 +296,10 @@
     font-weight: 700;
     color: var(--text-color-primary, #212529);
     margin-top: 0.25rem;
+}
+
+.measurements-section {
+    padding: 5px !important;
 }
 
 

@@ -1,6 +1,7 @@
 import frappe
 from frappe.utils import getdate, formatdate
 from frappe import _
+from liseniq.utils import power_bi_util
 
 def get_context(context):
 
@@ -16,6 +17,7 @@ def get_context(context):
     items, templates = _get_finalized_surveys()
     context.finished_surveys_json = frappe.as_json(items)
     context.survey_templates_json = frappe.as_json(templates)
+    context.power_bi_embed_json = None
 
     return context
 
@@ -99,3 +101,23 @@ def _get_finalized_surveys(name_filtro: str | None = None,
 def get_finalized_surveys(name: str | None = None, template: str | None = None):
     items, templates = _get_finalized_surveys(name_filtro=name, template_filtro=template)
     return {"items": items, "templates": templates}
+
+@frappe.whitelist()
+def get_power_bi_embed_config(report_id: str | None = None,
+                              workspace_id: str | None = None,
+                              access_level: str = "View",
+                              survey_docname: str | None = None):
+    
+    if frappe.session.user == "Guest":
+        frappe.throw(_("No autorizado"), frappe.PermissionError)
+    try:
+        # Paso 2: Obtener configuración (survey_docname reservado para lógica futura).
+        cfg = power_bi_util.get_embed_config(report_id=report_id,
+                                             workspace_id=workspace_id,
+                                             access_level=access_level)
+        if survey_docname:
+            cfg["survey_docname"] = survey_docname
+        return cfg
+    except Exception as ex:
+        frappe.log_error(f"get_power_bi_embed_config error: {ex}", "iq-results")
+        frappe.throw(_("No fue posible obtener el token de Power BI."))

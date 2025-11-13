@@ -240,6 +240,29 @@
     background-color: transparent;
 }
 
+.measurement-card .card-footer .results-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: .25rem;
+}
+
+.measurement-card .card-footer .results-row .percentage-display {
+    margin: 0;
+}
+
+.measurement-card .card-footer .results-row .results-link-icon {
+    margin-left: 12px;
+    align-self: center;
+    margin-top: 0;
+}
+
+.measurement-card .card-footer .results-link-icon {
+    align-self: flex-start;
+    margin-top: auto;
+}
+
 .progress-info {
     display: flex;
     align-items: center;
@@ -302,6 +325,24 @@
     padding: 5px !important;
 }
 
+.results-link-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--brand-primary,#7B24FF);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #fff;
+    text-decoration: none;
+    margin-left: 8px;
+    transition: background .2s;
+}
+.results-link-icon:hover {
+    background: #6920d6;
+    color:#fff;
+}
 
 @media (max-width: 768px) {
     .home-container {

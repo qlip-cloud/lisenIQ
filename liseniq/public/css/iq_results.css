@@ -77,3 +77,35 @@
 @media (max-width: 991.98px){
     .results-filters { grid-template-columns:1fr; }
 }
+.filter-name-wrapper {
+    position: relative;
+}
+.filter-name-wrapper input {
+    padding-right: 2rem;
+}
+.clear-filter-btn {
+    position: absolute;
+    right: .5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    outline: none;
+}
+.clear-filter-btn:hover {
+    color: #1f2937;
+}
+.clear-filter-btn:focus,
+.clear-filter-btn:active {
+    outline: none;
+    box-shadow: none;
+    color: #1f2937;
+}

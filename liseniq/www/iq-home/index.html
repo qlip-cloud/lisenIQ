@@ -82,7 +82,14 @@
                         <div class="progress-container">
                             <div class="progress-bar" style="--progress-width: {{ m.percentage }}%;"></div>
                         </div>
-                        <div class="percentage-display">{{ m.percentage }}%</div>
+                        <div class="results-row">
+                            <div class="percentage-display">{{ m.percentage }}%</div>
+                            {% if m.status == "Finalizada" %}
+                            <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
+                                <i class="fa fa-bar-chart"></i>
+                            </a>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 {% endfor %}

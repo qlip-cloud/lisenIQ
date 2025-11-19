@@ -2,6 +2,7 @@ import frappe
 from frappe.utils import getdate, formatdate
 from frappe import _
 from liseniq.utils import power_bi_util
+from typing import Optional
 
 def get_context(context):
 
@@ -22,7 +23,7 @@ def get_context(context):
     return context
 
 
-def _get_status_name_finalizada() -> str | None:
+def _get_status_name_finalizada() -> Optional[str]:
     """Obtiene el name del DocType qp_IQ_SurveyStatus cuyo se_status = 'Finalizada'."""
     return frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
 
@@ -57,8 +58,8 @@ def _format_period_text(start, end) -> str:
         return "-"
 
 
-def _get_finalized_surveys(name_filtro: str | None = None,
-                           template_filtro: str | None = None,
+def _get_finalized_surveys(name_filtro: Optional[str] = None,
+                           template_filtro: Optional[str] = None,
                            limite: int = 100):
     status_name = _get_status_name_finalizada()
     if not status_name:
@@ -98,15 +99,15 @@ def _get_finalized_surveys(name_filtro: str | None = None,
 
 
 @frappe.whitelist()
-def get_finalized_surveys(name: str | None = None, template: str | None = None):
+def get_finalized_surveys(name: Optional[str] = None, template: Optional[str] = None):
     items, templates = _get_finalized_surveys(name_filtro=name, template_filtro=template)
     return {"items": items, "templates": templates}
 
 @frappe.whitelist()
-def get_power_bi_embed_config(report_id: str | None = None,
-                              workspace_id: str | None = None,
+def get_power_bi_embed_config(report_id: Optional[str] = None,
+                              workspace_id: Optional[str] = None,
                               access_level: str = "View",
-                              survey_docname: str | None = None):
+                              survey_docname: Optional[str] = None):
     
     if frappe.session.user == "Guest":
         frappe.throw(_("No autorizado"), frappe.PermissionError)

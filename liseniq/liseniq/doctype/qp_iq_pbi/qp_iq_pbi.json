@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "creation": "2025-11-19 10:32:10.669011",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pbi_id_name",
+  "column_break_2",
+  "pbi_tenant_id",
+  "pbi_client_id",
+  "pbi_client_secret",
+  "pbi_workspace_id",
+  "column_break_7",
+  "pbi_report_id",
+  "pbi_authority_host",
+  "pbi_url_base",
+  "pbi_template"
+ ],
+ "fields": [
+  {
+   "fieldname": "pbi_client_id",
+   "fieldtype": "Password",
+   "label": "PBI Client ID"
+  },
+  {
+   "fieldname": "pbi_tenant_id",
+   "fieldtype": "Password",
+   "label": "PBI Tenant ID"
+  },
+  {
+   "fieldname": "pbi_client_secret",
+   "fieldtype": "Password",
+   "label": "PBI Client Secret"
+  },
+  {
+   "fieldname": "pbi_workspace_id",
+   "fieldtype": "Password",
+   "label": "PBI Workspace ID"
+  },
+  {
+   "fieldname": "pbi_report_id",
+   "fieldtype": "Data",
+   "label": "PBI Report ID"
+  },
+  {
+   "fieldname": "pbi_authority_host",
+   "fieldtype": "Data",
+   "label": "PBI Authority Host"
+  },
+  {
+   "fieldname": "pbi_url_base",
+   "fieldtype": "Data",
+   "label": "PBI URL Base"
+  },
+  {
+   "fieldname": "pbi_template",
+   "fieldtype": "Data",
+   "label": "PBI Measurement or Template"
+  },
+  {
+   "fieldname": "pbi_id_name",
+   "fieldtype": "Data",
+   "label": "PBI ID"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_7",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-11-19 11:24:45.348654",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_PBI",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

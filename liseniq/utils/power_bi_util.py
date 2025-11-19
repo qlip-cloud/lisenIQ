@@ -17,11 +17,49 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 def _conf() -> Dict[str, Any]:
-    cfg = frappe.conf.get("power_bi") or {}
+    # Leer la primera configuración del DocType qp_IQ_PBI
+    records = frappe.get_all(
+        "qp_IQ_PBI",
+        fields=[
+            "name",
+            "pbi_tenant_id",
+            "pbi_client_id",
+            "pbi_client_secret",
+            "pbi_workspace_id",
+            "pbi_report_id",
+            "pbi_authority_host",
+            "pbi_url_base",
+            "pbi_template",
+            "pbi_id_name",
+        ],
+        limit=1,
+    )
+    if not records:
+        raise frappe.ValidationError("No existe registro de configuración Power BI en qp_IQ_PBI.")
+    rec = records[0]
+    doc = frappe.get_doc("qp_IQ_PBI", rec["name"])
+
+    # Desencriptar campos tipo Password desde el DocType
+    tenant_id = doc.get_password("pbi_tenant_id")
+    client_id = doc.get_password("pbi_client_id")
+    client_secret = doc.get_password("pbi_client_secret")
+    workspace_id = doc.get_password("pbi_workspace_id")
+
+    cfg: Dict[str, Any] = {
+        "tenant_id": tenant_id,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "workspace_id": workspace_id,
+        "report_id": rec.get("pbi_report_id"),
+        "authority_host": rec.get("pbi_authority_host"),
+        "api_base": (rec.get("pbi_url_base") or "https://api.powerbi.com"),
+        "template": rec.get("pbi_template"),
+        "id_name": rec.get("pbi_id_name"),
+    }
     required = ("tenant_id", "client_id", "client_secret", "workspace_id", "report_id", "authority_host", "api_base")
     missing = [k for k in required if not cfg.get(k)]
     if missing:
-        raise frappe.ValidationError(f"Faltan claves en power_bi del site_config: {', '.join(missing)}")
+        raise frappe.ValidationError(f"Faltan claves en qp_IQ_PBI: {', '.join(missing)}")
     return cfg
 
 def _cache_get(key: str) -> Optional[Dict[str, Any]]:

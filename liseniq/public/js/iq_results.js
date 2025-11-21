@@ -14,6 +14,7 @@ const ui = {
 const state = {
   items: [],
   templates: [],
+  allTemplates: [],
   debounce: null,
   embedConfig: null,
   pbiSdkReady: null,
@@ -26,21 +27,30 @@ function initPreloaded() {
   try {
     state.items = JSON.parse(ui.preload.dataset.surveys || '[]');
     state.templates = JSON.parse(ui.preload.dataset.templates || '[]');
+    state.allTemplates = [...state.templates]; // conservar todas
   } catch {
     state.items = [];
     state.templates = [];
+    state.allTemplates = [];
   }
 }
 
 function fillTemplateSelect() {
   if (!ui.template) return;
+  const previous = ui.template.value;
   ui.template.querySelectorAll('option:not([value=""])').forEach(o => o.remove());
-  state.templates.forEach(t => {
+  const source = state.allTemplates.length ? state.allTemplates : state.templates;
+  source.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t;
     opt.textContent = t;
     ui.template.appendChild(opt);
   });
+  if (previous && source.includes(previous)) {
+    ui.template.value = previous;
+  } else {
+    ui.template.value = '';
+  }
 }
 
 function card(item) {
@@ -86,7 +96,6 @@ async function fetchFiltered() {
     });
     const msg = r.message || {};
     state.items = msg.items || [];
-    state.templates = msg.templates || [];
     fillTemplateSelect();
     render(state.items);
   } catch (e) {
@@ -153,7 +162,6 @@ function embedPowerBI() {
     if (!ui.pbi || !state.embedConfig) return;
     if (!window.powerbi || !window['powerbi-client']) return;
     const models = window['powerbi-client'].models;
-
     const config = {
       type: 'report',
       id: state.embedConfig.reportId,
@@ -162,15 +170,14 @@ function embedPowerBI() {
       tokenType: models.TokenType.Embed,
       permissions: models.Permissions.Read,
       settings: {
-        panes: {
-          filters: { visible: false },
-          pageNavigation: { visible: true }
-        },
+        panes: { filters: { visible: false }, pageNavigation: { visible: true } },
         layoutType: models.LayoutType.Responsive,
         background: models.BackgroundType.Transparent
       }
     };
-
+    if (state.embedConfig.filters && Array.isArray(state.embedConfig.filters)) {
+      config.filters = state.embedConfig.filters;
+    }
     if (window.powerbi.find(ui.pbi)) {
       window.powerbi.reset(ui.pbi);
     }

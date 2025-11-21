@@ -58,15 +58,26 @@ def _format_period_text(start, end) -> str:
         return "-"
 
 
+def _get_user_company() -> Optional[str]:
+    try:
+        return frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    except Exception:
+        return None
+
+
 def _get_finalized_surveys(name_filtro: Optional[str] = None,
                            template_filtro: Optional[str] = None,
                            limite: int = 100):
     status_name = _get_status_name_finalizada()
     if not status_name:
         return [], []
-
     sql = _build_base_sql(status_name)
     params = [status_name]
+
+    company = _get_user_company()
+    if company:
+        sql += " AND s.su_owner = %s"
+        params.append(company)
 
     if name_filtro:
         sql += " AND s.su_name LIKE %s"
@@ -112,10 +123,11 @@ def get_power_bi_embed_config(report_id: Optional[str] = None,
     if frappe.session.user == "Guest":
         frappe.throw(_("No autorizado"), frappe.PermissionError)
     try:
-        # Paso 2: Obtener configuración (survey_docname reservado para lógica futura).
+        company = _get_user_company()
         cfg = power_bi_util.get_embed_config(report_id=report_id,
                                              workspace_id=workspace_id,
-                                             access_level=access_level)
+                                             access_level=access_level,
+                                             filter_company=company)
         if survey_docname:
             cfg["survey_docname"] = survey_docname
         return cfg

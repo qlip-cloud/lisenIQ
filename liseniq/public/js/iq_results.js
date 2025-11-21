@@ -162,7 +162,6 @@ function embedPowerBI() {
     if (!ui.pbi || !state.embedConfig) return;
     if (!window.powerbi || !window['powerbi-client']) return;
     const models = window['powerbi-client'].models;
-
     const config = {
       type: 'report',
       id: state.embedConfig.reportId,
@@ -171,15 +170,14 @@ function embedPowerBI() {
       tokenType: models.TokenType.Embed,
       permissions: models.Permissions.Read,
       settings: {
-        panes: {
-          filters: { visible: false },
-          pageNavigation: { visible: true }
-        },
+        panes: { filters: { visible: false }, pageNavigation: { visible: true } },
         layoutType: models.LayoutType.Responsive,
         background: models.BackgroundType.Transparent
       }
     };
-
+    if (state.embedConfig.filters && Array.isArray(state.embedConfig.filters)) {
+      config.filters = state.embedConfig.filters;
+    }
     if (window.powerbi.find(ui.pbi)) {
       window.powerbi.reset(ui.pbi);
     }

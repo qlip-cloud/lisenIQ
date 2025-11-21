@@ -1,7 +1,7 @@
 import json
 import frappe
 from frappe import _
-
+from datetime import datetime, timedelta
 
 CATEGORIES = {
     "Sentido de propósito": "MI INSPIRACIÓN",
@@ -75,6 +75,7 @@ def custom_report(filters=None):
 
     return translated_data
 
+
 @frappe.whitelist()
 def custom_report_by_question(filters=None):
     """
@@ -98,6 +99,32 @@ def custom_report_by_question(filters=None):
     transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
     translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
 
+
+    return translated_data
+
+
+@frappe.whitelist()
+def custom_report_by_question_yesterday(filters=None):
+    """
+    Reporte de las encuestas del día anterior donde cada pregunta está en un objeto separado
+    con los datos demográficos repetidos
+    """
+    filters = filters or {}
+    
+    # Obtener todas las encuestas válidas
+    valid_surveys = get_valid_surveys()
+    
+    if not valid_surveys:
+        frappe.throw(_("No se encontraron encuestas válidas en qp_IQ_Survey"))
+
+    # Obtener todas las preguntas únicas de todas las encuestas
+    all_questions_map = get_all_unique_questions(valid_surveys)
+    demographics_map = get_demographics_labels()
+
+    # Obtener solo datos del día anterior
+    data = get_survey_data_yesterday(valid_surveys, all_questions_map, demographics_map)
+    transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+    translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
 
     return translated_data
 
@@ -207,6 +234,85 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     """
     
     responses = frappe.db.sql(query, survey_names, as_dict=True)
+    
+    if not responses:
+        return []
+
+    # Obtener datos demográficos para todos los usuarios
+    users_list = [r.user for r in responses if r.user]
+    demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
+
+    data = []
+    for response in responses:
+        row = process_response_row(
+            response, 
+            all_questions_map, 
+            demographics_data,
+            survey_company_map,
+            survey_id_map,
+            survey_expected_responses_map
+        )
+        data.append(row)
+
+    return data
+
+
+def get_survey_data_yesterday(valid_surveys, all_questions_map, demographics_map):
+    """
+    Obtiene los datos de las encuestas del día anterior
+    """
+    if not valid_surveys:
+        return []
+    
+    # Calcular fecha del día anterior
+    yesterday = datetime.now().date() - timedelta(days=1)
+    yesterday_start = datetime.combine(yesterday, datetime.min.time())
+    yesterday_end = datetime.combine(yesterday, datetime.max.time())
+    
+    # Crear mapeo de survey_name a company_name e id
+    survey_company_map = {
+        survey['survey_name']: survey['company_name'] or ''
+        for survey in valid_surveys
+    }
+    survey_id_map = {
+        survey['survey_name']: survey['id']
+        for survey in valid_surveys
+    }
+
+    survey_expected_responses_map = {
+        survey['name']: survey['expected_responses']
+        for survey in get_surveys_expected_responses()
+    }
+    
+    # Obtener nombres de encuestas válidas
+    survey_names = [survey['survey_name'] for survey in valid_surveys]
+    survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
+    
+    query = f"""
+        SELECT 
+            sr.name,
+            sr.user,
+            sr.survey,
+            sr.response_json,
+            c.custom_document_number,
+            c.first_name,
+            c.last_name,
+            c.custom_dob,
+            c.gender,
+            c.custom_entry_date,
+            c.custom_country,
+            a.al_title
+        FROM `tabSurvey Response` sr
+        LEFT JOIN `tabContact` c ON c.name = sr.user
+        LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
+        WHERE sr.survey IN ({survey_names_placeholder})
+        AND sr.creation >= %s
+        AND sr.creation <= %s
+        ORDER BY sr.survey, sr.creation DESC
+    """
+    
+    params = survey_names + [yesterday_start, yesterday_end]
+    responses = frappe.db.sql(query, params, as_dict=True)
     
     if not responses:
         return []

@@ -60,7 +60,7 @@ def _format_period_text(start, end) -> str:
 
 def _get_user_company() -> Optional[str]:
     try:
-        return frappe.db.get_value("User", frappe.session.user, "company")
+        return frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
     except Exception:
         return None
 

@@ -86,7 +86,9 @@ def get_access_token(force_refresh: bool = False) -> Dict[str, Any]:
     authority_host = cfg["authority_host"].rstrip("/")
     authority = f"{authority_host}/{tenant_id}"
     token_data: Dict[str, Any]
+    
     if MSAL_AVAILABLE:
+        
         try:
             app = msal.ConfidentialClientApplication(client_id=client_id, client_credential=client_secret, authority=authority)
             result = app.acquire_token_for_client(scopes=[AAD_SCOPE])
@@ -96,9 +98,12 @@ def get_access_token(force_refresh: bool = False) -> Dict[str, Any]:
             exp = int((_now_utc() + timedelta(seconds=max(expires_in - 120, 300))).timestamp())
             token_data = {"token": result["access_token"], "exp": exp}
             _cache_set(cache_key, token_data)
+            
             return token_data
+        
         except Exception as ex:
             frappe.log_error(f"MSAL falló al autenticar: {ex}", "Power BI Auth (MSAL)")
+    
     try:
         token_url = f"{authority}/oauth2/v2.0/token"
         resp = requests.post(token_url, data={
@@ -109,14 +114,16 @@ def get_access_token(force_refresh: bool = False) -> Dict[str, Any]:
         }, timeout=15)
         resp.raise_for_status()
         data = resp.json()
+
         if "access_token" not in data:
             raise Exception(data)
         expires_in = int(data.get("expires_in", 3600))
         exp = int((_now_utc() + timedelta(seconds=max(expires_in - 120, 300))).timestamp())
         token_data = {"token": data["access_token"], "exp": exp}
         _cache_set(cache_key, token_data)
-        # print("Power BI Authenticated using OAuth client_credentials", token_data)
+
         return token_data
+    
     except Exception as ex:
         frappe.log_error(f"OAuth client_credentials falló: {ex}", "Power BI Auth (Fallback)")
         raise
@@ -140,8 +147,9 @@ def get_report(report_id: Optional[str] = None, workspace_id: Optional[str] = No
             )
             frappe.throw("Power BI: Reporte o Workspace no encontrado (404).")
         resp.raise_for_status()
-        # print("Power BI Get Report successful", resp.json())
+
         return resp.json() or {}
+    
     except Exception as ex:
         frappe.log_error(f"Fallo al obtener reporte {report_id} en grupo {workspace_id}: {ex}", "Power BI GET Report")
         raise
@@ -154,26 +162,32 @@ def generate_embed_token(report_id: Optional[str] = None, workspace_id: Optional
     bearer = get_access_token().get("token")
     report_info = get_report(report_id=report_id, workspace_id=workspace_id)
     dataset_id = report_info.get("datasetId") or cfg.get("dataset_id")
+    
     try:
         body_v2: Dict[str, Any] = {
             "accessLevel": access_level,
             "reports": [{"id": report_id, "groupId": workspace_id}],
             "targetWorkspaces": [{"id": workspace_id}],
         }
+        
         if dataset_id:
             body_v2["datasets"] = [{"id": dataset_id}]
         url_v2 = f"{api_base}/v1.0/myorg/GenerateToken"
         resp_v2 = requests.post(url_v2, json=body_v2, headers=_auth_headers(bearer), timeout=15)
+        
         if resp_v2.status_code == 404:
             frappe.log_error(f"404 GenerateToken V2. groupId={workspace_id}, reportId={report_id}, datasetId={dataset_id}", "Power BI GenerateToken V2 (404)")
         resp_v2.raise_for_status()
         data_v2 = resp_v2.json()
+    
         if data_v2 and data_v2.get("token"):
-            # print("Power BI GenerateToken V2 successful", data_v2)
             return {"token": data_v2["token"], "expiration": data_v2.get("expiration"), "datasetId": dataset_id}
+    
     except Exception as ex:
         frappe.log_error(f"Fallo GenerateToken V2: {ex}", "Power BI GenerateToken V2")
+    
     url = f"{api_base}/v1.0/myorg/groups/{workspace_id}/reports/{report_id}/GenerateToken"
+    
     try:
         resp = requests.post(url, json={"accessLevel": access_level}, headers=_auth_headers(bearer), timeout=15)
         if resp.status_code == 404:
@@ -183,8 +197,9 @@ def generate_embed_token(report_id: Optional[str] = None, workspace_id: Optional
         data = resp.json()
         if "token" not in data:
             raise Exception(data)
-        # print("Power BI GenerateToken successful", data)
+        
         return {"token": data["token"], "expiration": data.get("expiration"), "datasetId": dataset_id}
+    
     except Exception as ex:
         frappe.log_error(f"Fallo GenerateToken para reporte {report_id}: {ex}", "Power BI GenerateToken")
         raise
@@ -193,13 +208,16 @@ def build_embed_url(report_id: Optional[str] = None, workspace_id: Optional[str]
     cfg = _conf()
     workspace_id = workspace_id or cfg["workspace_id"]
     report_id = report_id or cfg["report_id"]
+    
     try:
         info = get_report(report_id=report_id, workspace_id=workspace_id)
-        # print("Power BI build_embed_url successful", info)
+        
         if info and info.get("embedUrl"):
             return info["embedUrl"]
+    
     except Exception:
         pass
+    
     return f"https://app.powerbi.com/reportEmbed?reportId={report_id}&groupId={workspace_id}"
 
 def get_embed_config(report_id: Optional[str] = None,
@@ -213,6 +231,7 @@ def get_embed_config(report_id: Optional[str] = None,
     cached = _cache_get(cache_key)
     now_epoch = int(_now_utc().timestamp())
     dataset_id: Optional[str] = None
+    
     if cached and int(cached.get("exp", 0)) > now_epoch + 60:
         embed_token = cached["token"]
         token_expiration = cached["tokenExpiration"]
@@ -223,6 +242,7 @@ def get_embed_config(report_id: Optional[str] = None,
         token_expiration = token_info.get("expiration")
         dataset_id = token_info.get("datasetId")
         exp_epoch = now_epoch + 600
+        
         try:
             if token_expiration:
                 dt = datetime.fromisoformat(token_expiration.replace("Z", "+00:00"))
@@ -230,7 +250,9 @@ def get_embed_config(report_id: Optional[str] = None,
         except Exception:
             pass
         _cache_set(cache_key, {"token": embed_token, "tokenExpiration": token_expiration, "datasetId": dataset_id, "exp": exp_epoch})
+    
     embed_url = build_embed_url(report_id=report_id, workspace_id=workspace_id)
+    
     result = {
         "reportId": report_id,
         "groupId": workspace_id,
@@ -239,14 +261,16 @@ def get_embed_config(report_id: Optional[str] = None,
         "tokenExpiration": token_expiration,
         "datasetId": dataset_id
     }
-    if filter_company and cfg.get("template"):
+
+    if filter_company: # and cfg.get("template"):
         result["filters"] = [{
             "$schema": "http://powerbi.com/product/schema#basicFilter",
             "target": {
-                "table": "",  # Nombre de la tabla en Power BI, consultar con Cami
-                "column": ""  # Nombre de la columna en Power BI, consultar con Cami
+                "table": "report",          # Nombre de la tabla en Power BI
+                "column": "company_name"    # Nombre de la columna en Power BI
             },
             "operator": "In",
             "values": [filter_company]
         }]
+    
     return result

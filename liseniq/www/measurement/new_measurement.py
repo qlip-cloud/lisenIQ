@@ -128,6 +128,12 @@ def get_context(context):
             context.preloaded_questions_json = "[]"
     else:
         context.preloaded_questions_json = "[]"
+    # Exponer el nombre de la plantilla
+    context.template_name = template_name or None
+    if template_name:
+        # Persistimos en cache y en frappe.local para fallback
+        frappe.cache().set_value(f"measurement_template:{frappe.session.user}", template_name)
+        frappe.local.template_name = template_name
 
     context.update({
         "is_navbar_custom": True,
@@ -670,7 +676,17 @@ def save_measurement(data):
         survey.su_start_date = data.get("startDate")
         survey.su_end_date = data.get("endDate")
         survey.su_timezone = data.get("timezone")
-        
+        # Fallbacks para obtener el template usado
+        template_cache_key = f"measurement_template:{frappe.session.user}"
+        template_name = (
+            data.get("template_name")
+            or frappe.request.args.get("template")
+            or getattr(frappe.local, "template_name", None)
+            or frappe.cache().get_value(template_cache_key)
+        )
+        if template_name:
+            survey.su_template = template_name
+            frappe.cache().delete_value(template_cache_key)
         contacts_data = data.get("contacts", {})
         survey_type = contacts_data.get("surveyType")
         response_type = contacts_data.get("responseType")

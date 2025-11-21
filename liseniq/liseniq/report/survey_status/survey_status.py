@@ -113,8 +113,7 @@ def get_data(filters):
 
     query = f"""
         SELECT
-            s.name AS name,
-            s.su_name AS title,
+            s.su_name AS name,
             co.co_name AS company
             {select_extra},
             COUNT(DISTINCT srp.name) AS expected_responses,
@@ -133,7 +132,7 @@ def get_data(filters):
             ON c.name = srp.sr_contact
         {joins}
         {where_clause}
-        GROUP BY s.name, s.su_owner {group_extra}
+        GROUP BY s.su_name, s.su_owner {group_extra}
         ORDER BY co.co_name, s.su_name {group_extra}
     """
 

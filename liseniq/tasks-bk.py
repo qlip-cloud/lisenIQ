@@ -264,27 +264,41 @@ def launch_pending_surveys():
     <div class="header">
       <h1> {survey.su_name} </h1>
     </div>
-    <p>Hola ,</p>
-    <p>Te damos la bienvenida a <strong>{survey.su_name}</strong>, una iniciativa clave que nos permitirá obtener información valiosa acerca de nuestra compañía y avanzar en nuestro propósito de mejora continua.</p>
+    <p>Cordial saludo, </p>
+	<p>Te damos la bienvenida al proceso de <strong>Medición - {survey.su_name}</strong>, la cual, es de gran valor para nosotros, pues nos arroja información acerca de la percepción que tienes de la cultura actual y nos da claridad de las acciones que debemos implementar para continuar desarrollando una cultura sana y las mejores condiciones para asegurar que vivas la mejor experiencia en tu día a día.</p>
+
     <div class="info">
       <p><strong>Información importante sobre la encuesta:</strong></p>
       <ul>
-        <li>Completarla tomará menos de 20 minutos.</li>
-        <li>Tus respuestas serán manejadas de forma confidencial y se utilizarán únicamente con fines estadísticos.</li>
-        <li>Para una mejor experiencia, te recomendamos usar Google Chrome y asegurarte de estar conectado a internet.</li>
-        <li>Si tienes alguna duda o presentas inconvenientes, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>.</li>
-        <li>Este enlace es personal e intransferible, por lo que no debe compartirse.</li>
+        <li>La valoración te tomará menos de 20 minutos para realizarla</li>
+        <li>La información que compartas será manejada de manera confidencial y utilizada con fines estadísticos.</li>
+        <li>Te pedimos por favor contestar con total sinceridad.</li>
+        <li>Es necesario que uses <strong>Google Chrome</strong> para desarrollar la valoración, recuerda que debes estar conectado a internet.</li>
+		<li>Te recomendamos <strong>revisar permanentemente tu bandeja de correos</strong> no deseados, en caso de que no encuentres en tu carpeta de entrada los mails correspondientes a la medición.</li>
+		<li>Este enlace es <strong>personal e intransferible</strong>.</li>
       </ul>
     </div>
-    {end_date_html}
-    <p>Agradecemos de antemano tu tiempo y tus valiosos aportes en este importante proceso.</p>
-    <p style="text-align:center;">
+
+	<p><strong>Recuerda que recibirás dos mails, este de cultura y otro de compromiso (engagement) que debe estar en tu bandeja de correo o de no deseados.</strong></p>
+
+	<p>Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a></p>
+
+	{end_date_html}
+
+    <p>De antemano, agradecemos por tu tiempo y tus valiosos aportes en este importante proceso que nos permitirá continuar trabajando por hacer las cosas bien.</p>
+
+	<p>Atentamente,</p>
+
+	<p>Equipo de Experiencia de Personas</p>
+	
+	<p style="text-align:center;">
       <a href="{unique_url}" class="btn">Iniciar encuesta</a>
     </p>
+
   </div>
 </body>
 </html>
-						"""
+					"""
 					
 						recipients = [contact_email]
 						sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
@@ -436,20 +450,20 @@ def send_survey_reminders():
 <body>
   <div class="container">
     <div class="header"><h1>Recordatorio de Medición</h1></div>
-    <p>Hola ,</p>
-    <p>Queremos recordarte que aún tienes pendiente completar la encuesta – <strong>{survey.su_name}</strong>, la cual nos ayudará a obtener información valiosa acerca de nuestra compañía y continuar fortaleciendo nuestra cultura organizacional.</p>
+    <p>Hola <strong>{contact_name}</strong>,</p>
+    <p>Aún tienes pendiente completar la <strong>encuesta de Medición {survey.su_name}</strong>. Tu participación es fundamental para obtener información valiosa acerca de nuestra compañía y fortalecer nuestra cultura organizacional.</p>
     <div class="info">
       <p><strong>Información importante sobre la encuesta:</strong></p>
       <ul>
-        <li>Completarla tomará menos de 20 minutos.</li>
-        <li>Tus respuestas serán manejadas de forma confidencial y se utilizarán únicamente con fines estadísticos.</li>
-        <li>Para una mejor experiencia, te recomendamos usar Google Chrome y asegurarte de estar conectado a internet.</li>
-        <li>Si tienes alguna duda o presentas inconvenientes, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>.</li>
-        <li>Este enlace es personal e intransferible, por lo que no debe compartirse.</li>
+        <li>Completarla tomará menos de <strong>20 minutos</strong>.</li>
+        <li>Tus respuestas serán manejadas de forma <strong>confidencial</strong> y con fines estadísticos.</li>
+        <li>Usa <strong>Google Chrome</strong> y asegúrate de estar conectado a internet.</li>
+        <li>Este enlace es <strong>personal e intransferible</strong>.</li>
       </ul>
     </div>
     <p style="text-align:center;"><a href="{link}" class="btn">Responder encuesta</a></p>
-    <p>Tu voz es fundamental para este proceso. Gracias por tu participación y compromiso.</p>
+    <p>Tu voz es clave en este proceso. ¡Gracias por tu tiempo y compromiso!</p>
+    <div class="footer">Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a></div>
   </div>
 </body>
 </html>
@@ -461,6 +475,7 @@ def send_survey_reminders():
 						continue
 
 					recipients_list = [contact_email]
+					# Se elimina modo debug: siempre se envía al destinatario real
 
 					# Remitente solo desde Email Account por defecto
 					sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
@@ -763,23 +778,37 @@ def send_pending_links_for_survey(survey_name: str):
     <div class="header">
       <h1> {survey.su_name} </h1>
     </div>
-    <p>Hola ,</p>
-    <p>Te damos la bienvenida a <strong>{survey.su_name}</strong>, una iniciativa clave que nos permitirá obtener información valiosa acerca de nuestra compañía y avanzar en nuestro propósito de mejora continua.</p>
+    <p>Cordial saludo, </p>
+	<p>Te damos la bienvenida al proceso de <strong>Medición - {survey.su_name}</strong>, la cual, es de gran valor para nosotros, pues nos arroja información acerca de la percepción que tienes de la cultura actual y nos da claridad de las acciones que debemos implementar para continuar desarrollando una cultura sana y las mejores condiciones para asegurar que vivas la mejor experiencia en tu día a día.</p>
+
     <div class="info">
       <p><strong>Información importante sobre la encuesta:</strong></p>
       <ul>
-        <li>Completarla tomará menos de 20 minutos.</li>
-        <li>Tus respuestas serán manejadas de forma confidencial y se utilizarán únicamente con fines estadísticos.</li>
-        <li>Para una mejor experiencia, te recomendamos usar Google Chrome y asegurarte de estar conectado a internet.</li>
-        <li>Si tienes alguna duda o presentas inconvenientes, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>.</li>
-        <li>Este enlace es personal e intransferible, por lo que no debe compartirse.</li>
+        <li>La valoración te tomará menos de 20 minutos para realizarla</li>
+        <li>La información que compartas será manejada de manera confidencial y utilizada con fines estadísticos.</li>
+        <li>Te pedimos por favor contestar con total sinceridad.</li>
+        <li>Es necesario que uses <strong>Google Chrome</strong> para desarrollar la valoración, recuerda que debes estar conectado a internet.</li>
+		<li>Te recomendamos <strong>revisar permanentemente tu bandeja de correos</strong> no deseados, en caso de que no encuentres en tu carpeta de entrada los mails correspondientes a la medición.</li>
+		<li>Este enlace es <strong>personal e intransferible</strong>.</li>
       </ul>
     </div>
-    {end_date_html}
-    <p>Agradecemos de antemano tu tiempo y tus valiosos aportes en este importante proceso.</p>
-    <p style="text-align:center;">
+
+	<p><strong>Recuerda que recibirás dos mails, este de cultura y otro de compromiso (engagement) que debe estar en tu bandeja de correo o de no deseados.</strong></p>
+
+	<p>Si tienes dudas o problemas con la encuesta, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a></p>
+
+	{end_date_html}
+
+    <p>De antemano, agradecemos por tu tiempo y tus valiosos aportes en este importante proceso que nos permitirá continuar trabajando por hacer las cosas bien.</p>
+
+	<p>Atentamente,</p>
+
+	<p>Equipo de Experiencia de Personas</p>
+	
+	<p style="text-align:center;">
       <a href="{unique_url}" class="btn">Iniciar encuesta</a>
     </p>
+
   </div>
 </body>
 </html>

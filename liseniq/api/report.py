@@ -459,13 +459,9 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
     for demographic_id in user_demographics:
         row[demographic_id] = user_demographics[demographic_id]
 
-    # Inicializar todas las preguntas con valores vacíos
-    for qid in all_questions_map.keys():
-        row[qid] = ''
-    
-    # Llenar solo las preguntas que tienen respuesta
+    # Agregar solo las preguntas que el usuario contestó (sin inicializar todas con '')
     for qid, answer in parsed_responses.items():
-        if qid in all_questions_map:
+        if qid in all_questions_map and answer not in (None, ''):
             row[qid] = answer
 
     return row

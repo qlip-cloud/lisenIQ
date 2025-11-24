@@ -27,7 +27,7 @@ function initPreloaded() {
   try {
     state.items = JSON.parse(ui.preload.dataset.surveys || '[]');
     state.templates = JSON.parse(ui.preload.dataset.templates || '[]');
-    state.allTemplates = [...state.templates]; // conservar todas
+    state.allTemplates = [...state.templates];
   } catch {
     state.items = [];
     state.templates = [];

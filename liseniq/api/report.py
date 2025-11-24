@@ -170,14 +170,16 @@ def get_all_unique_questions(valid_surveys):
 
 
 def get_surveys_expected_responses():
-    query_survey = f"""
+    query_survey = """
         SELECT
             s.su_name AS name,
-            COUNT(DISTINCT c.name) AS expected_responses
-
+            COUNT(DISTINCT srp.name) AS expected_responses
         FROM `tabqp_IQ_Survey` s
         LEFT JOIN `tabqp_IQ_Company` co ON co.name = s.su_owner
-        LEFT JOIN `tabContact` c ON c.custom_company = s.su_owner
+        LEFT JOIN `tabqp_IQ_SurveyRecipient` srp 
+            ON srp.sr_survey = s.name
+        LEFT JOIN `tabContact` c 
+            ON c.name = srp.sr_contact
         GROUP BY s.su_name, s.su_owner 
         ORDER BY co.co_name, s.su_name
     """

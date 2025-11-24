@@ -70,7 +70,7 @@ def get_columns(filters):
             "fieldtype": "Int",
             "width": 100,
         },
-    ]
+    ]   
     return columns
 
 

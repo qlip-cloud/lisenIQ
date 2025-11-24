@@ -95,7 +95,7 @@ def custom_report_by_question(filters=None):
     demographics_map = get_demographics_labels()
 
 
-    data = get_all_survey_data(valid_surveys, all_questions_map, demographics_map)
+    data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
     transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
     translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
 
@@ -256,6 +256,76 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
 
     return data
 
+def get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map):
+    """
+    Obtiene los datos de todas las encuestas válidas
+    """
+    if not valid_surveys:
+        return []
+    
+    # Crear mapeo de survey_name a company_name e id
+    survey_company_map = {
+        survey['survey_name']: survey['company_name'] or ''
+        for survey in valid_surveys
+    }
+    survey_id_map = {
+        survey['survey_name']: survey['id']
+        for survey in valid_surveys
+    }
+
+    survey_expected_responses_map = {
+        survey['name']: survey['expected_responses']
+        for survey in get_surveys_expected_responses()
+    }
+    
+    # Obtener nombres de encuestas válidas
+    survey_names = [survey['survey_name'] for survey in valid_surveys]
+    survey_ids = [survey['id'] for survey in valid_surveys]
+    survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
+    
+    query = f"""
+        SELECT 
+            sr.name,
+            sr.user,
+            sr.survey,
+            sr.response_json,
+            c.custom_document_number,
+            c.first_name,
+            c.last_name,
+            c.custom_dob,
+            c.gender,
+            c.custom_entry_date,
+            c.custom_country,
+            a.al_title
+        FROM `tabSurvey Response` sr
+        LEFT JOIN `tabContact` c ON c.name = sr.user
+        LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
+        WHERE sr.survey IN ({survey_names_placeholder})
+        ORDER BY sr.survey, sr.creation DESC
+    """
+    
+    responses = frappe.db.sql(query, survey_names, as_dict=True)
+    
+    if not responses:
+        return []
+
+    # Obtener datos demográficos para todos los usuarios
+    users_list = [r.user for r in responses if r.user]
+    demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
+
+    data = []
+    for response in responses:
+        row = process_response_row_by_question(
+            response, 
+            all_questions_map, 
+            demographics_data,
+            survey_company_map,
+            survey_id_map,
+            survey_expected_responses_map
+        )
+        data.append(row)
+
+    return data
 
 def get_survey_data_yesterday(valid_surveys, all_questions_map, demographics_map):
     """
@@ -323,7 +393,7 @@ def get_survey_data_yesterday(valid_surveys, all_questions_map, demographics_map
 
     data = []
     for response in responses:
-        row = process_response_row(
+        row = process_response_row_by_question(
             response, 
             all_questions_map, 
             demographics_data,
@@ -400,6 +470,45 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
 
     return row
 
+def process_response_row_by_question(response, all_questions_map, demographics_data, survey_company_map, survey_id_map, survey_expected_responses_map):
+    """
+    Procesa una fila individual de respuesta
+    """
+    user = response.get('user', '')
+    survey_name = response.get('survey', '')
+    
+    # Datos básicos
+    row = {
+        'survey_id': survey_id_map.get(survey_name, ''),
+        'survey_name': survey_name,
+        'company_name': survey_company_map.get(survey_name, ''),
+        'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
+        'user_id': response.get('custom_document_number', ''),
+        'first_name': response.get('first_name', ''),
+        'last_name': response.get('last_name', ''),
+        'custom_dob': response.get('custom_dob', ''),
+        'gender': response.get('gender', ''),
+        'custom_academic_level': response.get('al_title', ''),
+        'entry_date': response.get('custom_entry_date', ''),
+        'country': response.get('custom_country', ''),
+    }
+
+    # Procesar respuestas de la encuesta
+    response_json = response.get('response_json', '{}')
+    parsed_responses = parse_response_json(response_json)
+    
+    # Agregar datos demográficos adicionales
+    user_demographics = demographics_data.get(user, {})
+    for demographic_id in user_demographics:
+        row[demographic_id] = user_demographics[demographic_id]
+
+    # Guardar solo las respuestas válidas en una propiedad separada
+    row['_responses'] = {}
+    for qid, answer in parsed_responses.items():
+        if qid in all_questions_map and answer not in (None, ''):
+            row['_responses'][qid] = answer
+
+    return row
 
 def parse_response_json(response_json):
     """
@@ -573,8 +682,6 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
 
     transformed_data = []
     
-
-    question_ids = set(all_questions_map.keys())
     demographic_ids = set(demographics_map.keys())
     
     # campos demográficos base que siempre deberían aparecer
@@ -589,25 +696,24 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
     required_demographic_keys = set(core_demographic_keys) | set(demographic_ids)
 
     for row in data:
-        demographic_data = {}
-        question_responses = {}
-
-        # separar respuestas de preguntas del resto
-        for key, value in row.items():
-            if key in question_ids and value not in (None, ''):
-                question_responses[key] = value
-            else:
-                demographic_data[key] = value
+        # Extraer respuestas de la propiedad especial
+        question_responses = row.get('_responses', {})
+        
+        # Preparar datos demográficos (sin _responses)
+        demographic_data = {k: v for k, v in row.items() if k != '_responses'}
 
         # Asegurar que todas las claves demográficas estén presentes (aunque sean None)
         for dem_key in required_demographic_keys:
             if dem_key not in demographic_data:
                 demographic_data[dem_key] = None
 
+        # Si no hay respuestas, saltar este registro
+        if not question_responses:
+            continue
+
         for qid, answer in question_responses.items():
             question_object = demographic_data.copy()
 
-            # usar el texto de la pregunta para 'question'
             question_text = all_questions_map.get(qid, qid)
             question_object['question'] = question_text
             question_object['answer'] = answer

@@ -1,0 +1,63 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Resultados") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="main-content-padding">
+    <div id="results-preloaded"
+         data-surveys='{{ finished_surveys_json | e if finished_surveys_json else "[]" }}'
+         data-templates='{{ survey_templates_json | e if survey_templates_json else "[]" }}'
+         style="display:none;"></div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="results-filters">
+                <div class="results-filter-group">
+                    <label for="filter-name" class="results-filter-label">Nombre de la medición</label>
+                    <span class="results-filter-desc text-muted small">Filtrar por el nombre de la medición</span>
+                    <div class="filter-name-wrapper">
+                        <input id="filter-name" type="text" class="form-control">
+                        <button type="button" id="filter-name-clear" class="clear-filter-btn" title="Limpiar" aria-label="Limpiar filtro">
+                            <i class="fa fa-eraser"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="results-filter-group">
+                    <label for="filter-template" class="results-filter-label">Plantilla de la medición</label>
+                    <span class="results-filter-desc text-muted small">Filtrar por la plantilla de la medición</span>
+                    <select id="filter-template" class="form-control form-select">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+            </div>
+            <div id="results-grid" class="results-grid"></div>
+            <div id="results-empty" class="text-muted small d-none">No hay resultados para los filtros seleccionados.</div>
+        </div>
+    </div>
+
+    <div id="step2-pbi" class="card mb-3 d-none">
+        <div class="card-body">
+            <div class="d-flex justify-content-end mb-2">
+                <button id="btn-back-step-2" type="button" class="btn btn-outline-purple btn-sm">Atrás</button>
+            </div>
+            <div id="pbi-embed" style="width:100%;height:600px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+                <!-- Embebido dinámico tras selección -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_results.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script type="module" src="/assets/liseniq/js/iq_results.js"></script>
+{% endblock %}

@@ -18,19 +18,36 @@ def get_context(context):
         frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
     user_company = user_contact_info
 
-    templates_from_db = frappe.get_list(
+    # Obtener plantillas públicas (visibles para todos)
+    templates_public = frappe.get_list(
         "qp_IQ_Template",
-        filters=[
-            ['custom_company', '=', user_company]
-        ],
+        filters=[['tp_is_public', '=', 1]],
+        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private", "tp_is_public"],
+        order_by="creation desc",
+        ignore_permissions=True
+    )
+
+    # Obtener plantillas de la compañía del usuario (públicas y privadas del usuario)
+    templates_company_scoped = frappe.get_list(
+        "qp_IQ_Template",
+        filters=[['custom_company', '=', user_company]],
         or_filters=[
             ['tp_is_private', '=', 0],
             ['tp_owner', '=', frappe.session.user]
         ],
-        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private"],
+        fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private", "tp_is_public"],
         order_by="creation desc",
         ignore_permissions=True
     )
+
+    # Agregar y deduplicar por nombre
+    templates_from_db = []
+    seen = set()
+    for t in templates_public + templates_company_scoped:
+        if t.name in seen:
+            continue
+        seen.add(t.name)
+        templates_from_db.append(t)
     
     processed_templates = []
     for template_data in templates_from_db:
@@ -117,7 +134,7 @@ def get_questions_from_template(template_name):
                     {
                         "text": opt.qo_option_text,
                         "value": opt.qo_option_value,
-                        "url": getattr(opt, "qo_url", None)  # incluir URL si existe
+                        "url": getattr(opt, "qo_url", None)
                     }
                     for opt in q_doc.qn_response_options
                 ]
@@ -241,8 +258,7 @@ def get_bank_data(keyword=None, demographic=None):
         frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
 
     question_filters = {
-        'qn_status': 'Activa',
-        'qn_owner': user_company
+        'qn_status': 'Activa'
     }
     if keyword:
         question_filters['qn_statement'] = ['like', f'%{keyword}%']
@@ -252,6 +268,10 @@ def get_bank_data(keyword=None, demographic=None):
     questions = frappe.get_list(
         "qp_IQ_Question",
         filters=question_filters,
+        or_filters=[
+            ['qn_owner', '=', user_company],
+            ['qp_is_public', '=', 1]
+        ],
         fields=[
             "name", "qn_statement as text", "qn_category", "qn_type", "qn_nps_min",
             "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic"
@@ -310,3 +330,27 @@ def get_bank_data(keyword=None, demographic=None):
         "questions": questions,
         "demographics": demographics
     }
+
+# Metodo para marcar preguntas de una plantilla como públicas
+@frappe.whitelist()
+def mark_template_questions_public(template_name: str):
+    if not template_name:
+        frappe.throw("Nombre de plantilla inválido.")
+
+    try:
+        # Obtener preguntas desde la tabla hija sin cargar el Doc completo
+        rows = frappe.get_all(
+            "qp_IQ_TemplateQuestion",
+            filters={"parent": template_name, "parenttype": "qp_IQ_Template"},
+            fields=["tq_question"],
+            ignore_permissions=True
+        )
+        question_names = [r.tq_question for r in rows if r.tq_question]
+
+        for qname in question_names:
+            frappe.db.set_value("qp_IQ_Question", qname, "qp_is_public", 1, update_modified=True)
+
+        return {"updated": len(question_names)}
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Error al marcar preguntas como públicas")
+        frappe.throw("No fue posible marcar las preguntas como públicas. Intenta nuevamente.")

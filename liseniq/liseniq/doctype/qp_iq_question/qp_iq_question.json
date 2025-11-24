@@ -14,6 +14,7 @@
   "qn_owner",
   "qn_status",
   "qn_category",
+  "qp_is_public",
   "qn_optional",
   "qp_sec_od",
   "qn_demographic",
@@ -155,11 +156,17 @@
   {
    "fieldname": "qp_col_2",
    "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "qp_is_public",
+   "fieldtype": "Check",
+   "label": "Pregunta Publica"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 18:57:31.802006",
+ "modified": "2025-11-06 16:16:31.906173",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

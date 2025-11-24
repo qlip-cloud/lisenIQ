@@ -11,6 +11,7 @@
   "tp_owner",
   "custom_company",
   "tp_is_private",
+  "tp_is_public",
   "tp_status",
   "tp_logo",
   "column_break_1",
@@ -79,11 +80,17 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Es privada"
+  },
+  {
+   "default": "0",
+   "fieldname": "tp_is_public",
+   "fieldtype": "Check",
+   "label": "Es publica"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 19:11:59.112206",
+ "modified": "2025-11-05 21:54:46.305770",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Template",

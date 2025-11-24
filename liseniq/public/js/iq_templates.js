@@ -22,7 +22,8 @@ document.addEventListener('DOMContentLoaded', function () {
         category: document.getElementById('template_category_input'),
         description: document.getElementById('template_description_input'),
         image: document.getElementById('template_image_input'),
-        isPrivate: document.getElementById('template_is_private_input')
+        isPrivate: document.getElementById('template_is_private_input'),
+        isPublic: document.getElementById('template_is_public_input')
     };
 
     const wizardDataEl = document.getElementById('template-wizard-data');
@@ -221,7 +222,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const bankQuestionNames = questions.filter(q => !q.id.startsWith('manual-')).map(q => q.id);
             const allQuestionNames = [...newQuestionNames, ...bankQuestionNames];
 
-            const isPrivate = formStep1.isPrivate.checked;
+            const isPrivate = formStep1.isPrivate?.checked;
+            const hiddenPublic = document.getElementById('tp_is_public_value');
+            const isPublic = formStep1.isPublic?.checked ? 1 : (hiddenPublic && hiddenPublic.value === '1' ? 1 : 0);
 
             const templateDoc = {
                 doctype: 'qp_IQ_Template',
@@ -229,7 +232,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 tp_category: formStep1.category.value,
                 tp_description: formStep1.description.value.trim(),
                 tp_status: 'Borrador',
-                tp_is_private: isPrivate ? 1 : 0,
+                tp_is_private: isPublic ? 0 : (isPrivate ? 1 : 0),
+                tp_is_public: isPublic,
                 tp_owner: frappe.session.user,
                 custom_company: userCompany,
                 tp_questions: allQuestionNames.map(q_name => ({ doctype: 'qp_IQ_TemplateQuestion', tq_question: q_name }))
@@ -255,6 +259,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 const result = await response.json();
                 if (!response.ok || result.exc) throw new Error(result._server_messages ? JSON.parse(result._server_messages)[0] : 'La subida del archivo falló.');
+            }
+
+            // Si la plantilla es pública, marcar sus preguntas como públicas
+            if (isPublic) {
+                await frappe.call({
+                    method: 'liseniq.www.iq-templates.index.mark_template_questions_public',
+                    args: { template_name: newTemplateName }
+                });
             }
 
             showGlobalNotification('Se ha creado la Plantilla', 'success');
@@ -291,6 +303,28 @@ document.addEventListener('DOMContentLoaded', function () {
             fileNameDisplay.textContent = imageInput.files.length > 0 ? imageInput.files[0].name : 'Adjuntar archivo';
             fileNameDisplay.classList.toggle('has-file', imageInput.files.length > 0);
         });
+        
+        const chkPrivate = formStep1.isPrivate;
+        const chkPublic = formStep1.isPublic;
+        const hiddenPublic = document.getElementById('tp_is_public_value');
+
+        const syncPublicFlag = () => {
+            if (hiddenPublic) hiddenPublic.value = (chkPublic && chkPublic.checked) ? '1' : '0';
+        };
+
+        if (chkPublic) {
+            chkPublic.addEventListener('change', () => {
+                if (chkPublic.checked && chkPrivate) chkPrivate.checked = false;
+                syncPublicFlag();
+            });
+        }
+        if (chkPrivate) {
+            chkPrivate.addEventListener('change', () => {
+                if (chkPrivate.checked && chkPublic) chkPublic.checked = false;
+                syncPublicFlag();
+            });
+        }
+        syncPublicFlag();
     }
     
     function init() {

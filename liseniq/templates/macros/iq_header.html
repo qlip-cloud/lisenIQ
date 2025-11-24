@@ -1,7 +1,10 @@
 {% macro iq_header(title='Título de Página') %}
 <div class="page-header-container">
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center" style="width:100%;">
         <h1 class="h5 mb-0">{{ title }}</h1>
+        <div id="iq-header-company-name" class="iq-header-company-name mx-auto">
+            {{ frappe.session.data.liseniq_company_name or "" }}
+        </div>
         <div class="d-flex align-items-center">
             <button id="btn-open-create-measurement-modal" class="btn btn-outline-purple btn-sm mr-4">+ Crear Medición</button>
             <i class="fa fa-bell-o text-muted mx-4" style="font-size: 1.2rem; cursor: pointer;"></i>

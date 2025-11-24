@@ -12,8 +12,9 @@
 
 .template-grid-container {
     flex: 1;
-    max-height: 75vh;
+    max-height: 65vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding-right: 1rem;
 }
 
@@ -657,3 +658,18 @@
 }
 .visual-file-preview { display: flex; align-items: center; gap: 0.5rem; }
 .visual-option-input-row.is-uploading { opacity: 0.6; pointer-events: none; }
+
+.template-grid-container::-webkit-scrollbar {
+    width: 8px;
+}
+.template-grid-container::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 8px;
+}
+.template-grid-container::-webkit-scrollbar-thumb {
+    background: var(--brand-primary, #7B24FF);
+    border-radius: 8px;
+}
+.template-grid-container::-webkit-scrollbar-thumb:hover {
+    background: #6920d6;
+}

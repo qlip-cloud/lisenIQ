@@ -170,14 +170,16 @@ def get_all_unique_questions(valid_surveys):
 
 
 def get_surveys_expected_responses():
-    query_survey = f"""
+    query_survey = """
         SELECT
             s.su_name AS name,
-            COUNT(DISTINCT c.name) AS expected_responses
-
+            COUNT(DISTINCT srp.name) AS expected_responses
         FROM `tabqp_IQ_Survey` s
         LEFT JOIN `tabqp_IQ_Company` co ON co.name = s.su_owner
-        LEFT JOIN `tabContact` c ON c.custom_company = s.su_owner
+        LEFT JOIN `tabqp_IQ_SurveyRecipient` srp 
+            ON srp.sr_survey = s.name
+        LEFT JOIN `tabContact` c 
+            ON c.name = srp.sr_contact
         GROUP BY s.su_name, s.su_owner 
         ORDER BY co.co_name, s.su_name
     """
@@ -623,6 +625,35 @@ def get_question_variables_map():
         return {}
 
 
+def get_question_types_map():
+    """
+    Obtiene el mapeo de preguntas a sus tipos
+    """
+    try:
+        query = """
+            SELECT 
+                q.qn_statement as question_text,
+                qt.qnt_type_name as question_type
+            FROM `tabqp_IQ_Question` q
+            LEFT JOIN `tabqp_IQ_QuestionType` qt ON qt.name = q.qn_type
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        
+        mapping = {}
+        for row in results:
+            question_text = row.get('question_text', '')
+            question_type = row.get('question_type', '')
+            
+            if question_text:
+                mapping[question_text] = question_type or ''
+                
+        return mapping
+        
+    except Exception as e:
+        frappe.log_error(f"Error getting question types map: {str(e)}")
+        return {}
+
+
 def get_bulk_demographics(users_list, demographics_map):
     """
     Obtiene datos demográficos adicionales para múltiples usuarios de manera optimizada
@@ -687,6 +718,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
     ]
 
     question_variables_map = get_question_variables_map()
+    question_types_map = get_question_types_map()
 
     # conjunto total de claves demográficas (ids sin traducir)
     required_demographic_keys = set(core_demographic_keys) | set(demographic_ids)
@@ -717,6 +749,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
             # Agregar variable y tema basado en la pregunta
             question_info = question_variables_map.get(question_text, {})
             question_object['variable'] = question_info.get('variable', '')
+            question_object['question_type'] = question_types_map.get(question_text, '')
             tema = question_info.get('tema', '')
             try:
                 company_name_val = (demographic_data.get('company_name') or '').lower().strip()

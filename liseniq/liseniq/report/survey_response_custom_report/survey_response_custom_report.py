@@ -33,6 +33,12 @@ def build_columns(question_map, demographics_map):
     """
     columns = [
         {
+            "label": _("Número de Identificación"),
+            "fieldname": "custom_document_number",
+            "fieldtype": "Data",
+            "width": 150   
+        },
+        {
             "label": _("Nombre"),
             "fieldname": "first_name",
             "fieldtype": "Data",
@@ -105,6 +111,7 @@ def get_survey_data(survey_name, question_map, demographics_map):
             sr.name,
             sr.user,
             sr.response_json,
+            c.custom_document_number,
             c.first_name,
             c.last_name,
             c.custom_dob,
@@ -143,6 +150,7 @@ def process_response_row(response, question_map, demographics_data):
     user = response.get('user', '')
     
     row = {
+        'custom_document_number': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
         'gender': response.get('gender', ''),

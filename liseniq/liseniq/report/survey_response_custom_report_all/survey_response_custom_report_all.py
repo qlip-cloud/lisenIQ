@@ -87,6 +87,12 @@ def build_columns(all_questions_map, demographics_map):
             "width": 200
         },
         {
+            "label": _("Número de Identificación"),
+            "fieldname": "custom_document_number",
+            "fieldtype": "Data",
+            "width": 150   
+        },
+        {
             "label": _("Nombre"),
             "fieldname": "first_name",
             "fieldtype": "Data",
@@ -174,6 +180,7 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             sr.user,
             sr.survey,
             sr.response_json,
+            c.custom_document_number,
             c.first_name,
             c.last_name,
             c.custom_dob,
@@ -221,6 +228,7 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
     row = {
         'survey_name': survey_name,
         'company_name': survey_company_map.get(survey_name, ''),
+        'custom_document_number': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
         'gender': response.get('gender', ''),

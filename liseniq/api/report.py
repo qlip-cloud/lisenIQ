@@ -138,6 +138,7 @@ def get_valid_surveys():
                 iq.name as id,
                 iq.su_name,
                 iq.su_owner,
+                c.name as company_id,
                 c.co_name as company_name
             FROM `tabSurvey` s
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
@@ -196,7 +197,10 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     
     # Crear mapeo de survey_name a company_name e id
     survey_company_map = {
-        survey['survey_name']: survey['company_name'] or ''
+        survey['survey_name']: {
+            'company_id': survey.get('company_id', ''),
+            'company_name': survey.get('company_name', '')
+        }
         for survey in valid_surveys
     }
     survey_id_map = {
@@ -265,9 +269,12 @@ def get_all_survey_data_by_question(valid_surveys, all_questions_map, demographi
     if not valid_surveys:
         return []
     
-    # Crear mapeo de survey_name a company_name e id
+    # Crear mapeo de survey_name a company_name, company_id y survey_id
     survey_company_map = {
-        survey['survey_name']: survey['company_name'] or ''
+        survey['survey_name']: {
+            'company_id': survey.get('company_id', ''),
+            'company_name': survey.get('company_name', '')
+        }
         for survey in valid_surveys
     }
     survey_id_map = {
@@ -343,7 +350,10 @@ def get_survey_data_yesterday(valid_surveys, all_questions_map, demographics_map
     
     # Crear mapeo de survey_name a company_name e id
     survey_company_map = {
-        survey['survey_name']: survey['company_name'] or ''
+        survey['survey_name']: {
+            'company_id': survey.get('company_id', ''),
+            'company_name': survey.get('company_name', '')
+        }
         for survey in valid_surveys
     }
     survey_id_map = {
@@ -437,10 +447,12 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
     survey_name = response.get('survey', '')
     
     # Datos básicos
+    company_data = survey_company_map.get(survey_name, {})
     row = {
         'survey_id': survey_id_map.get(survey_name, ''),
         'survey_name': survey_name,
-        'company_name': survey_company_map.get(survey_name, ''),
+        'company_id': company_data.get('company_id', ''),
+        'company_name': company_data.get('company_name', ''),
         'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
         'user_id': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
@@ -476,10 +488,12 @@ def process_response_row_by_question(response, all_questions_map, demographics_d
     survey_name = response.get('survey', '')
     
     # Datos básicos
+    company_data = survey_company_map.get(survey_name, {})
     row = {
         'survey_id': survey_id_map.get(survey_name, ''),
         'survey_name': survey_name,
-        'company_name': survey_company_map.get(survey_name, ''),
+        'company_id': company_data.get('company_id', ''),
+        'company_name': company_data.get('company_name', ''),
         'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
         'user_id': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
@@ -628,10 +642,13 @@ def get_question_variables_map():
 def get_question_types_map():
     """
     Obtiene el mapeo de preguntas a sus tipos
+    La clave del mapeo será el ID de la pregunta
+    y el valor será el tipo de la pregunta
     """
     try:
         query = """
             SELECT 
+                q.name as question_id,
                 q.qn_statement as question_text,
                 qt.qnt_type_name as question_type
             FROM `tabqp_IQ_Question` q
@@ -641,11 +658,12 @@ def get_question_types_map():
         
         mapping = {}
         for row in results:
+            question_id = row.get('question_id', '')
             question_text = row.get('question_text', '')
             question_type = row.get('question_type', '')
             
-            if question_text:
-                mapping[question_text] = question_type or ''
+            if question_id:
+                mapping[question_id] = question_type or ''
                 
         return mapping
         
@@ -713,7 +731,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
     
     # campos demográficos base que siempre deberían aparecer
     core_demographic_keys = [
-        'survey_id', 'survey_name', 'company_name', 'first_name', 'last_name',
+        'survey_id', 'survey_name', 'company_id', 'company_name', 'first_name', 'last_name',
         'custom_dob', 'gender', 'custom_academic_level', 'entry_date', 'country'
     ]
 
@@ -743,13 +761,14 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
             question_object = demographic_data.copy()
 
             question_text = all_questions_map.get(qid, qid)
+            question_object['question_id'] = qid
             question_object['question'] = question_text
             question_object['answer'] = answer
 
             # Agregar variable y tema basado en la pregunta
             question_info = question_variables_map.get(question_text, {})
             question_object['variable'] = question_info.get('variable', '')
-            question_object['question_type'] = question_types_map.get(question_text, '')
+            question_object['question_type'] = question_types_map.get(qid, '')
             tema = question_info.get('tema', '')
             try:
                 company_name_val = (demographic_data.get('company_name') or '').lower().strip()

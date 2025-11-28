@@ -750,7 +750,7 @@ class MeasurementCreator {
             ? `<i class="fa fa-spinner fa-spin"> </i> Guardando...`
             : `<i class="fa fa-spinner fa-spin"> </i> Enviando...`;
 
-        // Nuevo: si usa plantilla por defecto, no enviar personalización
+        // Si usa plantilla por defecto, no enviar personalización
         const useDefault = !!this.ui.personalizationStep.useDefaultCheck?.checked;
         const emailCustomization = useDefault ? {} : {
             invitation_subject: this.state.measurementData.emailCustomization.invitation_subject,

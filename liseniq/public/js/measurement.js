@@ -100,7 +100,8 @@ class MeasurementCreator {
                     reminder_subject: '',
                     reminder_body: ''
                 }
-            }
+            },
+            wasUsingDefault: false
         };
         
         if (this.ui.stepperContainer) {
@@ -317,7 +318,14 @@ class MeasurementCreator {
         personalizationStep.body?.addEventListener('input', () => this.syncEmailStateFromFields());
 
         personalizationStep.useDefaultCheck?.addEventListener('change', () => {
+            const wasDefault = this.state.wasUsingDefault;
+            const nowDefault = personalizationStep.useDefaultCheck.checked;
             this.applyEmailCustomizationToggle();
+            if (wasDefault && !nowDefault) {
+                this.setEmailType('invitation');
+                this.syncEmailFieldsFromState();
+            }
+            this.state.wasUsingDefault = nowDefault;
         });
 
         // Listeners que deben funcionar en ambos modos (creación y edición)
@@ -654,7 +662,7 @@ class MeasurementCreator {
     applyEmailCustomizationToggle() {
         const { customizationFields, useDefaultCheck } = this.ui.personalizationStep;
         if (!customizationFields || !useDefaultCheck) return;
-        const useDefault = !!useDefaultCheck.checked;
+        const useDefault = useDefaultCheck.checked;
         customizationFields.style.display = useDefault ? 'none' : '';
     }
 

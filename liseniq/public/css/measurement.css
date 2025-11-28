@@ -333,7 +333,7 @@
 .email-type-toggle .btn-group .btn {
     background: transparent !important;
     border: none !important;
-    border-bottom: 1px solid var(--brand-primary) !important;
+    border-bottom: 1px solid transparent !important;
     box-shadow: none !important;
     color: var(--text-color-secondary, #6c757d);
     font-weight: 500;
@@ -354,7 +354,6 @@
     border-bottom-color: var(--brand-primary) !important;
 }
 
-/* Remover estilos heredados que pudieran interferir */
 .email-type-toggle .btn-group .btn.btn-purple-main,
 .email-type-toggle .btn-group .btn.btn-outline-purple {
     background: transparent !important;
@@ -371,6 +370,7 @@
 
 #step-4-form .form-group {
     margin-bottom: 1.25rem;
+    margin-top: 2.5rem;
 }
 
 /* Fallback si TinyMCE no carga */

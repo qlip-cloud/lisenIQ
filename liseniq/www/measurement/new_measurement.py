@@ -70,6 +70,11 @@ def get_context(context):
                     "frequency": doc.su_reminder_frequency,
                     "max": doc.su_reminder_max
                 },
+                # Personalización de correos
+                "su_invitation_subject": doc.su_invitation_subject,
+                "su_invitation_body": doc.su_invitation_body,
+                "su_reminder_subject": doc.su_reminder_subject,
+                "su_reminder_body": doc.su_reminder_body,
                 "questions": questions,
                 "contacts": {
                     "surveyType": survey_type,
@@ -377,8 +382,9 @@ def delete_measurement_contacts(survey_name, contact_names):
 def save_measurement(data):
     try:
         data = json.loads(data)
+        email_data = data.get("email_customization") or {}
 
-        # Modo edición: actualizar solo nombre, fecha de cierre y recordatorios
+        # Modo edición
         if data.get("is_edit_mode") and data.get("doc_name"):
             survey = frappe.get_doc("qp_IQ_Survey", data["doc_name"])
 
@@ -411,6 +417,12 @@ def save_measurement(data):
                 survey.su_send_reminders = 0
                 survey.su_reminder_frequency = None
                 survey.su_reminder_max = None
+
+            # Personalización de correos en edición
+            survey.su_invitation_subject = email_data.get("invitation_subject")
+            survey.su_invitation_body = email_data.get("invitation_body")
+            survey.su_reminder_subject = email_data.get("reminder_subject")
+            survey.su_reminder_body = email_data.get("reminder_body")
 
             survey.save(ignore_permissions=True)
             frappe.db.commit()
@@ -708,6 +720,12 @@ def save_measurement(data):
             survey.su_reminder_max = data["reminders"]["max"]
         else:
             survey.su_send_reminders = 0
+
+        # Personalización de correos en creación
+        survey.su_invitation_subject = email_data.get("invitation_subject")
+        survey.su_invitation_body = email_data.get("invitation_body")
+        survey.su_reminder_subject = email_data.get("reminder_subject")
+        survey.su_reminder_body = email_data.get("reminder_body")
 
         if data.get("questions"):
             for q in data["questions"]:

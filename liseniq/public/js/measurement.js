@@ -10,6 +10,7 @@ class MeasurementCreator {
                 step2: document.getElementById('step-2-form'),
                 step3: document.getElementById('step-3-form'),
                 step4: document.getElementById('step-4-form'),
+                step5: document.getElementById('step-5-form'),
             },
             navButtons: {
                 next1: document.getElementById('btn-next-step-1'),
@@ -19,6 +20,8 @@ class MeasurementCreator {
                 next3: document.getElementById('btn-next-step-3'),
                 back4: document.getElementById('btn-back-step-4'),
                 next4: document.getElementById('btn-next-step-4'),
+                back5: document.getElementById('btn-back-step-5'),
+                next5: document.getElementById('btn-next-step-5'),
             },
             step1Form: {
                 name: document.getElementById('measurement-name'),
@@ -38,6 +41,16 @@ class MeasurementCreator {
                 arrow: document.querySelector('.categories-arrow'),
                 contactCountNumber: document.getElementById('contact-count-number'),
                 viewContactsBtn: document.getElementById('view-contacts-btn'),
+            },
+            personalizationStep: {
+                typeButtons: {
+                    invitation: document.getElementById('email-type-invitation-btn'),
+                    reminder: document.getElementById('email-type-reminder-btn'),
+                },
+                subject: document.getElementById('email-subject'),
+                body: document.getElementById('email-body'),
+                useDefaultCheck: document.getElementById('email-use-default-template'),
+                customizationFields: document.getElementById('email-customization-fields'),
             },
             reviewStep: {
                 measurementName: document.getElementById('review-measurement-name'),
@@ -66,6 +79,7 @@ class MeasurementCreator {
             isEditMode: false,
             docName: null,
             contactCountDebounceTimer: null,
+            currentEmailType: 'invitation',
             measurementData: {
                 name: '',
                 startDate: '',
@@ -79,12 +93,18 @@ class MeasurementCreator {
                     filters: [],
                     list: [],
                     headers: []
+                },
+                emailCustomization: {
+                    invitation_subject: '',
+                    invitation_body: '',
+                    reminder_subject: '',
+                    reminder_body: ''
                 }
             }
         };
         
         if (this.ui.stepperContainer) {
-            this.stepper = new Stepper('measurement-stepper-container', ['Nombre', 'Preguntas', 'Participantes', 'Revisión']);
+            this.stepper = new Stepper('measurement-stepper-container', ['Nombre', 'Preguntas', 'Participantes', 'Personalización', 'Revisión']);
             this.questionBuilder = new QuestionBuilder((questions) => {
                 this.state.measurementData.questions = questions;
                 this.ui.navButtons.next2.disabled = questions.length === 0;
@@ -101,7 +121,10 @@ class MeasurementCreator {
         }
     }
 
-    initializeDefaults() {}
+    initializeDefaults() {
+        this.initWysiwygEditor();
+        this.setEmailType('invitation');
+    }
 
     loadPreloadedQuestions() {
         const dataEl = document.getElementById('preloaded-questions-data');
@@ -186,11 +209,23 @@ class MeasurementCreator {
                 this.ui.reviewStep.remindersSection.classList.add('d-none');
             }
 
+            // Personalización de correo (asunto/cuerpo)
+            if (data.su_invitation_subject || data.su_invitation_body || data.su_reminder_subject || data.su_reminder_body) {
+                this.state.measurementData.emailCustomization = {
+                    invitation_subject: data.su_invitation_subject || '',
+                    invitation_body: data.su_invitation_body || '',
+                    reminder_subject: data.su_reminder_subject || '',
+                    reminder_body: data.su_reminder_body || ''
+                };
+                this.setEmailType('invitation');
+                this.syncEmailFieldsFromState();
+            }
+
             // Bloquear campos no editables
             this.disableNonEditableFields();
 
             // Cambiar texto del botón final
-            if (this.ui.navButtons.next4) this.ui.navButtons.next4.textContent = 'Guardar Cambios';
+            if (this.ui.navButtons.next5) this.ui.navButtons.next5.textContent = 'Guardar Cambios';
         } catch (e) {
             console.error("Error al cargar datos de la medición para editar:", e);
             showGlobalNotification("No se pudieron cargar los datos de la medición.", "error");
@@ -228,18 +263,21 @@ class MeasurementCreator {
         if (stepNumber === 2) {
             this.ui.navButtons.next2.disabled = this.state.measurementData.questions.length === 0;
         }
-        
-        // Sincronizar la UI de contactos al entrar al paso 3 en modo edición
         if (stepNumber === 3 && this.state.isEditMode) {
             const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
             if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                 selectedContactsSection?.classList.remove('d-none');
             }
         }
+        if (stepNumber === 4) {
+            this.initWysiwygEditor(true);
+            this.syncEmailFieldsFromState();
+            this.applyEmailCustomizationToggle();
+        }
     }
 
     initializeEventListeners() {
-        const { navButtons, contactsStep, step1Form, contactsModal, reviewStep } = this.ui;
+        const { navButtons, contactsStep, step1Form, contactsModal, reviewStep, personalizationStep } = this.ui;
 
         navButtons.next1?.addEventListener('click', async () => {
             if (await this.validateStep1()) {
@@ -253,13 +291,35 @@ class MeasurementCreator {
         navButtons.back3?.addEventListener('click', () => this.showStep(2));
         navButtons.next3?.addEventListener('click', () => {
             if (this.validateStep3()) {
-                this.renderReviewStep();
                 this.showStep(4);
             }
         });
         navButtons.back4?.addEventListener('click', () => this.showStep(3));
-        navButtons.next4?.addEventListener('click', () => this.saveMeasurement());
-        
+        navButtons.next4?.addEventListener('click', () => {
+            // Guarda cambios de personalización y pasa a revisión
+            this.syncEmailStateFromFields();
+            this.renderReviewStep();
+            this.showStep(5);
+        });
+        navButtons.back5?.addEventListener('click', () => this.showStep(4));
+        navButtons.next5?.addEventListener('click', () => this.saveMeasurement());
+
+        // Personalización
+        personalizationStep.typeButtons.invitation?.addEventListener('click', () => {
+            this.setEmailType('invitation');
+            this.syncEmailFieldsFromState();
+        });
+        personalizationStep.typeButtons.reminder?.addEventListener('click', () => {
+            this.setEmailType('reminder');
+            this.syncEmailFieldsFromState();
+        });
+        personalizationStep.subject?.addEventListener('input', () => this.syncEmailStateFromFields());
+        personalizationStep.body?.addEventListener('input', () => this.syncEmailStateFromFields());
+
+        personalizationStep.useDefaultCheck?.addEventListener('change', () => {
+            this.applyEmailCustomizationToggle();
+        });
+
         // Listeners que deben funcionar en ambos modos (creación y edición)
         contactsStep.sendAllContactsCheck?.addEventListener('change', () => this.handleSendAllCheckChange());
         contactsStep.fieldTypeSelect?.addEventListener('change', () => this.handleFieldTypeChange());
@@ -543,62 +603,129 @@ class MeasurementCreator {
         }
     }
 
-    renderReviewStep() {
-        const { measurementName, surveyType, responseType, questionsCount, contactCount, questionsList, viewContactsBtn } = this.ui.reviewStep;
-        const { surveyTypeSelect, responseTypeSelect } = this.ui.contactsStep;
+    // Inicializa el editor WYSIWYG (TinyMCE) para el cuerpo del correo
+    initWysiwygEditor(force = false) {
+        const textareaId = 'email-body';
+        const el = document.getElementById(textareaId);
+        if (!el) return;
 
-        measurementName.textContent = this.state.measurementData.name;
+        const already = window.tinymce && window.tinymce.get(textareaId);
+        if (already && !force) return;
 
-        if (this.state.isEditMode) {
-            const dataEl = document.getElementById('measurement-data');
-            const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
-            surveyType.textContent = data?.contacts?.surveyType === 'selected' ? 'Contactos Cargados Previamente' : 'Público Externo';
-            responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
-            questionsCount.textContent = (data?.questions || []).length;
-
-            const listLen = this.state.measurementData.contacts.list?.length || 0;
-            contactCount.textContent = listLen;
-            if (viewContactsBtn) viewContactsBtn.style.display = listLen > 0 ? 'inline-block' : 'none';
-        } else {
-            surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
-            responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
-            questionsCount.textContent = this.state.measurementData.questions.length;
-            contactCount.textContent = this.state.measurementData.contacts.list.length;
-            this.ui.reviewStep.viewContactsBtn.style.display = 'inline-block';
+        if (window.tinymce) {
+            // Destruir instancia previa si existe
+            try { window.tinymce.get(textareaId)?.remove(); } catch (_) {}
+            window.tinymce.init({
+                selector: `#${textareaId}`,
+                menubar: false,
+                statusbar: true,
+                branding: false,
+                plugins: 'link lists autoresize',
+                toolbar: 'undo redo | bold italic underline | bullist numlist | link removeformat',
+                autoresize_bottom_margin: 24,
+                min_height: 360,
+                content_style: 'body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto; font-size:14px;}',
+                setup: (editor) => {
+                    editor.on('change input keyup undo redo', () => {
+                        this.syncEmailStateFromFields();
+                    });
+                }
+            });
         }
+    }
 
-        questionsList.innerHTML = '';
-        const questions = this.state.isEditMode
-            ? (JSON.parse(document.getElementById('measurement-data')?.dataset?.measurement || '{}').questions || [])
-            : this.state.measurementData.questions;
+    setEmailType(type) {
+        this.state.currentEmailType = type === 'reminder' ? 'reminder' : 'invitation';
+        const { invitation, reminder } = this.ui.personalizationStep.typeButtons;
+        if (!invitation || !reminder) return;
 
-        if (questions.length === 0) {
-            questionsList.innerHTML = `<div class="text-center text-muted p-4">No se han añadido preguntas.</div>`;
+        // Limpiar clases anteriores
+        invitation.classList.remove('email-type-active');
+        reminder.classList.remove('email-type-active');
+
+        if (this.state.currentEmailType === 'invitation') {
+            invitation.classList.add('email-type-active');
         } else {
-            questions.forEach((q, i) => questionsList.appendChild(this.createReviewQuestionItem(q, i)));
+            reminder.classList.add('email-type-active');
+        }
+    }
+
+    // Función para ocultar/mostrar los campos de personalización
+    applyEmailCustomizationToggle() {
+        const { customizationFields, useDefaultCheck } = this.ui.personalizationStep;
+        if (!customizationFields || !useDefaultCheck) return;
+        const useDefault = !!useDefaultCheck.checked;
+        customizationFields.style.display = useDefault ? 'none' : '';
+    }
+
+    syncEmailFieldsFromState() {
+        // Si se usa plantilla por defecto, no cargar valores en UI de personalización
+        if (this.ui.personalizationStep.useDefaultCheck?.checked) {
+            this.applyEmailCustomizationToggle();
+            return;
+        }
+        const { subject, body } = this.ui.personalizationStep;
+        const ec = this.state.measurementData.emailCustomization;
+        const editor = window.tinymce?.get('email-body');
+
+        if (this.state.currentEmailType === 'invitation') {
+            subject.value = ec.invitation_subject || '';
+            if (editor) {
+                editor.setContent(ec.invitation_body || '');
+            } else {
+                body.value = ec.invitation_body || '';
+            }
+        } else {
+            subject.value = ec.reminder_subject || '';
+            if (editor) {
+                editor.setContent(ec.reminder_body || '');
+            } else {
+                body.value = ec.reminder_body || '';
+            }
+        }
+        this.applyEmailCustomizationToggle();
+    }
+
+    syncEmailStateFromFields() {
+        // Si se usa plantilla por defecto, no almacenar cambios
+        if (this.ui.personalizationStep.useDefaultCheck?.checked) return;
+        const { subject, body } = this.ui.personalizationStep;
+        const ec = this.state.measurementData.emailCustomization;
+        const editor = window.tinymce?.get('email-body');
+        const content = editor ? editor.getContent() : (body?.value || '');
+
+        if (this.state.currentEmailType === 'invitation') {
+            ec.invitation_subject = subject.value || '';
+            ec.invitation_body = content || '';
+        } else {
+            ec.reminder_subject = subject.value || '';
+            ec.reminder_body = content || '';
         }
     }
 
     async saveMeasurement() {
         const { navButtons, reviewStep, contactsStep, step1Form } = this.ui;
-        const saveButton = navButtons.next4;
+        const saveButton = navButtons.next5;
 
         saveButton.disabled = true;
         saveButton.innerHTML = this.state.isEditMode
             ? `<i class="fa fa-spinner fa-spin"> </i> Guardando...`
             : `<i class="fa fa-spinner fa-spin"> </i> Enviando...`;
 
-        const basePayload = {
-            name: this.state.measurementData.name,
-            endDate: step1Form.endDate.value
+        // Nuevo: si usa plantilla por defecto, no enviar personalización
+        const useDefault = !!this.ui.personalizationStep.useDefaultCheck?.checked;
+        const emailCustomization = useDefault ? {} : {
+            invitation_subject: this.state.measurementData.emailCustomization.invitation_subject,
+            invitation_body: this.state.measurementData.emailCustomization.invitation_body,
+            reminder_subject: this.state.measurementData.emailCustomization.reminder_subject,
+            reminder_body: this.state.measurementData.emailCustomization.reminder_body
         };
 
-        if (reviewStep.sendRemindersCheck.checked) {
-            basePayload.reminders = {
-                frequency: reviewStep.reminderFrequency.value,
-                max: reviewStep.reminderMax.value,
-            };
-        }
+        const basePayload = {
+            name: this.state.measurementData.name,
+            endDate: step1Form.endDate.value,
+            email_customization: emailCustomization
+        };
 
         const measurementPayload = this.state.isEditMode
             ? { 
@@ -640,6 +767,42 @@ class MeasurementCreator {
             showGlobalNotification(error.message, 'error');
             saveButton.disabled = false;
             saveButton.textContent = this.state.isEditMode ? 'Guardar Cambios' : 'Enviar';
+        }
+    }
+
+    renderReviewStep() {
+        const { measurementName, surveyType, responseType, questionsCount, contactCount, questionsList, viewContactsBtn } = this.ui.reviewStep;
+        const { surveyTypeSelect, responseTypeSelect } = this.ui.contactsStep;
+
+        measurementName.textContent = this.state.measurementData.name;
+
+        if (this.state.isEditMode) {
+            const dataEl = document.getElementById('measurement-data');
+            const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
+            surveyType.textContent = data?.contacts?.surveyType === 'selected' ? 'Contactos Cargados Previamente' : 'Público Externo';
+            responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
+            questionsCount.textContent = (data?.questions || []).length;
+
+            const listLen = this.state.measurementData.contacts.list?.length || 0;
+            contactCount.textContent = listLen;
+            if (viewContactsBtn) viewContactsBtn.style.display = listLen > 0 ? 'inline-block' : 'none';
+        } else {
+            surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
+            responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
+            questionsCount.textContent = this.state.measurementData.questions.length;
+            contactCount.textContent = this.state.measurementData.contacts.list.length;
+            this.ui.reviewStep.viewContactsBtn.style.display = 'inline-block';
+        }
+
+        questionsList.innerHTML = '';
+        const questions = this.state.isEditMode
+            ? (JSON.parse(document.getElementById('measurement-data')?.dataset?.measurement || '{}').questions || [])
+            : this.state.measurementData.questions;
+
+        if (questions.length === 0) {
+            questionsList.innerHTML = `<div class="text-center text-muted p-4">No se han añadido preguntas.</div>`;
+        } else {
+            questions.forEach((q, i) => questionsList.appendChild(this.createReviewQuestionItem(q, i)));
         }
     }
 

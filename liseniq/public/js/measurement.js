@@ -759,10 +759,16 @@ class MeasurementCreator {
             reminder_body: this.state.measurementData.emailCustomization.reminder_body
         };
 
+        const reminders = reviewStep.sendRemindersCheck?.checked ? {
+            frequency: reviewStep.reminderFrequency?.value,
+            max: reviewStep.reminderMax?.value
+        } : undefined;
+
         const basePayload = {
             name: this.state.measurementData.name,
             endDate: step1Form.endDate.value,
-            email_customization: emailCustomization
+            email_customization: emailCustomization,
+            ...(reminders ? { reminders } : {})
         };
 
         const measurementPayload = this.state.isEditMode

@@ -38,6 +38,7 @@
   "su_send_reminders",
   "su_reminder_frequency",
   "su_reminder_max",
+  "su_default_notif",
   "column_break_34",
   "su_invitation_subject",
   "su_invitation_body",
@@ -250,11 +251,16 @@
   {
    "fieldname": "column_break_37",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "su_default_notif",
+   "fieldtype": "Data",
+   "label": "Notificaci\u00f3n por Default"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-25 20:03:45.567525",
+ "modified": "2025-11-28 18:47:49.203504",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

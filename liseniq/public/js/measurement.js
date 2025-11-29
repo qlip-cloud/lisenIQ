@@ -218,6 +218,13 @@ class MeasurementCreator {
                     reminder_subject: data.su_reminder_subject || '',
                     reminder_body: data.su_reminder_body || ''
                 };
+
+                const useDefault = !!data.su_default_notif && String(data.su_default_notif) !== '0';
+                if (this.ui.personalizationStep.useDefaultCheck) {
+                    this.ui.personalizationStep.useDefaultCheck.checked = useDefault;
+                    this.state.wasUsingDefault = useDefault;
+                    this.applyEmailCustomizationToggle();
+                }
                 this.setEmailType('invitation');
                 this.syncEmailFieldsFromState();
             }
@@ -768,6 +775,7 @@ class MeasurementCreator {
             name: this.state.measurementData.name,
             endDate: step1Form.endDate.value,
             email_customization: emailCustomization,
+            email_use_default: useDefault,
             ...(reminders ? { reminders } : {})
         };
 

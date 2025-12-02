@@ -243,6 +243,34 @@
     margin-right: -1rem;
 }
 
+/* Scroll interno para el paso de Personalización */
+#step-4-form .internal-scroll-section {
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 4px; /* homogeneidad con home.css */
+    overscroll-behavior: contain;
+}
+
+/* Homogeneidad de scroll con home.css */
+#step-4-form .internal-scroll-section::-webkit-scrollbar,
+.review-questions-list::-webkit-scrollbar {
+    width: 8px;
+}
+#step-4-form .internal-scroll-section::-webkit-scrollbar-track,
+.review-questions-list::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 8px;
+}
+#step-4-form .internal-scroll-section::-webkit-scrollbar-thumb,
+.review-questions-list::-webkit-scrollbar-thumb {
+    background: var(--brand-primary, #7B24FF);
+    border-radius: 8px;
+}
+#step-4-form .internal-scroll-section::-webkit-scrollbar-thumb:hover,
+.review-questions-list::-webkit-scrollbar-thumb:hover {
+    background: #6920d6;
+}
+
 .review-question-item {
     padding: 1rem 0;
     border-bottom: 1px solid #f1f3f5;
@@ -295,6 +323,60 @@
     color: #495057;
 }
 
+.email-type-toggle .btn-group {
+    display: flex;
+    gap: 1.5rem;
+    /* border-bottom: 1px solid #e2e6ea; */
+    padding-bottom: .25rem;
+}
+
+.email-type-toggle .btn-group .btn {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid transparent !important;
+    box-shadow: none !important;
+    color: var(--text-color-secondary, #6c757d);
+    font-weight: 500;
+    padding: .4rem 0 .55rem 0;
+    border-radius: 0;
+    transition: border-color .2s, color .2s;
+    min-width: auto;
+}
+
+.email-type-toggle .btn-group .btn:hover {
+    color: var(--text-color-primary, #212529);
+    border-bottom-color: #d0d5db;
+}
+
+.email-type-toggle .btn-group .btn.email-type-active {
+    color: var(--brand-primary, #7B24FF);
+    font-weight: 600;
+    border-bottom-color: var(--brand-primary) !important;
+}
+
+.email-type-toggle .btn-group .btn.btn-purple-main,
+.email-type-toggle .btn-group .btn.btn-outline-purple {
+    background: transparent !important;
+    color: inherit;
+}
+
+.email-body-textarea {
+    min-height: 220px;
+}
+
+#step-4-form .measurement-form-container {
+    max-width: 85%;
+}
+
+#step-4-form .form-group {
+    margin-bottom: 1.25rem;
+    margin-top: 2.5rem;
+}
+
+/* Fallback si TinyMCE no carga */
+#step-4-form .email-body-textarea {
+    min-height: 360px;
+}
 
 @media (max-width: 991.98px) {
     .review-layout-grid {

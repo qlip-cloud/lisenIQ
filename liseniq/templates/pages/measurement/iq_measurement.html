@@ -155,14 +155,60 @@
         <div id="step-4-form" class="d-none">
             <div class="page-title-section">
                 <div class="breadcrumb-nav">
-                    <a href="/iq-home">Mediciones</a> / 
+                    <a href="/iq-home">Mediciones</a> /
+                    <span class="measurement-name-breadcrumb"></span>
+                </div>
+                <div class="title-with-action">
+                    <h3 class="page-main-title">Personalización</h3>
+                    <div class="form-action-buttons">
+                        <button id="btn-back-step-4" class="btn btn-outline-purple">Atrás</button>
+                        <button id="btn-next-step-4" class="btn btn-purple-main">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="measurement-form-container">
+                <div class="internal-scroll-section">
+                    <p class="text-muted small mb-4">Personaliza el mensaje del correo de invitación o de recordatorio.</p>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="email-use-default-template">
+                        <label class="form-check-label" for="email-use-default-template">Usar plantilla por defecto</label>
+                    </div>
+
+                    <div id="email-customization-fields">
+                        <div class="email-type-toggle mb-3">
+                            <div class="btn-group" role="group" aria-label="Tipo de correo">
+                                <button type="button" id="email-type-invitation-btn" class="btn btn-purple-main">Invitación a la encuesta</button>
+                                <button type="button" id="email-type-reminder-btn" class="btn btn-outline-purple">Correo de recordatorio</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email-subject">Asunto</label>
+                            <input type="text" id="email-subject" class="form-control" maxlength="150" placeholder="Escribe el asunto del correo">
+                        </div>
+
+                        <div class="form-group mt-3">
+                            <label for="email-body">Cuerpo del mensaje</label>
+                            <textarea id="email-body" class="form-control email-body-textarea" rows="8" placeholder=""></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-5-form" class="d-none">
+            <div class="page-title-section">
+                <div class="breadcrumb-nav">
+                    <a href="/iq-home">Mediciones</a> /
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
                     <h3 class="page-main-title">Revisión</h3>
                     <div class="form-action-buttons">
-                        <button id="btn-back-step-4" class="btn btn-outline-purple">Atrás</button>
-                        <button id="btn-next-step-4" class="btn btn-purple-main">Enviar</button>
+                        <button id="btn-back-step-5" class="btn btn-outline-purple">Atrás</button>
+                        <button id="btn-next-step-5" class="btn btn-purple-main">Enviar</button>
                     </div>
                 </div>
             </div>

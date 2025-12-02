@@ -202,7 +202,33 @@ def launch_pending_surveys():
 							end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey_doc.su_end_date}</strong></p>'
 
 						if not getattr(survey_doc, "su_default_notif", True):
-							message = survey_doc.su_invitation_body
+							
+							message = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {{ font-family: Arial, Helvetica, sans-serif; background-color: #f7f9fc; color: #333; margin:0; padding:0; }}
+    .container {{ max-width:600px; margin:20px auto; background:#fff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:30px; }}
+    .header {{ text-align:center; border-bottom:2px solid #004aad; padding-bottom:15px; margin-bottom:20px; }}
+    .header h1 {{ color:#004aad; font-size:22px; margin:0; }}
+    .btn {{ display:inline-block; background-color:#004aad; color:#fff !important; text-decoration:none; padding:12px 20px; border-radius:6px; font-weight:bold; margin-top:20px; }}
+    .footer {{ font-size:12px; color:#777; margin-top:25px; text-align:center; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h1>{survey.su_name}</h1></div>
+    {survey_doc.su_invitation_body or ""}
+    {end_date_html}
+    <p style="text-align:center;">
+      <a href="{unique_url}" class="btn">Iniciar encuesta</a>
+    </p>
+  </div>
+</body>
+</html>
+							"""
 						else:
 							message = f"""
 <!DOCTYPE html>
@@ -289,7 +315,7 @@ def launch_pending_surveys():
   </div>
 </body>
 </html>
-						"""
+							"""
 					
 						recipients = [contact_email]
 						sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
@@ -423,7 +449,31 @@ def send_survey_reminders():
 					contact_name = contact_names.get(recipient.sr_contact, "Participante")
 
 					if not getattr(survey_doc, "su_default_notif", True):
-						message = survey_doc.su_reminder_body
+						
+						message = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {{ font-family: Arial, Helvetica, sans-serif; background-color: #f7f9fc; color: #333; margin:0; padding:0; }}
+    .container {{ max-width:600px; margin:20px auto; background:#fff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:30px; }}
+    .header {{ text-align:center; border-bottom:2px solid #e67e22; padding-bottom:15px; margin-bottom:20px; }}
+    .header h1 {{ color:#e67e22; font-size:22px; margin:0; }}
+    .btn {{ display:inline-block; background-color:#e67e22; color:#fff !important; text-decoration:none; padding:12px 20px; border-radius:6px; font-weight:bold; margin-top:20px; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h1>Recordatorio de Medición</h1></div>
+    {survey_doc.su_reminder_body or ""}
+    <p style="text-align:center;">
+      <a href="{link}" class="btn">Responder encuesta</a>
+    </p>
+  </div>
+</body>
+</html>
+						"""
 						subject = survey_doc.su_reminder_subject
 					else:
 						subject = f"Recordatorio: Encuesta de Medición - {survey.su_name}"
@@ -435,17 +485,50 @@ def send_survey_reminders():
   <style>
     body {{ font-family: Arial, Helvetica, sans-serif; background-color: #f7f9fc; color: #333333; margin: 0; padding: 0; }}
     .container {{ max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 30px; }}
-    .header {{ text-align: center; border-bottom: 2px solid #e67e22; padding-bottom: 15px; margin-bottom: 20px; }}
-    .header h1 {{ color: #e67e22; font-size: 22px; margin: 0; }}
-    p {{ text-align: justify; }}
-    .btn {{ display: inline-block; background-color: #e67e22; color: #ffffff !important; text-decoration: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; margin-top: 20px; }}
-    .info {{ margin: 20px 0; padding: 15px; background-color: #fff7f0; border-left: 4px solid #e67e22; }}
-    .footer {{ font-size: 12px; color: #777777; margin-top: 25px; text-align: center; }}
+    .header {{
+      text-align: center;
+      border-bottom: 2px solid #004aad;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }}
+    .header h1 {{
+      color: #004aad;
+      font-size: 22px;
+      margin: 0;
+    }}
+    p {{
+      margin-bottom: 20px;
+      text-align: justify;
+    }}
+    .btn {{
+      display: inline-block;
+      background-color: #004aad;
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-top: 20px;
+    }}
+    .info {{
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #f0f4ff;
+      border-left: 4px solid #004aad;
+    }}
+    .footer {{
+      font-size: 12px;
+      color: #777777;
+      margin-top: 25px;
+      text-align: center;
+    }}
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header"><h1>Recordatorio de Medición</h1></div>
+    <div class="header">
+      <h1> {survey.su_name} </h1>
+    </div>
     <p>Hola ,</p>
     <p>Queremos recordarte que aún tienes pendiente completar la encuesta – <strong>{survey.su_name}</strong>, la cual nos ayudará a obtener información valiosa acerca de nuestra compañía y continuar fortaleciendo nuestra cultura organizacional.</p>
     <div class="info">
@@ -463,7 +546,7 @@ def send_survey_reminders():
   </div>
 </body>
 </html>
-					"""
+						"""
 
 					contact_email = frappe.db.get_value("Contact", recipient.sr_contact, "email_id")
 					if not contact_email:
@@ -712,7 +795,33 @@ def send_pending_links_for_survey(survey_name: str):
 					end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey.su_end_date}</strong></p>'
 
 				if not getattr(survey, "su_default_notif", True):
-					message = survey.su_invitation_body
+					
+					message = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {{ font-family: Arial, Helvetica, sans-serif; background-color: #f7f9fc; color: #333; margin:0; padding:0; }}
+    .container {{ max-width:600px; margin:20px auto; background:#fff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:30px; }}
+    .header {{ text-align:center; border-bottom:2px solid #004aad; padding-bottom:15px; margin-bottom:20px; }}
+    .header h1 {{ color:#004aad; font-size:22px; margin:0; }}
+    .btn {{ display:inline-block; background-color:#004aad; color:#fff !important; text-decoration:none; padding:12px 20px; border-radius:6px; font-weight:bold; margin-top:20px; }}
+    .footer {{ font-size:12px; color:#777; margin-top:25px; text-align:center; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h1>{survey.su_name}</h1></div>
+    {survey.su_invitation_body or ""}
+    {end_date_html}
+    <p style="text-align:center;">
+      <a href="{unique_url}" class="btn">Iniciar encuesta</a>
+    </p>
+  </div>
+</body>
+</html>
+					"""
 				else:
 					message = f"""
 <!DOCTYPE html>
@@ -799,8 +908,8 @@ def send_pending_links_for_survey(survey_name: str):
   </div>
 </body>
 </html>
-				"""
-
+					"""
+					
 				recipients = [contact_email]
 				sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
 				if not sender_email:

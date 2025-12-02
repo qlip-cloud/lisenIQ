@@ -18,22 +18,33 @@
   "su_type",
   "su_is_anonymous",
   "column_break_2",
+  "su_timezone",
+  "su_start_date",
+  "su_end_date",
   "su_message",
   "section_break_4",
   "su_recipients",
   "su_respondents_template",
-  "su_start_date",
-  "su_end_date",
-  "su_timezone",
+  "column_break_20",
+  "secci\u00f3n_link_publico_section",
+  "su_custom_generate_public_link",
+  "su_public_link_created_on",
+  "su_public_link_created_by",
+  "column_break_26",
+  "su_public_link",
+  "column_break_27",
+  "su_public_token",
+  "section_break_5",
   "su_send_reminders",
   "su_reminder_frequency",
   "su_reminder_max",
-  "secci\u00f3n_link_publico_section",
-  "su_custom_generate_public_link",
-  "su_public_link",
-  "su_public_token",
-  "su_public_link_created_on",
-  "su_public_link_created_by"
+  "su_default_notif",
+  "column_break_34",
+  "su_invitation_subject",
+  "su_invitation_body",
+  "column_break_37",
+  "su_reminder_subject",
+  "su_reminder_body"
  ],
  "fields": [
   {
@@ -98,7 +109,7 @@
   {
    "fieldname": "section_break_1",
    "fieldtype": "Section Break",
-   "label": "Secci\u00f3n de Preguntas"
+   "label": "Preguntas"
   },
   {
    "fieldname": "column_break_1",
@@ -116,7 +127,7 @@
   {
    "fieldname": "section_break_3",
    "fieldtype": "Section Break",
-   "label": "Secci\u00f3n de Plantillas"
+   "label": "Plantilla"
   },
   {
    "fieldname": "section_break_4",
@@ -137,7 +148,7 @@
    "default": "0",
    "fieldname": "su_send_reminders",
    "fieldtype": "Check",
-   "label": "Enviar Recordatorios"
+   "label": "Recordatorios Activos"
   },
   {
    "fieldname": "su_reminder_frequency",
@@ -165,24 +176,24 @@
   {
    "fieldname": "secci\u00f3n_link_publico_section",
    "fieldtype": "Section Break",
-   "label": "Secci\u00f3n Link Publico"
+   "label": "Enlaces"
   },
   {
    "fieldname": "su_public_link",
    "fieldtype": "Long Text",
-   "label": "Link Publico"
+   "label": "Enlace P\u00fablico"
   },
   {
    "fieldname": "su_public_token",
    "fieldtype": "Long Text",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Token Publico"
+   "label": "Token P\u00fablico"
   },
   {
    "fieldname": "su_public_link_created_on",
    "fieldtype": "Datetime",
-   "label": "Fecha de Creaci\u00f3n de Link Publico"
+   "label": "Fecha de Creaci\u00f3n de Enlace P\u00fablico"
   },
   {
    "fieldname": "su_public_link_created_by",
@@ -194,12 +205,63 @@
    "default": "0",
    "fieldname": "su_custom_generate_public_link",
    "fieldtype": "Check",
-   "label": " Generar Link Publico"
+   "label": " Generar Enlace P\u00fablico"
+  },
+  {
+   "fieldname": "su_invitation_subject",
+   "fieldtype": "Data",
+   "label": "Asunto de Invitaci\u00f3n"
+  },
+  {
+   "fieldname": "su_invitation_body",
+   "fieldtype": "Text Editor",
+   "label": "Cuerpo de Msj de Invitaci\u00f3n"
+  },
+  {
+   "fieldname": "su_reminder_subject",
+   "fieldtype": "Data",
+   "label": "Asunto de Recordatorio"
+  },
+  {
+   "fieldname": "su_reminder_body",
+   "fieldtype": "Text Editor",
+   "label": "Cuerpo de Msj de Recordatorio"
+  },
+  {
+   "fieldname": "section_break_5",
+   "fieldtype": "Section Break",
+   "label": "Personalizaci\u00f3n"
+  },
+  {
+   "fieldname": "column_break_27",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_26",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_20",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_34",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_37",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_default_notif",
+   "fieldtype": "Check",
+   "label": "Notificaciones por Defecto"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-15 15:07:06.214270",
+ "modified": "2025-11-28 19:59:34.011063",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

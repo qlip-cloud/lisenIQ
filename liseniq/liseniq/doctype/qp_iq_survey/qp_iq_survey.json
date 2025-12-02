@@ -253,14 +253,15 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "0",
    "fieldname": "su_default_notif",
-   "fieldtype": "Data",
-   "label": "Notificaci\u00f3n por Default"
+   "fieldtype": "Check",
+   "label": "Notificaciones por Defecto"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-28 18:47:49.203504",
+ "modified": "2025-11-28 19:59:34.011063",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

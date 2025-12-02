@@ -143,6 +143,8 @@ def launch_pending_surveys():
 				}
 
 				subject = f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
+				if not getattr(survey_doc, "su_default_notif", True):
+					subject = survey_doc.su_invitation_subject
 
 				for recipient_doc in recipients_docs:
 					try:
@@ -199,7 +201,10 @@ def launch_pending_surveys():
 						if getattr(survey_doc, "su_end_date", None):
 							end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey_doc.su_end_date}</strong></p>'
 
-						message = f"""
+						if not getattr(survey_doc, "su_default_notif", True):
+							message = survey_doc.su_invitation_body
+						else:
+							message = f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -417,7 +422,12 @@ def send_survey_reminders():
 					link = f"{base_url}?new=1&token={recipient.sr_token}"
 					contact_name = contact_names.get(recipient.sr_contact, "Participante")
 
-					message = f"""
+					if not getattr(survey_doc, "su_default_notif", True):
+						message = survey_doc.su_reminder_body
+						subject = survey_doc.su_reminder_subject
+					else:
+						subject = f"Recordatorio: Encuesta de Medición - {survey.su_name}"
+						message = f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -473,7 +483,7 @@ def send_survey_reminders():
 					frappe.sendmail(
 						recipients=recipients_list,
 						sender=sender_formatted,
-						subject=f"Recordatorio: Encuesta de Medición - {survey.su_name}",
+						subject=subject,
 						message=message,
 						now=True
 					)
@@ -651,6 +661,9 @@ def send_pending_links_for_survey(survey_name: str):
 		base_url = frappe.utils.get_url(web_form_route)
 
 		subject = f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
+		if not getattr(survey, "su_default_notif", True):
+			subject = survey.su_invitation_subject
+
 		secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 		if not secret:
 			return {"status": "error", "message": "No se encontró 'liseniq_jwt_secret' ni 'encryption_key'."}
@@ -698,7 +711,10 @@ def send_pending_links_for_survey(survey_name: str):
 				if getattr(survey, "su_end_date", None):
 					end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey.su_end_date}</strong></p>'
 
-				message = f"""
+				if not getattr(survey, "su_default_notif", True):
+					message = survey.su_invitation_body
+				else:
+					message = f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>

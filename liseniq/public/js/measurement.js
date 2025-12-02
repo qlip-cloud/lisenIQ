@@ -218,15 +218,14 @@ class MeasurementCreator {
                     reminder_subject: data.su_reminder_subject || '',
                     reminder_body: data.su_reminder_body || ''
                 };
-
                 const useDefault = !!data.su_default_notif && String(data.su_default_notif) !== '0';
-                if (this.ui.personalizationStep.useDefaultCheck) {
-                    this.ui.personalizationStep.useDefaultCheck.checked = useDefault;
-                    this.state.wasUsingDefault = useDefault;
-                    this.applyEmailCustomizationToggle();
-                }
+                this.ui.personalizationStep.useDefaultCheck.checked = useDefault;
+                this.state.wasUsingDefault = useDefault;
+                this.applyEmailCustomizationToggle();
                 this.setEmailType('invitation');
-                this.syncEmailFieldsFromState();
+                this.initWysiwygEditor(true, () => {
+                    this.syncEmailFieldsFromState();
+                });
             }
 
             // Bloquear campos no editables
@@ -278,10 +277,12 @@ class MeasurementCreator {
             }
         }
         if (stepNumber === 4) {
-            this.initWysiwygEditor(true);
-            this.syncEmailFieldsFromState();
-            this.applyEmailCustomizationToggle();
-            this.updateStep4NextButton();
+            this.initWysiwygEditor(true, () => {
+                if (this.state.isEditMode) this.setEmailType('invitation');
+                this.syncEmailFieldsFromState();
+                this.applyEmailCustomizationToggle();
+                this.updateStep4NextButton();
+            });
         }
     }
 
@@ -630,17 +631,18 @@ class MeasurementCreator {
     }
 
     // Inicializa el editor WYSIWYG (TinyMCE) para el cuerpo del correo
-    initWysiwygEditor(force = false) {
+    initWysiwygEditor(force = false, onReady = null) {
         const textareaId = 'email-body';
         const el = document.getElementById(textareaId);
         if (!el) return;
-
         const already = window.tinymce && window.tinymce.get(textareaId);
-        if (already && !force) return;
-
+        if (already && !force) {
+            this.editorReady = true;
+            if (onReady) onReady(already);
+            return;
+        }
         if (window.tinymce) {
-            // Destruir instancia previa si existe
-            try { window.tinymce.get(textareaId)?.remove(); } catch (_) {}
+            try { window.tinymce.get(textareaId)?.remove(); } catch(_) {}
             window.tinymce.init({
                 selector: `#${textareaId}`,
                 menubar: false,
@@ -652,6 +654,10 @@ class MeasurementCreator {
                 min_height: 360,
                 content_style: 'body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto; font-size:14px;}',
                 setup: (editor) => {
+                    editor.on('init', () => {
+                        this.editorReady = true;
+                        if (onReady) onReady(editor);
+                    });
                     editor.on('change input keyup undo redo', () => {
                         this.syncEmailStateFromFields();
                         this.updateStep4NextButton();
@@ -686,31 +692,28 @@ class MeasurementCreator {
     }
 
     syncEmailFieldsFromState() {
-        // Si se usa plantilla por defecto, no cargar valores en UI de personalización
         if (this.ui.personalizationStep.useDefaultCheck?.checked) {
             this.applyEmailCustomizationToggle();
             return;
         }
-        const { subject, body } = this.ui.personalizationStep;
         const ec = this.state.measurementData.emailCustomization;
-        const editor = window.tinymce?.get('email-body');
-
-        if (this.state.currentEmailType === 'invitation') {
-            subject.value = ec.invitation_subject || '';
-            if (editor) {
-                editor.setContent(ec.invitation_body || '');
+        const { subject, body } = this.ui.personalizationStep;
+        const applyContent = () => {
+            const editor = window.tinymce?.get('email-body');
+            if (this.state.currentEmailType === 'invitation') {
+                subject.value = ec.invitation_subject || '';
+                editor ? editor.setContent(ec.invitation_body || '') : (body.value = ec.invitation_body || '');
             } else {
-                body.value = ec.invitation_body || '';
+                subject.value = ec.reminder_subject || '';
+                editor ? editor.setContent(ec.reminder_body || '') : (body.value = ec.reminder_body || '');
             }
+            this.applyEmailCustomizationToggle();
+        };
+        if (!this.editorReady) {
+            setTimeout(() => applyContent(), 120);
         } else {
-            subject.value = ec.reminder_subject || '';
-            if (editor) {
-                editor.setContent(ec.reminder_body || '');
-            } else {
-                body.value = ec.reminder_body || '';
-            }
+            applyContent();
         }
-        this.applyEmailCustomizationToggle();
     }
 
     syncEmailStateFromFields() {
@@ -773,6 +776,7 @@ class MeasurementCreator {
 
         const basePayload = {
             name: this.state.measurementData.name,
+            startDate: step1Form.startDate.value,
             endDate: step1Form.endDate.value,
             email_customization: emailCustomization,
             email_use_default: useDefault,
@@ -792,7 +796,6 @@ class MeasurementCreator {
             }
             : {
                 ...basePayload,
-                startDate: step1Form.startDate.value,
                 timezone: step1Form.timezone.value,
                 questions: this.state.measurementData.questions,
                 contacts: {

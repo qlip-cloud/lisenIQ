@@ -408,6 +408,8 @@ def save_measurement(data):
                 survey.su_name = new_name
 
             survey.su_end_date = data.get("endDate")
+            if data.get("startDate"):
+                survey.su_start_date = data.get("startDate")
 
             reminders = data.get("reminders")
             if reminders:

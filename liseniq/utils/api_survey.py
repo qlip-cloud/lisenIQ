@@ -65,6 +65,11 @@ def _get_jwt_secret():
   return frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 
 @frappe.whitelist(allow_guest=True)
+def get_survey_is_anonymous(survey_name):
+    is_anonymous = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_is_anonymous")
+    return bool(is_anonymous)
+
+@frappe.whitelist(allow_guest=True)
 def validate_survey_link(survey_name, user=None, token=None, dni=None):
   # frappe.log_error(
   #     message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",

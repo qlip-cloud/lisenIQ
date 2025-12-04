@@ -51,6 +51,12 @@ def build_columns(question_map, demographics_map):
             "width": 200
         },
         {
+            "label": _("ID Respuesta"),
+            "fieldname": "name",
+            "fieldtype": "Data",
+            "width": 150
+        },
+        {
             "label": _("Género"),
             "fieldname": "gender",
             "fieldtype": "Data",
@@ -153,6 +159,7 @@ def process_response_row(response, question_map, demographics_data):
         'custom_document_number': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),
+        'name': response.get('name', ''),
         'gender': response.get('gender', ''),
         'custom_dob': response.get('custom_dob', ''),
         'country': response.get('custom_country', ''),

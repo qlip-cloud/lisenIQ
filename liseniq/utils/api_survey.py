@@ -138,12 +138,15 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
               ["name", "custom_company", "status"],
               as_dict=True
           )
+          # obtener token público para redirección si aplica
+          public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
+
           if not contact_info:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado.", "redirect_register": True, "register_token": public_token}
           if contact_info.custom_company != survey_owner_company:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta.", "redirect_register": True, "register_token": public_token}
           if contact_info.status not in ("Enabled", "Passive"):
-              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta.", "redirect_register": True, "register_token": public_token}
 
           recipient_exists = frappe.db.exists(
               "qp_IQ_SurveyRecipient",
@@ -170,12 +173,15 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
               ["name", "custom_company", "status"],
               as_dict=True
           )
+          # obtener token público para redirección si aplica
+          public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
+
           if not contact_info:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado.", "redirect_register": True, "register_token": public_token}
           if contact_info.custom_company != survey_owner_company:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta.", "redirect_register": True, "register_token": public_token}
           if contact_info.status not in ("Enabled", "Passive"):
-              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta.", "redirect_register": True, "register_token": public_token}
 
           contact_name = contact_info.name
           if contact_name and survey_name_id:

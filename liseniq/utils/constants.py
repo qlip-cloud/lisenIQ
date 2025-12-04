@@ -29,7 +29,7 @@ frappe.web_form.after_load = () => {
   }).then(r => {
       const is_anonymous = r.message;
 
-      if (!is_anonymous && !dni) {
+      if (!is_anonymous && !dni && !token) {
           frappe.msgprint({
               title: __("Acceso denegado"),
               indicator: "red",
@@ -54,6 +54,14 @@ frappe.web_form.after_load = () => {
         })
         .then((r) => {
           const res = r.message || {};
+          // Si el backend indica redirección al registro, hacerlo con el token público proporcionado
+          if (res.redirect_register) {
+              const reg_token = res.register_token || token;
+              const register_url = "/iq-register" + (reg_token ? "?token=" + reg_token : "");
+              window.location.href = register_url;
+              return;
+          }
+
           if (res.allow === false) {
             show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
             // Limpiar cache si ya fue respondida
@@ -102,6 +110,14 @@ const validate_dni_on_input = function(dni) {
         },
     }).then((r) => {
         const res = r.message || {};
+        // Si el backend indica redirección al registro, hacerlo con el token público proporcionado
+        if (res.redirect_register) {
+            const reg_token = res.register_token || token;
+            const register_url = "/iq-register" + (reg_token ? "?token=" + reg_token : "");
+            window.location.href = register_url;
+            return;
+        }
+
         const dni_field = frappe.web_form.fields_dict.custom_document_number;
         const $submit_btn = $('.web-form-actions button[type="submit"]');
 
@@ -211,6 +227,13 @@ const submit_response = function (data) {
     })
     .then((r) => {
       const res = r.message || {};
+      // Redirección a registro si el backend lo solicita
+      if (res.redirect_register) {
+          const reg_token = res.register_token || token;
+          const register_url = "/iq-register" + (reg_token ? "?token=" + reg_token : "");
+          window.location.href = register_url;
+          return;
+      }
       if (res.allow === false) {
         show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
         window.saving = false;

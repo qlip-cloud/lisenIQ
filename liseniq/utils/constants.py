@@ -29,7 +29,7 @@ frappe.web_form.after_load = () => {
   }).then(r => {
       const is_anonymous = r.message;
 
-      if (!is_anonymous && !dni) {
+      if (!is_anonymous && !dni && !token) {
           frappe.msgprint({
               title: __("Acceso denegado"),
               indicator: "red",

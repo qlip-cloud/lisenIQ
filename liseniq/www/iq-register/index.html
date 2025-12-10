@@ -38,6 +38,7 @@
                         <small id="doc-id-error" class="form-error-message" style="display:none;"></small>
                         <div class="iq-register-hint-medium">Sólo se permiten letras y números</div>
                     </div>
+                    <div id="general-error" class="form-error-message" style="display:none; width:100%; text-align:center; margin-bottom: 15px;"></div>
                     <div class="iq-register-form-action-center" style="width:100%;">
                         <button type="submit" class="iq-register-btn" id="btn-submit">Iniciar</button>
                     </div>
@@ -47,6 +48,15 @@
     </main>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const errorMsg = urlParams.get('error_msg');
+            if (errorMsg) {
+                const errorDiv = document.getElementById('general-error');
+                errorDiv.textContent = decodeURIComponent(errorMsg);
+                errorDiv.style.display = 'block';
+            }
+        });
 
         var frappe = {
             call: function(options) {

@@ -2,13 +2,17 @@ WEB_FORM_CLIENT_SCRIPT = """
 const urlParamsGlobal = new URLSearchParams(window.location.search);
 const uqFlag = urlParamsGlobal.get("uq") === "true";
 
-const buildRegisterUrl = function(token) {
+const buildRegisterUrl = function(token, msg) {
   let url = "/iq-register";
   if (token) {
     url += "?token=" + token;
   }
   if (uqFlag) {
     url += token ? "&uq=true" : "?uq=true";
+  }
+  if (msg) {
+    const encodedMsg = encodeURIComponent(msg);
+    url += (url.includes("?") ? "&" : "?") + "error_msg=" + encodedMsg;
   }
   return url;
 };
@@ -72,12 +76,12 @@ frappe.web_form.after_load = () => {
           const res = r.message || {};
           if (res.redirect_register) {
               const reg_token = res.register_token || token;
-              const register_url = buildRegisterUrl(reg_token);
+              const register_url = buildRegisterUrl(reg_token, res.message);
               window.location.href = register_url;
               return;
           }
           if (res.require_dni && uqFlag) {
-              window.location.href = register_url;
+              window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
               return;
           }
           if (res.allow === false) {
@@ -131,7 +135,7 @@ const validate_dni_on_input = function(dni) {
         // Si el backend indica redirección al registro, hacerlo con el token público proporcionado
         if (res.redirect_register) {
             const reg_token = res.register_token || token;
-            const register_url = buildRegisterUrl(reg_token);
+            const register_url = buildRegisterUrl(reg_token, res.message || __("El DNI ingresado no se encuentra registrado como contacto."));
             window.location.href = register_url;
             return;
         }
@@ -157,7 +161,7 @@ const validate_dni_on_input = function(dni) {
             // El DNI no es válido; eliminarlo del storage
             localStorage.removeItem("liseniq_doc_id");
             if (uqFlag) {
-                setTimeout(() => { window.location.href = register_url; }, 1200);
+                setTimeout(() => { window.location.href = buildRegisterUrl(token, error_msg); }, 1200);
             }
         } else {
             // DNI válido: persistirlo para futuras validaciones y envío
@@ -252,11 +256,11 @@ const submit_response = function (data) {
       const res = r.message || {};
       if (res.redirect_register) {
           const reg_token = res.register_token || token;
-          window.location.href = buildRegisterUrl(reg_token);
+          window.location.href = buildRegisterUrl(reg_token, res.message);
           return;
       }
       if (res.require_dni && uqFlag) {
-          window.location.href = register_url;
+          window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
           return;
       }
       if (res.allow === false) {

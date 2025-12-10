@@ -1,4 +1,22 @@
 WEB_FORM_CLIENT_SCRIPT = """
+const urlParamsGlobal = new URLSearchParams(window.location.search);
+const uqFlag = urlParamsGlobal.get("uq") === "true";
+
+const buildRegisterUrl = function(token, msg) {
+  let url = "/iq-register";
+  if (token) {
+    url += "?token=" + token;
+  }
+  if (uqFlag) {
+    url += token ? "&uq=true" : "?uq=true";
+  }
+  if (msg) {
+    const encodedMsg = encodeURIComponent(msg);
+    url += (url.includes("?") ? "&" : "?") + "error_msg=" + encodedMsg;
+  }
+  return url;
+};
+
 frappe.web_form.after_load = () => {
   $(".page-header-actions-block").hide();
   $(".page-header").hide();
@@ -19,9 +37,10 @@ frappe.web_form.after_load = () => {
   const cachedResponses = localStorage.getItem(surveyCacheKey);
 
   // Validar si la encuesta ya fue respondida
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = urlParamsGlobal;
   const token = urlParams.get("token");
   const dni = localStorage.getItem("liseniq_doc_id");
+  const register_url = buildRegisterUrl(token);
 
   frappe.call({
       method: "liseniq.utils.api_survey.get_survey_is_anonymous",
@@ -49,19 +68,22 @@ frappe.web_form.after_load = () => {
             survey_name: frappe.web_form.title,
             user: token || "Anonimo",
             token: token,
-            dni: dni || null
+            dni: dni || null,
+            uq: uqFlag
           },
         })
         .then((r) => {
           const res = r.message || {};
-          // Si el backend indica redirección al registro, hacerlo con el token público proporcionado
           if (res.redirect_register) {
               const reg_token = res.register_token || token;
-              const register_url = "/iq-register" + (reg_token ? "?token=" + reg_token : "");
+              const register_url = buildRegisterUrl(reg_token, res.message);
               window.location.href = register_url;
               return;
           }
-
+          if (res.require_dni && uqFlag) {
+              window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
+              return;
+          }
           if (res.allow === false) {
             show_completed_message(res.message || __("Esta encuesta ya fue completada. Gracias por tu participación."));
             // Limpiar cache si ya fue respondida
@@ -98,22 +120,22 @@ const validate_dni_on_input = function(dni) {
         return;
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get("token");
-
+    const token = urlParamsGlobal.get("token");
+    const register_url = buildRegisterUrl(token);
     frappe.call({
         method: "liseniq.utils.api_survey.validate_survey_link",
         args: {
             survey_name: frappe.web_form.title,
             dni: dni,
-            token: token || null
+            token: token || null,
+            uq: uqFlag
         },
     }).then((r) => {
         const res = r.message || {};
         // Si el backend indica redirección al registro, hacerlo con el token público proporcionado
         if (res.redirect_register) {
             const reg_token = res.register_token || token;
-            const register_url = "/iq-register" + (reg_token ? "?token=" + reg_token : "");
+            const register_url = buildRegisterUrl(reg_token, res.message || __("El DNI ingresado no se encuentra registrado como contacto."));
             window.location.href = register_url;
             return;
         }
@@ -132,12 +154,15 @@ const validate_dni_on_input = function(dni) {
             // El DNI no es válido para esta encuesta; eliminarlo del storage
             localStorage.removeItem("liseniq_doc_id");
         } else if (res.valid_dni === false) {
-            const error_msg = res.message || __("El DNI proporcionado no corresponde a un contacto válido para esta encuesta.");
+            const error_msg = res.message || __("El DNI ingresado no se encuentra registrado como contacto.");
             $(dni_field.input).addClass('is-invalid');
             $(dni_field.wrapper).append(`<div class="invalid-feedback">${error_msg}</div>`);
             $submit_btn.prop('disabled', true);
             // El DNI no es válido; eliminarlo del storage
             localStorage.removeItem("liseniq_doc_id");
+            if (uqFlag) {
+                setTimeout(() => { window.location.href = buildRegisterUrl(token, error_msg); }, 1200);
+            }
         } else {
             // DNI válido: persistirlo para futuras validaciones y envío
             localStorage.setItem("liseniq_doc_id", dni);
@@ -211,9 +236,10 @@ const submit_response = function (data) {
   window.saving = true;
   frappe.form_dirty = false;
   
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = urlParamsGlobal;
   const token = urlParams.get("token");
   const doc_id = localStorage.getItem("liseniq_doc_id");
+  const register_url = buildRegisterUrl(token);
 
   frappe
     .call({
@@ -222,16 +248,19 @@ const submit_response = function (data) {
         survey_name: frappe.web_form.title,
         user: token || "Anonimo",
         token: token,
-        dni: doc_id || null
+        dni: doc_id || null,
+        uq: uqFlag
       },
     })
     .then((r) => {
       const res = r.message || {};
-      // Redirección a registro si el backend lo solicita
       if (res.redirect_register) {
           const reg_token = res.register_token || token;
-          const register_url = "/iq-register" + (reg_token ? "?token=" + reg_token : "");
-          window.location.href = register_url;
+          window.location.href = buildRegisterUrl(reg_token, res.message);
+          return;
+      }
+      if (res.require_dni && uqFlag) {
+          window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
           return;
       }
       if (res.allow === false) {

@@ -70,7 +70,8 @@ def get_survey_is_anonymous(survey_name):
     return bool(is_anonymous)
 
 @frappe.whitelist(allow_guest=True)
-def validate_survey_link(survey_name, user=None, token=None, dni=None):
+def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
+  uq_flag = str(uq).lower() == "true"
   # frappe.log_error(
   #     message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
   #     title="validate_survey_link Trace"
@@ -353,7 +354,7 @@ def generate_public_link_for_survey(doc, method):
             unique_url = f"{base_url}?new=1&token={token}"
         else:
             base_url = frappe.utils.get_url('/iq-register')
-            unique_url = f"{base_url}?token={token}"
+            unique_url = f"{base_url}?token={token}&uq=true"
 
         doc.su_public_link = unique_url
         doc.su_public_token = token

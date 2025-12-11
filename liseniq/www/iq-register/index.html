@@ -51,6 +51,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             const errorMsg = urlParams.get('error_msg');
+            const uqFromParam = urlParams.get('uq') === 'true';
+            if (uqFromParam) {
+                sessionStorage.setItem('liseniq_uq_flag', 'true');
+            }
             if (errorMsg) {
                 const errorDiv = document.getElementById('general-error');
                 errorDiv.textContent = decodeURIComponent(errorMsg);

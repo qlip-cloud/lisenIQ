@@ -1,6 +1,18 @@
 WEB_FORM_CLIENT_SCRIPT = """
-const urlParamsGlobal = new URLSearchParams(window.location.search);
-const uqFlag = urlParamsGlobal.get("uq") === "true";
+let urlParamsGlobal = new URLSearchParams(window.location.search);
+const uqFromUrl = urlParamsGlobal.get("uq") === "true";
+const uqStored = sessionStorage.getItem("liseniq_uq_flag") === "true";
+let uqFlag = uqFromUrl || uqStored;
+
+if (uqFlag && !uqFromUrl) {
+  const loc = new URL(window.location.href);
+  loc.searchParams.set("uq", "true");
+  window.history.replaceState({}, "", loc.toString());
+  urlParamsGlobal = new URLSearchParams(window.location.search);
+}
+if (uqFlag) {
+  sessionStorage.setItem("liseniq_uq_flag", "true");
+}
 
 const buildRegisterUrl = function(token, msg) {
   let url = "/iq-register";
@@ -41,6 +53,17 @@ frappe.web_form.after_load = () => {
   const token = urlParams.get("token");
   const dni = localStorage.getItem("liseniq_doc_id");
   const register_url = buildRegisterUrl(token);
+  if (uqFlag && (!dni || String(dni).trim() === "")) {
+      frappe.msgprint({
+          title: __("Acceso denegado"),
+          indicator: "red",
+          message: __("Debe ingresar su DNI para continuar con la medición. Será redirigido al registro."),
+      });
+      setTimeout(() => {
+          window.location.href = buildRegisterUrl(token, __("Debe ingresar su DNI para continuar con la medición."));
+      }, 1200);
+      return;
+  }
 
   frappe.call({
       method: "liseniq.utils.api_survey.get_survey_is_anonymous",

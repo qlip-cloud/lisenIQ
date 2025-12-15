@@ -65,7 +65,13 @@ def _get_jwt_secret():
   return frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
 
 @frappe.whitelist(allow_guest=True)
-def validate_survey_link(survey_name, user=None, token=None, dni=None):
+def get_survey_is_anonymous(survey_name):
+    is_anonymous = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_is_anonymous")
+    return bool(is_anonymous)
+
+@frappe.whitelist(allow_guest=True)
+def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
+  uq_flag = str(uq).lower() == "true"
   # frappe.log_error(
   #     message=f"Iniciando validación. survey_name='{survey_name}', token presente: {'Sí' if token else 'No'}",
   #     title="validate_survey_link Trace"
@@ -133,12 +139,15 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
               ["name", "custom_company", "status"],
               as_dict=True
           )
+          # obtener token público para redirección si aplica
+          public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
+
           if not contact_info:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado.", "redirect_register": True, "register_token": public_token}
           if contact_info.custom_company != survey_owner_company:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta.", "redirect_register": True, "register_token": public_token}
           if contact_info.status not in ("Enabled", "Passive"):
-              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta.", "redirect_register": True, "register_token": public_token}
 
           recipient_exists = frappe.db.exists(
               "qp_IQ_SurveyRecipient",
@@ -165,12 +174,15 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None):
               ["name", "custom_company", "status"],
               as_dict=True
           )
+          # obtener token público para redirección si aplica
+          public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
+
           if not contact_info:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado.", "redirect_register": True, "register_token": public_token}
           if contact_info.custom_company != survey_owner_company:
-              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no pertenece a un contacto válido para esta encuesta.", "redirect_register": True, "register_token": public_token}
           if contact_info.status not in ("Enabled", "Passive"):
-              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta."}
+              return {"allow": False, "valid_dni": False, "message": "El contacto no está activo para responder esta encuesta.", "redirect_register": True, "register_token": public_token}
 
           contact_name = contact_info.name
           if contact_name and survey_name_id:
@@ -342,7 +354,7 @@ def generate_public_link_for_survey(doc, method):
             unique_url = f"{base_url}?new=1&token={token}"
         else:
             base_url = frappe.utils.get_url('/iq-register')
-            unique_url = f"{base_url}?token={token}"
+            unique_url = f"{base_url}?token={token}&uq=true"
 
         doc.su_public_link = unique_url
         doc.su_public_token = token

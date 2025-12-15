@@ -21,6 +21,10 @@ def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
 def process_survey_response(doc, method):
     # frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
 
+    is_anonymous_survey = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_is_anonymous")
+    if not is_anonymous_survey and doc.user == "Anonimo":
+        frappe.throw("No se permiten respuestas anónimas para esta encuesta.")
+
     try:
         token = None
 

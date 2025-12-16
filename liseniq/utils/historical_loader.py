@@ -39,13 +39,13 @@ def _get_max_days_to_historic() -> int:
 		param = frappe.db.get_value(
 			"qp_IQ_Parameters",
 			{"pa_abbreviation": "max_days_to_historic"},
-			["pa_data_type", "pa_data_numeric"],
+			["pa_data_type", "pa_data_integer"],
 			as_dict=True
 		)
 		if param:
 			data_type = (param.get("pa_data_type") or "").strip().lower()
-			if data_type.startswith("num") and param.get("pa_data_numeric") is not None:
-				value = int(param.get("pa_data_numeric"))
+			if data_type.startswith("int") and param.get("pa_data_integer") is not None:
+				value = int(param.get("pa_data_integer"))
 				frappe.cache().set_value(cache_key, value)
 				return value
 	except Exception:

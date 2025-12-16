@@ -11,9 +11,14 @@
   "shd_survey_name",
   "datos_del_contacto_section",
   "shd_contact_name",
+  "shd_dob",
+  "shd_country",
   "shd_document_type",
-  "shd_company",
   "shd_document_number",
+  "shd_gender",
+  "shd_academic_level",
+  "shd_company",
+  "shd_entry_date",
   "sc_ii",
   "shd_demographics",
   "shd_measurement_response"
@@ -77,11 +82,36 @@
   {
    "fieldname": "sc_ii",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "shd_dob",
+   "fieldtype": "Date",
+   "label": "Fecha de Nacimiento"
+  },
+  {
+   "fieldname": "shd_country",
+   "fieldtype": "Data",
+   "label": "Pa\u00eds"
+  },
+  {
+   "fieldname": "shd_gender",
+   "fieldtype": "Data",
+   "label": "G\u00e9nero "
+  },
+  {
+   "fieldname": "shd_academic_level",
+   "fieldtype": "Data",
+   "label": "Nivel Acad\u00e9mico"
+  },
+  {
+   "fieldname": "shd_entry_date",
+   "fieldtype": "Date",
+   "label": "Fecha de Ingreso"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-15 09:52:01.445903",
+ "modified": "2025-12-16 15:38:47.377671",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyHistoricData",

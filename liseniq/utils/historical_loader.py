@@ -130,7 +130,11 @@ def archive_finished_surveys_to_history():
 
 		surveys = frappe.get_all(
 			"qp_IQ_Survey",
-			filters={"su_status": status_finished, "su_end_date": ["is", "set"]},
+			filters={
+				"su_status": status_finished, 
+				"su_end_date": ["is", "set"],
+				"su_in_history": 0
+			},
 			fields=["name", "su_name", "su_timezone", "su_end_date"],
 		)
 		# frappe.log_error(f"Encuestas candidatas: {len(surveys)}", "archive_finished_surveys_to_history")
@@ -176,6 +180,9 @@ def archive_finished_surveys_to_history():
 				except Exception:
 					frappe.log_error(frappe.get_traceback(), "archive_finished_surveys_to_history_item")
 					continue
+			
+			# Marcar la encuesta como procesada para que no se vuelva a incluir
+			frappe.db.set_value("qp_IQ_Survey", survey.name, "su_in_history", 1)
 
 		frappe.db.commit()
 		frappe.log_error(f"Fin pase a histórico. Respuestas revisadas: {total_responses_seen}, registros creados: {total_archived}", "archive_finished_surveys_to_history")

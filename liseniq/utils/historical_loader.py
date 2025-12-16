@@ -90,7 +90,10 @@ def _get_contact_fields(contact_name: str):
 	return frappe.db.get_value(
 		"Contact",
 		contact_name,
-		["first_name", "last_name", "custom_document_type", "custom_document_number", "custom_company"],
+		[
+			"first_name", "last_name", "custom_document_type", "custom_document_number", "custom_company",
+			"custom_country", "custom_dob", "gender", "custom_academic_level", "custom_entry_date"
+		],
 		as_dict=True,
 	)
 
@@ -146,6 +149,11 @@ def _insert_historic_row(survey_id: str, survey_name: str, contact_name: str, co
 		"shd_demographics": demographics_list,
 		"shd_measurement_response": response_json,
 		"shd_company": contact_data.get("custom_company"),
+		"shd_country": contact_data.get("custom_country"),
+		"shd_dob": contact_data.get("custom_dob"),
+		"shd_gender": contact_data.get("gender"),
+		"shd_academic_level": contact_data.get("custom_academic_level"),
+		"shd_entry_date": contact_data.get("custom_entry_date"),
 	})
 	doc.insert(ignore_permissions=True)
 

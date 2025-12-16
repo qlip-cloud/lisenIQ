@@ -25,13 +25,42 @@ def _now_in_survey_tz(survey_doc) -> datetime:
 	except Exception:
 		return datetime.now(pytz.utc)
 
-def _is_finalized_and_older_than_7_days(survey_doc) -> bool:
+def _get_max_days_to_historic() -> int:
+	"""
+	Obtiene el número de días a esperar antes de archivar desde los parámetros.
+	Usa 7 días como fallback.
+	"""
+	try:
+		cache_key = "liseniq_max_days_to_historic"
+		cached = frappe.cache().get_value(cache_key)
+		if cached is not None:
+			return int(cached)
+
+		param = frappe.db.get_value(
+			"qp_IQ_Parameters",
+			{"pa_abbreviation": "max_days_to_historic"},
+			["pa_data_type", "pa_data_numeric"],
+			as_dict=True
+		)
+		if param:
+			data_type = (param.get("pa_data_type") or "").strip().lower()
+			if data_type.startswith("num") and param.get("pa_data_numeric") is not None:
+				value = int(param.get("pa_data_numeric"))
+				frappe.cache().set_value(cache_key, value)
+				return value
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "_get_max_days_to_historic")
+	
+	return 7
+
+def _is_ready_for_archiving(survey_doc) -> bool:
 	if not getattr(survey_doc, "su_end_date", None):
 		return False
 	try:
+		days_to_wait = _get_max_days_to_historic()
 		end_dt = get_datetime(survey_doc.su_end_date)
 		now_dt = _now_in_survey_tz(survey_doc).replace(tzinfo=None)
-		return (now_dt - end_dt) >= timedelta(days=7)
+		return (now_dt - end_dt) >= timedelta(days=days_to_wait)
 	except Exception:
 		return False
 
@@ -144,7 +173,7 @@ def archive_finished_surveys_to_history():
 
 		for survey in surveys:
 			survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
-			if not _is_finalized_and_older_than_7_days(survey_doc):
+			if not _is_ready_for_archiving(survey_doc):
 				continue
 
 			# frappe.log_error(f"Procesando encuesta {survey.name} - {survey.su_name}", "archive_finished_surveys_to_history")

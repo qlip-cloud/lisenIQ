@@ -39,11 +39,10 @@ def get_valid_surveys():
                 iq.name as id,
                 iq.su_name,
                 iq.su_owner,
-                iqs.se_status as status,
+                iq.su_in_history as in_history,
                 c.co_name as company_name
             FROM `tabSurvey` s
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
-            LEFT JOIN `tabqp_IQ_SurveyStatus` iqs ON iqs.name = iq.su_status
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
             ORDER BY s.name
         """
@@ -67,6 +66,11 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 shd.shd_contact_name,
                 shd.shd_document_type,
                 shd.shd_document_number,
+                shd.shd_country,
+                shd.shd_entry_date,
+                shd.shd_academic_level,
+                shd.shd_dob,
+                shd.shd_gender,
                 shd.shd_company,
                 shd.shd_measurement_response,
                 GROUP_CONCAT(
@@ -96,11 +100,11 @@ def process_historical_response_row(hist_record, survey_name, company_name, all_
         'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
         'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
         'name': hist_record.get('name', ''),
-        'gender': '',
-        'custom_dob': '',
-        'country': '',
-        'custom_academic_level': '',
-        'entry_date': '',
+        'gender': hist_record.get('shd_gender', ''),
+        'custom_dob': hist_record.get('shd_dob', ''),
+        'country': hist_record.get('shd_country', ''),
+        'custom_academic_level': hist_record.get('shd_academic_level', ''),
+        'entry_date': hist_record.get('shd_entry_date', ''),
     }
 
     # Procesar datos demográficos del registro histórico
@@ -256,8 +260,8 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     data = []
     
     # Separar encuestas finalizadas y no finalizadas
-    finished_surveys = [s for s in valid_surveys if s.get('status') == 'Finalizada']
-    active_surveys = [s for s in valid_surveys if s.get('status') != 'Finalizada']
+    finished_surveys = [s for s in valid_surveys if s.get('in_history') == 1]
+    active_surveys = [s for s in valid_surveys if s.get('in_history') != 1]
     
     # Procesar encuestas finalizadas con datos históricos
     for survey in finished_surveys:

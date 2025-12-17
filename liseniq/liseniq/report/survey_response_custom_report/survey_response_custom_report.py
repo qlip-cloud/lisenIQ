@@ -37,21 +37,20 @@ def get_survey_status(survey_name):
         query = """
             SELECT 
                 iq.name as survey_id,
-                iqs.se_status as status
+                iq.su_in_history as in_history
             FROM `tabqp_IQ_Survey` iq
-            LEFT JOIN `tabqp_IQ_SurveyStatus` iqs ON iqs.name = iq.su_status
             WHERE iq.su_name = %s
         """
         result = frappe.db.sql(query, survey_name, as_dict=True)
         if result:
             return {
                 'survey_id': result[0].get('survey_id', ''),
-                'status': result[0].get('status', '')
+                'in_history': result[0].get('in_history', '')
             }
-        return {'survey_id': '', 'status': ''}
+        return {'survey_id': '', 'in_history': ''}
     except Exception as e:
         frappe.log_error(f"Error getting survey status: {str(e)}")
-        return {'survey_id': '', 'status': ''}
+        return {'survey_id': '', 'in_history': ''}
 
 
 def get_historical_survey_data(survey_id, question_map, demographics_map):
@@ -67,6 +66,11 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
                 shd.shd_contact_name,
                 shd.shd_document_type,
                 shd.shd_document_number,
+                 shd.shd_country,
+                shd.shd_entry_date,
+                shd.shd_academic_level,
+                shd.shd_dob,
+                shd.shd_gender,
                 shd.shd_company,
                 shd.shd_measurement_response,
                 GROUP_CONCAT(
@@ -94,11 +98,11 @@ def process_historical_response_row(hist_record, question_map, demographics_map)
         'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
         'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
         'name': hist_record.get('name', ''),
-        'gender': '',
-        'custom_dob': '',
-        'country': '',
-        'custom_academic_level': '',
-        'entry_date': '',
+        'gender': hist_record.get('shd_gender', ''),
+        'custom_dob': hist_record.get('shd_dob', ''),
+        'country': hist_record.get('shd_country', ''),
+        'custom_academic_level': hist_record.get('shd_academic_level', ''),
+        'entry_date': hist_record.get('shd_entry_date', ''),
     }
 
     # Procesar datos demográficos del registro histórico
@@ -209,7 +213,7 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
     data = []
     
     # Si la encuesta está finalizada, usar datos históricos
-    if survey_status.get('status') == 'Finalizada':
+    if survey_status.get('in_history') == 1:
         survey_id = survey_status.get('survey_id', '')
         if survey_id:
             historical_data = get_historical_survey_data(survey_id, question_map, demographics_map)

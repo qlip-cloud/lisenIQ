@@ -634,11 +634,11 @@ def process_historical_response_row_by_question(hist_record, survey, all_questio
         'user_id': hist_record.get('shd_document_number', ''),
         'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
         'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
-        'custom_dob': '',
-        'gender': '',
-        'custom_academic_level': '',
-        'entry_date': '',
-        'country': '',
+        'custom_dob': hist_record.get('shd_dob', ''),
+        'gender': hist_record.get('shd_gender', ''),
+        'custom_academic_level': hist_record.get('shd_academic_level', ''),
+        'entry_date': hist_record.get('shd_entry_date', ''),
+        'country': hist_record.get('shd_country', ''),
     }
 
     # Procesar datos demográficos del registro histórico

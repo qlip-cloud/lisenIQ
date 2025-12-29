@@ -248,7 +248,7 @@ def validate_contacts():
 				content = content.decode('utf-8-sig')
 			reader = csv.reader(io.StringIO(content))
 			for r in reader:
-				rows.append([None if v is None else r.strip() for r in r])
+				rows.append([None if v is None else v.strip() for v in r])
 		else:
 			frappe.throw(_("Tipo de archivo no soportado: {0}").format(ext))
 	except Exception as e:

@@ -19,12 +19,10 @@ document.addEventListener('DOMContentLoaded', function () {
 		step3: document.getElementById('step-3'),
 		downloadBtn: document.getElementById('download-template'),
 		fileInput: document.getElementById('file-input'),
-		uploadBtn: document.getElementById('btn-upload'),
-		selectedFile: document.getElementById('selected-file'),
-		uploadModal: document.getElementById('upload-modal'),
-		modalFileInfo: document.getElementById('modal-file-info'),
-		modalCancel: document.getElementById('modal-cancel'),
-		modalConfirm: document.getElementById('modal-confirm'),
+		dropzone: document.getElementById('dropzone'),
+		dropzoneFilename: document.getElementById('dropzone-filename'),
+		btnCancel: document.getElementById('btn-cancel'),
+		btnContinue: document.getElementById('btn-continue'),
 		validationSummary: document.getElementById('validation-summary'),
 		previewContainer: document.getElementById('preview-table-container'),
 		btnBackToStep1: document.getElementById('btn-back-to-step1'),
@@ -61,63 +59,61 @@ document.addEventListener('DOMContentLoaded', function () {
 		window.location = '/api/method/liseniq.www.contacts.contacts_import.download_template';
 	});
 
-	ui.uploadBtn.addEventListener('click', () => ui.fileInput.click());
+	// dropzone click & drag/drop
+	ui.dropzone.addEventListener('click', () => ui.fileInput.click());
+	ui.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); ui.dropzone.classList.add('dragover'); });
+	ui.dropzone.addEventListener('dragleave', (e) => { e.preventDefault(); ui.dropzone.classList.remove('dragover'); });
+	ui.dropzone.addEventListener('drop', (e) => {
+		e.preventDefault();
+		ui.dropzone.classList.remove('dragover');
+		const f = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) || null;
+		handleFileSelect(f);
+	});
 
 	ui.fileInput.addEventListener('change', function () {
-		const f = this.files[0];
+		handleFileSelect(this.files[0]);
+	});
+
+	function handleFileSelect(f) {
 		if (!f) return;
 		const ext = f.name.split('.').pop().toLowerCase();
 		if (!['xlsx','xls','csv'].includes(ext)) {
 			alert('Tipo de archivo no permitido. Use .xlsx o .csv');
-			this.value = '';
+			ui.fileInput.value = '';
 			return;
 		}
 		state.file = f;
-		ui.selectedFile.textContent = f.name;
-		ui.modalFileInfo.textContent = `Archivo: ${f.name} (${Math.round(f.size/1024)} KB)`;
-		ui.uploadModal.classList.remove('hidden');
-	});
+		ui.dropzoneFilename.textContent = `${f.name} · ${Math.round(f.size/1024)} KB`;
+		ui.btnContinue.disabled = false;
+	}
 
-	ui.modalCancel.addEventListener('click', () => {
-		ui.uploadModal.classList.add('hidden');
-		ui.fileInput.value = '';
-		ui.selectedFile.textContent = '';
-		state.file = null;
-	});
+	ui.btnCancel.addEventListener('click', () => { window.location.href = '/contacts'; });
 
-	ui.modalConfirm.addEventListener('click', () => {
+	ui.btnContinue.addEventListener('click', () => {
 		if (!state.file) return;
-		ui.modalConfirm.disabled = true;
-		ui.modalConfirm.textContent = 'Validando...';
-		// enviar archivo al endpoint de validación
+		ui.btnContinue.disabled = true;
+		ui.btnContinue.textContent = 'Validando...';
 		const fd = new FormData();
 		fd.append('file', state.file);
 		fetch('/api/method/liseniq.www.contacts.contacts_import.validate_contacts', {
 			method: 'POST',
 			body: fd
 		}).then(r => r.json()).then(res => {
-			ui.modalConfirm.disabled = false;
-			ui.modalConfirm.textContent = 'Validar archivo';
-			ui.uploadModal.classList.add('hidden');
-			if (!res.message && res._server_messages) {
-				alert('Error en servidor: ' + res._server_messages);
-				return;
-			}
+			ui.btnContinue.disabled = false;
+			ui.btnContinue.textContent = 'Continuar';
 			const data = res.message || res;
 			if (!data.ok) {
 				alert(data.error || 'Error de validación');
 				return;
 			}
-			// cargar preview
 			state.headers = data.headers || [];
 			state.rows = data.rows || [];
 			state.errors = data.errors || [];
 			renderPreview();
 			showStep(2);
 		}).catch(err => {
-			ui.modalConfirm.disabled = false;
-			ui.modalConfirm.textContent = 'Validar archivo';
-			ui.uploadModal.classList.add('hidden');
+			ui.btnContinue.disabled = false;
+			ui.btnContinue.textContent = 'Continuar';
 			alert('Error en la validación: ' + (err.message || err));
 		});
 	});

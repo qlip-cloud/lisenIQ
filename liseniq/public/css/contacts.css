@@ -269,3 +269,33 @@
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+.import-choice-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    transition: all 0.15s ease;
+}
+.import-choice-card .fa { color: #7B24FF; }
+.import-choice-card:hover {
+    box-shadow: 0 6px 18px rgba(123,36,255,0.08);
+    transform: translateY(-3px);
+}
+.import-choice-card.selected {
+    border-color: rgba(123,36,255,0.18);
+    box-shadow: 0 8px 24px rgba(123,36,255,0.06);
+}
+
+/* dropzone */
+.dropzone {
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dropzone.dragover {
+    border-color: #7B24FF;
+    background: rgba(123,36,255,0.03);
+}
+
+/* botones inferiores del import */
+#btn-cancel.btn, #btn-continue.btn {
+    min-width: 120px;
+}

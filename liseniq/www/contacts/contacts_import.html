@@ -2,7 +2,7 @@
 {% from "/templates/macros/iq_header.html" import iq_header %}
 
 {% block page_header %}
-    {{ iq_header(title="Nuevo Contacto") }}
+    {{ iq_header(title="Importar contactos") }}
 {% endblock %}
 
 {% block page_main_content %}
@@ -13,29 +13,65 @@
     <div id="step-1" class="import-step">
         <div class="page-title-section">
             <nav class="breadcrumb-nav">
-                <a href="/contacts">Contactos</a> / Nuevo Contacto
+                <a href="/contacts">Contactos</a> / Carga Masiva de Contactos
             </nav>
-            <h2 class="page-main-title">Nuevo contacto</h2>
+            <h2 class="page-main-title">Importar contactos</h2>
         </div>
-        <div class="form-section-wrapper" style="max-width: 600px;">
-            <div class="form-group">
-                <label style="font-weight:600;">Cargar Plantilla</label>
-                <span style="color:#737373;">Cargue el Excel de la plantilla</span>
-                <div class="actions" style="margin-top:18px;display:flex;gap:12px;align-items:center;">
-                    <a id="download-template" class="btn btn-outline-purple">Descargar Plantilla en excel</a>
-                    <input id="file-input" type="file" accept=".xlsx,.csv" class="hidden" />
-                    <button id="btn-upload" class="btn btn-purple-main">Subir Archivo</button>
-                    <span id="selected-file" style="color:#555;"></span>
+
+        <!-- Opciones (Cargar archivo / Editar en línea) -->
+        <div style="display:flex;gap:16px;align-items:flex-start;justify-content:space-between;max-width:900px;">
+            <div style="flex:1;display:flex;gap:12px;">
+                <div id="opt-upload" class="import-choice-card selected" style="flex:1;cursor:pointer;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:18px;">
+                        <i class="fa fa-upload" style="font-size:18px;color:#7B24FF;"></i>
+                        <div>
+                            <div style="font-weight:600;">Cargar archivo</div>
+                            <div style="color:#737373;font-size:0.85rem;">Sube tu plantilla (.xlsx o .csv)</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="opt-edit" class="import-choice-card" style="flex:1;cursor:pointer;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:18px;">
+                        <i class="fa fa-desktop" style="font-size:18px;color:#7B24FF;"></i>
+                        <div>
+                            <div style="font-weight:600;">Editar en línea</div>
+                            <div style="color:#737373;font-size:0.85rem;">Abrir editor para pegar datos</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a id="download-template" class="btn btn-outline-purple">Descargar plantilla</a>
+            </div>
+        </div>
+
+        <!-- Área principal con dropzone -->
+        <div style="margin-top:18px;max-width:900px;">
+            <input id="file-input" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+            <div id="dropzone" class="dropzone" style="background:#fff;border:1px dashed #e6e6e6;border-radius:10px;padding:28px;text-align:center;cursor:pointer;max-width:900px;">
+                <i class="fa fa-cloud-upload" style="font-size:28px;color:#7B24FF;margin-bottom:8px;display:block;"></i>
+                <div style="font-weight:600;">Arrastra el archivo o haz clic para seleccionarlo</div>
+                <div style="color:#9aa3ad;font-size:0.85rem;margin-top:6px;">Solo .xlsx o .csv de menos de 6MB</div>
+                <div id="dropzone-filename" style="margin-top:10px;color:#555;font-size:0.9rem;"></div>
+            </div>
+
+            <!-- Controles inferiores -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;max-width:900px;">
+                <div></div>
+                <div style="display:flex;gap:12px;">
+                    <button id="btn-cancel" class="btn btn-outline-purple">Cancelar</button>
+                    <button id="btn-continue" class="btn btn-purple-main" disabled>Continuar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Paso 2: Validar Datos / Previsualizar y corregir -->
+    <!-- Paso 2 y 3: se reutilizan existentes -->
     <div id="step-2" class="import-step d-none">
         <div class="page-title-section">
             <nav class="breadcrumb-nav">
-                <a href="/contacts">Contactos</a> / Nuevo Contacto
+                <a href="/contacts">Contactos</a> / Importar contactos
             </nav>
             <h2 class="page-main-title">Validar datos</h2>
         </div>
@@ -49,11 +85,10 @@
         </div>
     </div>
 
-    <!-- Paso 3: Creación y Resumen -->
     <div id="step-3" class="import-step d-none">
         <div class="page-title-section">
             <nav class="breadcrumb-nav">
-                <a href="/contacts">Contactos</a> / Nuevo Contacto
+                <a href="/contacts">Contactos</a> / Importar contactos
             </nav>
             <h2 class="page-main-title">Creación</h2>
         </div>
@@ -62,22 +97,6 @@
             <div style="margin-top:12px;text-align:right;">
                 <button id="btn-back-to-step2" class="btn btn-outline-purple">Atrás</button>
                 <button id="btn-finish" class="btn btn-purple-main">Finalizar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal confirmación subida -->
-<div id="upload-modal" class="choice-modal-overlay hidden">
-    <div class="choice-modal-content">
-        <div class="choice-modal-header">
-            <span class="choice-modal-title">Confirmar subida de plantilla</span>
-            <button class="close" id="modal-cancel" aria-label="Cerrar">&times;</button>
-        </div>
-        <div class="choice-modal-body" style="flex-direction:column;align-items:flex-start;">
-            <p id="modal-file-info"></p>
-            <div style="text-align:right;margin-top:12px;width:100%;">
-                <button id="modal-confirm" class="btn btn-purple-main" style="float:right;">Validar archivo</button>
             </div>
         </div>
     </div>

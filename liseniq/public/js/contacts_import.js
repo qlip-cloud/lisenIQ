@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', function () {
 		errors: [],
 		processResult: null,
 		mode: 'upload',
-		gridApi: null
+		gridApi: null,
+        demographicColsCount: 1
 	};
 
 	const ui = {
@@ -35,17 +36,18 @@ document.addEventListener('DOMContentLoaded', function () {
 		optUpload: document.getElementById('opt-upload'),
 		optEdit: document.getElementById('opt-edit'),
 		uploadArea: document.getElementById('upload-area'),
-		btnAddRow: document.getElementById('btn-add-row')
+		btnAddRow: document.getElementById('btn-add-row'),
+        btnAddDemo: document.getElementById('btn-add-demo')
 	};
 
 	const stepper = new Stepper(ui.stepperContainer, ['Cargar/Seleccionar', 'Validar y Editar', 'Procesar']);
 	stepper.render();
 	updateStepUI();
 
-	// Columnas para Ag-Grid
-	const gridColDefs = [
-		{ field: "Nombre", headerName: "Nombre", editable: true, minWidth: 150 },
-		{ field: "Apellido", headerName: "Apellido", editable: true, minWidth: 150 },
+    // Definición base de columnas (estáticas)
+    const getBaseColDefs = () => [
+		{ field: "Nombre", headerName: "Nombre", editable: true, minWidth: 150, pinned: 'left' },
+		{ field: "Apellido", headerName: "Apellido", editable: true, minWidth: 150, pinned: 'left' },
 		{ 
 			field: "Género", 
 			headerName: "Género", 
@@ -72,10 +74,31 @@ document.addEventListener('DOMContentLoaded', function () {
 			editable: true,
 			cellEditor: 'agSelectCellEditor', 
 			cellEditorParams: { values: ['Activo', 'Inactivo'] }
-		},
-		{ field: "Nombre de Demográfico", headerName: "Nombre Demográfico", editable: true },
-		{ field: "Valor de Demográfico", headerName: "Valor Demográfico", editable: true }
-	];
+		}
+    ];
+
+    // Función para generar todas las columnas incluyendo las dinámicas de demográficos
+    function getAllColDefs() {
+        const cols = getBaseColDefs();
+        
+        // Agregar columnas dinámicas según el contador en el estado
+        for (let i = 1; i <= state.demographicColsCount; i++) {
+            const suffix = i === 1 ? "" : ` ${i}`; // El primero no lleva número para compatibilidad con plantilla
+            cols.push({ 
+                field: `Nombre de Demográfico${suffix}`, 
+                headerName: `Nombre Demográfico ${i}`, 
+                editable: true,
+                cellStyle: { 'backgroundColor': '#f9f9ff' }
+            });
+            cols.push({ 
+                field: `Valor de Demográfico${suffix}`, 
+                headerName: `Valor Demográfico ${i}`, 
+                editable: true,
+                cellStyle: { 'backgroundColor': '#f9f9ff' }
+            });
+        }
+        return cols;
+    }
 
 	// helpers
 	function showStep(n) {
@@ -94,12 +117,14 @@ document.addEventListener('DOMContentLoaded', function () {
 		// Limpiar contenido previo si existe
 		ui.gridContainer.innerHTML = '';
 		
+        const colDefs = getAllColDefs();
+
 		const gridOptions = {
 			rowData: state.rows,
-			columnDefs: gridColDefs,
+			columnDefs: colDefs,
 			defaultColDef: {
 				flex: 1,
-				minWidth: 100,
+				minWidth: 120,
 				resizable: true,
 			},
 			pagination: true,
@@ -108,20 +133,22 @@ document.addEventListener('DOMContentLoaded', function () {
 			rowSelection: 'multiple',
 			onGridReady: (params) => {
 				state.gridApi = params.api;
-				params.api.sizeColumnsToFit();
+				// params.api.sizeColumnsToFit(); // Desactivado para permitir scroll horizontal si hay muchas columnas
 			}
 		};
 
 		// Crear la grid
 		agGrid.createGrid(ui.gridContainer, gridOptions);
 
-		// Mostrar botón de agregar fila si estamos en modo edición
+		// Mostrar botones de edición
 		if (state.mode === 'edit') {
 			ui.btnAddRow.style.display = 'inline-block';
-			ui.validationSummary.textContent = "Edite los contactos existentes o agregue nuevos.";
+            ui.btnAddDemo.style.display = 'inline-block';
+			ui.validationSummary.textContent = "Edite los contactos existentes o agregue nuevos. Deslice a la derecha para ver más demográficos.";
 			ui.btnValidateContinue.disabled = false;
 		} else {
 			ui.btnAddRow.style.display = 'none';
+            ui.btnAddDemo.style.display = 'none'; // Opcional: permitir agregar demográficos también en carga masiva si se desea
 		}
 	}
 
@@ -134,7 +161,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 	ui.optEdit.addEventListener('click', () => {
 		setMode('edit');
-		// Al seleccionar modo edición, avanzamos al paso 2 cargando datos
 		fetchExistingContacts();
 	});
 
@@ -147,7 +173,6 @@ document.addEventListener('DOMContentLoaded', function () {
 		} else {
 			ui.optEdit.classList.add('selected');
 			ui.optUpload.classList.remove('selected');
-			// ui.uploadArea.style.display = 'none'; // Opcional, ocultar dropzone si se quiere
 		}
 	}
 
@@ -167,8 +192,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>`;
 				
 				if (r.message) {
-					state.rows = r.message || [];
-					state.headers = gridColDefs.map(c => c.field);
+					state.rows = r.message.rows || [];
+                    // Detectar cuántas columnas de demográficos vienen
+                    state.demographicColsCount = Math.max(1, r.message.max_demographics || 1);
+					state.headers = getAllColDefs().map(c => c.field);
 					state.errors = [];
 					showStep(2);
 				} else {
@@ -235,15 +262,15 @@ document.addEventListener('DOMContentLoaded', function () {
 			state.headers = data.headers || [];
 			state.rows = data.rows || [];
 			state.errors = data.errors || [];
-			
-			// Si hay errores, mostrar advertencia, pero permitir ver Grid
+            
+            // Reiniciar contador de demográficos para archivo nuevo (asumimos 1 por defecto salvo que detectemos más en un futuro)
+            state.demographicColsCount = 1; 
+
 			if (state.errors.length > 0) {
 				ui.validationSummary.innerHTML = `<strong>Advertencias:</strong> ${state.errors.length} fila(s) con incidencias. Revise en la tabla.`;
 			} else {
 				ui.validationSummary.textContent = 'Archivo validado. Puede realizar ajustes finales en la tabla.';
 			}
-			
-			// Asegurar que state.rows tenga las keys correctas para AgGrid
 			showStep(2);
 		}).catch(err => {
 			ui.btnContinue.disabled = false;
@@ -252,15 +279,24 @@ document.addEventListener('DOMContentLoaded', function () {
 		});
 	});
 
-	// Botón Agregar Fila (Solo modo edición)
+	// Botón Agregar Fila
 	ui.btnAddRow.addEventListener('click', () => {
 		if (state.gridApi) {
 			const newRow = {};
-			gridColDefs.forEach(col => newRow[col.field] = "");
-			newRow["Estatus"] = "Activo"; // Default
+			getAllColDefs().forEach(col => newRow[col.field] = "");
+			newRow["Estatus"] = "Activo";
 			state.gridApi.applyTransaction({ add: [newRow] });
 		}
 	});
+
+    // Botón Agregar Demográfico (Nuevas columnas)
+    ui.btnAddDemo.addEventListener('click', () => {
+        if (!state.gridApi) return;
+        
+        state.demographicColsCount++;
+        const newColDefs = getAllColDefs();
+        state.gridApi.setGridOption('columnDefs', newColDefs);
+    });
 
 	ui.btnBackToStep1.addEventListener('click', () => {
 		showStep(1);

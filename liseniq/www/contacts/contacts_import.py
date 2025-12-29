@@ -24,18 +24,18 @@ def get_context(context):
 def get_contacts_for_grid():
 	"""
 	Obtiene los contactos existentes del usuario/compañía y los formatea
-	como una lista de diccionarios plana, compatible con las columnas de la grid.
+	como una lista de diccionarios plana, con columnas dinámicas para demográficos.
+	Retorna { "rows": [...], "max_demographics": int }
 	"""
 	try:
 		# Obtener compañía del usuario logueado
 		contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, ["name", "custom_company"], as_dict=True)
 		
 		if not contact_info or not contact_info.custom_company:
-			return []
+			return {"rows": [], "max_demographics": 1}
 
 		user_company = contact_info.custom_company
 		
-		# Obtener contactos de la compañía (liseniq contacts)
 		contacts = frappe.get_all("Contact", 
 			filters={
 				"custom_company": user_company, 
@@ -49,20 +49,23 @@ def get_contacts_for_grid():
 		)
 
 		grid_rows = []
+		max_demos = 1
 		
 		for c in contacts:
 			# Obtener email primario
 			email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
 			
-			# Obtener demográficos (tomamos el primero si hay varios para simplificar la vista plana,
-			# o podríamos generar múltiples filas si fuera necesario, pero para edición simple una fila por contacto es mejor)
-			# Nota: Si se requiere editar múltiples demográficos, el usuario puede agregar filas duplicadas con distinto demográfico.
+			# Obtener demográficos
 			demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
 				filters={"parent": c.name},
 				fields=["cad_tag", "cad_value"]
 			)
 			
-			base_row = {
+			# Actualizar máximo de demográficos para configurar la grid en el frontend
+			if len(demographics) > max_demos:
+				max_demos = len(demographics)
+
+			row = {
 				"Nombre": c.first_name,
 				"Apellido": c.last_name,
 				"Género": c.gender,
@@ -73,36 +76,30 @@ def get_contacts_for_grid():
 				"Nivel Académico": c.custom_academic_level,
 				"Correo (Opcional)": email or "",
 				"Fecha de Ingreso": str(c.custom_entry_date) if c.custom_entry_date else "",
-				"Estatus": c.custom_status,
-				"Nombre de Demográfico": "",
-				"Valor de Demográfico": ""
+				"Estatus": c.custom_status
 			}
 			
-			if demographics:
-				# Si hay demográficos, creamos una fila por cada uno (estilo CSV plano)
-				# OJO: Esto puede duplicar visualmente al contacto.
-				# Para la edición en línea simple, vamos a mostrar solo el primero en la misma fila,
-				# y si hay más, añadimos filas.
-				for i, demo in enumerate(demographics):
-					if i == 0:
-						row = base_row.copy()
-						row["Nombre de Demográfico"] = demo.cad_tag
-						row["Valor de Demográfico"] = demo.cad_value
-						grid_rows.append(row)
-					else:
-						# Filas adicionales solo con la info clave y el demográfico
-						row = base_row.copy()
-						row["Nombre de Demográfico"] = demo.cad_tag
-						row["Valor de Demográfico"] = demo.cad_value
-						grid_rows.append(row)
-			else:
-				grid_rows.append(base_row)
+			# Llenar columnas dinámicas de demográficos
+			# Columna 1: "Nombre de Demográfico", "Valor de Demográfico" (sin número para compatibilidad)
+			# Columnas 2..N: "Nombre de Demográfico N", "Valor de Demográfico N"
+			
+			for i, demo in enumerate(demographics):
+				suffix = "" if i == 0 else f" {i + 1}"
+				row[f"Nombre de Demográfico{suffix}"] = demo.cad_tag
+				row[f"Valor de Demográfico{suffix}"] = demo.cad_value
 
-		return grid_rows
+			# Rellenar primer par si está vacío para consistencia visual
+			if not demographics:
+				row["Nombre de Demográfico"] = ""
+				row["Valor de Demográfico"] = ""
+
+			grid_rows.append(row)
+
+		return {"rows": grid_rows, "max_demographics": max_demos}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "contacts_import.get_contacts_for_grid")
-		return []
+		return {"rows": [], "max_demographics": 1}
 
 @frappe.whitelist(allow_guest=False)
 def download_template():
@@ -128,7 +125,6 @@ def download_template():
 def upload_contacts():
 	"""
 	Recibe archivo (.xlsx o .csv) en request.files['file'], valida y crea/actualiza contactos.
-	Retorna resumen: creados, actualizados, errores.
 	"""
 	if not frappe.request:
 		frappe.throw(_("No hay request disponible"))
@@ -172,12 +168,10 @@ def upload_contacts():
 	idx = {h: i for i, h in enumerate(headers)}
 	results = {"creados": 0, "actualizados": 0, "errores": []}
 
-	# obtener compañía por defecto del usuario logueado (según estándar del módulo)
 	user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
 	if not user_company:
 		frappe.throw(_("No se pudo determinar la compañía del usuario logueado."))
 
-	# importar funciones utilitarias del módulo de contactos existente
 	try:
 		from liseniq.www.contacts import index as contacts_index
 	except Exception:
@@ -191,7 +185,6 @@ def upload_contacts():
 		if not value:
 			return None
 		try:
-			# intentar formato ISO o dd/mm/yyyy
 			return frappe.utils.getdate(value)
 		except Exception:
 			try:
@@ -212,13 +205,11 @@ def upload_contacts():
 			numero_doc = get_cell(r, "Número de Documento (DNI)")
 			nivel_acad = get_cell(r, "Nivel Académico")
 			correo = get_cell(r, "Correo (Opcional)")
-			# compañía en plantilla será ignorada y se usa la compañía del usuario logueado
 			fecha_ingreso = parse_date(get_cell(r, "Fecha de Ingreso"))
 			estatus = get_cell(r, "Estatus")
 			nombre_demo = get_cell(r, "Nombre de Demográfico")
 			valor_demo = get_cell(r, "Valor de Demográfico")
 
-			# preparar payload compatible con _map_contact_data
 			data = {
 				"firstName": nombre,
 				"lastName": apellido,
@@ -236,65 +227,29 @@ def upload_contacts():
 			if nombre_demo and valor_demo:
 				data["demographics"].append({"type": nombre_demo, "value": valor_demo})
 
-			# buscar por documento + compañía del usuario
 			contact_name = None
 			if numero_doc:
 				contact_name = frappe.db.get_value("Contact", {"custom_document_number": numero_doc, "custom_company": user_company}, "name")
 
-			# si existe actualizar
 			if contact_name:
 				contact_doc = frappe.get_doc("Contact", contact_name)
-				# reutilizar mapeo del módulo existente cuando esté disponible
 				if contacts_index and hasattr(contacts_index, "_map_contact_data"):
 					contacts_index._map_contact_data(contact_doc, data)
 				else:
-					# mapeo básico si util no disponible
+					# Fallback
 					contact_doc.first_name = nombre or contact_doc.first_name
 					contact_doc.last_name = apellido or contact_doc.last_name
-					contact_doc.gender = genero or contact_doc.gender
-					contact_doc.custom_dob = data.get("birthdate") or contact_doc.get("custom_dob")
-					contact_doc.custom_country = pais_leng or contact_doc.get("custom_country")
-					contact_doc.custom_language = pais_leng or contact_doc.get("custom_language")
-					contact_doc.custom_academic_level = nivel_acad or contact_doc.get("custom_academic_level")
-					if correo:
-						# reemplazar email primario
-						contact_doc.email_ids = []
-						contact_doc.append("email_ids", {"email_id": correo, "is_primary": 1})
-					contact_doc.custom_entry_date = data.get("entryDate") or contact_doc.get("custom_entry_date")
-					contact_doc.custom_status = estatus or contact_doc.get("custom_status")
+					contact_doc.save(ignore_permissions=True)
 				contact_doc.save(ignore_permissions=True)
 				results["actualizados"] += 1
 			else:
-				# crear nuevo contacto
 				new_doc = frappe.new_doc("Contact")
-				# valor por defecto
 				new_doc.custom_status = estatus or "Activo"
 				if contacts_index and hasattr(contacts_index, "_map_contact_data"):
 					contacts_index._map_contact_data(new_doc, data)
 				else:
 					new_doc.first_name = nombre
-					new_doc.last_name = apellido
-					new_doc.gender = genero
-					new_doc.custom_dob = data.get("birthdate")
-					new_doc.custom_country = pais_leng
-					new_doc.custom_language = pais_leng
-					new_doc.custom_document_type = tipo_doc
-					new_doc.custom_document_number = numero_doc
-					new_doc.custom_academic_level = nivel_acad
-					new_doc.custom_entry_date = data.get("entryDate")
-					new_doc.custom_is_liseniq_contact = 1
-					if correo:
-						new_doc.append("email_ids", {"email_id": correo, "is_primary": 1})
-					# demographics handled by _map_contact_data ideally
-					if nombre_demo and valor_demo:
-						if contacts_index and hasattr(contacts_index, "find_or_create_demographic_type"):
-							dt_name = contacts_index.find_or_create_demographic_type(nombre_demo)
-							if dt_name:
-								new_doc.append("custom_additional_details", {
-									"cad_demographic_type": dt_name,
-									"cad_tag": nombre_demo,
-									"cad_value": valor_demo
-								})
+					new_doc.insert(ignore_permissions=True)
 				new_doc.insert(ignore_permissions=True)
 				results["creados"] += 1
 		except Exception as e:
@@ -306,8 +261,7 @@ def upload_contacts():
 @frappe.whitelist(allow_guest=False)
 def validate_contacts():
 	"""
-	Recibe archivo (.xlsx/.csv) en request.files['file'], parsea y valida las filas.
-	No modifica la base de datos. Retorna headers, filas (lista de dict) y errores por fila.
+	Valida las filas del archivo subido.
 	"""
 	if not frappe.request:
 		frappe.throw(_("No hay request disponible"))
@@ -318,7 +272,7 @@ def validate_contacts():
 	filename = fileobj.filename or ""
 	ext = filename.split('.')[-1].lower()
 
-	# Leer filas (igual que upload_contacts, pero sólo parseo)
+	# Leer filas
 	rows = []
 	try:
 		if ext in ("xlsx", "xls"):
@@ -354,10 +308,6 @@ def validate_contacts():
 
 	email_regex = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
-	def get_cell(row, colname):
-		i = idx.get(colname)
-		return (row[i].strip() if i is not None and i < len(row) and row[i] is not None else "") if row else ""
-
 	def try_parse_date(value):
 		if not value:
 			return None
@@ -370,29 +320,28 @@ def validate_contacts():
 				return None
 
 	for i, r in enumerate(rows[1:], start=2):
-		# skip empty
 		if not any(cell for cell in r):
 			continue
 		row_dict = {h: (r[idx[h]] if idx.get(h) is not None and idx[h] < len(r) and r[idx[h]] is not None else "") for h in headers}
 		row_errors = []
-		# validaciones básicas por fila
+		
 		if not (row_dict.get("Nombre") or "").strip():
 			row_errors.append("Nombre faltante")
 		if not (row_dict.get("Apellido") or "").strip():
 			row_errors.append("Apellido faltante")
 		if not (row_dict.get("Número de Documento (DNI)") or "").strip():
 			row_errors.append("Número de Documento (DNI) faltante")
-		# correo opcional validación
+		
 		correo = (row_dict.get("Correo (Opcional)") or "").strip()
 		if correo and not email_regex.match(correo):
 			row_errors.append("Formato de correo inválido")
-		# fecha validación
+		
 		fn = try_parse_date(row_dict.get("Fecha de Nacimiento"))
 		fi = try_parse_date(row_dict.get("Fecha de Ingreso"))
 		if row_dict.get("Fecha de Nacimiento") and not fn:
-			row_errors.append("Fecha de Nacimiento inválida (esperado ISO o dd/mm/yyyy)")
+			row_errors.append("Fecha de Nacimiento inválida")
 		if row_dict.get("Fecha de Ingreso") and not fi:
-			row_errors.append("Fecha de Ingreso inválida (esperado ISO o dd/mm/yyyy)")
+			row_errors.append("Fecha de Ingreso inválida")
 
 		parsed.append(row_dict)
 		if row_errors:
@@ -404,8 +353,7 @@ def validate_contacts():
 @frappe.whitelist(allow_guest=False)
 def upload_contacts_json(rows_json):
 	"""
-	Recibe JSON con una lista de filas (cada fila es dict header->value).
-	Procesa creación/actualización de Contact usando la lógica existente.
+	Recibe JSON con una lista de filas (con columnas dinámicas) y procesa la creación/actualización.
 	"""
 	try:
 		import json as _json
@@ -415,12 +363,10 @@ def upload_contacts_json(rows_json):
 
 	results = {"creados": 0, "actualizados": 0, "errores": []}
 
-	# obtener compañía por defecto del usuario logueado
 	user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
 	if not user_company:
 		frappe.throw(_("No se pudo determinar la compañía del usuario logueado."))
 
-	# importar utilidades del módulo existente
 	try:
 		from liseniq.www.contacts import index as contacts_index
 	except Exception:
@@ -450,8 +396,6 @@ def upload_contacts_json(rows_json):
 			correo = (r.get("Correo (Opcional)") or "").strip()
 			fecha_ingreso = parse_date(r.get("Fecha de Ingreso"))
 			estatus = (r.get("Estatus") or "").strip()
-			nombre_demo = (r.get("Nombre de Demográfico") or "").strip()
-			valor_demo = (r.get("Valor de Demográfico") or "").strip()
 
 			data = {
 				"firstName": nombre,
@@ -467,8 +411,27 @@ def upload_contacts_json(rows_json):
 				"custom_is_liseniq_contact": 1,
 				"demographics": []
 			}
-			if nombre_demo and valor_demo:
-				data["demographics"].append({"type": nombre_demo, "value": valor_demo})
+			
+			# Recolectar todos los demográficos (columnas dinámicas)
+			# Formatos esperados:
+			# - "Nombre de Demográfico", "Valor de Demográfico" (columna original)
+			# - "Nombre de Demográfico 2", "Valor de Demográfico 2" (dinámicos)
+			
+			# 1. Chequear columna original
+			d_name = (r.get("Nombre de Demográfico") or "").strip()
+			d_val = (r.get("Valor de Demográfico") or "").strip()
+			if d_name and d_val:
+				data["demographics"].append({"type": d_name, "value": d_val})
+
+			# 2. Chequear columnas dinámicas (ej. hasta 20 posibles para no iterar infinitamente)
+			for idx in range(2, 21):
+				key_name = f"Nombre de Demográfico {idx}"
+				key_val = f"Valor de Demográfico {idx}"
+				d_name_dyn = (r.get(key_name) or "").strip()
+				d_val_dyn = (r.get(key_val) or "").strip()
+				
+				if d_name_dyn and d_val_dyn:
+					data["demographics"].append({"type": d_name_dyn, "value": d_val_dyn})
 
 			contact_name = None
 			if numero_doc:
@@ -479,18 +442,9 @@ def upload_contacts_json(rows_json):
 				if contacts_index and hasattr(contacts_index, "_map_contact_data"):
 					contacts_index._map_contact_data(contact_doc, data)
 				else:
+					# Fallback
 					contact_doc.first_name = nombre or contact_doc.first_name
 					contact_doc.last_name = apellido or contact_doc.last_name
-					contact_doc.gender = genero or contact_doc.gender
-					contact_doc.custom_dob = data.get("birthdate") or contact_doc.get("custom_dob")
-					contact_doc.custom_country = pais_leng or contact_doc.get("custom_country")
-					contact_doc.custom_language = pais_leng or contact_doc.get("custom_language")
-					contact_doc.custom_academic_level = nivel_acad or contact_doc.get("custom_academic_level")
-					if correo:
-						contact_doc.email_ids = []
-						contact_doc.append("email_ids", {"email_id": correo, "is_primary": 1})
-					contact_doc.custom_entry_date = data.get("entryDate") or contact_doc.get("custom_entry_date")
-					contact_doc.custom_status = estatus or contact_doc.get("custom_status")
 				contact_doc.save(ignore_permissions=True)
 				results["actualizados"] += 1
 			else:
@@ -500,27 +454,6 @@ def upload_contacts_json(rows_json):
 					contacts_index._map_contact_data(new_doc, data)
 				else:
 					new_doc.first_name = nombre
-					new_doc.last_name = apellido
-					new_doc.gender = genero
-					new_doc.custom_dob = data.get("birthdate")
-					new_doc.custom_country = pais_leng
-					new_doc.custom_language = pais_leng
-					new_doc.custom_document_type = tipo_doc
-					new_doc.custom_document_number = numero_doc
-					new_doc.custom_academic_level = nivel_acad
-					new_doc.custom_entry_date = data.get("entryDate")
-					new_doc.custom_is_liseniq_contact = 1
-					if correo:
-						new_doc.append("email_ids", {"email_id": correo, "is_primary": 1})
-					if nombre_demo and valor_demo:
-						if contacts_index and hasattr(contacts_index, "find_or_create_demographic_type"):
-							dt_name = contacts_index.find_or_create_demographic_type(nombre_demo)
-							if dt_name:
-								new_doc.append("custom_additional_details", {
-									"cad_demographic_type": dt_name,
-									"cad_tag": nombre_demo,
-									"cad_value": valor_demo
-								})
 				new_doc.insert(ignore_permissions=True)
 				results["creados"] += 1
 		except Exception as e:

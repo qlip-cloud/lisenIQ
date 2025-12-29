@@ -81,10 +81,15 @@
             <!-- Contenedor para Ag-Grid -->
             <div id="myGrid" class="ag-theme-alpine" style="height: 60vh; width: 100%;"></div>
 
-            <div style="margin-top:12px;display:flex;justify-content:space-between;">
-                <button id="btn-add-row" class="btn btn-outline-purple" style="display:none;">
-                    <i class="fa fa-plus"></i> Agregar Fila
-                </button>
+            <div style="margin-top:12px;display:flex;justify-content:space-between;gap: 12px;">
+                <div>
+                    <button id="btn-add-row" class="btn btn-outline-purple" style="display:none;">
+                        <i class="fa fa-plus"></i> Agregar Fila
+                    </button>
+                    <button id="btn-add-demo" class="btn btn-outline-purple" style="display:none;">
+                        <i class="fa fa-columns"></i> Agregar Demográfico
+                    </button>
+                </div>
                 <div style="text-align:right; flex:1;">
                     <button id="btn-back-to-step1" class="btn btn-outline-purple">Atrás</button>
                     <button id="btn-validate-continue" class="btn btn-purple-main">Confirmar y continuar</button>

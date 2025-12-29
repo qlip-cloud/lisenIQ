@@ -3,6 +3,7 @@ from frappe import _
 import io, csv
 from datetime import datetime
 import re
+import json
 
 REQUIRED_COLUMNS = [
 	"Nombre", "Apellido", "Género", "Fecha de Nacimiento", "País Lenguaje",
@@ -18,6 +19,90 @@ def get_context(context):
 	context.no_breadcrumbs = True
 	context.is_navbar_custom = True
 	return context
+
+@frappe.whitelist(allow_guest=False)
+def get_contacts_for_grid():
+	"""
+	Obtiene los contactos existentes del usuario/compañía y los formatea
+	como una lista de diccionarios plana, compatible con las columnas de la grid.
+	"""
+	try:
+		# Obtener compañía del usuario logueado
+		contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, ["name", "custom_company"], as_dict=True)
+		
+		if not contact_info or not contact_info.custom_company:
+			return []
+
+		user_company = contact_info.custom_company
+		
+		# Obtener contactos de la compañía (liseniq contacts)
+		contacts = frappe.get_all("Contact", 
+			filters={
+				"custom_company": user_company, 
+				"custom_is_liseniq_contact": 1
+			},
+			fields=[
+				"name", "first_name", "last_name", "gender", "custom_dob",
+				"custom_country", "custom_document_type", "custom_document_number",
+				"custom_academic_level", "custom_entry_date", "custom_status"
+			]
+		)
+
+		grid_rows = []
+		
+		for c in contacts:
+			# Obtener email primario
+			email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
+			
+			# Obtener demográficos (tomamos el primero si hay varios para simplificar la vista plana,
+			# o podríamos generar múltiples filas si fuera necesario, pero para edición simple una fila por contacto es mejor)
+			# Nota: Si se requiere editar múltiples demográficos, el usuario puede agregar filas duplicadas con distinto demográfico.
+			demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
+				filters={"parent": c.name},
+				fields=["cad_tag", "cad_value"]
+			)
+			
+			base_row = {
+				"Nombre": c.first_name,
+				"Apellido": c.last_name,
+				"Género": c.gender,
+				"Fecha de Nacimiento": str(c.custom_dob) if c.custom_dob else "",
+				"País Lenguaje": c.custom_country,
+				"Tipo de Documento": c.custom_document_type,
+				"Número de Documento (DNI)": c.custom_document_number,
+				"Nivel Académico": c.custom_academic_level,
+				"Correo (Opcional)": email or "",
+				"Fecha de Ingreso": str(c.custom_entry_date) if c.custom_entry_date else "",
+				"Estatus": c.custom_status,
+				"Nombre de Demográfico": "",
+				"Valor de Demográfico": ""
+			}
+			
+			if demographics:
+				# Si hay demográficos, creamos una fila por cada uno (estilo CSV plano)
+				# OJO: Esto puede duplicar visualmente al contacto.
+				# Para la edición en línea simple, vamos a mostrar solo el primero en la misma fila,
+				# y si hay más, añadimos filas.
+				for i, demo in enumerate(demographics):
+					if i == 0:
+						row = base_row.copy()
+						row["Nombre de Demográfico"] = demo.cad_tag
+						row["Valor de Demográfico"] = demo.cad_value
+						grid_rows.append(row)
+					else:
+						# Filas adicionales solo con la info clave y el demográfico
+						row = base_row.copy()
+						row["Nombre de Demográfico"] = demo.cad_tag
+						row["Valor de Demográfico"] = demo.cad_value
+						grid_rows.append(row)
+			else:
+				grid_rows.append(base_row)
+
+		return grid_rows
+
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "contacts_import.get_contacts_for_grid")
+		return []
 
 @frappe.whitelist(allow_guest=False)
 def download_template():

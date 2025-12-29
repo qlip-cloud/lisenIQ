@@ -35,7 +35,7 @@
                         <i class="fa fa-desktop" style="font-size:18px;color:#7B24FF;"></i>
                         <div>
                             <div style="font-weight:600;">Editar en línea</div>
-                            <div style="color:#737373;font-size:0.85rem;">Abrir editor para pegar datos</div>
+                            <div style="color:#737373;font-size:0.85rem;">Editar existentes o crear nuevos</div>
                         </div>
                     </div>
                 </div>
@@ -47,7 +47,7 @@
         </div>
 
         <!-- Área principal con dropzone -->
-        <div style="margin-top:18px;max-width:900px;">
+        <div id="upload-area" style="margin-top:18px;max-width:900px;">
             <input id="file-input" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
             <div id="dropzone" class="dropzone" style="background:#fff;border:1px dashed #e6e6e6;border-radius:10px;padding:28px;text-align:center;cursor:pointer;max-width:900px;">
                 <i class="fa fa-cloud-upload" style="font-size:28px;color:#7B24FF;margin-bottom:8px;display:block;"></i>
@@ -67,7 +67,7 @@
         </div>
     </div>
 
-    <!-- Paso 2 y 3: se reutilizan existentes -->
+    <!-- Paso 2: Validar Datos (Ag-Grid) -->
     <div id="step-2" class="import-step d-none">
         <div class="page-title-section">
             <nav class="breadcrumb-nav">
@@ -75,16 +75,25 @@
             </nav>
             <h2 class="page-main-title">Validar datos</h2>
         </div>
-        <div class="form-section-wrapper" style="max-width: 900px;">
+        <div class="form-section-wrapper" style="max-width: 100%;">
             <div id="validation-summary" style="margin-bottom:12px;color:#333;"></div>
-            <div id="preview-table-container" style="max-height:50vh;overflow:auto;border:1px solid #eee;padding:8px;background:#fff;"></div>
-            <div style="margin-top:12px;text-align:right;">
-                <button id="btn-back-to-step1" class="btn btn-outline-purple">Atrás</button>
-                <button id="btn-validate-continue" class="btn btn-purple-main" disabled>Confirmar y continuar</button>
+            
+            <!-- Contenedor para Ag-Grid -->
+            <div id="myGrid" class="ag-theme-alpine" style="height: 60vh; width: 100%;"></div>
+
+            <div style="margin-top:12px;display:flex;justify-content:space-between;">
+                <button id="btn-add-row" class="btn btn-outline-purple" style="display:none;">
+                    <i class="fa fa-plus"></i> Agregar Fila
+                </button>
+                <div style="text-align:right; flex:1;">
+                    <button id="btn-back-to-step1" class="btn btn-outline-purple">Atrás</button>
+                    <button id="btn-validate-continue" class="btn btn-purple-main">Confirmar y continuar</button>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Paso 3: Resultados -->
     <div id="step-3" class="import-step d-none">
         <div class="page-title-section">
             <nav class="breadcrumb-nav">
@@ -107,10 +116,26 @@
     {{ super() }}
     <link rel="stylesheet" href="/assets/liseniq/css/main.css">
     <link rel="stylesheet" href="/assets/liseniq/css/contacts.css">
+    <!-- Estilos de Ag-Grid -->
+    <style>
+        .ag-theme-alpine {
+            --ag-foreground-color: #555;
+            --ag-background-color: #fff;
+            --ag-header-foreground-color: #333;
+            --ag-header-background-color: #f8f9fa;
+            --ag-odd-row-background-color: #fff;
+            --ag-header-column-separator-display: block;
+            --ag-header-column-separator-color: #d7d7d7;
+            --ag-row-border-color: #e2e2e2;
+        }
+    </style>
 {% endblock %}
 
 {% block script %}
     {{ super() }}
+    <!-- Ag-Grid CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@35.0.0/dist/ag-grid-community.min.js"></script>
+    
     <script type="module" src="/assets/liseniq/js/utils/stepper.js"></script>
     <script type="module" src="/assets/liseniq/js/contacts_import.js"></script>
 {% endblock %}

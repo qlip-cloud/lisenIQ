@@ -512,6 +512,17 @@ document.addEventListener('DOMContentLoaded', function () {
         ui.buttons.newContact?.addEventListener('click', () => { ui.modal.classList.remove('d-none'); });
         ui.buttons.closeModal?.addEventListener('click', () => { ui.modal.classList.add('d-none'); });
         ui.modal?.addEventListener('click', (e) => { if (e.target === ui.modal) ui.modal.classList.add('d-none'); });
+
+        // Redireccionar a flujo de carga masiva cuando el usuario selecciona Carga masiva
+        const templateBtn = document.getElementById('btn-template-contact');
+        if (templateBtn) {
+            templateBtn.addEventListener('click', () => {
+                // cerrar modal actual y redirigir a la vista de importación
+                ui.modal.classList.add('d-none');
+                window.location.href = '/contacts/contacts_import';
+            });
+        }
+
         ui.buttons.manualContact?.addEventListener('click', () => {
             ui.modal.classList.add('d-none');
             setTimeout(setupFormForCreate, 150);

@@ -1,0 +1,97 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Nuevo Contacto") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="main-content-padding" id="contacts-import-app">
+    <div id="import-stepper-container"></div>
+
+    <!-- Paso 1: Cargar Plantilla -->
+    <div id="step-1" class="import-step">
+        <div class="page-title-section">
+            <nav class="breadcrumb-nav">
+                <a href="/contacts">Contactos</a> / Nuevo Contacto
+            </nav>
+            <h2 class="page-main-title">Nuevo contacto</h2>
+        </div>
+        <div class="form-section-wrapper" style="max-width: 600px;">
+            <div class="form-group">
+                <label style="font-weight:600;">Cargar Plantilla</label>
+                <span style="color:#737373;">Cargue el Excel de la plantilla</span>
+                <div class="actions" style="margin-top:18px;display:flex;gap:12px;align-items:center;">
+                    <a id="download-template" class="btn btn-outline-purple">Descargar Plantilla en excel</a>
+                    <input id="file-input" type="file" accept=".xlsx,.csv" class="hidden" />
+                    <button id="btn-upload" class="btn btn-purple-main">Subir Archivo</button>
+                    <span id="selected-file" style="color:#555;"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 2: Validar Datos / Previsualizar y corregir -->
+    <div id="step-2" class="import-step d-none">
+        <div class="page-title-section">
+            <nav class="breadcrumb-nav">
+                <a href="/contacts">Contactos</a> / Nuevo Contacto
+            </nav>
+            <h2 class="page-main-title">Validar datos</h2>
+        </div>
+        <div class="form-section-wrapper" style="max-width: 900px;">
+            <div id="validation-summary" style="margin-bottom:12px;color:#333;"></div>
+            <div id="preview-table-container" style="max-height:50vh;overflow:auto;border:1px solid #eee;padding:8px;background:#fff;"></div>
+            <div style="margin-top:12px;text-align:right;">
+                <button id="btn-back-to-step1" class="btn btn-outline-purple">Atrás</button>
+                <button id="btn-validate-continue" class="btn btn-purple-main" disabled>Confirmar y continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 3: Creación y Resumen -->
+    <div id="step-3" class="import-step d-none">
+        <div class="page-title-section">
+            <nav class="breadcrumb-nav">
+                <a href="/contacts">Contactos</a> / Nuevo Contacto
+            </nav>
+            <h2 class="page-main-title">Creación</h2>
+        </div>
+        <div class="form-section-wrapper" style="max-width: 600px;">
+            <div id="process-result"></div>
+            <div style="margin-top:12px;text-align:right;">
+                <button id="btn-back-to-step2" class="btn btn-outline-purple">Atrás</button>
+                <button id="btn-finish" class="btn btn-purple-main">Finalizar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal confirmación subida -->
+<div id="upload-modal" class="choice-modal-overlay hidden">
+    <div class="choice-modal-content">
+        <div class="choice-modal-header">
+            <span class="choice-modal-title">Confirmar subida de plantilla</span>
+            <button class="close" id="modal-cancel" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="choice-modal-body" style="flex-direction:column;align-items:flex-start;">
+            <p id="modal-file-info"></p>
+            <div style="text-align:right;margin-top:12px;width:100%;">
+                <button id="modal-confirm" class="btn btn-purple-main" style="float:right;">Validar archivo</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/contacts.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script type="module" src="/assets/liseniq/js/utils/stepper.js"></script>
+    <script type="module" src="/assets/liseniq/js/contacts_import.js"></script>
+{% endblock %}

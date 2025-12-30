@@ -7,12 +7,12 @@ document.addEventListener('DOMContentLoaded', function () {
 		currentStep: 1,
 		file: null,
 		headers: [],
-		rows: [],
-		errors: [],
+		rows: [], // array of objects
+		errors: [], // validation errors per row
 		processResult: null,
-		mode: 'upload',
-		gridApi: null,
-        demographicColsCount: 1
+		mode: 'upload', // 'upload' or 'edit'
+		gridApi: null, // referencia al API de Ag-Grid
+        demographicColsCount: 1 // Inicialmente 1 par de columnas de demográfico
 	};
 
 	const ui = {
@@ -46,8 +46,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Definición base de columnas (estáticas)
     const getBaseColDefs = () => [
-		{ field: "Nombre", headerName: "Nombre", editable: true, minWidth: 150, pinned: 'left' },
-		{ field: "Apellido", headerName: "Apellido", editable: true, minWidth: 150, pinned: 'left' },
+		{ 
+            field: "Nombre", 
+            headerName: "Nombre", 
+            editable: true, 
+            minWidth: 150, 
+            pinned: 'left',
+            wrapText: true,     // Permite que el texto baje a la siguiente línea
+            autoHeight: true    // Ajusta la altura de la fila automáticamente
+        },
+		{ 
+            field: "Apellido", 
+            headerName: "Apellido", 
+            editable: true, 
+            minWidth: 150, 
+            pinned: 'left',
+            wrapText: true,     // Permite que el texto baje a la siguiente línea
+            autoHeight: true    // Ajusta la altura de la fila automáticamente
+        },
 		{ 
 			field: "Género", 
 			headerName: "Género", 
@@ -81,18 +97,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function getAllColDefs() {
         const cols = getBaseColDefs();
         
-        // Agregar columnas dinámicas según el contador en el estado
+        // Agregar columnas dinámicas según el contador en el estado con nomenclatura Demográfico_N / Dato_N
         for (let i = 1; i <= state.demographicColsCount; i++) {
-            const suffix = i === 1 ? "" : ` ${i}`; // El primero no lleva número para compatibilidad con plantilla
             cols.push({ 
-                field: `Nombre de Demográfico${suffix}`, 
-                headerName: `Nombre Demográfico ${i}`, 
+                field: `Demográfico_${i}`, 
+                headerName: `Demográfico_${i}`, 
                 editable: true,
                 cellStyle: { 'backgroundColor': '#f9f9ff' }
             });
             cols.push({ 
-                field: `Valor de Demográfico${suffix}`, 
-                headerName: `Valor Demográfico ${i}`, 
+                field: `Dato_${i}`, 
+                headerName: `Dato_${i}`, 
                 editable: true,
                 cellStyle: { 'backgroundColor': '#f9f9ff' }
             });
@@ -263,6 +278,21 @@ document.addEventListener('DOMContentLoaded', function () {
 			state.rows = data.rows || [];
 			state.errors = data.errors || [];
             
+            // Normalizar filas del archivo (mapear nombres viejos a nuevos)
+            // Si el archivo trae "Nombre de Demográfico", lo movemos a "Demográfico_1"
+            if (state.rows.length > 0) {
+                state.rows.forEach(row => {
+                    if (row["Nombre de Demográfico"] !== undefined) {
+                        row["Demográfico_1"] = row["Nombre de Demográfico"];
+                        delete row["Nombre de Demográfico"];
+                    }
+                    if (row["Valor de Demográfico"] !== undefined) {
+                        row["Dato_1"] = row["Valor de Demográfico"];
+                        delete row["Valor de Demográfico"];
+                    }
+                });
+            }
+
             // Reiniciar contador de demográficos para archivo nuevo (asumimos 1 por defecto salvo que detectemos más en un futuro)
             state.demographicColsCount = 1; 
 

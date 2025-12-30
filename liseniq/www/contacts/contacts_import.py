@@ -24,7 +24,8 @@ def get_context(context):
 def get_contacts_for_grid():
 	"""
 	Obtiene los contactos existentes del usuario/compañía y los formatea
-	como una lista de diccionarios plana, con columnas dinámicas para demográficos.
+	como una lista de diccionarios plana, con columnas dinámicas para demográficos
+	usando la nomenclatura Demográfico_N y Dato_N.
 	Retorna { "rows": [...], "max_demographics": int }
 	"""
 	try:
@@ -79,19 +80,16 @@ def get_contacts_for_grid():
 				"Estatus": c.custom_status
 			}
 			
-			# Llenar columnas dinámicas de demográficos
-			# Columna 1: "Nombre de Demográfico", "Valor de Demográfico" (sin número para compatibilidad)
-			# Columnas 2..N: "Nombre de Demográfico N", "Valor de Demográfico N"
-			
+			# Llenar columnas dinámicas de demográficos con nomenclatura Demográfico_N / Dato_N
 			for i, demo in enumerate(demographics):
-				suffix = "" if i == 0 else f" {i + 1}"
-				row[f"Nombre de Demográfico{suffix}"] = demo.cad_tag
-				row[f"Valor de Demográfico{suffix}"] = demo.cad_value
+				idx = i + 1
+				row[f"Demográfico_{idx}"] = demo.cad_tag
+				row[f"Dato_{idx}"] = demo.cad_value
 
-			# Rellenar primer par si está vacío para consistencia visual
+			# Rellenar primer par si está vacío para consistencia visual (Grid espera al menos 1)
 			if not demographics:
-				row["Nombre de Demográfico"] = ""
-				row["Valor de Demográfico"] = ""
+				row["Demográfico_1"] = ""
+				row["Dato_1"] = ""
 
 			grid_rows.append(row)
 
@@ -236,7 +234,7 @@ def upload_contacts():
 				if contacts_index and hasattr(contacts_index, "_map_contact_data"):
 					contacts_index._map_contact_data(contact_doc, data)
 				else:
-					# Fallback
+					# Fallback manual logic if module not found
 					contact_doc.first_name = nombre or contact_doc.first_name
 					contact_doc.last_name = apellido or contact_doc.last_name
 					contact_doc.save(ignore_permissions=True)
@@ -353,7 +351,8 @@ def validate_contacts():
 @frappe.whitelist(allow_guest=False)
 def upload_contacts_json(rows_json):
 	"""
-	Recibe JSON con una lista de filas (con columnas dinámicas) y procesa la creación/actualización.
+	Recibe JSON con una lista de filas (con columnas dinámicas Demográfico_N / Dato_N)
+	y procesa la creación/actualización.
 	"""
 	try:
 		import json as _json
@@ -412,26 +411,16 @@ def upload_contacts_json(rows_json):
 				"demographics": []
 			}
 			
-			# Recolectar todos los demográficos (columnas dinámicas)
-			# Formatos esperados:
-			# - "Nombre de Demográfico", "Valor de Demográfico" (columna original)
-			# - "Nombre de Demográfico 2", "Valor de Demográfico 2" (dinámicos)
-			
-			# 1. Chequear columna original
-			d_name = (r.get("Nombre de Demográfico") or "").strip()
-			d_val = (r.get("Valor de Demográfico") or "").strip()
-			if d_name and d_val:
-				data["demographics"].append({"type": d_name, "value": d_val})
-
-			# 2. Chequear columnas dinámicas (ej. hasta 20 posibles para no iterar infinitamente)
-			for idx in range(2, 21):
-				key_name = f"Nombre de Demográfico {idx}"
-				key_val = f"Valor de Demográfico {idx}"
-				d_name_dyn = (r.get(key_name) or "").strip()
-				d_val_dyn = (r.get(key_val) or "").strip()
+			# Recolectar todos los demográficos (columnas dinámicas con nomenclatura Demográfico_N)
+			# Iterar hasta un número razonable (ej. 20) para capturar todas las columnas creadas dinámicamente
+			for idx in range(1, 21):
+				key_name = f"Demográfico_{idx}"
+				key_val = f"Dato_{idx}"
+				d_name = (r.get(key_name) or "").strip()
+				d_val = (r.get(key_val) or "").strip()
 				
-				if d_name_dyn and d_val_dyn:
-					data["demographics"].append({"type": d_name_dyn, "value": d_val_dyn})
+				if d_name and d_val:
+					data["demographics"].append({"type": d_name, "value": d_val})
 
 			contact_name = None
 			if numero_doc:
@@ -442,7 +431,7 @@ def upload_contacts_json(rows_json):
 				if contacts_index and hasattr(contacts_index, "_map_contact_data"):
 					contacts_index._map_contact_data(contact_doc, data)
 				else:
-					# Fallback
+					# Fallback básico
 					contact_doc.first_name = nombre or contact_doc.first_name
 					contact_doc.last_name = apellido or contact_doc.last_name
 				contact_doc.save(ignore_permissions=True)

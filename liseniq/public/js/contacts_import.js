@@ -52,8 +52,9 @@ document.addEventListener('DOMContentLoaded', function () {
             editable: true, 
             minWidth: 150, 
             pinned: 'left',
-            wrapText: true,     // Permite que el texto baje a la siguiente línea
-            autoHeight: true    // Ajusta la altura de la fila automáticamente
+            wrapText: true,
+            autoHeight: true,
+			filter: true
         },
 		{ 
             field: "Apellido", 
@@ -61,8 +62,9 @@ document.addEventListener('DOMContentLoaded', function () {
             editable: true, 
             minWidth: 150, 
             pinned: 'left',
-            wrapText: true,     // Permite que el texto baje a la siguiente línea
-            autoHeight: true    // Ajusta la altura de la fila automáticamente
+            wrapText: true,
+            autoHeight: true,
+			filter: true
         },
 		{ 
 			field: "Género", 
@@ -71,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			cellEditor: 'agSelectCellEditor', 
 			cellEditorParams: { values: ['Masculino', 'Femenino', 'Otro', ''] } 
 		},
-		{ field: "Fecha de Nacimiento", headerName: "Fecha Nacimiento (YYYY-MM-DD)", editable: true },
+		{ field: "Fecha de Nacimiento", headerName: "Fecha Nacimiento (YYYY-MM-DD)", editable: true, wrapText: true, autoHeight: true, filter: true },
 		{ field: "País Lenguaje", headerName: "País/Lenguaje", editable: true },
 		{ 
 			field: "Tipo de Documento", 
@@ -80,9 +82,9 @@ document.addEventListener('DOMContentLoaded', function () {
 			cellEditor: 'agSelectCellEditor', 
 			cellEditorParams: { values: ['CC', 'CE', 'TI', 'PAS', 'NIT', ''] }
 		},
-		{ field: "Número de Documento (DNI)", headerName: "Número Doc", editable: true, minWidth: 140 },
+		{ field: "Número de Documento (DNI)", headerName: "Número Doc", editable: true, minWidth: 140, wrapText: true, autoHeight: true, filter: true },
 		{ field: "Nivel Académico", headerName: "Nivel Académico", editable: true },
-		{ field: "Correo (Opcional)", headerName: "Correo", editable: true, minWidth: 200 },
+		{ field: "Correo Electrónico", headerName: "Correo", editable: true, minWidth: 200, wrapText: true, autoHeight: true },
 		{ field: "Fecha de Ingreso", headerName: "Fecha Ingreso (YYYY-MM-DD)", editable: true },
 		{ 
 			field: "Estatus", 

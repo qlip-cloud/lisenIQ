@@ -12,7 +12,9 @@ document.addEventListener('DOMContentLoaded', function () {
 		processResult: null,
 		mode: 'upload', // 'upload' or 'edit'
 		gridApi: null, // referencia al API de Ag-Grid
-        demographicColsCount: 1 // Inicialmente 1 par de columnas de demográfico
+        demographicColsCount: 1, // Inicialmente 1 par de columnas de demográfico
+        finalStats: { total: 0 },
+        dataToProcess: null, // Datos listos para enviar
 	};
 
 	const ui = {
@@ -66,6 +68,21 @@ document.addEventListener('DOMContentLoaded', function () {
             autoHeight: true,
 			filter: true
         },
+        { 
+			field: "Tipo de Documento", 
+			headerName: "Tipo Doc", 
+			editable: true,
+		},
+		{ field: "Número de Documento (DNI)", headerName: "Número Doc", editable: true, minWidth: 140, wrapText: true, autoHeight: true, filter: true },
+        { field: "País", headerName: "País", editable: true },
+        { field: "Idioma", headerName: "Idioma", editable: true },
+		{ 
+			field: "Estatus", 
+			headerName: "Estatus", 
+			editable: true,
+			cellEditor: 'agSelectCellEditor', 
+			cellEditorParams: { values: ['Activo', 'Inactivo'] }
+		},
 		{ 
 			field: "Género", 
 			headerName: "Género", 
@@ -74,32 +91,14 @@ document.addEventListener('DOMContentLoaded', function () {
 			cellEditorParams: { values: ['Masculino', 'Femenino', 'Otro', ''] } 
 		},
 		{ field: "Fecha de Nacimiento", headerName: "Fecha Nacimiento (YYYY-MM-DD)", editable: true, wrapText: true, autoHeight: true, filter: true },
-		{ field: "País Lenguaje", headerName: "País/Lenguaje", editable: true },
-		{ 
-			field: "Tipo de Documento", 
-			headerName: "Tipo Doc", 
-			editable: true,
-			cellEditor: 'agSelectCellEditor', 
-			cellEditorParams: { values: ['CC', 'CE', 'TI', 'PAS', 'NIT', ''] }
-		},
-		{ field: "Número de Documento (DNI)", headerName: "Número Doc", editable: true, minWidth: 140, wrapText: true, autoHeight: true, filter: true },
 		{ field: "Nivel Académico", headerName: "Nivel Académico", editable: true },
-		{ field: "Correo Electrónico", headerName: "Correo", editable: true, minWidth: 200, wrapText: true, autoHeight: true },
-		{ field: "Fecha de Ingreso", headerName: "Fecha Ingreso (YYYY-MM-DD)", editable: true },
-		{ 
-			field: "Estatus", 
-			headerName: "Estatus", 
-			editable: true,
-			cellEditor: 'agSelectCellEditor', 
-			cellEditorParams: { values: ['Activo', 'Inactivo'] }
-		}
+		{ field: "Correo (Opcional)", headerName: "Correo", editable: true, minWidth: 200, wrapText: true, autoHeight: true },
+		{ field: "Fecha de Ingreso", headerName: "Fecha Ingreso (YYYY-MM-DD)", editable: true }
     ];
 
     // Función para generar todas las columnas incluyendo las dinámicas de demográficos
     function getAllColDefs() {
         const cols = getBaseColDefs();
-        
-        // Agregar columnas dinámicas según el contador en el estado con nomenclatura Demográfico_N / Dato_N
         for (let i = 1; i <= state.demographicColsCount; i++) {
             cols.push({ 
                 field: `Demográfico_${i}`, 
@@ -131,7 +130,6 @@ document.addEventListener('DOMContentLoaded', function () {
 	}
 
 	function initAgGrid() {
-		// Limpiar contenido previo si existe
 		ui.gridContainer.innerHTML = '';
 		
         const colDefs = getAllColDefs();
@@ -150,22 +148,19 @@ document.addEventListener('DOMContentLoaded', function () {
 			rowSelection: 'multiple',
 			onGridReady: (params) => {
 				state.gridApi = params.api;
-				// params.api.sizeColumnsToFit(); // Desactivado para permitir scroll horizontal si hay muchas columnas
 			}
 		};
 
-		// Crear la grid
 		agGrid.createGrid(ui.gridContainer, gridOptions);
 
-		// Mostrar botones de edición
 		if (state.mode === 'edit') {
 			ui.btnAddRow.style.display = 'inline-block';
             ui.btnAddDemo.style.display = 'inline-block';
 			ui.validationSummary.textContent = "Edite los contactos existentes o agregue nuevos. Deslice a la derecha para ver más demográficos.";
 			ui.btnValidateContinue.disabled = false;
 		} else {
-			ui.btnAddRow.style.display = 'none';
-            ui.btnAddDemo.style.display = 'none'; // Opcional: permitir agregar demográficos también en carga masiva si se desea
+			ui.btnAddRow.style.display = 'inline-block';
+            ui.btnAddDemo.style.display = 'inline-block'; 
 		}
 	}
 
@@ -174,6 +169,9 @@ document.addEventListener('DOMContentLoaded', function () {
 	// Toggle Upload vs Edit
 	ui.optUpload.addEventListener('click', () => {
 		setMode('upload');
+		if (ui.fileInput) {
+			ui.fileInput.click();
+		}
 	});
 
 	ui.optEdit.addEventListener('click', () => {
@@ -198,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function () {
 		frappe.call({
 			method: 'liseniq.www.contacts.contacts_import.get_contacts_for_grid',
 			callback: function(r) {
-				// Restaurar texto UI
 				ui.optEdit.innerHTML = `
                     <div style="display:flex;align-items:center;gap:12px;padding:18px;">
                         <i class="fa fa-desktop" style="font-size:18px;color:#7B24FF;"></i>
@@ -210,11 +207,10 @@ document.addEventListener('DOMContentLoaded', function () {
 				
 				if (r.message) {
 					state.rows = r.message.rows || [];
-                    // Detectar cuántas columnas de demográficos vienen
                     state.demographicColsCount = Math.max(1, r.message.max_demographics || 1);
 					state.headers = getAllColDefs().map(c => c.field);
 					state.errors = [];
-					showStep(2);
+					ui.btnContinue.disabled = false;
 				} else {
 					frappe.msgprint('No se pudieron cargar los contactos.');
 				}
@@ -258,7 +254,20 @@ document.addEventListener('DOMContentLoaded', function () {
 	ui.btnCancel.addEventListener('click', () => { window.location.href = '/contacts'; });
 
 	ui.btnContinue.addEventListener('click', () => {
-		if (state.mode === 'upload' && !state.file) return;
+		if (state.mode === 'edit') {
+            if (!state.rows || state.rows.length === 0) {
+                 alert("No hay datos cargados. Por favor intente recargar la página.");
+                 return;
+            }
+            ui.validationSummary.textContent = 'Datos cargados desde el sistema.';
+            showStep(2);
+            return;
+        }
+
+		if (state.mode === 'upload' && !state.file) {
+            alert("Por favor seleccione un archivo para cargar.");
+            return;
+        }
 		
 		ui.btnContinue.disabled = true;
 		ui.btnContinue.textContent = 'Validando...';
@@ -267,7 +276,10 @@ document.addEventListener('DOMContentLoaded', function () {
 		
 		fetch('/api/method/liseniq.www.contacts.contacts_import.validate_contacts', {
 			method: 'POST',
-			body: fd
+			body: fd,
+            headers: {
+                'X-Frappe-CSRF-Token': frappe.csrf_token || window.csrf_token
+            }
 		}).then(r => r.json()).then(res => {
 			ui.btnContinue.disabled = false;
 			ui.btnContinue.textContent = 'Continuar';
@@ -280,23 +292,22 @@ document.addEventListener('DOMContentLoaded', function () {
 			state.rows = data.rows || [];
 			state.errors = data.errors || [];
             
-            // Normalizar filas del archivo (mapear nombres viejos a nuevos)
-            // Si el archivo trae "Nombre de Demográfico", lo movemos a "Demográfico_1"
-            if (state.rows.length > 0) {
-                state.rows.forEach(row => {
-                    if (row["Nombre de Demográfico"] !== undefined) {
-                        row["Demográfico_1"] = row["Nombre de Demográfico"];
-                        delete row["Nombre de Demográfico"];
-                    }
-                    if (row["Valor de Demográfico"] !== undefined) {
-                        row["Dato_1"] = row["Valor de Demográfico"];
-                        delete row["Valor de Demográfico"];
+            // Detectar columnas de demográficos
+            let maxDemoIndex = 1;
+            if (state.headers && state.headers.length > 0) {
+                state.headers.forEach(h => {
+                    if (h && h.startsWith('Demográfico_')) {
+                        const parts = h.split('_');
+                        if (parts.length === 2) {
+                            const idx = parseInt(parts[1]);
+                            if (!isNaN(idx) && idx > maxDemoIndex) {
+                                maxDemoIndex = idx;
+                            }
+                        }
                     }
                 });
             }
-
-            // Reiniciar contador de demográficos para archivo nuevo (asumimos 1 por defecto salvo que detectemos más en un futuro)
-            state.demographicColsCount = 1; 
+            state.demographicColsCount = maxDemoIndex;
 
 			if (state.errors.length > 0) {
 				ui.validationSummary.innerHTML = `<strong>Advertencias:</strong> ${state.errors.length} fila(s) con incidencias. Revise en la tabla.`;
@@ -311,7 +322,6 @@ document.addEventListener('DOMContentLoaded', function () {
 		});
 	});
 
-	// Botón Agregar Fila
 	ui.btnAddRow.addEventListener('click', () => {
 		if (state.gridApi) {
 			const newRow = {};
@@ -321,10 +331,8 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	});
 
-    // Botón Agregar Demográfico (Nuevas columnas)
     ui.btnAddDemo.addEventListener('click', () => {
         if (!state.gridApi) return;
-        
         state.demographicColsCount++;
         const newColDefs = getAllColDefs();
         state.gridApi.setGridOption('columnDefs', newColDefs);
@@ -334,6 +342,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		showStep(1);
 	});
 
+    // Acción del botón "Confirmar y Continuar" del Paso 2
 	ui.btnValidateContinue.addEventListener('click', () => {
 		// Obtener datos del Grid
 		let gridData = [];
@@ -350,49 +359,84 @@ document.addEventListener('DOMContentLoaded', function () {
 			return;
 		}
 
-		const payload = JSON.stringify(gridData);
-		ui.btnValidateContinue.disabled = true;
-		ui.btnValidateContinue.textContent = 'Procesando...';
-		
-		fetch('/api/method/liseniq.www.contacts.contacts_import.upload_contacts_json', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ rows_json: payload })
-		}).then(r => r.json()).then(res => {
-			ui.btnValidateContinue.disabled = false;
-			ui.btnValidateContinue.textContent = 'Confirmar y continuar';
-			const data = res.message || res;
-			state.processResult = data;
-			renderProcessResult();
-			showStep(3);
-		}).catch(err => {
-			ui.btnValidateContinue.disabled = false;
-			ui.btnValidateContinue.textContent = 'Confirmar y continuar';
-			alert('Error al procesar: ' + (err.message || err));
-		});
+        // Preparar datos para el paso 3
+        state.finalStats.total = gridData.length;
+        state.dataToProcess = JSON.stringify(gridData);
+
+        // UI Reset
+        ui.btnFinish.disabled = false;
+        ui.btnFinish.textContent = 'Finalizar';
+        ui.btnBackToStep2.style.display = 'inline-block';
+        
+        // Renderizar estado (mensaje de espera para iniciar)
+		renderProcessResult();
+		showStep(3);
 	});
 
 	function renderProcessResult() {
-		const r = state.processResult || {};
-		let html = `<div style="padding:12px;border:1px solid #eee;background:#fff;">`;
-		html += `<strong>Resultados:</strong><br/>Contactos creados: ${r.creados || 0}<br/>Contactos actualizados: ${r.actualizados || 0}<br/>`;
-		if (r.errores && r.errores.length) {
-			html += `<br/><strong>Errores:</strong><ul>`;
-			r.errores.forEach(err => {
-				html += `<li>Fila ${err.fila}: ${err.error}</li>`;
-			});
-			html += `</ul>`;
-		}
+        const now = new Date();
+        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+		let html = `<div class="import-results-card">`;
+        
+        // Encabezado con fecha
+        html += `
+            <div class="result-header">
+                <div class="result-date"><i class="fa fa-calendar-o"></i> Fecha de carga: ${dateStr}</div>
+            </div>
+        `;
+
+        // Estadísticas principales (Total a procesar)
+        const totalRows = state.finalStats.total || 0;
+        
+        html += `<div class="result-stats-container">`;
+        html += `
+            <div class="result-stat-item">
+                <div class="stat-value">${totalRows}</div>
+                <div class="stat-label">Registros a procesar</div>
+            </div>
+        `;
+        html += `</div>`; 
+
+        // Mensaje de estado: Se usa la clase .ready-message para el color solicitado
+        html += `
+            <div class="ready-message" style="padding: 1.5rem;">
+                <i class="fa fa-clock-o"></i> El proceso será iniciado en segundo plano al presionar el botón <strong>Finalizar</strong>.<br>
+                <span style="font-size:0.85rem; font-weight:400; color:#666;">
+                    Recibirá una notificación en el sistema cuando la carga finalice con el detalle de registros creados y actualizados.
+                </span>
+            </div>
+        `;
+
 		html += `</div>`;
 		ui.processResult.innerHTML = html;
 	}
 
-	ui.btnBackToStep2.addEventListener('click', () => {
-		showStep(2);
+    // Acción del botón "Finalizar" del Paso 3
+	ui.btnFinish.addEventListener('click', () => {
+        // Iniciamos la carga y redirigimos
+        ui.btnFinish.disabled = true;
+        ui.btnFinish.textContent = 'Iniciando...';
+        
+        fetch('/api/method/liseniq.www.contacts.contacts_import.upload_contacts_json', {
+			method: 'POST',
+			headers: { 
+                'Content-Type': 'application/json',
+                'X-Frappe-CSRF-Token': frappe.csrf_token || window.csrf_token
+            },
+			body: JSON.stringify({ rows_json: state.dataToProcess })
+		}).then(r => r.json()).then(res => {
+            // Redirección inmediata a contactos al finalizar correctamente la petición de inicio
+		    window.location.href = '/contacts';
+		}).catch(err => {
+			ui.btnFinish.disabled = false;
+			ui.btnFinish.textContent = 'Finalizar';
+			alert('Error al iniciar el proceso: ' + (err.message || err));
+		});
 	});
 
-	ui.btnFinish.addEventListener('click', () => {
-		window.location.href = '/contacts';
+	ui.btnBackToStep2.addEventListener('click', () => {
+		showStep(2);
 	});
 
 	function updateStepUI() {

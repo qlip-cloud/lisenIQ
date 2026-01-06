@@ -299,3 +299,64 @@
 #btn-cancel.btn, #btn-continue.btn {
     min-width: 120px;
 }
+
+/* ESTILOS DE RESULTADOS DE IMPORTACIÓN */
+.import-results-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.result-header {
+    background-color: #f8f9fa;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.result-date {
+    font-size: 0.85rem;
+    color: #555;
+    font-weight: 500;
+}
+
+.result-stats-container {
+    display: flex;
+    padding: 2rem 1.5rem;
+    gap: 2rem;
+    justify-content: center;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.result-stat-item {
+    text-align: center;
+    min-width: 120px;
+}
+
+.result-stat-item .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #333;
+    line-height: 1.2;
+}
+
+.result-stat-item.success .stat-value { color: #03BF3C; }
+.result-stat-item.info .stat-value { color: #7B24FF; }
+
+.result-stat-item .stat-label {
+    font-size: 0.8rem;
+    color: #737373;
+    margin-top: 4px;
+}
+
+.ready-message {
+    padding: 2rem;
+    text-align: center;
+    color: #7B24FF;
+    font-weight: 600;
+    font-size: 1rem;
+}

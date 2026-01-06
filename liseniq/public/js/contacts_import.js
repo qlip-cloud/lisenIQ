@@ -7,14 +7,14 @@ document.addEventListener('DOMContentLoaded', function () {
 		currentStep: 1,
 		file: null,
 		headers: [],
-		rows: [], // array of objects
-		errors: [], // validation errors per row
+		rows: [], 				// Array de objetos
+		errors: [], 			// Errores de validación por fila
 		processResult: null,
-		mode: 'upload', // 'upload' or 'edit'
-		gridApi: null, // referencia al API de Ag-Grid
-        demographicColsCount: 1, // Inicialmente 1 par de columnas de demográfico
+		mode: 'upload', 			// 'upload' o 'edit'
+		gridApi: null, 				// referencia al API de Ag-Grid
+        demographicColsCount: 1, 	// Inicialmente 1 par de columnas demográficas
         finalStats: { total: 0 },
-        dataToProcess: null, // Datos listos para enviar
+        dataToProcess: null, 		// Datos listos para enviar
 	};
 
     // Campos obligatorios para validación frontend
@@ -162,7 +162,6 @@ document.addEventListener('DOMContentLoaded', function () {
 	}
 
     // Función de Validación en Tiempo Real
-    // Escanea el grid y deshabilita el botón si encuentra errores
     function validateRealTime() {
         if (!state.gridApi) return;
 
@@ -188,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // 1. Deshabilitar/Habilitar el botón basado en el estado de errores
+        // 1. Control del botón Continuar
         ui.btnValidateContinue.disabled = hasErrors;
 
         // 2. Actualizar resumen visual
@@ -213,15 +212,13 @@ document.addEventListener('DOMContentLoaded', function () {
              </div>`;
         }
         
-        // 3. Refrescar celdas para actualizar estilos (rojo para vacíos)
-        // Nota: AgGrid es inteligente y solo repinta lo necesario, pero force=true asegura que el cellStyle se re-evalúe
+        // 3. Refrescar celdas para actualizar estilos
         state.gridApi.refreshCells({ force: true });
     }
 
 	function initAgGrid() {
 		ui.gridContainer.innerHTML = '';
-		
-        const colDefs = getAllColDefs();
+		const colDefs = getAllColDefs();
 
 		const gridOptions = {
 			rowData: state.rows,
@@ -237,15 +234,13 @@ document.addEventListener('DOMContentLoaded', function () {
 			rowSelection: 'multiple',
 			onGridReady: (params) => {
 				state.gridApi = params.api;
-                validateRealTime(); // Validar inmediatamente al cargar
+                validateRealTime(); // Validar al cargar
 			},
             onCellValueChanged: (params) => {
-                validateRealTime(); // Validar al editar cualquier celda
+                validateRealTime(); // Validar al editar
             },
             onModelUpdated: () => {
-                // Validar si cambian filas (filtro, borrado, agregado)
-                // Se usa setTimeout para asegurar que el modelo está estable
-                setTimeout(validateRealTime, 0); 
+                setTimeout(validateRealTime, 0); // Validar cambios de modelo
             }
 		};
 
@@ -260,9 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	}
 
-	// Step 1 Actions
-	
-	// Toggle Upload vs Edit
+	// Handlers de Paso 1
 	ui.optUpload.addEventListener('click', () => {
 		setMode('upload');
 		if (ui.fileInput) {
@@ -319,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		window.location = '/api/method/liseniq.www.contacts.contacts_import.download_template';
 	});
 
-	// Dropzone logic
+	// Lógica de Dropzone
 	ui.dropzone.addEventListener('click', () => ui.fileInput.click());
 	ui.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); ui.dropzone.classList.add('dragover'); });
 	ui.dropzone.addEventListener('dragleave', (e) => { e.preventDefault(); ui.dropzone.classList.remove('dragover'); });
@@ -387,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			state.rows = data.rows || [];
 			state.errors = data.errors || [];
             
-            // Detectar columnas de demográficos
+            // Detectar columnas de demográficos para configurar el grid
             let maxDemoIndex = 1;
             if (state.headers && state.headers.length > 0) {
                 state.headers.forEach(h => {
@@ -404,9 +397,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             state.demographicColsCount = maxDemoIndex;
 
-            // Nota: Ya no generamos el HTML de error aquí manualmente. 
-            // Al llamar showStep(2), se inicializa AgGrid y validateRealTime()
-            // se encargará de mostrar los errores y deshabilitar el botón inmediatamente.
 			showStep(2);
 
 		}).catch(err => {
@@ -422,7 +412,6 @@ document.addEventListener('DOMContentLoaded', function () {
 			getAllColDefs().forEach(col => newRow[col.field] = "");
 			newRow["Estatus"] = "Activo";
 			state.gridApi.applyTransaction({ add: [newRow] });
-            // validateRealTime se disparará por onModelUpdated
 		}
 	});
 
@@ -439,10 +428,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Acción del botón "Confirmar y Continuar" del Paso 2
 	ui.btnValidateContinue.addEventListener('click', () => {
-        // En este punto, si el botón está habilitado, asumimos que validateRealTime ha dado el visto bueno.
-        // Aun así, obtenemos los datos para pasarlos al siguiente paso.
-
-		// Obtener datos del Grid
 		let gridData = [];
 		if (state.gridApi) {
 			state.gridApi.forEachNode(node => {
@@ -457,16 +442,13 @@ document.addEventListener('DOMContentLoaded', function () {
 			return;
 		}
 
-        // Preparar datos para el paso 3
         state.finalStats.total = gridData.length;
         state.dataToProcess = JSON.stringify(gridData);
 
-        // UI Reset
         ui.btnFinish.disabled = false;
         ui.btnFinish.textContent = 'Finalizar';
         ui.btnBackToStep2.style.display = 'inline-block';
         
-        // Renderizar estado (mensaje de espera para iniciar)
 		renderProcessResult();
 		showStep(3);
 	});
@@ -477,14 +459,12 @@ document.addEventListener('DOMContentLoaded', function () {
         
 		let html = `<div class="import-results-card">`;
         
-        // Encabezado con fecha
         html += `
             <div class="result-header">
                 <div class="result-date"><i class="fa fa-calendar-o"></i> Fecha de carga: ${dateStr}</div>
             </div>
         `;
 
-        // Estadísticas principales (Total a procesar)
         const totalRows = state.finalStats.total || 0;
         
         html += `<div class="result-stats-container">`;
@@ -496,7 +476,6 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
         html += `</div>`; 
 
-        // Mensaje de estado: Se usa la clase .ready-message para el color solicitado
         html += `
             <div class="ready-message" style="padding: 1.5rem;">
                 <i class="fa fa-clock-o"></i> El proceso será iniciado en segundo plano al presionar el botón <strong>Finalizar</strong>.<br>
@@ -512,7 +491,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Acción del botón "Finalizar" del Paso 3
 	ui.btnFinish.addEventListener('click', () => {
-        // Iniciamos la carga y redirigimos
         ui.btnFinish.disabled = true;
         ui.btnFinish.textContent = 'Iniciando...';
         
@@ -524,7 +502,6 @@ document.addEventListener('DOMContentLoaded', function () {
             },
 			body: JSON.stringify({ rows_json: state.dataToProcess })
 		}).then(r => r.json()).then(res => {
-            // Redirección inmediata a contactos al finalizar correctamente la petición de inicio
 		    window.location.href = '/contacts';
 		}).catch(err => {
 			ui.btnFinish.disabled = false;

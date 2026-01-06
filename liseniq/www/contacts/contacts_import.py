@@ -26,7 +26,6 @@ MANDATORY_FIELDS = [
 	"Idioma"
 ]
 
-# Nombre del campo de tabla hija para demográficos
 CHILD_TABLE_FIELD = "custom_additional_details"
 
 # Lista fija de países LATAM
@@ -49,26 +48,27 @@ def get_mapping_dicts():
 	Retorna diccionarios para mapear ID -> Nombre (para exportar) 
 	y Nombre -> ID (para importar).
 	"""
-	# Tipo de Documento: dt_name (Visible) <-> name (ID)
+	# Tipo de Documento
 	doc_types = frappe.get_all("qp_IQ_DocumentType", fields=["name", "dt_name"])
 	dt_id_to_name = {d.name: d.dt_name for d in doc_types}
 	dt_name_to_id = {d.dt_name: d.name for d in doc_types}
 
-	# Idioma: la_name (Visible) <-> name (ID)
+	# Idioma
 	langs = frappe.get_all("qp_IQ_Language", fields=["name", "la_name"])
 	lang_id_to_name = {d.name: d.la_name for d in langs}
 	lang_name_to_id = {d.la_name: d.name for d in langs}
 
-	# País: country_name (Visible) <-> name (ID)
+	# País
 	countries = frappe.get_all("Country", fields=["name", "country_name"])
 	country_id_to_name = {d.name: d.country_name for d in countries}
 	country_name_to_id = {d.country_name: d.name for d in countries}
 
-	# Nivel Académico: al_title (Visible) <-> name (ID)
+	# Nivel Académico
 	academics = frappe.get_all("qp_IQ_AcademicLevel", fields=["name", "al_title"])
 	academic_id_to_name = {d.name: d.al_title for d in academics}
 	academic_name_to_id = {d.al_title: d.name for d in academics}
-
+	
+	# Demográficos: dt_title (Visible) <-> name (ID)
 	demos = frappe.get_all("qp_IQ_DemographicType", fields=["name", "dt_title"])
 	demo_title_to_id = {d.dt_title: d.name for d in demos}
 
@@ -81,6 +81,9 @@ def get_mapping_dicts():
 	}
 
 def find_or_create_demographic_type(demographic_title):
+	"""
+	Busca el ID de un tipo demográfico por su título. Si no existe, lo crea.
+	"""
 	normalized_title = " ".join(demographic_title.strip().split()).title()
 	object_type = "Contacto"
 
@@ -106,6 +109,7 @@ def find_or_create_demographic_type(demographic_title):
 			return doc.name
 
 	except Exception:
+		# Recuperación en caso de concurrencia
 		return frappe.db.get_value(
 			"qp_IQ_DemographicType",
 			{"dt_title": normalized_title, "dt_object_type": object_type},
@@ -353,15 +357,12 @@ def update_contact_fields(contact_doc, data, status, demo_map=None):
 			contact_doc.append("email_ids", {"email_id": new_email, "is_primary": 1})
 		contact_doc.save(ignore_permissions=True)
 	
-	# Manejo robusto de tabla hija
-	
-	# 1. Validar que el campo existe en la Metadata del DocType
+	# Validar existencia del campo de tabla hija en metadata
 	if not contact_doc.meta.get_field(CHILD_TABLE_FIELD):
 		frappe.log_error(f"Error Crítico: El campo '{CHILD_TABLE_FIELD}' no existe en el DocType Contact.", "Import Contacts Error")
-		# No lanzamos excepción para no detener todo el lote, pero no guardamos demográficos para este registro
 		return
 
-	# 2. Limpiar existentes y agregar nuevos
+	# Reemplazar demográficos
 	contact_doc.set(CHILD_TABLE_FIELD, [])
 	
 	for d in data['demographics']:
@@ -383,6 +384,7 @@ def update_contact_fields(contact_doc, data, status, demo_map=None):
 def process_contacts_background(rows, user):
 	"""
 	Procesa los contactos en segundo plano.
+	Genera notificación en qp_IQ_PortalNotification al finalizar.
 	"""
 	results = {"creados": 0, "actualizados": 0, "ignorados": 0, "errores": []}
 	
@@ -394,6 +396,7 @@ def process_contacts_background(rows, user):
 
 		user_company = contact_info.custom_company
 		
+		# Obtener mapas (incluyendo el nuevo mapa de demográficos)
 		maps = get_mapping_dicts()
 		dt_map = maps["dt_import"]
 		country_map = maps["country_import"]
@@ -410,6 +413,7 @@ def process_contacts_background(rows, user):
 
 		for i, r in enumerate(rows, start=1):
 			try:
+				# Extracción y limpieza de datos
 				tipo_doc_raw = (r.get("Tipo de Documento") or "").strip()
 				tipo_doc_id = dt_map.get(tipo_doc_raw, tipo_doc_raw)
 				pais_raw = (r.get("País") or "").strip()
@@ -428,7 +432,7 @@ def process_contacts_background(rows, user):
 				fecha_nac = parse_date(r.get("Fecha de Nacimiento"))
 				fecha_ing = parse_date(r.get("Fecha de Ingreso"))
 				
-				# Validar campos obligatorios
+				# Validación de campos obligatorios
 				missing = []
 				if not nombre: missing.append("Nombre")
 				if not apellido: missing.append("Apellido")
@@ -465,6 +469,7 @@ def process_contacts_background(rows, user):
 						if val_clean and d_val:
 							data["demographics"].append({"type": val_clean, "value": d_val})
 
+				# Verificar si existe
 				contact_name = None
 				if numero_doc:
 					contact_name = frappe.db.get_value("Contact", {"custom_document_number": numero_doc, "custom_company": user_company}, "name")
@@ -498,9 +503,8 @@ def process_contacts_background(rows, user):
 					
 					new_doc.insert(ignore_permissions=True)
 					
-					# Insertar demográficos después de crear el doc, manejando el mapeo
 					if data['demographics']:
-						# Verificamos metadata antes de append
+						# Validar metadata antes de insertar hijos
 						if new_doc.meta.get_field(CHILD_TABLE_FIELD):
 							for d in data['demographics']:
 								demo_id = demo_map.get(d['type'])
@@ -520,20 +524,21 @@ def process_contacts_background(rows, user):
 				frappe.log_error(frappe.get_traceback(), f"Error procesando fila {i} en carga masiva")
 				results["errores"].append({"fila": i, "error": str(e)})
 
-		# Notificar al usuario al finalizar
-		msg = f"""
-			<b>Carga masiva finalizada</b><br>
-			Creados: {results['creados']}<br>
-			Actualizados: {results['actualizados']}<br>
-			Sin cambios: {results['ignorados']}<br>
-			Errores: {len(results['errores'])}
-		"""
-		frappe.publish_realtime('msgprint', msg, user=user)
+		# Crear Notificación de Portal (Sin realtime)
+		try:
+			notification = frappe.new_doc("qp_IQ_PortalNotification")
+			notification.pn_user = user
+			notification.pn_title = "Carga Masiva de Contactos"
+			notification.pn_message = f"Proceso de carga masiva finalizado con éxito. Creados: {results['creados']}, Actualizados: {results['actualizados']}, Errores: {len(results['errores'])}."
+			notification.pn_route = "/contacts"
+			notification.pn_type = "Info"
+			notification.pn_is_read = 0
+			notification.insert(ignore_permissions=True)
+		except Exception as e:
+			frappe.log_error(f"Error creando notificación de portal: {str(e)}", "Portal Notification Error")
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: process_contacts_background")
-		frappe.publish_realtime('msgprint', f"Error fatal en carga de contactos en segundo plano: {str(e)}", user=user)
-
 
 @frappe.whitelist(allow_guest=False)
 def upload_contacts():
@@ -569,7 +574,6 @@ def upload_contacts():
 	if "Nombre" not in idx or "Apellido" not in idx:
 		frappe.throw(_("Faltan columnas obligatorias (Nombre, Apellido)"))
 
-	# Convertir a lista de diccionarios para el worker
 	def get_val(r, col):
 		if col not in idx: return ""
 		i = idx[col]
@@ -583,7 +587,7 @@ def upload_contacts():
 			row_dict[h] = get_val(r, h)
 		rows_dicts.append(row_dict)
 
-	# Encolar proceso asincronico
+	# Encolar proceso
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',
@@ -593,7 +597,6 @@ def upload_contacts():
 	)
 	
 	return {"message": {"total_rows": len(rows_dicts), "queued": True}, "status": "queued"}
-
 
 @frappe.whitelist(allow_guest=False)
 def validate_contacts():
@@ -639,7 +642,7 @@ def validate_contacts():
 			val = get_val(r, h)
 			row_dict[h] = val
 		
-		# Se revisa que todos los campos mandatorios tengan valor
+		# Validación estricta
 		row_errors = []
 		for field in MANDATORY_FIELDS:
 			if not row_dict.get(field):
@@ -657,7 +660,7 @@ def upload_contacts_json(rows_json):
 	try: rows = _json.loads(rows_json)
 	except: frappe.throw(_("JSON inválido"))
 
-	# Encolar proceso asincronico
+	# Encolar proceso
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',

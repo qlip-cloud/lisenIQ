@@ -6,11 +6,13 @@
  "engine": "InnoDB",
  "field_order": [
   "pn_user",
-  "pn_title",
-  "pn_message",
   "pn_route",
   "pn_type",
-  "pn_is_read"
+  "pn_is_read",
+  "pn_read_date",
+  "column_break_3",
+  "pn_title",
+  "pn_message"
  ],
  "fields": [
   {
@@ -53,11 +55,20 @@
    "fieldname": "pn_is_read",
    "fieldtype": "Check",
    "label": "Le\u00eddo"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pn_read_date",
+   "fieldtype": "Datetime",
+   "label": "Fecha de lectura"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-06 15:57:17.407360",
+ "modified": "2026-01-06 16:41:15.298798",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_PortalNotification",

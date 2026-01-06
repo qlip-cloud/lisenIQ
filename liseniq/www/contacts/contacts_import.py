@@ -15,6 +15,16 @@ REQUIRED_COLUMNS = [
 	"Fecha de Ingreso"
 ]
 
+# Campos que NO pueden estar vacíos para la validación estricta
+MANDATORY_FIELDS = [
+	"Nombre", 
+	"Apellido", 
+	"Tipo de Documento", 
+	"Número de Documento (DNI)", 
+	"País", 
+	"Idioma"
+]
+
 # Lista fija de países LATAM
 LATAM_COUNTRIES = [
 	"Argentina", "Bolivia", "Brazil", "Chile", "Colombia", "Costa Rica",
@@ -359,6 +369,18 @@ def process_contacts_background(rows, user):
 				
 				fecha_nac = parse_date(r.get("Fecha de Nacimiento"))
 				fecha_ing = parse_date(r.get("Fecha de Ingreso"))
+				
+				# VALIDACIÓN FINAL DE BACKEND (Seguridad adicional)
+				missing = []
+				if not nombre: missing.append("Nombre")
+				if not apellido: missing.append("Apellido")
+				if not tipo_doc_id: missing.append("Tipo de Documento")
+				if not numero_doc: missing.append("Número de Documento")
+				if not pais_id: missing.append("País")
+				if not idioma_id: missing.append("Idioma")
+				
+				if missing:
+					raise Exception(f"Campos obligatorios faltantes: {', '.join(missing)}")
 
 				data = {
 					"firstName": nombre,
@@ -548,10 +570,17 @@ def validate_contacts():
 		for h in headers:
 			val = get_val(r, h)
 			row_dict[h] = val
+		
+		# VALIDACIÓN ESTRICTA
+		# Se revisa que todos los campos mandatorios tengan valor
 		row_errors = []
-		if not row_dict.get("Nombre"): row_errors.append("Nombre faltante")
+		for field in MANDATORY_FIELDS:
+			if not row_dict.get(field):
+				row_errors.append(field)
+
 		parsed.append(row_dict)
-		if row_errors: errors.append({"fila": i, "errores": row_errors})
+		if row_errors: 
+			errors.append({"fila": i, "errores": row_errors})
 
 	return {"ok": True, "headers": headers, "rows": parsed, "errors": errors}
 

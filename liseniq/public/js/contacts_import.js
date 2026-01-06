@@ -17,6 +17,16 @@ document.addEventListener('DOMContentLoaded', function () {
         dataToProcess: null, // Datos listos para enviar
 	};
 
+    // Campos obligatorios para validación frontend
+    const MANDATORY_FIELDS = [
+        "Nombre", 
+        "Apellido", 
+        "Tipo de Documento", 
+        "Número de Documento (DNI)", 
+        "País", 
+        "Idioma"
+    ];
+
 	const ui = {
 		stepperContainer: 'import-stepper-container',
 		step1: document.getElementById('step-1'),
@@ -50,32 +60,54 @@ document.addEventListener('DOMContentLoaded', function () {
     const getBaseColDefs = () => [
 		{ 
             field: "Nombre", 
-            headerName: "Nombre", 
+            headerName: "Nombre (Obligatorio)", 
             editable: true, 
             minWidth: 150, 
             pinned: 'left',
             wrapText: true,
             autoHeight: true,
-			filter: true
+			filter: true,
+            cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
         },
 		{ 
             field: "Apellido", 
-            headerName: "Apellido", 
+            headerName: "Apellido (Obligatorio)", 
             editable: true, 
             minWidth: 150, 
             pinned: 'left',
             wrapText: true,
             autoHeight: true,
-			filter: true
+			filter: true,
+            cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
         },
         { 
 			field: "Tipo de Documento", 
-			headerName: "Tipo Doc", 
+			headerName: "Tipo Doc (Obligatorio)", 
 			editable: true,
+            cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
 		},
-		{ field: "Número de Documento (DNI)", headerName: "Número Doc", editable: true, minWidth: 140, wrapText: true, autoHeight: true, filter: true },
-        { field: "País", headerName: "País", editable: true },
-        { field: "Idioma", headerName: "Idioma", editable: true },
+		{ 
+            field: "Número de Documento (DNI)", 
+            headerName: "Número Doc (Obligatorio)", 
+            editable: true, 
+            minWidth: 140, 
+            wrapText: true, 
+            autoHeight: true, 
+            filter: true,
+            cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
+        },
+        { 
+            field: "País", 
+            headerName: "País (Obligatorio)", 
+            editable: true,
+            cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
+        },
+        { 
+            field: "Idioma", 
+            headerName: "Idioma (Obligatorio)", 
+            editable: true,
+            cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
+        },
 		{ 
 			field: "Estatus", 
 			headerName: "Estatus", 
@@ -129,6 +161,63 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	}
 
+    // Función de Validación en Tiempo Real
+    // Escanea el grid y deshabilita el botón si encuentra errores
+    function validateRealTime() {
+        if (!state.gridApi) return;
+
+        let hasErrors = false;
+        let errorCount = 0;
+        const validationErrors = [];
+
+        state.gridApi.forEachNode((node, index) => {
+             const row = node.data;
+             const missing = [];
+             MANDATORY_FIELDS.forEach(field => {
+                if (!row[field] || row[field].toString().trim() === "") {
+                    missing.push(field);
+                }
+            });
+
+            if (missing.length > 0) {
+                hasErrors = true;
+                errorCount++;
+                if (validationErrors.length < 5) { // Limitar errores visuales a 5
+                     validationErrors.push({ row: index + 1, missing: missing });
+                }
+            }
+        });
+
+        // 1. Deshabilitar/Habilitar el botón basado en el estado de errores
+        ui.btnValidateContinue.disabled = hasErrors;
+
+        // 2. Actualizar resumen visual
+        if (hasErrors) {
+            let summaryHtml = `
+                <div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <strong>Validación incompleta:</strong> Se detectaron campos obligatorios sin completar.<br>
+                    <ul>
+            `;
+            validationErrors.forEach(e => {
+                summaryHtml += `<li>Fila ${e.row}: Faltan [${e.missing.join(', ')}]</li>`;
+            });
+            if (errorCount > 5) {
+                summaryHtml += `<li>... y ${errorCount - 5} filas más.</li>`;
+            }
+            summaryHtml += `</ul></div>`;
+            ui.validationSummary.innerHTML = summaryHtml;
+        } else {
+             ui.validationSummary.innerHTML = `
+             <div class="alert alert-success" style="background-color: #f0fff4; border: 1px solid #68d391; color: #276749; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                <i class="fa fa-check-circle"></i> Validación exitosa.
+             </div>`;
+        }
+        
+        // 3. Refrescar celdas para actualizar estilos (rojo para vacíos)
+        // Nota: AgGrid es inteligente y solo repinta lo necesario, pero force=true asegura que el cellStyle se re-evalúe
+        state.gridApi.refreshCells({ force: true });
+    }
+
 	function initAgGrid() {
 		ui.gridContainer.innerHTML = '';
 		
@@ -148,7 +237,16 @@ document.addEventListener('DOMContentLoaded', function () {
 			rowSelection: 'multiple',
 			onGridReady: (params) => {
 				state.gridApi = params.api;
-			}
+                validateRealTime(); // Validar inmediatamente al cargar
+			},
+            onCellValueChanged: (params) => {
+                validateRealTime(); // Validar al editar cualquier celda
+            },
+            onModelUpdated: () => {
+                // Validar si cambian filas (filtro, borrado, agregado)
+                // Se usa setTimeout para asegurar que el modelo está estable
+                setTimeout(validateRealTime, 0); 
+            }
 		};
 
 		agGrid.createGrid(ui.gridContainer, gridOptions);
@@ -156,8 +254,6 @@ document.addEventListener('DOMContentLoaded', function () {
 		if (state.mode === 'edit') {
 			ui.btnAddRow.style.display = 'inline-block';
             ui.btnAddDemo.style.display = 'inline-block';
-			ui.validationSummary.textContent = "Edite los contactos existentes o agregue nuevos. Deslice a la derecha para ver más demográficos.";
-			ui.btnValidateContinue.disabled = false;
 		} else {
 			ui.btnAddRow.style.display = 'inline-block';
             ui.btnAddDemo.style.display = 'inline-block'; 
@@ -259,7 +355,6 @@ document.addEventListener('DOMContentLoaded', function () {
                  alert("No hay datos cargados. Por favor intente recargar la página.");
                  return;
             }
-            ui.validationSummary.textContent = 'Datos cargados desde el sistema.';
             showStep(2);
             return;
         }
@@ -309,12 +404,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             state.demographicColsCount = maxDemoIndex;
 
-			if (state.errors.length > 0) {
-				ui.validationSummary.innerHTML = `<strong>Advertencias:</strong> ${state.errors.length} fila(s) con incidencias. Revise en la tabla.`;
-			} else {
-				ui.validationSummary.textContent = 'Archivo validado. Puede realizar ajustes finales en la tabla.';
-			}
+            // Nota: Ya no generamos el HTML de error aquí manualmente. 
+            // Al llamar showStep(2), se inicializa AgGrid y validateRealTime()
+            // se encargará de mostrar los errores y deshabilitar el botón inmediatamente.
 			showStep(2);
+
 		}).catch(err => {
 			ui.btnContinue.disabled = false;
 			ui.btnContinue.textContent = 'Continuar';
@@ -328,6 +422,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			getAllColDefs().forEach(col => newRow[col.field] = "");
 			newRow["Estatus"] = "Activo";
 			state.gridApi.applyTransaction({ add: [newRow] });
+            // validateRealTime se disparará por onModelUpdated
 		}
 	});
 
@@ -344,6 +439,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Acción del botón "Confirmar y Continuar" del Paso 2
 	ui.btnValidateContinue.addEventListener('click', () => {
+        // En este punto, si el botón está habilitado, asumimos que validateRealTime ha dado el visto bueno.
+        // Aun así, obtenemos los datos para pasarlos al siguiente paso.
+
 		// Obtener datos del Grid
 		let gridData = [];
 		if (state.gridApi) {

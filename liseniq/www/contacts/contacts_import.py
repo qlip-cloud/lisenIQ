@@ -4,6 +4,7 @@ import io, csv
 from datetime import datetime
 import re
 import json
+import random
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.utils import get_column_letter
 
@@ -24,6 +25,9 @@ MANDATORY_FIELDS = [
 	"País", 
 	"Idioma"
 ]
+
+# Nombre del campo de tabla hija para demográficos
+CHILD_TABLE_FIELD = "custom_additional_details"
 
 # Lista fija de países LATAM
 LATAM_COUNTRIES = [
@@ -65,12 +69,48 @@ def get_mapping_dicts():
 	academic_id_to_name = {d.name: d.al_title for d in academics}
 	academic_name_to_id = {d.al_title: d.name for d in academics}
 
+	demos = frappe.get_all("qp_IQ_DemographicType", fields=["name", "dt_title"])
+	demo_title_to_id = {d.dt_title: d.name for d in demos}
+
 	return {
 		"dt_export": dt_id_to_name, "dt_import": dt_name_to_id,
 		"lang_export": lang_id_to_name, "lang_import": lang_name_to_id,
 		"country_export": country_id_to_name, "country_import": country_name_to_id,
-		"academic_export": academic_id_to_name, "academic_import": academic_name_to_id
+		"academic_export": academic_id_to_name, "academic_import": academic_name_to_id,
+		"demo_import": demo_title_to_id
 	}
+
+def find_or_create_demographic_type(demographic_title):
+	normalized_title = " ".join(demographic_title.strip().split()).title()
+	object_type = "Contacto"
+
+	if not normalized_title:
+		return None
+
+	try:
+		existing_doc_name = frappe.db.get_value(
+			"qp_IQ_DemographicType",
+			{"dt_title": normalized_title, "dt_object_type": object_type},
+			"name"
+		)
+
+		if existing_doc_name:
+			return existing_doc_name
+		else:
+			doc = frappe.new_doc("qp_IQ_DemographicType")
+			doc.dt_title = normalized_title
+			doc.dt_object_type = object_type
+			doc.dt_tag_color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
+			doc.dt_description = _("Demográfico '{0}' creado automáticamente desde Carga Masiva.").format(normalized_title)
+			doc.insert(ignore_permissions=True)
+			return doc.name
+
+	except Exception:
+		return frappe.db.get_value(
+			"qp_IQ_DemographicType",
+			{"dt_title": normalized_title, "dt_object_type": object_type},
+			"name"
+		)
 
 @frappe.whitelist(allow_guest=False)
 def get_contacts_for_grid():
@@ -286,7 +326,7 @@ def check_if_modified(contact_doc, data, status):
 
 	return False
 
-def update_contact_fields(contact_doc, data, status):
+def update_contact_fields(contact_doc, data, status, demo_map=None):
 	"""Actualiza los campos del documento en memoria y guarda."""
 	contact_doc.first_name = data['firstName']
 	contact_doc.last_name = data['lastName']
@@ -313,10 +353,28 @@ def update_contact_fields(contact_doc, data, status):
 			contact_doc.append("email_ids", {"email_id": new_email, "is_primary": 1})
 		contact_doc.save(ignore_permissions=True)
 	
-	frappe.db.sql("DELETE FROM `tabqp_IQ_ContactAdditionalDetail` WHERE parent = %s", contact_doc.name)
+	# Manejo robusto de tabla hija
+	
+	# 1. Validar que el campo existe en la Metadata del DocType
+	if not contact_doc.meta.get_field(CHILD_TABLE_FIELD):
+		frappe.log_error(f"Error Crítico: El campo '{CHILD_TABLE_FIELD}' no existe en el DocType Contact.", "Import Contacts Error")
+		# No lanzamos excepción para no detener todo el lote, pero no guardamos demográficos para este registro
+		return
+
+	# 2. Limpiar existentes y agregar nuevos
+	contact_doc.set(CHILD_TABLE_FIELD, [])
+	
 	for d in data['demographics']:
 		if d['type'] and d['value']:
-			child = contact_doc.append("custom_contact_additional_detail", {})
+			demo_id = None
+			if demo_map:
+				demo_id = demo_map.get(d['type'])
+			
+			if not demo_id:
+				demo_id = find_or_create_demographic_type(d['type'])
+			
+			child = contact_doc.append(CHILD_TABLE_FIELD, {})
+			child.cad_demographic_type = demo_id
 			child.cad_tag = d['type']
 			child.cad_value = d['value']
 	
@@ -336,12 +394,12 @@ def process_contacts_background(rows, user):
 
 		user_company = contact_info.custom_company
 		
-		# Obtener mapas
 		maps = get_mapping_dicts()
 		dt_map = maps["dt_import"]
 		country_map = maps["country_import"]
 		lang_map = maps["lang_import"]
 		academic_map = maps["academic_import"]
+		demo_map = maps["demo_import"]
 
 		def parse_date(value):
 			if not value: return None
@@ -370,7 +428,7 @@ def process_contacts_background(rows, user):
 				fecha_nac = parse_date(r.get("Fecha de Nacimiento"))
 				fecha_ing = parse_date(r.get("Fecha de Ingreso"))
 				
-				# VALIDACIÓN FINAL DE BACKEND (Seguridad adicional)
+				# Validar campos obligatorios
 				missing = []
 				if not nombre: missing.append("Nombre")
 				if not apellido: missing.append("Apellido")
@@ -414,7 +472,7 @@ def process_contacts_background(rows, user):
 				if contact_name:
 					contact_doc = frappe.get_doc("Contact", contact_name)
 					if check_if_modified(contact_doc, data, estatus or contact_doc.custom_status):
-						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status)
+						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status, demo_map)
 						results["actualizados"] += 1
 					else:
 						results["ignorados"] += 1
@@ -438,16 +496,27 @@ def process_contacts_background(rows, user):
 					if correo:
 						new_doc.append("email_ids", {"email_id": correo, "is_primary": 1})
 					
-					for d in data['demographics']:
-						child = new_doc.append("custom_contact_additional_detail", {})
-						child.cad_tag = d['type']
-						child.cad_value = d['value']
-						
 					new_doc.insert(ignore_permissions=True)
+					
+					# Insertar demográficos después de crear el doc, manejando el mapeo
+					if data['demographics']:
+						# Verificamos metadata antes de append
+						if new_doc.meta.get_field(CHILD_TABLE_FIELD):
+							for d in data['demographics']:
+								demo_id = demo_map.get(d['type'])
+								if not demo_id:
+									demo_id = find_or_create_demographic_type(d['type'])
+								
+								child = new_doc.append(CHILD_TABLE_FIELD, {})
+								child.cad_demographic_type = demo_id
+								child.cad_tag = d['type']
+								child.cad_value = d['value']
+							
+							new_doc.save(ignore_permissions=True)
+					
 					results["creados"] += 1
 
 			except Exception as e:
-				# Log error específico para trazabilidad
 				frappe.log_error(frappe.get_traceback(), f"Error procesando fila {i} en carga masiva")
 				results["errores"].append({"fila": i, "error": str(e)})
 
@@ -514,7 +583,7 @@ def upload_contacts():
 			row_dict[h] = get_val(r, h)
 		rows_dicts.append(row_dict)
 
-	# Encolar proceso ASÍNCRONO
+	# Encolar proceso asincronico
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',
@@ -523,7 +592,6 @@ def upload_contacts():
 		user=frappe.session.user
 	)
 	
-	# Retornar conteo inmediato
 	return {"message": {"total_rows": len(rows_dicts), "queued": True}, "status": "queued"}
 
 
@@ -571,7 +639,6 @@ def validate_contacts():
 			val = get_val(r, h)
 			row_dict[h] = val
 		
-		# VALIDACIÓN ESTRICTA
 		# Se revisa que todos los campos mandatorios tengan valor
 		row_errors = []
 		for field in MANDATORY_FIELDS:
@@ -590,7 +657,7 @@ def upload_contacts_json(rows_json):
 	try: rows = _json.loads(rows_json)
 	except: frappe.throw(_("JSON inválido"))
 
-	# Encolar proceso ASÍNCRONO
+	# Encolar proceso asincronico
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',
@@ -599,5 +666,4 @@ def upload_contacts_json(rows_json):
 		user=frappe.session.user
 	)
 	
-	# Retornar conteo inmediato
 	return {"message": {"total_rows": len(rows), "queued": True}, "status": "queued"}

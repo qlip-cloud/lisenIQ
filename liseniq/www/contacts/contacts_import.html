@@ -1,0 +1,146 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Importar contactos") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="main-content-padding" id="contacts-import-app">
+    <div id="import-stepper-container"></div>
+
+    <!-- Paso 1: Cargar Plantilla -->
+    <div id="step-1" class="import-step">
+        <div class="page-title-section">
+            <nav class="breadcrumb-nav">
+                <a href="/contacts">Contactos</a> / Carga Masiva de Contactos
+            </nav>
+            <h2 class="page-main-title">Importar contactos</h2>
+        </div>
+
+        <!-- Opciones (Cargar archivo / Editar en línea) -->
+        <div style="display:flex;gap:16px;align-items:flex-start;justify-content:space-between;max-width:900px;">
+            <div style="flex:1;display:flex;gap:12px;">
+                <div id="opt-upload" class="import-choice-card selected" style="flex:1;cursor:pointer;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:18px;">
+                        <i class="fa fa-upload" style="font-size:18px;color:#7B24FF;"></i>
+                        <div>
+                            <div style="font-weight:600;">Cargar archivo</div>
+                            <div style="color:#737373;font-size:0.85rem;">Sube tu plantilla (.xlsx o .csv)</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="opt-edit" class="import-choice-card" style="flex:1;cursor:pointer;">
+                    <div style="display:flex;align-items:center;gap:12px;padding:18px;">
+                        <i class="fa fa-desktop" style="font-size:18px;color:#7B24FF;"></i>
+                        <div>
+                            <div style="font-weight:600;">Editar en línea</div>
+                            <div style="color:#737373;font-size:0.85rem;">Editar existentes o crear nuevos</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;">
+                <a id="download-template" class="btn btn-outline-purple">Descargar plantilla</a>
+            </div>
+        </div>
+
+        <!-- Área principal con dropzone -->
+        <div id="upload-area" style="margin-top:18px;max-width:900px;">
+            <input id="file-input" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+            <div id="dropzone" class="dropzone" style="background:#fff;border:1px dashed #e6e6e6;border-radius:10px;padding:28px;text-align:center;cursor:pointer;max-width:900px;">
+                <i class="fa fa-cloud-upload" style="font-size:28px;color:#7B24FF;margin-bottom:8px;display:block;"></i>
+                <div style="font-weight:600;">Arrastra el archivo o haz clic para seleccionarlo</div>
+                <div style="color:#9aa3ad;font-size:0.85rem;margin-top:6px;">Solo .xlsx o .csv de menos de 6MB</div>
+                <div id="dropzone-filename" style="margin-top:10px;color:#555;font-size:0.9rem;"></div>
+            </div>
+
+            <!-- Controles inferiores -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;max-width:900px;">
+                <div></div>
+                <div style="display:flex;gap:12px;">
+                    <button id="btn-cancel" class="btn btn-outline-purple">Cancelar</button>
+                    <button id="btn-continue" class="btn btn-purple-main" disabled>Continuar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 2: Validar Datos (Ag-Grid) -->
+    <div id="step-2" class="import-step d-none">
+        <div class="page-title-section">
+            <nav class="breadcrumb-nav">
+                <a href="/contacts">Contactos</a> / Importar contactos
+            </nav>
+            <h2 class="page-main-title">Validar datos</h2>
+        </div>
+        <div class="form-section-wrapper" style="max-width: 100%;">
+            <div id="validation-summary" style="margin-bottom:12px;color:#333;"></div>
+            
+            <!-- Contenedor para Ag-Grid -->
+            <div id="myGrid" class="ag-theme-alpine" style="height: 60vh; width: 100%;"></div>
+
+            <div style="margin-top:12px;display:flex;justify-content:space-between;gap: 12px;">
+                <div>
+                    <button id="btn-add-row" class="btn btn-outline-purple" style="display:none;">
+                        <i class="fa fa-plus"></i> Agregar Fila
+                    </button>
+                    <button id="btn-add-demo" class="btn btn-outline-purple" style="display:none;">
+                        <i class="fa fa-columns"></i> Agregar Demográfico
+                    </button>
+                </div>
+                <div style="text-align:right; flex:1;">
+                    <button id="btn-back-to-step1" class="btn btn-outline-purple">Atrás</button>
+                    <button id="btn-validate-continue" class="btn btn-purple-main">Confirmar y continuar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paso 3: Resultados -->
+    <div id="step-3" class="import-step d-none">
+        <div class="page-title-section">
+            <nav class="breadcrumb-nav">
+                <a href="/contacts">Contactos</a> / Importar contactos
+            </nav>
+            <h2 class="page-main-title">Creación</h2>
+        </div>
+        <div class="form-section-wrapper" style="max-width: 600px;">
+            <div id="process-result"></div>
+            <div style="margin-top:12px;text-align:right;">
+                <button id="btn-back-to-step2" class="btn btn-outline-purple">Atrás</button>
+                <button id="btn-finish" class="btn btn-purple-main">Finalizar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/contacts.css">
+    <!-- Estilos de Ag-Grid -->
+    <style>
+        .ag-theme-alpine {
+            --ag-foreground-color: #555;
+            --ag-background-color: #fff;
+            --ag-header-foreground-color: #333;
+            --ag-header-background-color: #f8f9fa;
+            --ag-odd-row-background-color: #fff;
+            --ag-header-column-separator-display: block;
+            --ag-header-column-separator-color: #d7d7d7;
+            --ag-row-border-color: #e2e2e2;
+        }
+    </style>
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <!-- Ag-Grid CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@35.0.0/dist/ag-grid-community.min.js"></script>
+    
+    <script type="module" src="/assets/liseniq/js/utils/stepper.js"></script>
+    <script type="module" src="/assets/liseniq/js/contacts_import.js"></script>
+{% endblock %}

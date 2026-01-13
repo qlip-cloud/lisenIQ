@@ -80,6 +80,25 @@ def get_mapping_dicts():
 		"demo_import": demo_title_to_id
 	}
 
+@frappe.whitelist()
+def get_grid_options():
+	"""
+	Retorna las listas de opciones para los selectores del frontend (Ag-Grid).
+	Devuelve las descripciones/nombres visibles que el backend mapeará posteriormente a IDs.
+	"""
+	try:
+		return {
+			"document_types": [d.dt_name for d in frappe.get_all("qp_IQ_DocumentType", fields=["dt_name"], order_by="dt_name asc")],
+			"languages": [d.la_name for d in frappe.get_all("qp_IQ_Language", fields=["la_name"], order_by="la_name asc")],
+			"countries": sorted(LATAM_COUNTRIES),
+			"genders": [d.gender for d in frappe.get_all("Gender", fields=["gender"], order_by="gender asc")],
+			"academic_levels": [d.al_title for d in frappe.get_all("qp_IQ_AcademicLevel", fields=["al_title"], order_by="al_title asc")],
+			"status": ["Activo", "Inactivo"]
+		}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Error obteniendo opciones para Grid")
+		return {}
+
 def find_or_create_demographic_type(demographic_title):
 	"""
 	Busca el ID de un tipo demográfico por su título. Si no existe, lo crea.

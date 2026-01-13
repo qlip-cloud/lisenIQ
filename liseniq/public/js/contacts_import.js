@@ -15,6 +15,14 @@ document.addEventListener('DOMContentLoaded', function () {
         demographicColsCount: 1, 	// Inicialmente 1 par de columnas demográficas
         finalStats: { total: 0 },
         dataToProcess: null, 		// Datos listos para enviar
+        options: {                  // Opciones para dropdowns (inicializadas vacías)
+            document_types: [],
+            languages: [],
+            countries: [],
+            genders: [],
+            academic_levels: [],
+            status: ['Activo', 'Inactivo']
+        }
 	};
 
     // Campos obligatorios para validación frontend
@@ -56,7 +64,29 @@ document.addEventListener('DOMContentLoaded', function () {
 	stepper.render();
 	updateStepUI();
 
-    // Definición base de columnas (estáticas)
+    // Inicializar: Obtener opciones para dropdowns
+    fetchOptions();
+
+    function fetchOptions() {
+        frappe.call({
+            method: 'liseniq.www.contacts.contacts_import.get_grid_options',
+            callback: function(r) {
+                if(r.message) {
+                    // Actualizamos el estado con las opciones recibidas
+                    state.options = { ...state.options, ...r.message };
+
+                    if (state.gridApi) {
+                        const newDefs = getAllColDefs();
+                        state.gridApi.setGridOption('columnDefs', newDefs);
+                        // Redibujar filas para asegurar consistencia visual
+                        state.gridApi.redrawRows();
+                    }
+                }
+            }
+        });
+    }
+
+    // Definición base de columnas (estáticas) con Dropdowns
     const getBaseColDefs = () => [
 		{ 
             field: "Nombre", 
@@ -84,6 +114,11 @@ document.addEventListener('DOMContentLoaded', function () {
 			field: "Tipo de Documento", 
 			headerName: "Tipo Doc (Obligatorio)", 
 			editable: true,
+            minWidth: 180,
+            cellEditor: 'agSelectCellEditor',
+            cellEditorParams: {
+                values: state.options.document_types || []
+            },
             cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
 		},
 		{ 
@@ -100,30 +135,51 @@ document.addEventListener('DOMContentLoaded', function () {
             field: "País", 
             headerName: "País (Obligatorio)", 
             editable: true,
+            minWidth: 150,
+            cellEditor: 'agSelectCellEditor',
+            cellEditorParams: {
+                values: state.options.countries || []
+            },
             cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
         },
         { 
             field: "Idioma", 
             headerName: "Idioma (Obligatorio)", 
             editable: true,
+            minWidth: 120,
+            cellEditor: 'agSelectCellEditor',
+            cellEditorParams: {
+                values: state.options.languages || []
+            },
             cellStyle: params => !params.value ? {backgroundColor: '#ffe6e6'} : null
         },
 		{ 
 			field: "Estatus", 
 			headerName: "Estatus", 
 			editable: true,
+            minWidth: 100,
 			cellEditor: 'agSelectCellEditor', 
-			cellEditorParams: { values: ['Activo', 'Inactivo'] }
+			cellEditorParams: { values: state.options.status }
 		},
 		{ 
 			field: "Género", 
 			headerName: "Género", 
 			editable: true, 
+            minWidth: 120,
 			cellEditor: 'agSelectCellEditor', 
-			cellEditorParams: { values: ['Masculino', 'Femenino', 'Otro', ''] } 
+			cellEditorParams: { values: state.options.genders || [] } 
 		},
 		{ field: "Fecha de Nacimiento", headerName: "Fecha Nacimiento (YYYY-MM-DD)", editable: true, wrapText: true, autoHeight: true, filter: true },
-		{ field: "Nivel Académico", headerName: "Nivel Académico", editable: true },
+		{ 
+            field: "Nivel Académico", 
+            headerName: "Nivel Académico", 
+            editable: true,
+            minWidth: 150,
+            cellEditor: 'agSelectCellEditor',
+            cellEditorParams: {
+                values: state.options.academic_levels || []
+            }
+        },
 		{ field: "Correo (Opcional)", headerName: "Correo", editable: true, minWidth: 200, wrapText: true, autoHeight: true },
 		{ field: "Fecha de Ingreso", headerName: "Fecha Ingreso (YYYY-MM-DD)", editable: true }
     ];

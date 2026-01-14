@@ -51,6 +51,20 @@ CARVAJAL_COMPANIES = {
     "e34486d9ea": "Carvajal espacios"
 }
 
+VEDANTA_BIENESTAR = {
+    "Propósito y Valores": "PILAR EMPRESARIAL",
+    "Seguridad Organizacional": "PILAR EMPRESARIAL",
+    "Liderazgo": "PILAR EMPRESARIAL",
+    "Comunicación": "PILAR CULTURAL",
+    "Desarrollo Profesional": "PILAR CULTURAL",
+    "Entorno": "PILAR CULTURAL",
+    "Pertenencia y Valoración": "PILAR CULTURAL",
+    "Emocional": "PILAR PERSONAL",
+    "Mental": "PILAR PERSONAL",
+    "Física": "PILAR PERSONAL",
+    "Financiera": "PILAR PERSONAL",
+}
+
 @frappe.whitelist()
 def custom_report(filters=None):
     """
@@ -139,11 +153,13 @@ def get_valid_surveys():
                 iq.su_name,
                 iq.su_owner,
                 iq.su_in_history as in_history,
+                tp.tp_name as template_name,
                 c.name as company_id,
                 c.co_name as company_name
             FROM `tabSurvey` s
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
+            LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
             ORDER BY s.name
         """
         results = frappe.db.sql(query, as_dict=True)
@@ -253,6 +269,7 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     data = []
     
     # Separar encuestas finalizadas y no finalizadas
+                # Usar el tema de question_variables_map (basado en CATEGORIES)
     finished_surveys = [s for s in valid_surveys if s.get('in_history') == 1]
     active_surveys = [s for s in valid_surveys if s.get('in_history') != 1]
     
@@ -341,7 +358,7 @@ def get_all_survey_data_by_question(valid_surveys, all_questions_map, demographi
         survey['name']: survey['expected_responses']
         for survey in get_surveys_expected_responses()
     }
-    
+
     data = []
     
     # Separar encuestas finalizadas y no finalizadas
@@ -854,7 +871,36 @@ def get_question_types_map():
         frappe.log_error(f"Error getting question types map: {str(e)}")
         return {}
 
-
+def get_survey_template_map():
+    """
+    Obtiene el mapeo de encuestas a sus plantillas
+    La clave del mapeo será el nombre de la encuesta
+    y el valor será el nombre de la plantilla
+    """
+    try:
+        query = """
+            SELECT 
+                iq.su_name as survey_name,
+                tp.tp_name as template_name
+            FROM `tabqp_IQ_Survey` iq
+            LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        
+        mapping = {}
+        for row in results:
+            survey_name = row.get('survey_name', '')
+            template_name = row.get('template_name', '')
+            
+            if survey_name:
+                mapping[survey_name] = template_name or ''
+                
+        return mapping
+        
+    except Exception as e:
+        frappe.log_error(f"Error getting survey template map: {str(e)}")
+        return {}
+    
 def get_bulk_demographics(users_list, demographics_map):
     """
     Obtiene datos demográficos adicionales para múltiples usuarios de manera optimizada
@@ -920,6 +966,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
 
     question_variables_map = get_question_variables_map()
     question_types_map = get_question_types_map()
+    survey_template_map = get_survey_template_map()
 
     # conjunto total de claves demográficas (ids sin traducir)
     required_demographic_keys = set(core_demographic_keys) | set(demographic_ids)
@@ -940,6 +987,10 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
         if not question_responses:
             continue
 
+        # Obtener el template de la encuesta actual
+        survey_name = demographic_data.get('survey_name', '')
+        template_name = survey_template_map.get(survey_name, '')
+
         for qid, answer in question_responses.items():
             question_object = demographic_data.copy()
 
@@ -950,9 +1001,18 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
 
             # Agregar variable y tema basado en la pregunta
             question_info = question_variables_map.get(question_text, {})
-            question_object['variable'] = question_info.get('variable', '')
+            variable = question_info.get('variable', '')
+            question_object['variable'] = variable
             question_object['question_type'] = question_types_map.get(qid, '')
-            tema = question_info.get('tema', '')
+            
+            # Determinar el tema según el template
+            tema = ''
+            if template_name == 'Plantilla Modelo Vedanta bienestar':
+                tema = VEDANTA_BIENESTAR.get(variable, '')
+            else:
+                tema = question_info.get('tema', '')
+                
+            # Lógica especial para empresas Carvajal
             try:
                 company_name_val = (demographic_data.get('company_name') or '').lower().strip()
                 carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}

@@ -17,6 +17,7 @@
   "su_status",
   "su_type",
   "su_is_anonymous",
+  "su_in_history",
   "column_break_2",
   "su_timezone",
   "su_start_date",
@@ -257,11 +258,17 @@
    "fieldname": "su_default_notif",
    "fieldtype": "Check",
    "label": "Notificaciones por Defecto"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_in_history",
+   "fieldtype": "Check",
+   "label": "En Historial"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-28 19:59:34.011063",
+ "modified": "2025-12-16 09:33:16.018042",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

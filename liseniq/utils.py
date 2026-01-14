@@ -61,7 +61,6 @@ def get_page_categories():
     Devuelve la lista de categorías para los filtros.
     En el futuro, esto podría venir de un DocType "Categoría de Plantilla".
     """
-    # Aquí puedes añadir la lógica para obtener las categorías
     return [
         {"name": "Creadas por ti", "id": "cat-creadas"},
         {"name": "Populares", "id": "cat-populares", "checked": True, "is_popular": True},

@@ -51,6 +51,20 @@ CARVAJAL_COMPANIES = {
     "e34486d9ea": "Carvajal espacios"
 }
 
+VEDANTA_BIENESTAR = {
+    "Propósito y Valores": "PILAR EMPRESARIAL",
+    "Seguridad Organizacional": "PILAR EMPRESARIAL",
+    "Liderazgo": "PILAR EMPRESARIAL",
+    "Comunicación": "PILAR CULTURAL",
+    "Desarrollo Profesional": "PILAR CULTURAL",
+    "Entorno": "PILAR CULTURAL",
+    "Pertenencia y Valoración": "PILAR CULTURAL",
+    "Emocional": "PILAR PERSONAL",
+    "Mental": "PILAR PERSONAL",
+    "Física": "PILAR PERSONAL",
+    "Financiera": "PILAR PERSONAL",
+}
+
 @frappe.whitelist()
 def custom_report(filters=None):
     """
@@ -138,11 +152,14 @@ def get_valid_surveys():
                 iq.name as id,
                 iq.su_name,
                 iq.su_owner,
+                iq.su_in_history as in_history,
+                tp.tp_name as template_name,
                 c.name as company_id,
                 c.co_name as company_name
             FROM `tabSurvey` s
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
+            LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
             ORDER BY s.name
         """
         results = frappe.db.sql(query, as_dict=True)
@@ -188,6 +205,42 @@ def get_surveys_expected_responses():
     return frappe.db.sql(query_survey, as_dict=True)
 
 
+def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
+    """
+    Obtiene los datos históricos de una encuesta finalizada desde qp_IQ_SurveyHistoricData
+    """
+    try:
+        query = """
+            SELECT 
+                shd.name,
+                shd.shd_survey_id,
+                shd.shd_survey_name,
+                shd.shd_contact_name,
+                shd.shd_document_type,
+                shd.shd_document_number,
+                shd.shd_country,
+                shd.shd_entry_date,
+                shd.shd_academic_level,
+                shd.shd_dob,
+                shd.shd_gender,
+                shd.shd_company,
+                shd.shd_measurement_response,
+                GROUP_CONCAT(
+                    CONCAT(cdh.cdh_demographic_type, ':', cdh.cdh_value)
+                    SEPARATOR '||'
+                ) as demographics_data
+            FROM `tabqp_IQ_SurveyHistoricData` shd
+            LEFT JOIN `tabqp_IQ_ContactDetailHistoric` cdh ON cdh.parent = shd.name
+            WHERE shd.shd_survey_id = %s
+            GROUP BY shd.name
+        """
+        results = frappe.db.sql(query, survey_id, as_dict=True)
+        return results
+    except Exception as e:
+        frappe.log_error(f"Error getting historical survey data: {str(e)}")
+        return []
+
+
 def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     """
     Obtiene los datos de todas las encuestas válidas
@@ -213,52 +266,71 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
         for survey in get_surveys_expected_responses()
     }
     
-    # Obtener nombres de encuestas válidas
-    survey_names = [survey['survey_name'] for survey in valid_surveys]
-    survey_ids = [survey['id'] for survey in valid_surveys]
-    survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
-    
-    query = f"""
-        SELECT 
-            sr.name,
-            sr.user,
-            sr.survey,
-            sr.response_json,
-            c.custom_document_number,
-            c.first_name,
-            c.last_name,
-            c.custom_dob,
-            c.gender,
-            c.custom_entry_date,
-            c.custom_country,
-            a.al_title
-        FROM `tabSurvey Response` sr
-        LEFT JOIN `tabContact` c ON c.name = sr.user
-        LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
-        WHERE sr.survey IN ({survey_names_placeholder})
-        ORDER BY sr.survey, sr.creation DESC
-    """
-    
-    responses = frappe.db.sql(query, survey_names, as_dict=True)
-    
-    if not responses:
-        return []
-
-    # Obtener datos demográficos para todos los usuarios
-    users_list = [r.user for r in responses if r.user]
-    demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
-
     data = []
-    for response in responses:
-        row = process_response_row(
-            response, 
-            all_questions_map, 
-            demographics_data,
-            survey_company_map,
-            survey_id_map,
-            survey_expected_responses_map
-        )
-        data.append(row)
+    
+    # Separar encuestas finalizadas y no finalizadas
+                # Usar el tema de question_variables_map (basado en CATEGORIES)
+    finished_surveys = [s for s in valid_surveys if s.get('in_history') == 1]
+    active_surveys = [s for s in valid_surveys if s.get('in_history') != 1]
+    
+    # Procesar encuestas finalizadas con datos históricos
+    for survey in finished_surveys:
+        historical_data = get_historical_survey_data(survey['id'], all_questions_map, demographics_map)
+        for hist_record in historical_data:
+            row = process_historical_response_row(
+                hist_record,
+                survey,
+                all_questions_map,
+                demographics_map,
+                survey_company_map,
+                survey_id_map,
+                survey_expected_responses_map
+            )
+            data.append(row)
+    
+    # Procesar encuestas activas con datos en tiempo real
+    if active_surveys:
+        survey_names = [survey['survey_name'] for survey in active_surveys]
+        survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
+        
+        query = f"""
+            SELECT 
+                sr.name,
+                sr.user,
+                sr.survey,
+                sr.response_json,
+                c.custom_document_number,
+                c.first_name,
+                c.last_name,
+                c.custom_dob,
+                c.gender,
+                c.custom_entry_date,
+                c.custom_country,
+                a.al_title
+            FROM `tabSurvey Response` sr
+            LEFT JOIN `tabContact` c ON c.name = sr.user
+            LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
+            WHERE sr.survey IN ({survey_names_placeholder})
+            ORDER BY sr.survey, sr.creation DESC
+        """
+        
+        responses = frappe.db.sql(query, survey_names, as_dict=True)
+        
+        if responses:
+            # Obtener datos demográficos para todos los usuarios
+            users_list = [r.user for r in responses if r.user]
+            demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
+
+            for response in responses:
+                row = process_response_row(
+                    response, 
+                    all_questions_map, 
+                    demographics_data,
+                    survey_company_map,
+                    survey_id_map,
+                    survey_expected_responses_map
+                )
+                data.append(row)
 
     return data
 
@@ -286,53 +358,71 @@ def get_all_survey_data_by_question(valid_surveys, all_questions_map, demographi
         survey['name']: survey['expected_responses']
         for survey in get_surveys_expected_responses()
     }
-    
-    # Obtener nombres de encuestas válidas
-    survey_names = [survey['survey_name'] for survey in valid_surveys]
-    survey_ids = [survey['id'] for survey in valid_surveys]
-    survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
-    
-    query = f"""
-        SELECT 
-            sr.name,
-            sr.user,
-            sr.survey,
-            sr.response_json,
-            c.custom_document_number,
-            c.first_name,
-            c.last_name,
-            c.custom_dob,
-            c.gender,
-            c.custom_entry_date,
-            c.custom_country,
-            a.al_title
-        FROM `tabSurvey Response` sr
-        LEFT JOIN `tabContact` c ON c.name = sr.user
-        LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
-        WHERE sr.survey IN ({survey_names_placeholder})
-        ORDER BY sr.survey, sr.creation DESC
-    """
-    
-    responses = frappe.db.sql(query, survey_names, as_dict=True)
-    
-    if not responses:
-        return []
-
-    # Obtener datos demográficos para todos los usuarios
-    users_list = [r.user for r in responses if r.user]
-    demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
 
     data = []
-    for response in responses:
-        row = process_response_row_by_question(
-            response, 
-            all_questions_map, 
-            demographics_data,
-            survey_company_map,
-            survey_id_map,
-            survey_expected_responses_map
-        )
-        data.append(row)
+    
+    # Separar encuestas finalizadas y no finalizadas
+    finished_surveys = [s for s in valid_surveys if s.get('in_history') == 1]
+    active_surveys = [s for s in valid_surveys if s.get('in_history') != 1]
+    
+    # Procesar encuestas finalizadas con datos históricos
+    for survey in finished_surveys:
+        historical_data = get_historical_survey_data(survey['id'], all_questions_map, demographics_map)
+        for hist_record in historical_data:
+            row = process_historical_response_row_by_question(
+                hist_record,
+                survey,
+                all_questions_map,
+                demographics_map,
+                survey_company_map,
+                survey_id_map,
+                survey_expected_responses_map
+            )
+            data.append(row)
+    
+    # Procesar encuestas activas con datos en tiempo real
+    if active_surveys:
+        survey_names = [survey['survey_name'] for survey in active_surveys]
+        survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
+        
+        query = f"""
+            SELECT 
+                sr.name,
+                sr.user,
+                sr.survey,
+                sr.response_json,
+                c.custom_document_number,
+                c.first_name,
+                c.last_name,
+                c.custom_dob,
+                c.gender,
+                c.custom_entry_date,
+                c.custom_country,
+                a.al_title
+            FROM `tabSurvey Response` sr
+            LEFT JOIN `tabContact` c ON c.name = sr.user
+            LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
+            WHERE sr.survey IN ({survey_names_placeholder})
+            ORDER BY sr.survey, sr.creation DESC
+        """
+        
+        responses = frappe.db.sql(query, survey_names, as_dict=True)
+        
+        if responses:
+            # Obtener datos demográficos para todos los usuarios
+            users_list = [r.user for r in responses if r.user]
+            demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
+
+            for response in responses:
+                row = process_response_row_by_question(
+                    response, 
+                    all_questions_map, 
+                    demographics_data,
+                    survey_company_map,
+                    survey_id_map,
+                    survey_expected_responses_map
+                )
+                data.append(row)
 
     return data
 
@@ -366,54 +456,73 @@ def get_survey_data_yesterday(valid_surveys, all_questions_map, demographics_map
         for survey in get_surveys_expected_responses()
     }
     
-    # Obtener nombres de encuestas válidas
-    survey_names = [survey['survey_name'] for survey in valid_surveys]
-    survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
-    
-    query = f"""
-        SELECT 
-            sr.name,
-            sr.user,
-            sr.survey,
-            sr.response_json,
-            c.custom_document_number,
-            c.first_name,
-            c.last_name,
-            c.custom_dob,
-            c.gender,
-            c.custom_entry_date,
-            c.custom_country,
-            a.al_title
-        FROM `tabSurvey Response` sr
-        LEFT JOIN `tabContact` c ON c.name = sr.user
-        LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
-        WHERE sr.survey IN ({survey_names_placeholder})
-        AND sr.creation >= %s
-        AND sr.creation <= %s
-        ORDER BY sr.survey, sr.creation DESC
-    """
-    
-    params = survey_names + [yesterday_start, yesterday_end]
-    responses = frappe.db.sql(query, params, as_dict=True)
-    
-    if not responses:
-        return []
-
-    # Obtener datos demográficos para todos los usuarios
-    users_list = [r.user for r in responses if r.user]
-    demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
-
     data = []
-    for response in responses:
-        row = process_response_row_by_question(
-            response, 
-            all_questions_map, 
-            demographics_data,
-            survey_company_map,
-            survey_id_map,
-            survey_expected_responses_map
-        )
-        data.append(row)
+    
+    # Separar encuestas finalizadas y no finalizadas
+    finished_surveys = [s for s in valid_surveys if s.get('in_history') == 1]
+    active_surveys = [s for s in valid_surveys if s.get('in_history') != 1]
+    
+    # Para encuestas finalizadas, obtener datos históricos (sin filtro de fecha, ya que son históricas)
+    for survey in finished_surveys:
+        historical_data = get_historical_survey_data(survey['id'], all_questions_map, demographics_map)
+        for hist_record in historical_data:
+            row = process_historical_response_row_by_question(
+                hist_record,
+                survey,
+                all_questions_map,
+                demographics_map,
+                survey_company_map,
+                survey_id_map,
+                survey_expected_responses_map
+            )
+            data.append(row)
+    
+    # Para encuestas activas, aplicar filtro de fecha del día anterior
+    if active_surveys:
+        survey_names = [survey['survey_name'] for survey in active_surveys]
+        survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
+        
+        query = f"""
+            SELECT 
+                sr.name,
+                sr.user,
+                sr.survey,
+                sr.response_json,
+                c.custom_document_number,
+                c.first_name,
+                c.last_name,
+                c.custom_dob,
+                c.gender,
+                c.custom_entry_date,
+                c.custom_country,
+                a.al_title
+            FROM `tabSurvey Response` sr
+            LEFT JOIN `tabContact` c ON c.name = sr.user
+            LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
+            WHERE sr.survey IN ({survey_names_placeholder})
+            AND sr.creation >= %s
+            AND sr.creation <= %s
+            ORDER BY sr.survey, sr.creation DESC
+        """
+        
+        params = survey_names + [yesterday_start, yesterday_end]
+        responses = frappe.db.sql(query, params, as_dict=True)
+        
+        if responses:
+            # Obtener datos demográficos para todos los usuarios
+            users_list = [r.user for r in responses if r.user]
+            demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
+
+            for response in responses:
+                row = process_response_row_by_question(
+                    response, 
+                    all_questions_map, 
+                    demographics_data,
+                    survey_company_map,
+                    survey_id_map,
+                    survey_expected_responses_map
+                )
+                data.append(row)
 
     return data
 
@@ -438,6 +547,51 @@ def translate_keys(data, all_questions_map, demographics_map):
         translated_data.append(translated_row)
 
     return translated_data
+
+def process_historical_response_row(hist_record, survey, all_questions_map, demographics_map, survey_company_map, survey_id_map, survey_expected_responses_map):
+    """
+    Procesa un registro histórico de respuesta
+    """
+    survey_name = survey['survey_name']
+    
+    # Datos básicos desde el registro histórico
+    company_data = survey_company_map.get(survey_name, {})
+    row = {
+        'survey_id': survey_id_map.get(survey_name, ''),
+        'survey_name': survey_name,
+        'company_id': company_data.get('company_id', ''),
+        'company_name': company_data.get('company_name', ''),
+        'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
+        'user_id': hist_record.get('shd_document_number', ''),
+        'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
+        'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
+        'custom_dob': hist_record.get('shd_dob', ''),
+        'gender': hist_record.get('shd_gender', ''),
+        'custom_academic_level': hist_record.get('shd_academic_level', ''),
+        'entry_date': hist_record.get('shd_entry_date', ''),
+        'country': hist_record.get('shd_country', ''),
+    }
+
+    # Procesar datos demográficos del registro histórico
+    demographics_data_str = hist_record.get('demographics_data', '')
+    if demographics_data_str:
+        for demo_pair in demographics_data_str.split('||'):
+            if ':' in demo_pair:
+                demo_id, demo_value = demo_pair.split(':', 1)
+                if demo_id in demographics_map:
+                    row[demo_id] = demo_value
+
+    # Procesar respuestas de la encuesta
+    response_json = hist_record.get('shd_measurement_response', '{}')
+    parsed_responses = parse_response_json(response_json)
+    
+    # Agregar solo las preguntas que el usuario contestó
+    for qid, answer in parsed_responses.items():
+        if qid in all_questions_map and answer not in (None, ''):
+            row[qid] = answer
+
+    return row
+
 
 def process_response_row(response, all_questions_map, demographics_data, survey_company_map, survey_id_map, survey_expected_responses_map):
     """
@@ -479,6 +633,52 @@ def process_response_row(response, all_questions_map, demographics_data, survey_
             row[qid] = answer
 
     return row
+
+def process_historical_response_row_by_question(hist_record, survey, all_questions_map, demographics_map, survey_company_map, survey_id_map, survey_expected_responses_map):
+    """
+    Procesa un registro histórico de respuesta (formato by_question)
+    """
+    survey_name = survey['survey_name']
+    
+    # Datos básicos desde el registro histórico
+    company_data = survey_company_map.get(survey_name, {})
+    row = {
+        'survey_id': survey_id_map.get(survey_name, ''),
+        'survey_name': survey_name,
+        'company_id': company_data.get('company_id', ''),
+        'company_name': company_data.get('company_name', ''),
+        'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
+        'user_id': hist_record.get('shd_document_number', ''),
+        'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
+        'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
+        'custom_dob': hist_record.get('shd_dob', ''),
+        'gender': hist_record.get('shd_gender', ''),
+        'custom_academic_level': hist_record.get('shd_academic_level', ''),
+        'entry_date': hist_record.get('shd_entry_date', ''),
+        'country': hist_record.get('shd_country', ''),
+    }
+
+    # Procesar datos demográficos del registro histórico
+    demographics_data_str = hist_record.get('demographics_data', '')
+    if demographics_data_str:
+        for demo_pair in demographics_data_str.split('||'):
+            if ':' in demo_pair:
+                demo_id, demo_value = demo_pair.split(':', 1)
+                if demo_id in demographics_map:
+                    row[demo_id] = demo_value
+
+    # Procesar respuestas de la encuesta
+    response_json = hist_record.get('shd_measurement_response', '{}')
+    parsed_responses = parse_response_json(response_json)
+    
+    # Guardar solo las respuestas válidas en una propiedad separada
+    row['_responses'] = {}
+    for qid, answer in parsed_responses.items():
+        if qid in all_questions_map and answer not in (None, ''):
+            row['_responses'][qid] = answer
+
+    return row
+
 
 def process_response_row_by_question(response, all_questions_map, demographics_data, survey_company_map, survey_id_map, survey_expected_responses_map):
     """
@@ -671,7 +871,36 @@ def get_question_types_map():
         frappe.log_error(f"Error getting question types map: {str(e)}")
         return {}
 
-
+def get_survey_template_map():
+    """
+    Obtiene el mapeo de encuestas a sus plantillas
+    La clave del mapeo será el nombre de la encuesta
+    y el valor será el nombre de la plantilla
+    """
+    try:
+        query = """
+            SELECT 
+                iq.su_name as survey_name,
+                tp.tp_name as template_name
+            FROM `tabqp_IQ_Survey` iq
+            LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        
+        mapping = {}
+        for row in results:
+            survey_name = row.get('survey_name', '')
+            template_name = row.get('template_name', '')
+            
+            if survey_name:
+                mapping[survey_name] = template_name or ''
+                
+        return mapping
+        
+    except Exception as e:
+        frappe.log_error(f"Error getting survey template map: {str(e)}")
+        return {}
+    
 def get_bulk_demographics(users_list, demographics_map):
     """
     Obtiene datos demográficos adicionales para múltiples usuarios de manera optimizada
@@ -737,6 +966,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
 
     question_variables_map = get_question_variables_map()
     question_types_map = get_question_types_map()
+    survey_template_map = get_survey_template_map()
 
     # conjunto total de claves demográficas (ids sin traducir)
     required_demographic_keys = set(core_demographic_keys) | set(demographic_ids)
@@ -757,6 +987,10 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
         if not question_responses:
             continue
 
+        # Obtener el template de la encuesta actual
+        survey_name = demographic_data.get('survey_name', '')
+        template_name = survey_template_map.get(survey_name, '')
+
         for qid, answer in question_responses.items():
             question_object = demographic_data.copy()
 
@@ -767,9 +1001,18 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
 
             # Agregar variable y tema basado en la pregunta
             question_info = question_variables_map.get(question_text, {})
-            question_object['variable'] = question_info.get('variable', '')
+            variable = question_info.get('variable', '')
+            question_object['variable'] = variable
             question_object['question_type'] = question_types_map.get(qid, '')
-            tema = question_info.get('tema', '')
+            
+            # Determinar el tema según el template
+            tema = ''
+            if template_name == 'Plantilla Modelo Vedanta bienestar':
+                tema = VEDANTA_BIENESTAR.get(variable, '')
+            else:
+                tema = question_info.get('tema', '')
+                
+            # Lógica especial para empresas Carvajal
             try:
                 company_name_val = (demographic_data.get('company_name') or '').lower().strip()
                 carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}

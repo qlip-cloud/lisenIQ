@@ -7,13 +7,35 @@
         </div>
         <div class="d-flex align-items-center">
             <button id="btn-open-create-measurement-modal" class="btn btn-outline-purple btn-sm mr-4">+ Crear Medición</button>
-            <i class="fa fa-bell-o text-muted mx-4" style="font-size: 1.2rem; cursor: pointer;"></i>
+            
+            <!-- Bloque de Notificaciones Inicio -->
+            <div class="notification-wrapper position-relative mx-4">
+                <i id="btn-notifications" class="fa fa-bell-o text-muted" style="font-size: 1.2rem; cursor: pointer;"></i>
+                <span id="notification-badge" class="notification-badge d-none">0</span>
+                
+                <!-- Dropdown de Notificaciones -->
+                <div id="notification-dropdown" class="notification-dropdown d-none">
+                    <div class="notification-header">
+                        <h6>Notificaciones</h6>
+                    </div>
+                    <div id="notification-list" class="notification-list">
+                        <!-- El contenido se llenará dinámicamente con JS -->
+                        <div class="text-center p-3 text-muted">
+                            <i class="fa fa-spinner fa-spin"></i> Cargando...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Bloque de Notificaciones Fin -->
+
+            <!-- Menú de Usuario -->
             <div class="user-menu-container position-relative">
                 <img id="iq-header-avatar" src="/assets/liseniq/images/qlip_avatar.png" class="rounded-circle" style="width: 35px; height: 35px; cursor: pointer;">
                 <div id="iq-header-user-menu" class="user-menu-dropdown d-none" style="position: absolute; top: 110%; right: 0; background: #fff; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); min-width: 140px; z-index: 100;">
                     <a href="#" id="iq-header-logout" class="dropdown-item" style="padding: 0.75rem 1.2rem; color: #212529; font-size: 0.9rem;">Salir</a>
                 </div>
             </div>
+            <!-- Menú de Usuario Fin -->
         </div>
     </div>
 </div>

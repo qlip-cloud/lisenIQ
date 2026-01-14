@@ -1,0 +1,105 @@
+{
+ "actions": [],
+ "creation": "2026-01-06 15:53:33.516353",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pn_user",
+  "pn_route",
+  "pn_type",
+  "pn_is_read",
+  "pn_read_date",
+  "column_break_3",
+  "pn_title",
+  "pn_message"
+ ],
+ "fields": [
+  {
+   "fieldname": "pn_user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Usuario",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pn_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "T\u00edtulo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pn_message",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Mensaje",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pn_route",
+   "fieldtype": "Data",
+   "label": "Ruta de redirecci\u00f3n"
+  },
+  {
+   "fieldname": "pn_type",
+   "fieldtype": "Select",
+   "label": "Tipo de mensaje",
+   "options": "Info\nSuccess\nWarning\nError"
+  },
+  {
+   "default": "0",
+   "fieldname": "pn_is_read",
+   "fieldtype": "Check",
+   "label": "Le\u00eddo"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pn_read_date",
+   "fieldtype": "Datetime",
+   "label": "Fecha de lectura"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-06 16:41:15.298798",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_PortalNotification",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

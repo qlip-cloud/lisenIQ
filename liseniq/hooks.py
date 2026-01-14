@@ -127,6 +127,9 @@ scheduler_events = {
 		],
 		"0 9 * * *": [
 			"liseniq.tasks.send_survey_reminders"
+		],
+		"30 1 * * *": [
+			"liseniq.utils.historical_loader.scheduled_archive_finished_surveys"
 		]
 	},
 	# "hourly": [

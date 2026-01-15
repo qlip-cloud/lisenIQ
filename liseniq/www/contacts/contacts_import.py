@@ -8,15 +8,15 @@ import random
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.utils import get_column_letter
 
-# Definición de columnas base (Orden lógico sugerido)
-REQUIRED_COLUMNS = [
+# Definición de columnas base
+STANDARD_COLUMNS = [
 	"Nombre", "Apellido", "Tipo de Documento", "Número de Documento (DNI)",
 	"País", "Idioma", "Estatus", "Género", 
 	"Fecha de Nacimiento", "Nivel Académico", "Correo (Opcional)", 
 	"Fecha de Ingreso"
 ]
 
-# Campos que NO pueden estar vacíos para la validación estricta
+# Campos que no pueden estar vacíos
 MANDATORY_FIELDS = [
 	"Nombre", 
 	"Apellido", 
@@ -42,6 +42,10 @@ def get_context(context):
 	context.no_breadcrumbs = True
 	context.is_navbar_custom = True
 	return context
+
+def get_all_demographic_types():
+	"""Retorna una lista de títulos de demográficos existentes en el sistema."""
+	return [d.dt_title for d in frappe.get_all("qp_IQ_DemographicType", filters={"dt_object_type": "Contacto"}, fields=["dt_title"], order_by="dt_title asc")]
 
 def get_mapping_dicts():
 	"""
@@ -83,8 +87,7 @@ def get_mapping_dicts():
 @frappe.whitelist()
 def get_grid_options():
 	"""
-	Retorna las listas de opciones para los selectores del frontend (Ag-Grid).
-	Devuelve las descripciones/nombres visibles que el backend mapeará posteriormente a IDs.
+	Retorna las opciones para selectores y la lista de columnas dinámicas de demográficos.
 	"""
 	try:
 		return {
@@ -93,7 +96,8 @@ def get_grid_options():
 			"countries": sorted(LATAM_COUNTRIES),
 			"genders": [d.gender for d in frappe.get_all("Gender", fields=["gender"], order_by="gender asc")],
 			"academic_levels": [d.al_title for d in frappe.get_all("qp_IQ_AcademicLevel", fields=["al_title"], order_by="al_title asc")],
-			"status": ["Activo", "Inactivo"]
+			"status": ["Activo", "Inactivo"],
+			"demographic_headers": get_all_demographic_types() # Lista de columnas dinámicas
 		}
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Error obteniendo opciones para Grid")
@@ -147,7 +151,7 @@ def get_contacts_for_grid():
 		)
 		
 		if not contact_info or not contact_info.custom_company:
-			return {"rows": [], "max_demographics": 1}
+			return {"rows": [], "demographic_headers": []}
 
 		user_company = contact_info.custom_company
 		
@@ -166,20 +170,18 @@ def get_contacts_for_grid():
 		)
 
 		maps = get_mapping_dicts()
+		demographic_headers = get_all_demographic_types() # Obtener lista completa actual
 		grid_rows = []
-		max_demos = 1
 		
 		for c in contacts:
 			email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
 			
+			# Obtener demográficos
 			demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
 				filters={"parent": c.name},
 				fields=["cad_tag", "cad_value"]
 			)
 			
-			if len(demographics) > max_demos:
-				max_demos = len(demographics)
-
 			tipo_doc_label = maps["dt_export"].get(c.custom_document_type, c.custom_document_type)
 			pais_label = maps["country_export"].get(c.custom_country, c.custom_country)
 			idioma_label = maps["lang_export"].get(c.custom_language, c.custom_language)
@@ -200,22 +202,19 @@ def get_contacts_for_grid():
 				"Fecha de Ingreso": str(c.custom_entry_date) if c.custom_entry_date else ""
 			}
 			
-			for i, demo in enumerate(demographics):
-				idx = i + 1
-				row[f"Demográfico_{idx}"] = demo.cad_tag
-				row[f"Dato_{idx}"] = demo.cad_value
-
-			if not demographics:
-				row["Demográfico_1"] = ""
-				row["Dato_1"] = ""
+			# Llenar columnas dinámicas
+			for demo in demographics:
+				# Solo agregamos si el tag tiene valor
+				if demo.cad_tag:
+					row[demo.cad_tag] = demo.cad_value
 
 			grid_rows.append(row)
 
-		return {"rows": grid_rows, "max_demographics": max_demos}
+		return {"rows": grid_rows, "demographic_headers": demographic_headers}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: get_contacts_for_grid")
-		return {"rows": [], "max_demographics": 1}
+		return {"rows": [], "demographic_headers": []}
 
 @frappe.whitelist(allow_guest=False)
 def download_template():
@@ -223,9 +222,9 @@ def download_template():
 		from openpyxl import Workbook
 		from openpyxl.styles import Font
 		
-		data_result = get_contacts_for_grid()
-		rows = data_result.get("rows", [])
-		max_demos = data_result.get("max_demographics", 1)
+		# Obtener datos actuales para pre-llenar si fuera necesario, 
+		# o simplemente para obtener headers consistentes
+		demographic_headers = get_all_demographic_types()
 
 		wb = Workbook()
 		ws = wb.active
@@ -254,10 +253,8 @@ def download_template():
 			for idx, val in enumerate(data_list, start=1):
 				ws_opts[f"{col_letter}{idx}"] = val
 
-		headers = list(REQUIRED_COLUMNS)
-		for i, range_val in enumerate(range(1, max_demos + 1)):
-			headers.append(f"Demográfico_{range_val}")
-			headers.append(f"Dato_{range_val}")
+		# Construir Headers: Estándar + Dinámicos
+		headers = list(STANDARD_COLUMNS) + demographic_headers
 		
 		ws.append(headers)
 		for cell in ws[1]:
@@ -281,9 +278,9 @@ def download_template():
 		ws.add_data_validation(dv_status)
 		ws.add_data_validation(dv_academic)
 
-		col_map = {name: i+1 for i, name in enumerate(REQUIRED_COLUMNS)}
+		col_map = {name: i+1 for i, name in enumerate(headers)}
 		start_row = 2
-		end_row = 1000
+		end_row = 5000 # Rango extendido para data existente
 
 		if "Tipo de Documento" in col_map: dv_doctype.add(f"{get_column_letter(col_map['Tipo de Documento'])}{start_row}:{get_column_letter(col_map['Tipo de Documento'])}{end_row}")
 		if "País" in col_map: dv_country.add(f"{get_column_letter(col_map['País'])}{start_row}:{get_column_letter(col_map['País'])}{end_row}")
@@ -292,22 +289,76 @@ def download_template():
 		if "Estatus" in col_map: dv_status.add(f"{get_column_letter(col_map['Estatus'])}{start_row}:{get_column_letter(col_map['Estatus'])}{end_row}")
 		if "Nivel Académico" in col_map: dv_academic.add(f"{get_column_letter(col_map['Nivel Académico'])}{start_row}:{get_column_letter(col_map['Nivel Académico'])}{end_row}")
 
-		for r_dict in rows:
-			row_values = []
-			for col in REQUIRED_COLUMNS:
-				val = r_dict.get(col, "")
-				row_values.append(val)
-			for i in range(1, max_demos + 1):
-				row_values.append(r_dict.get(f"Demográfico_{i}", ""))
-				row_values.append(r_dict.get(f"Dato_{i}", ""))
-			ws.append(row_values)
+	
+		user = frappe.session.user
+		contact_info = frappe.db.get_value(
+			"Contact", 
+			{"user": user, "custom_is_liseniq_contact": 0}, 
+			["name", "custom_company"], 
+			as_dict=True
+		)
+
+		if contact_info and contact_info.custom_company:
+			user_company = contact_info.custom_company
+			contacts = frappe.get_all("Contact", 
+				filters={
+					"custom_company": user_company, 
+					"custom_is_liseniq_contact": 1
+				},
+				fields=[
+					"name", "first_name", "last_name", "gender", "custom_dob",
+					"custom_country", "custom_document_type", "custom_document_number",
+					"custom_academic_level", "custom_entry_date", "custom_status",
+					"custom_language"
+				],
+				order_by="first_name asc"
+			)
+
+			maps = get_mapping_dicts()
+			
+			for c in contacts:
+				email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
+				
+				# Demográficos
+				demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
+					filters={"parent": c.name},
+					fields=["cad_tag", "cad_value"]
+				)
+				demo_dict = {d.cad_tag: d.cad_value for d in demographics}
+
+				# Mapeo de valores
+				tipo_doc_label = maps["dt_export"].get(c.custom_document_type, c.custom_document_type)
+				pais_label = maps["country_export"].get(c.custom_country, c.custom_country)
+				idioma_label = maps["lang_export"].get(c.custom_language, c.custom_language)
+				academic_label = maps["academic_export"].get(c.custom_academic_level, c.custom_academic_level)
+				
+				row_values = []
+				for h in headers:
+					val = ""
+					if h == "Nombre": val = c.first_name
+					elif h == "Apellido": val = c.last_name
+					elif h == "Tipo de Documento": val = tipo_doc_label
+					elif h == "Número de Documento (DNI)": val = c.custom_document_number
+					elif h == "País": val = pais_label
+					elif h == "Idioma": val = idioma_label
+					elif h == "Estatus": val = c.custom_status
+					elif h == "Género": val = c.gender
+					elif h == "Fecha de Nacimiento": val = c.custom_dob
+					elif h == "Nivel Académico": val = academic_label
+					elif h == "Correo (Opcional)": val = email
+					elif h == "Fecha de Ingreso": val = c.custom_entry_date
+					elif h in demo_dict: val = demo_dict[h]
+					
+					row_values.append(val)
+				
+				ws.append(row_values)
 
 		output = io.BytesIO()
 		wb.save(output)
 		output.seek(0)
 		
 		timestamp = frappe.utils.now_datetime().strftime("%Y%m%d_%H%M")
-		frappe.local.response['filename'] = f"Plantilla_Contactos_{timestamp}.xlsx"
+		frappe.local.response['filename'] = f"Plantilla_Contactos_Dinamica_{timestamp}.xlsx"
 		frappe.local.response["filecontent"] = output.read()
 		frappe.local.response["type"] = "download"
 
@@ -432,7 +483,7 @@ def process_contacts_background(rows, user):
 
 		for i, r in enumerate(rows, start=1):
 			try:
-				# Extracción y limpieza de datos
+				# Extracción y limpieza de datos básicos
 				tipo_doc_raw = (r.get("Tipo de Documento") or "").strip()
 				tipo_doc_id = dt_map.get(tipo_doc_raw, tipo_doc_raw)
 				pais_raw = (r.get("País") or "").strip()
@@ -478,15 +529,14 @@ def process_contacts_background(rows, user):
 					"demographics": []
 				}
 				
-				# Recolectar demográficos
-				for key, val in r.items():
-					if key.startswith("Demográfico_"):
-						idx = key.split("_")[1]
-						val_key = f"Dato_{idx}"
-						d_val = (r.get(val_key) or "").strip()
-						val_clean = (val or "").strip()
-						if val_clean and d_val:
-							data["demographics"].append({"type": val_clean, "value": d_val})
+				# Recolectar demográficos dinámicos
+				# Cualquier columna que NO sea estándar se considera demográfico
+				for col_name, val in r.items():
+					clean_col = col_name.strip()
+					clean_val = str(val or "").strip()
+					
+					if clean_col not in STANDARD_COLUMNS and clean_col and clean_val:
+						data["demographics"].append({"type": clean_col, "value": clean_val})
 
 				# Verificar si existe
 				contact_name = None
@@ -543,7 +593,7 @@ def process_contacts_background(rows, user):
 				frappe.log_error(frappe.get_traceback(), f"Error procesando fila {i} en carga masiva")
 				results["errores"].append({"fila": i, "error": str(e)})
 
-		# Crear Notificación de Portal (Sin realtime)
+		# Crear Notificación de Portal
 		try:
 			notification = frappe.new_doc("qp_IQ_PortalNotification")
 			notification.pn_user = user
@@ -621,7 +671,7 @@ def upload_contacts():
 def validate_contacts():
 	if not frappe.request: frappe.throw(_("No hay request disponible"))
 	fileobj = frappe.local.request.files.get('file')
-	if not fileobj: frappe.throw(_("Error de validación: No se detectó ningún archivo adjunto. Si está en modo 'Editar en línea', esto no debería ocurrir."))
+	if not fileobj: frappe.throw(_("Error de validación: No se detectó ningún archivo adjunto."))
 
 	filename = fileobj.filename or ""
 	ext = filename.split('.')[-1].lower()

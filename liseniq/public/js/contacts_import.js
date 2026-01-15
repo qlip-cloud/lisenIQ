@@ -1,5 +1,45 @@
 import { Stepper } from './utils/stepper.js';
 
+// Definición del componente de cabecera personalizado
+class CustomHeader {
+    init(params) {
+        this.params = params;
+        this.eGui = document.createElement('div');
+        this.eGui.style.width = '100%';
+        this.eGui.style.display = 'flex';
+        this.eGui.style.alignItems = 'center';
+        
+        const initialValue = params.displayName || '';
+        const borderStyle = initialValue ? '1px solid #ced4da' : '2px solid #fc8181';
+
+        this.eGui.innerHTML = `
+            <input type="text" 
+                class="ag-custom-header-input"
+                style="width: 100%; height: 28px; border-radius: 4px; border: ${borderStyle}; padding: 2px 6px; font-size: 12px;" 
+                placeholder="Nombre..." 
+                value="${initialValue}"/>
+        `;
+        
+        this.input = this.eGui.querySelector('input');
+        
+        this.input.addEventListener('input', (e) => {
+            const val = e.target.value;
+            this.input.style.border = val ? '1px solid #ced4da' : '2px solid #fc8181';
+            if (this.params.onNameChange) {
+                this.params.onNameChange(val);
+            }
+        });
+
+        // Evitar que el grid capture eventos de clic/arrastre sobre el input
+        this.input.addEventListener('click', e => e.stopPropagation());
+        this.input.addEventListener('mousedown', e => e.stopPropagation());
+    }
+
+    getGui() {
+        return this.eGui;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     if (!document.getElementById('contacts-import-app')) return;
 
@@ -12,17 +52,18 @@ document.addEventListener('DOMContentLoaded', function () {
         processResult: null,
         mode: 'upload', 			// 'upload' o 'edit'
         gridApi: null, 				// referencia al API de Ag-Grid
-        demographicColsCount: 1, 	// Inicialmente 1 par de columnas demográficas
         finalStats: { total: 0 },
         dataToProcess: null, 		// Datos listos para enviar
-        options: {                  // Opciones para dropdowns (inicializadas vacías)
+        options: {                  // Opciones para dropdowns y headers
             document_types: [],
             languages: [],
             countries: [],
             genders: [],
             academic_levels: [],
-            status: ['Activo', 'Inactivo']
-        }
+            status: ['Activo', 'Inactivo'],
+            demographic_headers: [] // Nombres de columnas demográficas existentes
+        },
+        newColumns: [] // { id: string, name: string }
     };
 
     // Campos obligatorios para validación frontend
@@ -57,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function () {
         optEdit: document.getElementById('opt-edit'),
         uploadArea: document.getElementById('upload-area'),
         btnAddRow: document.getElementById('btn-add-row'),
-        btnAddDemo: document.getElementById('btn-add-demo')
+        btnAddColumn: document.getElementById('btn-add-column')
     };
 
     if (ui.fileInput) ui.fileInput.value = '';
@@ -68,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function () {
     stepper.render();
     updateStepUI();
 
-    // Inicializar: Obtener opciones para dropdowns
+    //Obtener opciones para dropdowns y columnas demográficas
     fetchOptions();
 
     function fetchOptions() {
@@ -90,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Definición base de columnas (estáticas) con Dropdowns
+    // Definición base de columnas (estáticas)
     const getBaseColDefs = () => [
         { 
             field: "Nombre", 
@@ -191,20 +232,55 @@ document.addEventListener('DOMContentLoaded', function () {
     // Función para generar todas las columnas incluyendo las dinámicas de demográficos
     function getAllColDefs() {
         const cols = getBaseColDefs();
-        for (let i = 1; i <= state.demographicColsCount; i++) {
-            cols.push({ 
-                field: `Demográfico_${i}`, 
-                headerName: `Demográfico_${i}`, 
-                editable: true,
-                cellStyle: { 'backgroundColor': '#f9f9ff' }
-            });
-            cols.push({ 
-                field: `Dato_${i}`, 
-                headerName: `Dato_${i}`, 
-                editable: true,
-                cellStyle: { 'backgroundColor': '#f9f9ff' }
+        const stdFields = cols.map(c => c.field);
+        
+        if (state.options.demographic_headers && state.options.demographic_headers.length > 0) {
+            state.options.demographic_headers.forEach(header => {
+                if (!stdFields.includes(header)) {
+                    cols.push({
+                        field: header,
+                        headerName: header,
+                        editable: true,
+                        minWidth: 130,
+                        cellStyle: { 'backgroundColor': '#f9f9ff' }
+                    });
+                }
             });
         }
+        
+        if (state.headers && state.headers.length > 0) {
+            const currentFields = cols.map(c => c.field);
+            state.headers.forEach(h => {
+                if (!currentFields.includes(h)) {
+                    cols.push({
+                        field: h,
+                        headerName: h,
+                        editable: true,
+                        minWidth: 130,
+                        cellStyle: { 'backgroundColor': '#f9f9ff' }
+                    });
+                }
+            });
+        }
+
+        state.newColumns.forEach(col => {
+            cols.push({
+                field: col.id,
+                headerName: col.name,
+                headerComponent: 'customHeader',
+                headerComponentParams: {
+                    displayName: col.name,
+                    onNameChange: (newName) => {
+                        col.name = newName;
+                        validateRealTime(); // Revalidar al cambiar nombre
+                    }
+                },
+                editable: true,
+                minWidth: 160,
+                cellStyle: { 'backgroundColor': '#e6f7ff' }
+            });
+        });
+
         return cols;
     }
 
@@ -229,21 +305,49 @@ document.addEventListener('DOMContentLoaded', function () {
         let errorCount = 0;
         const validationErrors = [];
 
+        // Validar Nombres de Columnas Nuevas
+        const invalidColNames = state.newColumns.filter(c => !c.name || c.name.trim() === '');
+        if (invalidColNames.length > 0) {
+            hasErrors = true;
+            validationErrors.push({ row: 'Cabecera', missing: ['Nombre de columna(s) nuevo demográfico vacío'] });
+        }
+
+        // Validar Densidad de Columnas Nuevas (Al menos 1 valor)
+        const newColCounts = {};
+        state.newColumns.forEach(c => newColCounts[c.id] = 0);
+
         state.gridApi.forEachNode((node, index) => {
             const row = node.data;
             const missing = [];
+            
+            // Validar Campos Obligatorios Estándar
             MANDATORY_FIELDS.forEach(field => {
                 if (!row[field] || row[field].toString().trim() === "") {
                     missing.push(field);
                 }
             });
 
+            // Contar valores para columnas nuevas
+            state.newColumns.forEach(c => {
+                if (row[c.id] && row[c.id].toString().trim() !== "") {
+                    newColCounts[c.id]++;
+                }
+            });
+
             if (missing.length > 0) {
                 hasErrors = true;
                 errorCount++;
-                if (validationErrors.length < 5) { // Limitar errores visuales a 5
+                if (validationErrors.length < 5) { 
                     validationErrors.push({ row: index + 1, missing: missing });
                 }
+            }
+        });
+
+        // Verificar si alguna columna nueva está totalmente vacía
+        state.newColumns.forEach(c => {
+            if (newColCounts[c.id] === 0) {
+                hasErrors = true;
+                validationErrors.push({ row: 'Columna', missing: [`La columna nueva '${c.name || 'Sin Nombre'}' debe tener al menos un valor.`] });
             }
         });
 
@@ -254,14 +358,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (hasErrors) {
             let summaryHtml = `
                 <div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                    <strong>Validación incompleta:</strong> Se detectaron campos obligatorios sin completar.<br>
+                    <strong>Validación incompleta:</strong><br>
                     <ul>
             `;
             validationErrors.forEach(e => {
-                summaryHtml += `<li>Fila ${e.row}: Faltan [${e.missing.join(', ')}]</li>`;
+                summaryHtml += `<li>${typeof e.row === 'number' ? 'Fila ' + e.row : e.row}: ${e.missing.join(', ')}</li>`;
             });
             if (errorCount > 5) {
-                summaryHtml += `<li>... y ${errorCount - 5} filas más.</li>`;
+                summaryHtml += `<li>... y ${errorCount - 5} filas más con errores.</li>`;
             }
             summaryHtml += `</ul></div>`;
             ui.validationSummary.innerHTML = summaryHtml;
@@ -272,7 +376,6 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>`;
         }
         
-        // 3. Refrescar celdas para actualizar estilos
         state.gridApi.refreshCells({ force: true });
     }
 
@@ -283,11 +386,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const gridOptions = {
             rowData: state.rows,
             columnDefs: colDefs,
+            components: {
+                customHeader: CustomHeader
+            },
             defaultColDef: {
                 flex: 1,
                 minWidth: 120,
                 resizable: true,
-                },
+            },
             pagination: true,
             paginationPageSize: 20,
             theme: "legacy",
@@ -300,19 +406,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 validateRealTime(); // Validar al editar
             },
             onModelUpdated: () => {
-                setTimeout(validateRealTime, 0); // Validar cambios de modelo
+                setTimeout(validateRealTime, 0); 
             }
         };
 
         agGrid.createGrid(ui.gridContainer, gridOptions);
-
-        if (state.mode === 'edit') {
-            ui.btnAddRow.style.display = 'inline-block';
-            ui.btnAddDemo.style.display = 'inline-block';
-        } else {
-            ui.btnAddRow.style.display = 'inline-block';
-            ui.btnAddDemo.style.display = 'inline-block'; 
-        }
+        
+        ui.btnAddRow.style.display = 'inline-block';
+        ui.btnAddColumn.style.display = 'inline-block';
     }
 
     // Handlers de Paso 1
@@ -324,11 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Cambiar modo y deshabilitar continuar hasta que se elija nuevo archivo
         setMode('upload');
-        
-        // Abrir selector de archivos automáticamente
-        if (ui.fileInput) {
-            ui.fileInput.click(); 
-        }
+        if (ui.fileInput) ui.fileInput.click(); 
     });
 
     ui.optEdit.addEventListener('click', () => {
@@ -341,33 +438,28 @@ document.addEventListener('DOMContentLoaded', function () {
         if (m === 'upload') {
             ui.optUpload.classList.add('selected');
             ui.optEdit.classList.remove('selected');
-            // ui.uploadArea.style.display = 'block';
             ui.btnContinue.disabled = !state.file;
         } else {
             ui.optEdit.classList.add('selected');
             ui.optUpload.classList.remove('selected');
         }
-        // Asegurar que siempre sea visible
         ui.uploadArea.style.display = 'block';
     }
 
     function fetchExistingContacts() {
-        // Mostrar loading en la tarjeta
         ui.optEdit.innerHTML = `
             <div style="padding:18px; text-align:center;">
                 <i class="fa fa-spinner fa-spin" style="font-size:24px;color:#7B24FF;"></i>
                 <div style="margin-top:8px;color:#7B24FF;">Cargando contactos...</div>
             </div>`;
-        ui.optEdit.style.pointerEvents = 'none'; // Evitar doble click
+        ui.optEdit.style.pointerEvents = 'none';
 
-        // Deshabilitamos el botón continuar temporalmente mientras carga
         ui.btnContinue.disabled = true;
         ui.btnContinue.textContent = 'Cargando...';
 
         frappe.call({
             method: 'liseniq.www.contacts.contacts_import.get_contacts_for_grid',
             callback: function(r) {
-                // Restaurar UI de la tarjeta
                 ui.optEdit.innerHTML = `
                     <div style="display:flex;align-items:center;gap:12px;padding:18px;">
                         <i class="fa fa-desktop" style="font-size:18px;color:#7B24FF;"></i>
@@ -378,24 +470,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>`;
                 ui.optEdit.style.pointerEvents = 'auto';
                 
-                // Restaurar botón continuar
                 ui.btnContinue.textContent = 'Continuar';
                 
                 if (r.message) {
                     state.rows = r.message.rows || [];
-                    state.demographicColsCount = Math.max(1, r.message.max_demographics || 1);
-                    state.headers = getAllColDefs().map(c => c.field);
+                    if (r.message.demographic_headers) {
+                        state.options.demographic_headers = r.message.demographic_headers;
+                    }
                     state.errors = [];
                 } else {
-                    // Si falla o viene vacío, inicializamos vacío pero permitimos continuar
                     state.rows = [];
-                    state.demographicColsCount = 1;
                 }
                 ui.btnContinue.disabled = false;
                 showStep(2);
             },
             error: function(r) {
-                // Restaurar UI en caso de error
                 ui.optEdit.innerHTML = `
                     <div style="display:flex;align-items:center;gap:12px;padding:18px;">
                         <i class="fa fa-desktop" style="font-size:18px;color:#7B24FF;"></i>
@@ -406,12 +495,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>`;
                 ui.optEdit.style.pointerEvents = 'auto';
                 
-                // En error, inicializamos vacío y permitimos continuar para modo "Creación manual"
                 state.rows = [];
                 ui.btnContinue.textContent = 'Continuar';
                 ui.btnContinue.disabled = false;
-                console.warn("No se pudieron cargar contactos existentes. Se iniciará en modo creación.");
-
                 showStep(2);
             }
         });
@@ -422,7 +508,6 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location = '/api/method/liseniq.www.contacts.contacts_import.download_template';
     });
 
-    // Lógica de Dropzone
     ui.dropzone.addEventListener('click', () => ui.fileInput.click());
     ui.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); ui.dropzone.classList.add('dragover'); });
     ui.dropzone.addEventListener('dragleave', (e) => { e.preventDefault(); ui.dropzone.classList.remove('dragover'); });
@@ -454,7 +539,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     ui.btnContinue.addEventListener('click', () => {
         if (state.mode === 'edit') {
-            // Permitimos continuar incluso si rows está vacío para permitir agregar nuevos
             state.rows = state.rows || [];
             showStep(2);
             return;
@@ -488,23 +572,6 @@ document.addEventListener('DOMContentLoaded', function () {
             state.rows = data.rows || [];
             state.errors = data.errors || [];
             
-            // Detectar columnas de demográficos para configurar el grid
-            let maxDemoIndex = 1;
-            if (state.headers && state.headers.length > 0) {
-                state.headers.forEach(h => {
-                    if (h && h.startsWith('Demográfico_')) {
-                        const parts = h.split('_');
-                        if (parts.length === 2) {
-                            const idx = parseInt(parts[1]);
-                            if (!isNaN(idx) && idx > maxDemoIndex) {
-                                maxDemoIndex = idx;
-                            }
-                        }
-                    }
-                });
-            }
-            state.demographicColsCount = maxDemoIndex;
-
             showStep(2);
 
         }).catch(err => {
@@ -523,23 +590,39 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    ui.btnAddDemo.addEventListener('click', () => {
-        if (!state.gridApi) return;
-        state.demographicColsCount++;
-        const newColDefs = getAllColDefs();
-        state.gridApi.setGridOption('columnDefs', newColDefs);
+    // Agregar columna vacía para que el usuario la nombre
+    ui.btnAddColumn.addEventListener('click', () => {
+        const id = `new_col_${Date.now()}`;
+        state.newColumns.push({ id: id, name: '' });
+
+        if (state.gridApi) {
+            state.gridApi.setGridOption('columnDefs', getAllColDefs());
+            // Validar que tenga nombre
+            setTimeout(() => {
+                validateRealTime();
+                state.gridApi.ensureColumnVisible(id);
+            }, 100);
+        }
     });
 
     ui.btnBackToStep1.addEventListener('click', () => {
         showStep(1);
     });
 
-    // Acción del botón "Confirmar y Continuar" del Paso 2
     ui.btnValidateContinue.addEventListener('click', () => {
         let gridData = [];
         if (state.gridApi) {
             state.gridApi.forEachNode(node => {
-                gridData.push(node.data);
+                let row = { ...node.data };
+
+                // Mapear IDs temporales a nombres reales para el backend
+                state.newColumns.forEach(c => {
+                    if (row[c.id]) {
+                        row[c.name] = row[c.id];
+                        delete row[c.id]; // Limpiar ID temporal
+                    }
+                });
+                gridData.push(row);
             });
         } else {
             gridData = state.rows;
@@ -566,15 +649,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         
         let html = `<div class="import-results-card">`;
-        
         html += `
             <div class="result-header">
                 <div class="result-date"><i class="fa fa-calendar-o"></i> Fecha de carga: ${dateStr}</div>
             </div>
         `;
-
         const totalRows = state.finalStats.total || 0;
-        
         html += `<div class="result-stats-container">`;
         html += `
             <div class="result-stat-item">
@@ -583,7 +663,6 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
         html += `</div>`; 
-
         html += `
             <div class="ready-message" style="padding: 1.5rem;">
                 <i class="fa fa-clock-o"></i> El proceso será iniciado en segundo plano al presionar el botón <strong>Finalizar</strong>.<br>
@@ -592,12 +671,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 </span>
             </div>
         `;
-
         html += `</div>`;
         ui.processResult.innerHTML = html;
     }
 
-    // Acción del botón "Finalizar" del Paso 3
     ui.btnFinish.addEventListener('click', () => {
         ui.btnFinish.disabled = true;
         ui.btnFinish.textContent = 'Iniciando...';

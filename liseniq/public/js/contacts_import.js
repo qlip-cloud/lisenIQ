@@ -687,6 +687,7 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: JSON.stringify({ rows_json: state.dataToProcess })
         }).then(r => r.json()).then(res => {
+            // El backend devuelve status queued y mensaje
             window.location.href = '/contacts';
         }).catch(err => {
             ui.btnFinish.disabled = false;

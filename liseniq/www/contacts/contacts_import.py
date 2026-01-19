@@ -451,17 +451,42 @@ def update_contact_fields(contact_doc, data, status, demo_map=None):
 	
 	contact_doc.save(ignore_permissions=True)
 
-def process_contacts_background(rows, user):
+def create_upload_log(file_name, total_rows, user, company):
+	"""
+	Crea el registro de Upload Log con estatus 'Pendiente'
+	"""
+	log = frappe.new_doc("qp_IQ_UploadLog")
+	log.ul_file_name = file_name
+	log.ul_status = "Pendiente"
+	log.ul_total_rows = total_rows
+	log.ul_processed_rows = 0
+	log.ul_success_count = 0
+	log.ul_error_count = 0
+	log.ul_owner = user
+	log.ul_company = company
+	log.insert(ignore_permissions=True)
+	return log.name
+
+def process_contacts_background(log_name, rows, user):
 	"""
 	Procesa los contactos en segundo plano.
-	Genera notificación en qp_IQ_PortalNotification al finalizar.
+	Actualiza el registro qp_IQ_UploadLog a medida que avanza.
 	"""
-	results = {"creados": 0, "actualizados": 0, "ignorados": 0, "errores": []}
-	
 	try:
+		# Obtener log doc
+		log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+		log_doc.ul_status = "Procesando"
+		log_doc.ul_started_at = frappe.utils.now()
+		log_doc.ul_error_log = "[]" # Inicializar como lista vacía JSON
+		log_doc.save(ignore_permissions=True)
+		frappe.db.commit()
+
 		contact_info = frappe.db.get_value("Contact", {"user": user, "custom_is_liseniq_contact": 0}, ["name", "custom_company"], as_dict=True)
 		if not contact_info or not contact_info.custom_company:
-			frappe.log_error("No se pudo determinar la compañía del usuario", "Process Contacts Error")
+			log_doc.ul_status = "Fallido"
+			log_doc.ul_completed_at = frappe.utils.now()
+			log_doc.ul_error_log = json.dumps([{"fila": 0, "error": "No se pudo determinar la compañía del usuario"}])
+			log_doc.save(ignore_permissions=True)
 			return
 
 		user_company = contact_info.custom_company
@@ -480,6 +505,11 @@ def process_contacts_background(rows, user):
 			except:
 				try: return datetime.strptime(value, "%d/%m/%Y").date()
 				except: return None
+
+		success_count = 0
+		error_count = 0
+		processed_count = 0
+		error_list = []
 
 		for i, r in enumerate(rows, start=1):
 			try:
@@ -530,7 +560,6 @@ def process_contacts_background(rows, user):
 				}
 				
 				# Recolectar demográficos dinámicos
-				# Cualquier columna que NO sea estándar se considera demográfico
 				for col_name, val in r.items():
 					clean_col = col_name.strip()
 					clean_val = str(val or "").strip()
@@ -547,9 +576,7 @@ def process_contacts_background(rows, user):
 					contact_doc = frappe.get_doc("Contact", contact_name)
 					if check_if_modified(contact_doc, data, estatus or contact_doc.custom_status):
 						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status, demo_map)
-						results["actualizados"] += 1
-					else:
-						results["ignorados"] += 1
+					# Si no se modificó, cuenta como éxito de procesamiento aunque no hubo escritura
 				else:
 					new_doc = frappe.new_doc("Contact")
 					new_doc.first_name = nombre
@@ -573,7 +600,6 @@ def process_contacts_background(rows, user):
 					new_doc.insert(ignore_permissions=True)
 					
 					if data['demographics']:
-						# Validar metadata antes de insertar hijos
 						if new_doc.meta.get_field(CHILD_TABLE_FIELD):
 							for d in data['demographics']:
 								demo_id = demo_map.get(d['type'])
@@ -586,21 +612,55 @@ def process_contacts_background(rows, user):
 								child.cad_value = d['value']
 							
 							new_doc.save(ignore_permissions=True)
-					
-					results["creados"] += 1
+				
+				success_count += 1
 
 			except Exception as e:
-				frappe.log_error(frappe.get_traceback(), f"Error procesando fila {i} en carga masiva")
-				results["errores"].append({"fila": i, "error": str(e)})
+				error_count += 1
+				# Agregar al log de errores JSON
+				error_entry = {"fila": i, "error": str(e)}
+				error_list.append(error_entry)
+
+			# Actualizar progreso periódicamente (cada 5 registros) para no saturar DB
+			processed_count += 1
+			if processed_count % 5 == 0:
+				log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+				log_doc.ul_processed_rows = processed_count
+				log_doc.ul_success_count = success_count
+				log_doc.ul_error_count = error_count
+				# Actualizar JSON de errores incrementalmente si es necesario, 
+				# pero por eficiencia lo guardamos completo o en chunks. 
+				# Aquí guardamos el estado actual.
+				log_doc.ul_error_log = json.dumps(error_list)
+				log_doc.save(ignore_permissions=True)
+				frappe.db.commit()
+
+		# Finalización
+		log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+		log_doc.ul_processed_rows = processed_count
+		log_doc.ul_success_count = success_count
+		log_doc.ul_error_count = error_count
+		log_doc.ul_completed_at = frappe.utils.now()
+		log_doc.ul_error_log = json.dumps(error_list)
+
+		if error_count == 0:
+			log_doc.ul_status = "Completado"
+		elif success_count == 0 and error_count > 0:
+			log_doc.ul_status = "Fallido"
+		else:
+			log_doc.ul_status = "Completado con errores"
+		
+		log_doc.save(ignore_permissions=True)
 
 		# Crear Notificación de Portal
 		try:
 			notification = frappe.new_doc("qp_IQ_PortalNotification")
 			notification.pn_user = user
 			notification.pn_title = "Carga Masiva de Contactos"
-			notification.pn_message = f"Proceso de carga masiva finalizado con éxito. Creados: {results['creados']}, Actualizados: {results['actualizados']}, Errores: {len(results['errores'])}."
+			status_msg = "finalizada con éxito" if error_count == 0 else ("completada con errores" if success_count > 0 else "fallida")
+			notification.pn_message = f"Carga {status_msg}. Éxitos: {success_count}, Errores: {error_count}."
 			notification.pn_route = "/contacts"
-			notification.pn_type = "Info"
+			notification.pn_type = "Info" if error_count == 0 else "Warning"
 			notification.pn_is_read = 0
 			notification.insert(ignore_permissions=True)
 		except Exception as e:
@@ -608,6 +668,14 @@ def process_contacts_background(rows, user):
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: process_contacts_background")
+		# Intentar marcar como fallido el log si algo catastrófico ocurre
+		try:
+			log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+			log_doc.ul_status = "Fallido"
+			log_doc.ul_error_log = json.dumps([{"fila": 0, "error": f"Error fatal de sistema: {str(e)}"}])
+			log_doc.save(ignore_permissions=True)
+		except:
+			pass
 
 @frappe.whitelist(allow_guest=False)
 def upload_contacts():
@@ -615,7 +683,7 @@ def upload_contacts():
 	fileobj = frappe.local.request.files.get('file')
 	if not fileobj: frappe.throw(_("No se envió ningún archivo"))
 
-	filename = fileobj.filename or ""
+	filename = fileobj.filename or "Carga_Archivo.xlsx"
 	ext = filename.split('.')[-1].lower()
 	rows = []
 	try:
@@ -656,16 +724,28 @@ def upload_contacts():
 			row_dict[h] = get_val(r, h)
 		rows_dicts.append(row_dict)
 
-	# Encolar proceso
+	# Obtener compañía del usuario para el log
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	company = contact_info.custom_company if contact_info else None
+
+	if not company:
+		frappe.throw(_("No se pudo determinar la compañía del usuario"))
+
+	# Crear Log
+	log_name = create_upload_log(filename, len(rows_dicts), user, company)
+
+	# Encolar proceso pasando el log_name
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',
 		timeout=3600,
+		log_name=log_name,
 		rows=rows_dicts,
-		user=frappe.session.user
+		user=user
 	)
 	
-	return {"message": {"total_rows": len(rows_dicts), "queued": True}, "status": "queued"}
+	return {"message": {"total_rows": len(rows_dicts), "queued": True, "log_name": log_name}, "status": "queued"}
 
 @frappe.whitelist(allow_guest=False)
 def validate_contacts():
@@ -729,13 +809,60 @@ def upload_contacts_json(rows_json):
 	try: rows = _json.loads(rows_json)
 	except: frappe.throw(_("JSON inválido"))
 
+	# Obtener compañía
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	company = contact_info.custom_company if contact_info else None
+
+	if not company:
+		frappe.throw(_("No se pudo determinar la compañía del usuario"))
+
+	# Crear Log con nombre "Edición en Linea" si no hay archivo
+	log_name = create_upload_log("Edición en Linea", len(rows), user, company)
+
 	# Encolar proceso
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',
 		timeout=3600,
+		log_name=log_name,
 		rows=rows,
-		user=frappe.session.user
+		user=user
 	)
 	
-	return {"message": {"total_rows": len(rows), "queued": True}, "status": "queued"}
+	return {"message": {"total_rows": len(rows), "queued": True, "log_name": log_name}, "status": "queued"}
+
+@frappe.whitelist(allow_guest=False)
+def check_upload_status():
+	"""
+	Verifica si hay un proceso de carga activo (Pendiente o Procesando)
+	para la compañía del usuario actual.
+	"""
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	if not contact_info or not contact_info.custom_company:
+		return {"active": False}
+
+	company = contact_info.custom_company
+
+	# Buscar logs activos
+	active_log = frappe.db.get_value(
+		"qp_IQ_UploadLog",
+		{
+			"ul_company": company,
+			"ul_status": ["in", ["Pendiente", "Procesando"]]
+		},
+		["name", "ul_status", "ul_processed_rows", "ul_total_rows", "ul_file_name"],
+		as_dict=True
+	)
+
+	if active_log:
+		return {
+			"active": True,
+			"status": active_log.ul_status,
+			"processed": active_log.ul_processed_rows,
+			"total": active_log.ul_total_rows,
+			"file_name": active_log.ul_file_name
+		}
+	
+	return {"active": False}

@@ -4,5 +4,5 @@
 # import frappe
 from frappe.model.document import Document
 
-class qp_PO_UploadLog(Document):
+class qp_IQ_UploadLog(Document):
 	pass

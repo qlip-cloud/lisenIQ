@@ -2,7 +2,10 @@ import { Stepper } from './utils/stepper.js';
 
 document.addEventListener('DOMContentLoaded', function () {
 
+    // Verificación inicial
     if (!document.getElementById('contacts-list-view')) return;
+
+    let uploadCheckInterval = null;
 
     const appState = {
         isEditMode: false,
@@ -67,6 +70,62 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const stepper = new Stepper(ui.stepperContainer, ['Datos Básicos', 'Datos Opcionales', 'Datos Demográficos']);
 
+    // Monitor de estado de carga masiva
+    function monitorUploadStatus() {
+        // Solo ejecutar si estamos en la vista de lista
+        if (ui.listView.classList.contains('d-none')) return;
+
+        frappe.call({
+            method: 'liseniq.www.contacts.contacts_import.check_upload_status',
+            callback: function(r) {
+                const notificationBar = document.getElementById('global-notification-bar');
+                
+                if (r.message && r.message.active) {
+                    const status = r.message.status;
+                    const processed = r.message.processed || 0;
+                    const total = r.message.total || 0;
+                    
+                    // Calcular porcentaje (0 a 100)
+                    const percent = total > 0 ? (processed / total) * 100 : 0;
+
+                    // Bloquear botón de creación
+                    if (ui.buttons.newContact) {
+                        ui.buttons.newContact.disabled = true;
+                        ui.buttons.newContact.title = "Carga masiva en proceso";
+                        ui.buttons.newContact.style.opacity = '0.6';
+                        ui.buttons.newContact.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Procesando...';
+                    }
+
+                    // Actualizar barra de progreso visual (Variable CSS)
+                    if (notificationBar) {
+                        notificationBar.style.setProperty('--progress', `${percent}%`);
+                    }
+
+                    // Mostrar notificación persistente
+                    // const msg = `Carga en Proceso (${status})... Registros: ${processed} de ${total}`;
+                    const msg = `Carga en Proceso, Registros: ${processed} de ${total}`;
+                    showGlobalNotification(msg, 'info', 60000); 
+
+                } else {
+                    // Si finalizó y el botón estaba bloqueado, restaurar
+                    if (ui.buttons.newContact && ui.buttons.newContact.disabled) {
+                        ui.buttons.newContact.disabled = false;
+                        ui.buttons.newContact.title = "";
+                        ui.buttons.newContact.style.opacity = '1';
+                        ui.buttons.newContact.innerHTML = 'Nuevo Contacto';
+                        
+                        // Completar la barra al 100% antes de cerrar
+                        if (notificationBar) notificationBar.style.setProperty('--progress', '100%');
+                        showGlobalNotification('Carga masiva finalizada.', 'success', 5000);
+                        
+                        // Recargar la tabla para mostrar los nuevos datos
+                        setTimeout(() => location.reload(), 1500);
+                    }
+                }
+            }
+        });
+    }
+
     const showView = (view) => {
         ui.listView.classList.toggle('d-none', view !== 'list');
         ui.createView.classList.toggle('d-none', view !== 'form');
@@ -111,10 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const emailFilter = parseFilterValue(appState.filters.email);
 
         appState.filteredContacts = appState.contacts.filter(c => {
-            // Filtro por DNI
             const dniOk = matchText(c.docNumber, dniFilter.term, dniFilter.exact);
-
-            // Filtro por nombre
             const fullName = `${c.firstName || ''} ${c.lastName || ''}`.trim();
             let nameOk = true;
             if (nameFilter.term) {
@@ -641,6 +697,11 @@ document.addEventListener('DOMContentLoaded', function () {
         showView('list');
         initializeEventListeners();
         renderContactsTable();
+        
+        // Iniciar monitor de carga
+        monitorUploadStatus();
+        if (uploadCheckInterval) clearInterval(uploadCheckInterval);
+        uploadCheckInterval = setInterval(monitorUploadStatus, 5000);
     }
 
     init();

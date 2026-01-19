@@ -4,5 +4,5 @@
 # import frappe
 import unittest
 
-class Testqp_PO_UploadLog(unittest.TestCase):
+class Testqp_IQ_UploadLog(unittest.TestCase):
 	pass

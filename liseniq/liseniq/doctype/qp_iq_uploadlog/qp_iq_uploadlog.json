@@ -1,0 +1,149 @@
+{
+ "actions": [],
+ "creation": "2026-01-19 10:13:23.153275",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "ul_file_name",
+  "ul_status",
+  "column_break_3",
+  "ul_file_url",
+  "section_break_5",
+  "ul_total_rows",
+  "ul_processed_rows",
+  "ul_success_count",
+  "ul_error_count",
+  "column_break_10",
+  "ul_error_log",
+  "section_break_11",
+  "ul_started_at",
+  "ul_completed_at",
+  "column_break_14",
+  "ul_owner",
+  "ul_company"
+ ],
+ "fields": [
+  {
+   "fieldname": "ul_file_name",
+   "fieldtype": "Data",
+   "label": "Nombre de Archivo"
+  },
+  {
+   "fieldname": "ul_file_url",
+   "fieldtype": "Text",
+   "label": "Ruta del Archivo"
+  },
+  {
+   "fieldname": "ul_status",
+   "fieldtype": "Select",
+   "label": "Estatus de Proceso",
+   "options": "Pendiente\nProcesando\nCompletado\nCompletado con errores\nFallido"
+  },
+  {
+   "fieldname": "ul_total_rows",
+   "fieldtype": "Int",
+   "label": "Total de Filas"
+  },
+  {
+   "fieldname": "ul_processed_rows",
+   "fieldtype": "Int",
+   "label": "Filas Procesadas"
+  },
+  {
+   "fieldname": "ul_success_count",
+   "fieldtype": "Int",
+   "label": "Registros Correctos"
+  },
+  {
+   "fieldname": "ul_error_count",
+   "fieldtype": "Data",
+   "label": "Registros Fallidos"
+  },
+  {
+   "fieldname": "ul_error_log",
+   "fieldtype": "Long Text",
+   "label": "Errores"
+  },
+  {
+   "fieldname": "ul_started_at",
+   "fieldtype": "Datetime",
+   "label": "Inicio de Procesamiento"
+  },
+  {
+   "fieldname": "ul_completed_at",
+   "fieldtype": "Datetime",
+   "label": "Fin de Procesamiento"
+  },
+  {
+   "fieldname": "ul_owner",
+   "fieldtype": "Link",
+   "label": "Usuario",
+   "options": "User"
+  },
+  {
+   "fieldname": "ul_company",
+   "fieldtype": "Link",
+   "label": "Compa\u00f1ia",
+   "options": "qp_IQ_Company"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_5",
+   "fieldtype": "Section Break",
+   "label": "Estatus de Procesamiento"
+  },
+  {
+   "fieldname": "section_break_11",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "column_break_14",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_10",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-19 10:32:47.948710",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_UploadLog",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

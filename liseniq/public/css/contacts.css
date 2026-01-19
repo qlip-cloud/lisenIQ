@@ -360,3 +360,62 @@
     font-weight: 600;
     font-size: 1rem;
 }
+
+/* ESTILOS DE BARRA DE NOTIFICACIÓN DE CARGA MASIVA */
+#global-notification-bar {
+    position: fixed;
+    top: 90px;
+    right: 20px;
+    background-color: #7B24FF;
+    color: #ffffff;
+    padding: 16px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(123, 36, 255, 0.25);
+    z-index: 9999;
+    min-width: 320px;
+    max-width: 450px;
+    display: none;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    overflow: hidden; 
+}
+
+#global-notification-bar.show {
+    display: flex;
+    align-items: center;
+    opacity: 1;
+    transform: translateY(0);
+    z-index: 1;
+}
+
+/* Estilo del texto */
+#global-notification-message {
+    position: relative;
+    z-index: 2;
+    font-weight: 500;
+    font-size: 0.9rem;
+    width: 100%;
+    white-space: pre-line;
+    line-height: 1.4;
+}
+
+/* Barra de progreso (Borde inferior que aumenta) */
+#global-notification-bar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 5px;
+    background-color: #03BF3C;
+    width: var(--progress, 0%);
+    transition: width 0.5s linear;
+    z-index: 1;
+}
+
+#global-notification-bar.notification-error {
+    background-color: #E95E5E;
+}
+#global-notification-bar.notification-error::after {
+    background-color: #fff;
+}

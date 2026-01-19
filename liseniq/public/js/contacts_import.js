@@ -689,13 +689,18 @@ document.addEventListener('DOMContentLoaded', function () {
         ui.btnFinish.disabled = true;
         ui.btnFinish.textContent = 'Iniciando...';
         
+        const payload = { rows_json: state.dataToProcess };
+        if (state.file && state.file.name) {
+            payload.file_name = state.file.name;
+        }
+
         fetch('/api/method/liseniq.www.contacts.contacts_import.upload_contacts_json', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 'X-Frappe-CSRF-Token': frappe.csrf_token || window.csrf_token
             },
-            body: JSON.stringify({ rows_json: state.dataToProcess })
+            body: JSON.stringify(payload)
         }).then(r => r.json()).then(res => {
             // El backend devuelve status queued y mensaje
             window.location.href = '/contacts';

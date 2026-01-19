@@ -37,6 +37,26 @@ LATAM_COUNTRIES = [
 ]
 
 def get_context(context):
+	# Validar si hay un proceso de carga masiva activo para la empresa
+	try:
+		user = frappe.session.user
+		contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+		
+		if contact_info and contact_info.custom_company:
+			# Verificar logs con estado Pendiente o Procesando
+			is_active = frappe.db.exists("qp_IQ_UploadLog", {
+				"ul_company": contact_info.custom_company,
+				"ul_status": ["in", ["Pendiente", "Procesando"]]
+			})
+			
+			if is_active:
+				# Redireccionar a la lista de contactos si hay proceso activo
+				frappe.local.response["type"] = "redirect"
+				frappe.local.response["location"] = "/contacts"
+				return
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Error validando proceso activo en Carga Masiva")
+
 	context.page_title = _("Carga masiva de Contactos")
 	context.no_cache = 1
 	context.no_breadcrumbs = True
@@ -805,7 +825,7 @@ def validate_contacts():
 	return {"ok": True, "headers": headers, "rows": parsed, "errors": errors}
 
 @frappe.whitelist(allow_guest=False)
-def upload_contacts_json(rows_json):
+def upload_contacts_json(rows_json, file_name=None):
 	import json as _json
 	try: rows = _json.loads(rows_json)
 	except: frappe.throw(_("JSON inválido"))
@@ -818,8 +838,11 @@ def upload_contacts_json(rows_json):
 	if not company:
 		frappe.throw(_("No se pudo determinar la compañía del usuario"))
 
-	# Crear Log con nombre "Edición en Linea" si no hay archivo
-	log_name = create_upload_log("Edición en Linea", len(rows), user, company)
+	# Determinar nombre del archivo
+	final_file_name = file_name or "Edición en Linea"
+
+	# Crear Log con nombre del archivo recibido o "Edición en Linea"
+	log_name = create_upload_log(final_file_name, len(rows), user, company)
 
 	# Encolar proceso
 	frappe.enqueue(

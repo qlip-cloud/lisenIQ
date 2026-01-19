@@ -2,8 +2,20 @@ import frappe
 from frappe.utils import now
 
 @frappe.whitelist()
+def get_unread_notification_count():
+    """
+    Devuelve solo el número de notificaciones no leídas para el usuario actual.
+    """
+    if frappe.session.user == "Guest":
+        return 0
+
+    return frappe.db.count("qp_IQ_PortalNotification", filters={
+        "owner": frappe.session.user,
+        "pn_is_read": 0
+    })
+
+@frappe.whitelist()
 def get_unread_notifications():
- 
     if frappe.session.user == "Guest":
         return []
 

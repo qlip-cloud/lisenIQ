@@ -2,13 +2,17 @@ import { Stepper } from './utils/stepper.js';
 
 document.addEventListener('DOMContentLoaded', function () {
 
+    // Verificación inicial
     if (!document.getElementById('contacts-list-view')) return;
+
+    let uploadCheckInterval = null;
 
     const appState = {
         isEditMode: false,
         currentContactName: null,
         demographicTypes: JSON.parse(document.getElementById('demographic-data').textContent),
         debounceTimer: null,
+        initialCheckDone: false,
 
         contacts: (() => {
             try {
@@ -67,6 +71,76 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const stepper = new Stepper(ui.stepperContainer, ['Datos Básicos', 'Datos Opcionales', 'Datos Demográficos']);
 
+    // Monitor de estado de carga masiva
+    function monitorUploadStatus() {
+        // Solo ejecutar si estamos en la vista de lista
+        if (ui.listView.classList.contains('d-none')) return;
+
+        frappe.call({
+            method: 'liseniq.www.contacts.contacts_import.check_upload_status',
+            callback: function(r) {
+                const notificationBar = document.getElementById('global-notification-bar');
+                
+                if (r.message) {
+                    const { active, status, processed, total, success, error } = r.message;
+                    
+                    if (active) {
+                        // Calcular porcentaje (0 a 100)
+                        const percent = total > 0 ? (processed / total) * 100 : 0;
+
+                        // Bloquear botón de creación
+                        if (ui.buttons.newContact) {
+                            ui.buttons.newContact.disabled = true;
+                            ui.buttons.newContact.title = "Carga masiva en proceso";
+                            ui.buttons.newContact.style.opacity = '0.6';
+                            ui.buttons.newContact.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Procesando...';
+                        }
+
+                        // Actualizar barra de progreso visual (Variable CSS)
+                        if (notificationBar) {
+                            notificationBar.style.setProperty('--progress', `${percent}%`);
+                        }
+
+                        // Mostrar notificación persistente
+                        const msg = `Carga en Proceso, Registros: ${processed} de ${total}`;
+                        showGlobalNotification(msg, 'info', 60000); 
+
+                    } else {
+                        // Guardar estado previo del botón antes de habilitarlo
+                        const wasDisabled = ui.buttons.newContact && ui.buttons.newContact.disabled;
+
+                        // Habilitar botón siempre si no hay proceso activo
+                        if (ui.buttons.newContact) {
+                            ui.buttons.newContact.disabled = false;
+                            ui.buttons.newContact.title = "";
+                            ui.buttons.newContact.style.opacity = '1';
+                            ui.buttons.newContact.innerHTML = 'Nuevo Contacto';
+                        }
+
+                        if (wasDisabled && appState.initialCheckDone) {
+                            // Completar la barra al 100% antes de cerrar
+                            if (notificationBar) notificationBar.style.setProperty('--progress', '100%');
+                            
+                            // Mensaje Final con detalle
+                            const msg = `Carga finalizada (${status})\n\n✅ Exitosos: ${success}\n❌ Fallidos: ${error}`;
+                            
+                            // Determinar tipo de notificación (si hubo fallos críticos o mixtos)
+                            const notifType = (status === 'Fallido' || (error > 0 && success === 0)) ? 'error' : 'success';
+                            
+                            showGlobalNotification(msg, notifType, 10000); // 10 segundos para leer el resumen
+                            
+                            // Recargar la tabla para mostrar los nuevos datos
+                            setTimeout(() => location.reload(), 2000);
+                        }
+                    }
+                    
+                    // Marcar que el chequeo inicial ya se realizó
+                    appState.initialCheckDone = true;
+                }
+            }
+        });
+    }
+
     const showView = (view) => {
         ui.listView.classList.toggle('d-none', view !== 'list');
         ui.createView.classList.toggle('d-none', view !== 'form');
@@ -111,10 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const emailFilter = parseFilterValue(appState.filters.email);
 
         appState.filteredContacts = appState.contacts.filter(c => {
-            // Filtro por DNI
             const dniOk = matchText(c.docNumber, dniFilter.term, dniFilter.exact);
-
-            // Filtro por nombre
             const fullName = `${c.firstName || ''} ${c.lastName || ''}`.trim();
             let nameOk = true;
             if (nameFilter.term) {
@@ -641,6 +712,17 @@ document.addEventListener('DOMContentLoaded', function () {
         showView('list');
         initializeEventListeners();
         renderContactsTable();
+        
+        // Bloquear botón inicialmente hasta que se valide el estado
+        if (ui.buttons.newContact) {
+            ui.buttons.newContact.disabled = true;
+            ui.buttons.newContact.style.opacity = '0.6';
+        }
+
+        // Iniciar monitor de carga
+        monitorUploadStatus();
+        if (uploadCheckInterval) clearInterval(uploadCheckInterval);
+        uploadCheckInterval = setInterval(monitorUploadStatus, 5000);
     }
 
     init();

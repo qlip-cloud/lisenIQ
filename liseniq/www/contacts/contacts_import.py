@@ -657,8 +657,9 @@ def process_contacts_background(log_name, rows, user):
 			notification = frappe.new_doc("qp_IQ_PortalNotification")
 			notification.pn_user = user
 			notification.pn_title = "Carga Masiva de Contactos"
-			status_msg = "finalizada con éxito" if error_count == 0 else ("completada con errores" if success_count > 0 else "fallida")
-			notification.pn_message = f"Carga {status_msg}. Éxitos: {success_count}, Errores: {error_count}."
+			
+			notification.pn_message = f"Carga finalizada ({log_doc.ul_status})\n\n✅ Exitosos: {success_count}\n❌ Fallidos: {error_count}"
+			
 			notification.pn_route = "/contacts"
 			notification.pn_type = "Info" if error_count == 0 else "Warning"
 			notification.pn_is_read = 0

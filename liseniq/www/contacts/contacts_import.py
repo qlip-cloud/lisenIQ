@@ -835,8 +835,8 @@ def upload_contacts_json(rows_json):
 @frappe.whitelist(allow_guest=False)
 def check_upload_status():
 	"""
-	Verifica si hay un proceso de carga activo (Pendiente o Procesando)
-	para la compañía del usuario actual.
+	Verifica el estado de la carga más reciente de la compañía,
+	sea activa o ya finalizada.
 	"""
 	user = frappe.session.user
 	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
@@ -845,24 +845,27 @@ def check_upload_status():
 
 	company = contact_info.custom_company
 
-	# Buscar logs activos
-	active_log = frappe.db.get_value(
+	# Obtener el último log de carga de esta compañía (por fecha de creación descendente)
+	last_log = frappe.get_all(
 		"qp_IQ_UploadLog",
-		{
-			"ul_company": company,
-			"ul_status": ["in", ["Pendiente", "Procesando"]]
-		},
-		["name", "ul_status", "ul_processed_rows", "ul_total_rows", "ul_file_name"],
-		as_dict=True
+		filters={"ul_company": company},
+		fields=["name", "ul_status", "ul_processed_rows", "ul_total_rows", "ul_file_name", "ul_success_count", "ul_error_count"],
+		order_by="creation desc",
+		limit=1
 	)
 
-	if active_log:
-		return {
-			"active": True,
-			"status": active_log.ul_status,
-			"processed": active_log.ul_processed_rows,
-			"total": active_log.ul_total_rows,
-			"file_name": active_log.ul_file_name
-		}
-	
-	return {"active": False}
+	if not last_log:
+		return {"active": False}
+
+	log = last_log[0]
+	is_active = log.ul_status in ["Pendiente", "Procesando"]
+
+	return {
+		"active": is_active,
+		"status": log.ul_status,
+		"processed": log.ul_processed_rows,
+		"total": log.ul_total_rows,
+		"success": log.ul_success_count,
+		"error": log.ul_error_count,
+		"file_name": log.ul_file_name
+	}

@@ -80,46 +80,53 @@ document.addEventListener('DOMContentLoaded', function () {
             callback: function(r) {
                 const notificationBar = document.getElementById('global-notification-bar');
                 
-                if (r.message && r.message.active) {
-                    const status = r.message.status;
-                    const processed = r.message.processed || 0;
-                    const total = r.message.total || 0;
+                if (r.message) {
+                    const { active, status, processed, total, success, error } = r.message;
                     
-                    // Calcular porcentaje (0 a 100)
-                    const percent = total > 0 ? (processed / total) * 100 : 0;
+                    if (active) {
+                        // Calcular porcentaje (0 a 100)
+                        const percent = total > 0 ? (processed / total) * 100 : 0;
 
                     // Bloquear botón de creación
-                    if (ui.buttons.newContact) {
-                        ui.buttons.newContact.disabled = true;
-                        ui.buttons.newContact.title = "Carga masiva en proceso";
-                        ui.buttons.newContact.style.opacity = '0.6';
+                        if (ui.buttons.newContact) {
+                            ui.buttons.newContact.disabled = true;
+                            ui.buttons.newContact.title = "Carga masiva en proceso";
+                            ui.buttons.newContact.style.opacity = '0.6';
                         ui.buttons.newContact.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Procesando...';
-                    }
+                        }
 
                     // Actualizar barra de progreso visual (Variable CSS)
-                    if (notificationBar) {
-                        notificationBar.style.setProperty('--progress', `${percent}%`);
-                    }
+                        if (notificationBar) {
+                            notificationBar.style.setProperty('--progress', `${percent}%`);
+                        }
 
                     // Mostrar notificación persistente
                     // const msg = `Carga en Proceso (${status})... Registros: ${processed} de ${total}`;
                     const msg = `Carga en Proceso, Registros: ${processed} de ${total}`;
-                    showGlobalNotification(msg, 'info', 60000); 
+                        showGlobalNotification(msg, 'info', 60000); 
 
-                } else {
-                    // Si finalizó y el botón estaba bloqueado, restaurar
-                    if (ui.buttons.newContact && ui.buttons.newContact.disabled) {
-                        ui.buttons.newContact.disabled = false;
-                        ui.buttons.newContact.title = "";
-                        ui.buttons.newContact.style.opacity = '1';
-                        ui.buttons.newContact.innerHTML = 'Nuevo Contacto';
-                        
-                        // Completar la barra al 100% antes de cerrar
-                        if (notificationBar) notificationBar.style.setProperty('--progress', '100%');
-                        showGlobalNotification('Carga masiva finalizada.', 'success', 5000);
-                        
-                        // Recargar la tabla para mostrar los nuevos datos
-                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        // Si finalizó y el botón estaba bloqueado, restaurar y mostrar resumen
+                        if (ui.buttons.newContact && ui.buttons.newContact.disabled) {
+                            ui.buttons.newContact.disabled = false;
+                            ui.buttons.newContact.title = "";
+                            ui.buttons.newContact.style.opacity = '1';
+                            ui.buttons.newContact.innerHTML = 'Nuevo Contacto';
+                            
+                            // Completar la barra al 100% antes de cerrar
+                            if (notificationBar) notificationBar.style.setProperty('--progress', '100%');
+                            
+                            // Mensaje Final con detalle
+                            const msg = `Carga finalizada (${status})\n\n✅ Exitosos: ${success}\n❌ Fallidos: ${error}`;
+                            
+                            // Determinar tipo de notificación (si hubo fallos críticos o mixtos)
+                            const notifType = (status === 'Fallido' || (error > 0 && success === 0)) ? 'error' : 'success';
+                            
+                            showGlobalNotification(msg, notifType, 10000); // 10 segundos para leer el resumen
+                            
+                            // Recargar la tabla para mostrar los nuevos datos
+                            setTimeout(() => location.reload(), 2000);
+                        }
                     }
                 }
             }

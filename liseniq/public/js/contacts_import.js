@@ -43,6 +43,16 @@ class CustomHeader {
 document.addEventListener('DOMContentLoaded', function () {
     if (!document.getElementById('contacts-import-app')) return;
 
+    frappe.call({
+        method: 'liseniq.www.contacts.contacts_import.check_upload_status',
+        callback: function(r) {
+            if (r.message && r.message.active) {
+                // Si hay una carga activa, redireccionar a la pantalla de contactos
+                window.location.href = '/contacts';
+            }
+        }
+    });
+
     const state = {
         currentStep: 1,
         file: null,

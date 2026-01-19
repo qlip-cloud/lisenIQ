@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
         currentContactName: null,
         demographicTypes: JSON.parse(document.getElementById('demographic-data').textContent),
         debounceTimer: null,
+        initialCheckDone: false,
 
         contacts: (() => {
             try {
@@ -87,32 +88,36 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Calcular porcentaje (0 a 100)
                         const percent = total > 0 ? (processed / total) * 100 : 0;
 
-                    // Bloquear botón de creación
+                        // Bloquear botón de creación
                         if (ui.buttons.newContact) {
                             ui.buttons.newContact.disabled = true;
                             ui.buttons.newContact.title = "Carga masiva en proceso";
                             ui.buttons.newContact.style.opacity = '0.6';
-                        ui.buttons.newContact.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Procesando...';
+                            ui.buttons.newContact.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Procesando...';
                         }
 
-                    // Actualizar barra de progreso visual (Variable CSS)
+                        // Actualizar barra de progreso visual (Variable CSS)
                         if (notificationBar) {
                             notificationBar.style.setProperty('--progress', `${percent}%`);
                         }
 
-                    // Mostrar notificación persistente
-                    // const msg = `Carga en Proceso (${status})... Registros: ${processed} de ${total}`;
-                    const msg = `Carga en Proceso, Registros: ${processed} de ${total}`;
+                        // Mostrar notificación persistente
+                        const msg = `Carga en Proceso, Registros: ${processed} de ${total}`;
                         showGlobalNotification(msg, 'info', 60000); 
 
                     } else {
-                        // Si finalizó y el botón estaba bloqueado, restaurar y mostrar resumen
-                        if (ui.buttons.newContact && ui.buttons.newContact.disabled) {
+                        // Guardar estado previo del botón antes de habilitarlo
+                        const wasDisabled = ui.buttons.newContact && ui.buttons.newContact.disabled;
+
+                        // Habilitar botón siempre si no hay proceso activo
+                        if (ui.buttons.newContact) {
                             ui.buttons.newContact.disabled = false;
                             ui.buttons.newContact.title = "";
                             ui.buttons.newContact.style.opacity = '1';
                             ui.buttons.newContact.innerHTML = 'Nuevo Contacto';
-                            
+                        }
+
+                        if (wasDisabled && appState.initialCheckDone) {
                             // Completar la barra al 100% antes de cerrar
                             if (notificationBar) notificationBar.style.setProperty('--progress', '100%');
                             
@@ -128,6 +133,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             setTimeout(() => location.reload(), 2000);
                         }
                     }
+                    
+                    // Marcar que el chequeo inicial ya se realizó
+                    appState.initialCheckDone = true;
                 }
             }
         });
@@ -705,6 +713,12 @@ document.addEventListener('DOMContentLoaded', function () {
         initializeEventListeners();
         renderContactsTable();
         
+        // Bloquear botón inicialmente hasta que se valide el estado
+        if (ui.buttons.newContact) {
+            ui.buttons.newContact.disabled = true;
+            ui.buttons.newContact.style.opacity = '0.6';
+        }
+
         // Iniciar monitor de carga
         monitorUploadStatus();
         if (uploadCheckInterval) clearInterval(uploadCheckInterval);

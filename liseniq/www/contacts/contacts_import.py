@@ -774,6 +774,18 @@ def validate_contacts():
 	fileobj = frappe.local.request.files.get('file')
 	if not fileobj: frappe.throw(_("Error de validación: No se detectó ningún archivo adjunto."))
 
+	# Obtener información del usuario para validaciones contra DB
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	company = contact_info.custom_company if contact_info else None
+	
+	existing_dnis = []
+	if company:
+		existing_dnis = frappe.get_all("Contact", filters={"custom_company": company}, pluck="custom_document_number")
+
+	# Obtener opciones válidas para listas
+	options = get_grid_options()
+
 	filename = fileobj.filename or ""
 	ext = filename.split('.')[-1].lower()
 	rows = []
@@ -805,6 +817,13 @@ def validate_contacts():
 		i = idx[col]
 		return str(r[i]).strip() if i < len(r) and r[i] else ""
 	
+	# Contadores de reporte
+	stats = {
+		"new": 0,
+		"existing": 0,
+		"errors": 0
+	}
+
 	for i, r in enumerate(rows[1:], start=2):
 		if not any(cell for cell in r): continue
 		row_dict = {}
@@ -812,17 +831,56 @@ def validate_contacts():
 			val = get_val(r, h)
 			row_dict[h] = val
 		
-		# Validación estricta
 		row_errors = []
+		
+		# Campos Obligatorios
 		for field in MANDATORY_FIELDS:
 			if not row_dict.get(field):
-				row_errors.append(field)
+				row_errors.append(f"Falta {field}")
 
-		parsed.append(row_dict)
-		if row_errors: 
+		# Validación de Listas (Selects)
+		# Mapeo campo -> key en options
+		field_map = {
+			"Tipo de Documento": "document_types",
+			"País": "countries",
+			"Idioma": "languages",
+			"Estatus": "status",
+			"Género": "genders",
+			"Nivel Académico": "academic_levels"
+		}
+		
+		for field_name, option_key in field_map.items():
+			val = row_dict.get(field_name)
+			if val and option_key in options:
+				if val not in options[option_key]:
+					row_errors.append(f"'{val}' no es válido para {field_name}")
+
+		# Validar Duplicado en Base de Datos (por DNI)
+		dni = row_dict.get("Número de Documento (DNI)")
+		is_existing = False
+		if dni:
+			if dni in existing_dnis:
+				is_existing = True
+				stats["existing"] += 1
+			else:
+				stats["new"] += 1
+		
+		if row_errors:
+			stats["errors"] += 1
 			errors.append({"fila": i, "errores": row_errors})
+		
+		parsed.append(row_dict)
 
-	return {"ok": True, "headers": headers, "rows": parsed, "errors": errors}
+	# Retornamos existing_dnis y options para que el frontend pueda seguir validando en tiempo real
+	return {
+		"ok": True, 
+		"headers": headers, 
+		"rows": parsed, 
+		"errors": errors,
+		"stats": stats,
+		"existing_dnis": existing_dnis,
+		"valid_options": options
+	}
 
 @frappe.whitelist(allow_guest=False)
 def upload_contacts_json(rows_json, file_name=None):

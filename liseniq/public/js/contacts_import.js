@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', function () {
         headers: [],
         rows: [], 				// Array de objetos
         errors: [], 			// Errores de validación por fila
+        existingDNIs: [],       // Lista de DNIs que ya existen en DB (cache)
         processResult: null,
         mode: 'upload', 			// 'upload' o 'edit'
         gridApi: null, 				// referencia al API de Ag-Grid
@@ -314,6 +315,37 @@ document.addEventListener('DOMContentLoaded', function () {
         let hasErrors = false;
         let errorCount = 0;
         const validationErrors = [];
+        
+        // Contadores para el resumen
+        let newCount = 0;
+        let existingCount = 0;
+
+        // Conjunto para verificar duplicados dentro del archivo
+        const seenDNIs = new Set();
+        const duplicateDNIsInFile = new Set();
+        
+        // Detectar duplicados internos
+        state.gridApi.forEachNode((node) => {
+            const row = node.data;
+            const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+            if (dni) {
+                if (seenDNIs.has(dni)) {
+                    duplicateDNIsInFile.add(dni);
+                } else {
+                    seenDNIs.add(dni);
+                }
+            }
+        });
+
+        // Mapas de validación de opciones (Campo -> Array en state.options)
+        const validationMaps = {
+            "Tipo de Documento": state.options.document_types,
+            "País": state.options.countries,
+            "Idioma": state.options.languages,
+            "Estatus": state.options.status,
+            "Género": state.options.genders,
+            "Nivel Académico": state.options.academic_levels
+        };
 
         // Validar Nombres de Columnas Nuevas
         const invalidColNames = state.newColumns.filter(c => !c.name || c.name.trim() === '');
@@ -329,6 +361,8 @@ document.addEventListener('DOMContentLoaded', function () {
         state.gridApi.forEachNode((node, index) => {
             const row = node.data;
             const missing = [];
+            const invalidValues = [];
+            const rowErrors = [];
             
             // Validar Campos Obligatorios Estándar
             MANDATORY_FIELDS.forEach(field => {
@@ -337,6 +371,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
+            // Validar Listas (Valores exactos)
+            Object.keys(validationMaps).forEach(field => {
+                const val = (row[field] || '').toString().trim();
+                const validOptions = validationMaps[field] || [];
+                if (val && validOptions.length > 0 && !validOptions.includes(val)) {
+                    invalidValues.push(`${val} no es válido en ${field}`);
+                }
+            });
+
+            // Validar Duplicados
+            const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+            let isExisting = false;
+            if (dni) {
+                // Duplicado en DB
+                if (state.existingDNIs && state.existingDNIs.includes(dni)) {
+                    isExisting = true;
+                    existingCount++;
+                } else {
+                    newCount++;
+                }
+
+                // Duplicado en Archivo
+                if (duplicateDNIsInFile.has(dni)) {
+                    rowErrors.push(`DNI ${dni} duplicado en el archivo`);
+                }
+            }
+
             // Contar valores para columnas nuevas
             state.newColumns.forEach(c => {
                 if (row[c.id] && row[c.id].toString().trim() !== "") {
@@ -344,11 +405,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
-            if (missing.length > 0) {
+            // Consolidar errores de fila
+            if (missing.length > 0) rowErrors.push("Faltan: " + missing.join(', '));
+            if (invalidValues.length > 0) rowErrors.push(invalidValues.join(', '));
+
+            if (rowErrors.length > 0) {
                 hasErrors = true;
                 errorCount++;
                 if (validationErrors.length < 5) { 
-                    validationErrors.push({ row: index + 1, missing: missing });
+                    validationErrors.push({ row: index + 1, missing: rowErrors });
                 }
             }
         });
@@ -364,27 +429,45 @@ document.addEventListener('DOMContentLoaded', function () {
         // 1. Control del botón Continuar
         ui.btnValidateContinue.disabled = hasErrors;
 
-        // 2. Actualizar resumen visual
+        // 2. Actualizar resumen visual con conteo detallado
+        let summaryHtml = '';
+        
+        // Tarjeta de Resumen de conteos
+        summaryHtml += `
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                <div class="alert alert-info" style="flex: 1; margin: 0; text-align: center;">
+                    <strong>${newCount}</strong><br>Nuevos
+                </div>
+                <div class="alert alert-warning" style="flex: 1; margin: 0; text-align: center; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
+                    <strong>${existingCount}</strong><br>Existentes (Actualizar)
+                </div>
+                <div class="alert alert-danger" style="flex: 1; margin: 0; text-align: center; display: ${errorCount > 0 ? 'block' : 'none'};">
+                    <strong>${errorCount}</strong><br>Con Errores
+                </div>
+            </div>
+        `;
+
         if (hasErrors) {
-            let summaryHtml = `
+            summaryHtml += `
                 <div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                    <strong>Validación incompleta:</strong><br>
+                    <strong>Errores de validación detectados:</strong><br>
                     <ul>
             `;
             validationErrors.forEach(e => {
-                summaryHtml += `<li>${typeof e.row === 'number' ? 'Fila ' + e.row : e.row}: ${e.missing.join(', ')}</li>`;
+                summaryHtml += `<li>${typeof e.row === 'number' ? 'Fila ' + e.row : e.row}: ${e.missing.join(' | ')}</li>`;
             });
             if (errorCount > 5) {
                 summaryHtml += `<li>... y ${errorCount - 5} filas más con errores.</li>`;
             }
             summaryHtml += `</ul></div>`;
-            ui.validationSummary.innerHTML = summaryHtml;
         } else {
-            ui.validationSummary.innerHTML = `
+            summaryHtml += `
             <div class="alert alert-success" style="background-color: #f0fff4; border: 1px solid #68d391; color: #276749; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                <i class="fa fa-check-circle"></i> Validación exitosa.
+                <i class="fa fa-check-circle"></i> Todos los datos son válidos. Listo para procesar.
             </div>`;
         }
+        
+        ui.validationSummary.innerHTML = summaryHtml;
         
         state.gridApi.refreshCells({ force: true });
     }
@@ -488,6 +571,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         state.options.demographic_headers = r.message.demographic_headers;
                     }
                     state.errors = [];
+                    state.existingDNIs = []; // Resetear para edición manual
                 } else {
                     state.rows = [];
                 }
@@ -581,6 +665,14 @@ document.addEventListener('DOMContentLoaded', function () {
             state.headers = data.headers || [];
             state.rows = data.rows || [];
             state.errors = data.errors || [];
+            
+            // Guardamos los DNIs existentes para validación en tiempo real sin llamar al backend
+            state.existingDNIs = data.existing_dnis || [];
+            
+            // Si el backend envía opciones actualizadas, las usamos
+            if (data.valid_options) {
+                state.options = { ...state.options, ...data.valid_options };
+            }
             
             showStep(2);
 

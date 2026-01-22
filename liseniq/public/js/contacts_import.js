@@ -74,7 +74,8 @@ document.addEventListener('DOMContentLoaded', function () {
             status: ['Activo', 'Inactivo'],
             demographic_headers: [] // Nombres de columnas demográficas existentes
         },
-        newColumns: [] // { id: string, name: string }
+        newColumns: [], // { id: string, name: string }
+        showOnlyErrors: false // Nuevo estado para filtro de errores
     };
 
     // Campos obligatorios para validación frontend
@@ -409,12 +410,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (missing.length > 0) rowErrors.push("Faltan: " + missing.join(', '));
             if (invalidValues.length > 0) rowErrors.push(invalidValues.join(', '));
 
-            if (rowErrors.length > 0) {
+            // Marcar estado interno de error en la fila para el filtrado y estilizado
+            const rowHasError = rowErrors.length > 0;
+            node.data._hasError = rowHasError;
+
+            if (rowHasError) {
                 hasErrors = true;
                 errorCount++;
-                if (validationErrors.length < 5) { 
-                    validationErrors.push({ row: index + 1, missing: rowErrors });
-                }
+                // Agregar al array de resumen si hay errores
+                validationErrors.push({ row: index + 1, missing: rowErrors });
             }
         });
 
@@ -426,12 +430,17 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // 1. Control del botón Continuar
+        // Control del botón Continuar
         ui.btnValidateContinue.disabled = hasErrors;
 
-        // 2. Actualizar resumen visual con conteo detallado
+        // Actualizar resumen visual con conteo detallado
         let summaryHtml = '';
         
+        // Estilo condicional para el botón de errores
+        const errorFilterClass = state.showOnlyErrors ? 'active-filter' : '';
+        const errorFilterText = state.showOnlyErrors ? 'Mostrar Todos' : 'Con Errores';
+        const errorDisplay = errorCount > 0 ? 'block' : 'none';
+
         // Tarjeta de Resumen de conteos
         summaryHtml += `
             <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
@@ -441,8 +450,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="alert alert-warning" style="flex: 1; margin: 0; text-align: center; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
                     <strong>${existingCount}</strong><br>Existentes (Actualizar)
                 </div>
-                <div class="alert alert-danger" style="flex: 1; margin: 0; text-align: center; display: ${errorCount > 0 ? 'block' : 'none'};">
-                    <strong>${errorCount}</strong><br>Con Errores
+                <div id="btn-toggle-errors" class="alert alert-danger alert-error-clickable ${errorFilterClass}" title="Click para filtrar errores" style="flex: 1; margin: 0; text-align: center; display: ${errorDisplay};">
+                    <strong>${errorCount}</strong><br>${errorFilterText}
                 </div>
             </div>
         `;
@@ -456,9 +465,6 @@ document.addEventListener('DOMContentLoaded', function () {
             validationErrors.forEach(e => {
                 summaryHtml += `<li>${typeof e.row === 'number' ? 'Fila ' + e.row : e.row}: ${e.missing.join(' | ')}</li>`;
             });
-            if (errorCount > 5) {
-                summaryHtml += `<li>... y ${errorCount - 5} filas más con errores.</li>`;
-            }
             summaryHtml += `</ul></div>`;
         } else {
             summaryHtml += `
@@ -469,7 +475,18 @@ document.addEventListener('DOMContentLoaded', function () {
         
         ui.validationSummary.innerHTML = summaryHtml;
         
-        state.gridApi.refreshCells({ force: true });
+        // Re-asignar evento al botón de filtro de errores (se pierde al sobrescribir innerHTML)
+        const toggleBtn = document.getElementById('btn-toggle-errors');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                state.showOnlyErrors = !state.showOnlyErrors;
+                state.gridApi.onFilterChanged(); // Disparar filtrado externo
+                validateRealTime(); // Re-renderizar para actualizar estado visual del botón
+            });
+        }
+        
+        // Forzar redibujado de filas para aplicar estilos de error
+        state.gridApi.redrawRows();
     }
 
     function initAgGrid() {
@@ -491,6 +508,23 @@ document.addEventListener('DOMContentLoaded', function () {
             paginationPageSize: 20,
             theme: "legacy",
             rowSelection: 'multiple',
+            
+            // Regla para estilizar filas con error
+            rowClassRules: {
+                'row-error-highlight': (params) => {
+                    return params.data && params.data._hasError;
+                }
+            },
+            
+            // Lógica de Filtro Externo
+            isExternalFilterPresent: () => {
+                return state.showOnlyErrors;
+            },
+            doesExternalFilterPass: (node) => {
+                // Si el filtro está activo, solo pasa si tiene error
+                return node.data && node.data._hasError;
+            },
+
             onGridReady: (params) => {
                 state.gridApi = params.api;
                 validateRealTime(); // Validar al cargar
@@ -499,7 +533,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 validateRealTime(); // Validar al editar
             },
             onModelUpdated: () => {
-                setTimeout(validateRealTime, 0); 
+                // Útil para cuando cambian filas, aunque validateRealTime maneja la mayoría
             }
         };
 
@@ -515,6 +549,7 @@ document.addEventListener('DOMContentLoaded', function () {
         state.file = null;
         if (ui.fileInput) ui.fileInput.value = '';
         if (ui.dropzoneFilename) ui.dropzoneFilename.textContent = '';
+        state.showOnlyErrors = false; // Resetear filtro
         
         // Cambiar modo y deshabilitar continuar hasta que se elija nuevo archivo
         setMode('upload');
@@ -572,6 +607,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     state.errors = [];
                     state.existingDNIs = []; // Resetear para edición manual
+                    state.showOnlyErrors = false;
                 } else {
                     state.rows = [];
                 }
@@ -665,6 +701,7 @@ document.addEventListener('DOMContentLoaded', function () {
             state.headers = data.headers || [];
             state.rows = data.rows || [];
             state.errors = data.errors || [];
+            state.showOnlyErrors = false;
             
             // Guardamos los DNIs existentes para validación en tiempo real sin llamar al backend
             state.existingDNIs = data.existing_dnis || [];
@@ -716,6 +753,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (state.gridApi) {
             state.gridApi.forEachNode(node => {
                 let row = { ...node.data };
+                // Eliminamos la propiedad de control interno antes de enviar
+                delete row._hasError; 
 
                 // Mapear IDs temporales a nombres reales para el backend
                 state.newColumns.forEach(c => {

@@ -145,6 +145,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Definición base de columnas (estáticas)
     const getBaseColDefs = () => [
+        {
+            headerName: "#",
+            maxWidth: 60,
+            minWidth: 50,
+            pinned: "left",
+            valueGetter: "node.rowIndex + 1",
+            editable: false,
+            sortable: false, // No ordenable porque siempre debe ser secuencial visualmente
+            filter: false,
+            resizable: false,
+            cellStyle: { 
+                'text-align': 'center', 
+                'background-color': '#f8f9fa', 
+                'color': '#737373',
+                'font-weight': '600'
+            }
+        },
         { 
             field: "Nombre", 
             headerName: "Nombre (Obligatorio)", 
@@ -418,7 +435,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 hasErrors = true;
                 errorCount++;
                 // Agregar al array de resumen si hay errores
-                validationErrors.push({ row: index + 1, missing: rowErrors });
+                // Usamos node.rowIndex + 1 para que coincida con la columna visual
+                validationErrors.push({ row: node.rowIndex + 1, missing: rowErrors });
             }
         });
 

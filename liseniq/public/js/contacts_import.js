@@ -448,6 +448,19 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        // Cálculo de registros a eliminar
+        let deleteCount = 0;
+        if (state.existingDNIs && state.existingDNIs.length > 0) {
+            // Comparamos los DNIs existentes en DB contra los DNIs presentes en la grilla (seenDNIs)
+            deleteCount = state.existingDNIs.filter(d => d != null && !seenDNIs.has(d.toString().trim())).length;
+        }
+
+        if (errorCount === 0 && state.showOnlyErrors) {
+            state.showOnlyErrors = false;
+            state.gridApi.onFilterChanged();
+        }
+ 
+
         // Control del botón Continuar
         ui.btnValidateContinue.disabled = hasErrors;
 
@@ -463,10 +476,13 @@ document.addEventListener('DOMContentLoaded', function () {
         summaryHtml += `
             <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
                 <div class="alert alert-info" style="flex: 1; margin: 0; text-align: center;">
-                    <strong>${newCount}</strong><br>Nuevos
+                    <strong>${newCount}</strong><br>Contactos a Crear
                 </div>
                 <div class="alert alert-warning" style="flex: 1; margin: 0; text-align: center; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
-                    <strong>${existingCount}</strong><br>Existentes (Actualizar)
+                    <strong>${existingCount}</strong><br>Contactos a Actualizar
+                </div>
+                <div class="alert alert-secondary" style="flex: 1; margin: 0; text-align: center; color: #383d41; background-color: #e2e3e5; border-color: #d6d8db;">
+                    <strong>${deleteCount}</strong><br>Contactos a Eliminar
                 </div>
                 <div id="btn-toggle-errors" class="alert alert-danger alert-error-clickable ${errorFilterClass}" title="Click para filtrar errores" style="flex: 1; margin: 0; text-align: center; display: ${errorDisplay};">
                     <strong>${errorCount}</strong><br>${errorFilterText}
@@ -525,7 +541,7 @@ document.addEventListener('DOMContentLoaded', function () {
             pagination: true,
             paginationPageSize: 20,
             theme: "legacy",
-            rowSelection: 'multiple',
+            rowSelection: { mode: 'multiRow' },
             
             // Regla para estilizar filas con error
             rowClassRules: {
@@ -768,11 +784,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     ui.btnValidateContinue.addEventListener('click', () => {
         let gridData = [];
+        const seenDNIs = new Set(); // Conjunto para rastrear DNIs presentes
+
         if (state.gridApi) {
             state.gridApi.forEachNode(node => {
                 let row = { ...node.data };
                 // Eliminamos la propiedad de control interno antes de enviar
                 delete row._hasError; 
+
+                // Rastrear DNI para validación de eliminación
+                const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+                if (dni) {
+                    seenDNIs.add(dni);
+                }
 
                 // Mapear IDs temporales a nombres reales para el backend
                 state.newColumns.forEach(c => {
@@ -785,6 +809,10 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         } else {
             gridData = state.rows;
+            gridData.forEach(r => {
+                const dni = (r['Número de Documento (DNI)'] || '').toString().trim();
+                if (dni) seenDNIs.add(dni);
+            });
         }
 
         if (gridData.length === 0) {
@@ -792,15 +820,34 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        state.finalStats.total = gridData.length;
-        state.dataToProcess = JSON.stringify(gridData);
+        // Calcular cuántos se eliminarán
+        let deleteCount = 0;
+        if (state.existingDNIs && state.existingDNIs.length > 0) {
+            deleteCount = state.existingDNIs.filter(d => d != null && !seenDNIs.has(d.toString().trim())).length;
+        }
 
-        ui.btnFinish.disabled = false;
-        ui.btnFinish.textContent = 'Finalizar';
-        ui.btnBackToStep2.style.display = 'inline-block';
-        
-        renderProcessResult();
-        showStep(3);
+        const proceed = () => {
+            state.finalStats.total = gridData.length;
+            state.dataToProcess = JSON.stringify(gridData);
+
+            ui.btnFinish.disabled = false;
+            ui.btnFinish.textContent = 'Finalizar';
+            ui.btnBackToStep2.style.display = 'inline-block';
+            
+            renderProcessResult();
+            showStep(3);
+        };
+
+        if (deleteCount > 0) {
+            frappe.confirm(
+                `Atención: Se han detectado <b>${deleteCount}</b> contactos que no están en el archivo y serán <b>eliminados</b> (archivados).<br><br>¿Desea continuar con el proceso?`,
+                () => {
+                    proceed();
+                }
+            );
+        } else {
+            proceed();
+        }
     });
 
     function renderProcessResult() {

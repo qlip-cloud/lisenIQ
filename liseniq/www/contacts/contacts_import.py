@@ -178,7 +178,8 @@ def get_contacts_for_grid():
 		contacts = frappe.get_all("Contact", 
 			filters={
 				"custom_company": user_company, 
-				"custom_is_liseniq_contact": 1
+				"custom_is_liseniq_contact": 1,
+				"custom_is_deleted": 0
 			},
 			fields=[
 				"name", "first_name", "last_name", "gender", "custom_dob",
@@ -510,7 +511,22 @@ def process_contacts_background(log_name, rows, user):
 			return
 
 		user_company = contact_info.custom_company
+
+		existing_contacts_map = {}
+		active_contacts = frappe.get_all("Contact", 
+			filters={
+				"custom_company": user_company, 
+				"custom_is_liseniq_contact": 1,
+				"custom_is_deleted": 0 
+			}, 
+			fields=["name", "custom_document_number"]
+		)
+		for c in active_contacts:
+			if c.custom_document_number:
+				existing_contacts_map[str(c.custom_document_number).strip()] = c.name
 		
+		processed_dnis_in_file = set()
+
 		# Obtener mapas (incluyendo el nuevo mapa de demográficos)
 		maps = get_mapping_dicts()
 		dt_map = maps["dt_import"]
@@ -548,7 +564,10 @@ def process_contacts_background(log_name, rows, user):
 				numero_doc = (r.get("Número de Documento (DNI)") or "").strip()
 				estatus = (r.get("Estatus") or "").strip()
 				correo = (r.get("Correo (Opcional)") or "").strip()
-				
+
+				if numero_doc:
+					processed_dnis_in_file.add(numero_doc)
+
 				fecha_nac = parse_date(r.get("Fecha de Nacimiento"))
 				fecha_ing = parse_date(r.get("Fecha de Ingreso"))
 				
@@ -594,9 +613,13 @@ def process_contacts_background(log_name, rows, user):
 
 				if contact_name:
 					contact_doc = frappe.get_doc("Contact", contact_name)
+
+					if contact_doc.custom_is_deleted:
+						contact_doc.custom_is_deleted = 0
+						contact_doc.save(ignore_permissions=True)
+						
 					if check_if_modified(contact_doc, data, estatus or contact_doc.custom_status):
 						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status, demo_map)
-					# Si no se modificó, cuenta como éxito de procesamiento aunque no hubo escritura
 				else:
 					new_doc = frappe.new_doc("Contact")
 					new_doc.first_name = nombre
@@ -609,6 +632,7 @@ def process_contacts_background(log_name, rows, user):
 					new_doc.custom_academic_level = nivel_acad_id
 					new_doc.custom_status = estatus or "Activo"
 					new_doc.custom_is_liseniq_contact = 1
+					new_doc.custom_is_deleted = 0
 					
 					new_doc.custom_dob = data['birthdate']
 					new_doc.custom_entry_date = data['entryDate']
@@ -655,6 +679,20 @@ def process_contacts_background(log_name, rows, user):
 				log_doc.save(ignore_permissions=True)
 				frappe.db.commit()
 
+		delete_count = 0
+		try:
+			existing_dnis_set = set(existing_contacts_map.keys())
+			missing_dnis = existing_dnis_set - processed_dnis_in_file
+			
+			for missing_dni in missing_dnis:
+				contact_name_to_delete = existing_contacts_map[missing_dni]
+				frappe.db.set_value("Contact", contact_name_to_delete, "custom_is_deleted", 1)
+				delete_count += 1
+				
+		except Exception as e:
+			# Loguear error de eliminación pero no detener el proceso general si ya se procesaron filas
+			error_list.append({"fila": "N/A", "error": f"Error en proceso de eliminación lógica: {str(e)}"})
+
 		# Finalización
 		log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
 		log_doc.ul_processed_rows = processed_count
@@ -677,8 +715,7 @@ def process_contacts_background(log_name, rows, user):
 			notification = frappe.new_doc("qp_IQ_PortalNotification")
 			notification.pn_user = user
 			notification.pn_title = "Carga Masiva de Contactos"
-			
-			notification.pn_message = f"Carga finalizada ({log_doc.ul_status})\n\n✅ Exitosos: {success_count}\n❌ Fallidos: {error_count}"
+			notification.pn_message = f"Carga finalizada ({log_doc.ul_status})\n\n✅ Exitosos: {success_count}\n❌ Fallidos: {error_count}\n🗑️ Contactos eliminados: {delete_count}"
 			
 			notification.pn_route = "/contacts"
 			notification.pn_type = "Info" if error_count == 0 else "Warning"
@@ -781,7 +818,7 @@ def validate_contacts():
 	
 	existing_dnis = []
 	if company:
-		existing_dnis = frappe.get_all("Contact", filters={"custom_company": company}, pluck="custom_document_number")
+		existing_dnis = frappe.get_all("Contact", filters={"custom_company": company, "custom_is_deleted": 0}, pluck="custom_document_number")
 
 	# Obtener opciones válidas para listas
 	options = get_grid_options()

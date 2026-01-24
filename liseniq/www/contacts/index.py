@@ -72,7 +72,8 @@ def get_context(context):
         filters={
             'custom_company': user_company,
             'name': ['!=', user_contact_name],
-            'custom_is_liseniq_contact': 1
+            'custom_is_liseniq_contact': 1,
+            'custom_is_deleted': 0
         },
         fields=[
             'name', 'custom_document_number', 'first_name', 'last_name',
@@ -330,7 +331,9 @@ def delete_contact(contact_name):
         if contact_doc.custom_company != user_company:
             frappe.throw(_("No tienes permiso para eliminar este contacto"))
 
-        frappe.delete_doc('Contact', contact_name, ignore_permissions=True, force=True)
+        contact_doc.custom_is_deleted = 1
+        contact_doc.save(ignore_permissions=True)
+        # frappe.delete_doc('Contact', contact_name, ignore_permissions=True, force=True)
         return {"status": "success"}
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error en delete_contact")

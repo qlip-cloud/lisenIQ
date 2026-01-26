@@ -29,7 +29,7 @@ CATEGORIES = {
     "Relaciones": "HUMANISTA",
     "Comunicación": "HUMANISTA",
     "Innovación": "COMPETITIVA",
-    "Logros": "COMPETITIVA",
+    "Logro": "COMPETITIVA",
     "Liderazgo": "COMPETITIVA",
 }
 

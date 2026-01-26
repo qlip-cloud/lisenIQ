@@ -7,7 +7,7 @@ CATEGORIES = {
     "Sentido de propósito": "MI INSPIRACIÓN",
     "Trabajo trascendental": "MI INSPIRACIÓN",
     "Me Conocen": "MI INSPIRACIÓN",
-    "Mi lider": "LOS LÍDERES",
+    "Mi líder": "LOS LÍDERES",
     "Apoyo": "LOS LÍDERES",
     "Nuestros lideres": "LOS LÍDERES",
     "Oportunidades de crecimiento en mi Rol": "MI DESARROLLO Y APRENDIZAJE",
@@ -31,13 +31,6 @@ CATEGORIES = {
     "Innovación": "COMPETITIVA",
     "Logros": "COMPETITIVA",
     "Liderazgo": "COMPETITIVA",
-    "Integridad": "CULTURA CARVAJAL",
-    "Respeto": "CULTURA CARVAJAL",
-    "Orientación al cliente": "CULTURA CARVAJAL",
-    "Compromiso social": "CULTURA CARVAJAL",
-    "Protección y cuidado de la vida": "CULTURA CARVAJAL",
-    "Compromiso con los resultados": "CULTURA CARVAJAL",
-    "Innovación": "CULTURA CARVAJAL",
 }
 
 CARVAJAL_COMPANIES = {

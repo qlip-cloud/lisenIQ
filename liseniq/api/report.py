@@ -29,7 +29,7 @@ CATEGORIES = {
     "Relaciones": "HUMANISTA",
     "Comunicación": "HUMANISTA",
     "Innovación": "COMPETITIVA",
-    "Logros": "COMPETITIVA",
+    "Logro": "COMPETITIVA",
     "Liderazgo": "COMPETITIVA",
 }
 
@@ -109,6 +109,28 @@ def custom_report_by_question(filters=None):
 
     return translated_data
 
+@frappe.whitelist()
+def custom_report_by_question_engagement(filters=None):
+
+    filters = filters or {}
+    
+    # Obtener todas las encuestas válidas
+    valid_surveys = get_valid_engagement_surveys()
+    
+    if not valid_surveys:
+        frappe.throw(_("No se encontraron encuestas válidas en qp_IQ_Survey"))
+
+    # Obtener todas las preguntas únicas de todas las encuestas
+    all_questions_map = get_all_unique_questions(valid_surveys)
+    demographics_map = get_demographics_labels()
+
+
+    data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
+    transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+    translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
+
+
+    return translated_data
 
 @frappe.whitelist()
 def custom_report_by_question_yesterday(filters=None):
@@ -161,6 +183,31 @@ def get_valid_surveys():
         frappe.log_error(f"Error getting valid surveys: {str(e)}")
         return []
 
+def get_valid_engagement_surveys():
+    try:
+        query = """
+            SELECT 
+                s.name as survey_name,
+                s.survey_json,
+                iq.name as id,
+                iq.su_name,
+                iq.su_owner,
+                iq.su_in_history as in_history,
+                tp.tp_name as template_name,
+                c.name as company_id,
+                c.co_name as company_name
+            FROM `tabSurvey` s
+            INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
+            LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
+            LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
+            WHERE LOWER(tp.tp_name) LIKE '%engagement%'
+            ORDER BY s.name
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        return results
+    except Exception as e:
+        frappe.log_error(f"Error getting valid engagement surveys: {str(e)}")
+        return []
 
 def get_all_unique_questions(valid_surveys):
     """

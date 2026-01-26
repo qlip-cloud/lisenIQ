@@ -175,7 +175,6 @@ def get_valid_surveys():
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
-            WHERE LOWER(tp.tp_name) LIKE '%cultura%'
             ORDER BY s.name
         """
         results = frappe.db.sql(query, as_dict=True)

@@ -203,7 +203,9 @@ def get_filtered_contacts_count(filters='[]'):
 
     base_filters = [
         ["Contact", "status", "in", ["Enabled", "Passive"]],
-        ["Contact", "custom_is_liseniq_contact", "=", 1]
+        ["Contact", "custom_is_liseniq_contact", "=", 1],
+        ["Contact", "custom_is_deleted", "=", 0],
+        ["Contact", "custom_status", "!=", "Inactivo"]
     ]
     if user_company:
         base_filters.append(["Contact", "custom_company", "=", user_company])
@@ -259,7 +261,9 @@ def get_filtered_contacts_count(filters='[]'):
     contact_filters = {
         "name": ["in", matching_contact_names], 
         "status": ["in", ["Enabled", "Passive"]],
-        "custom_is_liseniq_contact": 1
+        "custom_is_liseniq_contact": 1,
+        "custom_is_deleted": 0,
+        "custom_status": ["!=", "Inactivo"]
     }
     if user_contact_name:
         contact_filters["name"] = ["in", [name for name in matching_contact_names if name != user_contact_name]]

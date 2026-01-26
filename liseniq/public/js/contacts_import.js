@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', function () {
         headers: [],
         rows: [], 				// Array de objetos
         errors: [], 			// Errores de validación por fila
+        existingDNIs: [],       // Lista de DNIs que ya existen en DB (cache)
         processResult: null,
         mode: 'upload', 			// 'upload' o 'edit'
         gridApi: null, 				// referencia al API de Ag-Grid
@@ -73,7 +74,8 @@ document.addEventListener('DOMContentLoaded', function () {
             status: ['Activo', 'Inactivo'],
             demographic_headers: [] // Nombres de columnas demográficas existentes
         },
-        newColumns: [] // { id: string, name: string }
+        newColumns: [], // { id: string, name: string }
+        showOnlyErrors: false // Nuevo estado para filtro de errores
     };
 
     // Campos obligatorios para validación frontend
@@ -143,6 +145,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Definición base de columnas (estáticas)
     const getBaseColDefs = () => [
+        {
+            headerName: "#",
+            maxWidth: 60,
+            minWidth: 50,
+            pinned: "left",
+            valueGetter: "node.rowIndex + 1",
+            editable: false,
+            sortable: false, // No ordenable porque siempre debe ser secuencial visualmente
+            filter: false,
+            resizable: false,
+            cellStyle: { 
+                'text-align': 'center', 
+                'background-color': '#f8f9fa', 
+                'color': '#737373',
+                'font-weight': '600'
+            }
+        },
         { 
             field: "Nombre", 
             headerName: "Nombre (Obligatorio)", 
@@ -314,6 +333,37 @@ document.addEventListener('DOMContentLoaded', function () {
         let hasErrors = false;
         let errorCount = 0;
         const validationErrors = [];
+        
+        // Contadores para el resumen
+        let newCount = 0;
+        let existingCount = 0;
+
+        // Conjunto para verificar duplicados dentro del archivo
+        const seenDNIs = new Set();
+        const duplicateDNIsInFile = new Set();
+        
+        // Detectar duplicados internos
+        state.gridApi.forEachNode((node) => {
+            const row = node.data;
+            const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+            if (dni) {
+                if (seenDNIs.has(dni)) {
+                    duplicateDNIsInFile.add(dni);
+                } else {
+                    seenDNIs.add(dni);
+                }
+            }
+        });
+
+        // Mapas de validación de opciones (Campo -> Array en state.options)
+        const validationMaps = {
+            "Tipo de Documento": state.options.document_types,
+            "País": state.options.countries,
+            "Idioma": state.options.languages,
+            "Estatus": state.options.status,
+            "Género": state.options.genders,
+            "Nivel Académico": state.options.academic_levels
+        };
 
         // Validar Nombres de Columnas Nuevas
         const invalidColNames = state.newColumns.filter(c => !c.name || c.name.trim() === '');
@@ -329,6 +379,8 @@ document.addEventListener('DOMContentLoaded', function () {
         state.gridApi.forEachNode((node, index) => {
             const row = node.data;
             const missing = [];
+            const invalidValues = [];
+            const rowErrors = [];
             
             // Validar Campos Obligatorios Estándar
             MANDATORY_FIELDS.forEach(field => {
@@ -337,6 +389,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
+            // Validar Listas (Valores exactos)
+            Object.keys(validationMaps).forEach(field => {
+                const val = (row[field] || '').toString().trim();
+                const validOptions = validationMaps[field] || [];
+                if (val && validOptions.length > 0 && !validOptions.includes(val)) {
+                    invalidValues.push(`${val} no es válido en ${field}`);
+                }
+            });
+
+            // Validar Duplicados
+            const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+            let isExisting = false;
+            if (dni) {
+                // Duplicado en DB
+                if (state.existingDNIs && state.existingDNIs.includes(dni)) {
+                    isExisting = true;
+                    existingCount++;
+                } else {
+                    newCount++;
+                }
+
+                // Duplicado en Archivo
+                if (duplicateDNIsInFile.has(dni)) {
+                    rowErrors.push(`DNI ${dni} duplicado en el archivo`);
+                }
+            }
+
             // Contar valores para columnas nuevas
             state.newColumns.forEach(c => {
                 if (row[c.id] && row[c.id].toString().trim() !== "") {
@@ -344,12 +423,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
-            if (missing.length > 0) {
+            // Consolidar errores de fila
+            if (missing.length > 0) rowErrors.push("Faltan: " + missing.join(', '));
+            if (invalidValues.length > 0) rowErrors.push(invalidValues.join(', '));
+
+            // Marcar estado interno de error en la fila para el filtrado y estilizado
+            const rowHasError = rowErrors.length > 0;
+            node.data._hasError = rowHasError;
+
+            if (rowHasError) {
                 hasErrors = true;
                 errorCount++;
-                if (validationErrors.length < 5) { 
-                    validationErrors.push({ row: index + 1, missing: missing });
-                }
+                // Agregar al array de resumen si hay errores
+                // Usamos node.rowIndex + 1 para que coincida con la columna visual
+                validationErrors.push({ row: node.rowIndex + 1, missing: rowErrors });
             }
         });
 
@@ -361,32 +448,79 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // 1. Control del botón Continuar
+        // Cálculo de registros a eliminar
+        let deleteCount = 0;
+        if (state.existingDNIs && state.existingDNIs.length > 0) {
+            // Comparamos los DNIs existentes en DB contra los DNIs presentes en la grilla (seenDNIs)
+            deleteCount = state.existingDNIs.filter(d => d != null && !seenDNIs.has(d.toString().trim())).length;
+        }
+
+        if (errorCount === 0 && state.showOnlyErrors) {
+            state.showOnlyErrors = false;
+            state.gridApi.onFilterChanged();
+        }
+ 
+
+        // Control del botón Continuar
         ui.btnValidateContinue.disabled = hasErrors;
 
-        // 2. Actualizar resumen visual
+        // Actualizar resumen visual con conteo detallado
+        let summaryHtml = '';
+        
+        // Estilo condicional para el botón de errores
+        const errorFilterClass = state.showOnlyErrors ? 'active-filter' : '';
+        const errorFilterText = state.showOnlyErrors ? 'Mostrar Todos' : 'Con Errores';
+        const errorDisplay = errorCount > 0 ? 'block' : 'none';
+
+        // Tarjeta de Resumen de conteos
+        summaryHtml += `
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                <div class="alert alert-info" style="flex: 1; margin: 0; text-align: center;">
+                    <strong>${newCount}</strong><br>Contactos a Crear
+                </div>
+                <div class="alert alert-warning" style="flex: 1; margin: 0; text-align: center; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
+                    <strong>${existingCount}</strong><br>Contactos a Actualizar
+                </div>
+                <div class="alert alert-secondary" style="flex: 1; margin: 0; text-align: center; color: #383d41; background-color: #e2e3e5; border-color: #d6d8db;">
+                    <strong>${deleteCount}</strong><br>Contactos a Eliminar
+                </div>
+                <div id="btn-toggle-errors" class="alert alert-danger alert-error-clickable ${errorFilterClass}" title="Click para filtrar errores" style="flex: 1; margin: 0; text-align: center; display: ${errorDisplay};">
+                    <strong>${errorCount}</strong><br>${errorFilterText}
+                </div>
+            </div>
+        `;
+
         if (hasErrors) {
-            let summaryHtml = `
+            summaryHtml += `
                 <div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                    <strong>Validación incompleta:</strong><br>
+                    <strong>Errores de validación detectados:</strong><br>
                     <ul>
             `;
             validationErrors.forEach(e => {
-                summaryHtml += `<li>${typeof e.row === 'number' ? 'Fila ' + e.row : e.row}: ${e.missing.join(', ')}</li>`;
+                summaryHtml += `<li>${typeof e.row === 'number' ? 'Fila ' + e.row : e.row}: ${e.missing.join(' | ')}</li>`;
             });
-            if (errorCount > 5) {
-                summaryHtml += `<li>... y ${errorCount - 5} filas más con errores.</li>`;
-            }
             summaryHtml += `</ul></div>`;
-            ui.validationSummary.innerHTML = summaryHtml;
         } else {
-            ui.validationSummary.innerHTML = `
+            summaryHtml += `
             <div class="alert alert-success" style="background-color: #f0fff4; border: 1px solid #68d391; color: #276749; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                <i class="fa fa-check-circle"></i> Validación exitosa.
+                <i class="fa fa-check-circle"></i> Todos los datos son válidos. Listo para procesar.
             </div>`;
         }
         
-        state.gridApi.refreshCells({ force: true });
+        ui.validationSummary.innerHTML = summaryHtml;
+        
+        // Re-asignar evento al botón de filtro de errores (se pierde al sobrescribir innerHTML)
+        const toggleBtn = document.getElementById('btn-toggle-errors');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                state.showOnlyErrors = !state.showOnlyErrors;
+                state.gridApi.onFilterChanged(); // Disparar filtrado externo
+                validateRealTime(); // Re-renderizar para actualizar estado visual del botón
+            });
+        }
+        
+        // Forzar redibujado de filas para aplicar estilos de error
+        state.gridApi.redrawRows();
     }
 
     function initAgGrid() {
@@ -407,7 +541,24 @@ document.addEventListener('DOMContentLoaded', function () {
             pagination: true,
             paginationPageSize: 20,
             theme: "legacy",
-            rowSelection: 'multiple',
+            rowSelection: { mode: 'multiRow' },
+            
+            // Regla para estilizar filas con error
+            rowClassRules: {
+                'row-error-highlight': (params) => {
+                    return params.data && params.data._hasError;
+                }
+            },
+            
+            // Lógica de Filtro Externo
+            isExternalFilterPresent: () => {
+                return state.showOnlyErrors;
+            },
+            doesExternalFilterPass: (node) => {
+                // Si el filtro está activo, solo pasa si tiene error
+                return node.data && node.data._hasError;
+            },
+
             onGridReady: (params) => {
                 state.gridApi = params.api;
                 validateRealTime(); // Validar al cargar
@@ -416,7 +567,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 validateRealTime(); // Validar al editar
             },
             onModelUpdated: () => {
-                setTimeout(validateRealTime, 0); 
+                // Útil para cuando cambian filas, aunque validateRealTime maneja la mayoría
             }
         };
 
@@ -432,6 +583,7 @@ document.addEventListener('DOMContentLoaded', function () {
         state.file = null;
         if (ui.fileInput) ui.fileInput.value = '';
         if (ui.dropzoneFilename) ui.dropzoneFilename.textContent = '';
+        state.showOnlyErrors = false; // Resetear filtro
         
         // Cambiar modo y deshabilitar continuar hasta que se elija nuevo archivo
         setMode('upload');
@@ -488,6 +640,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         state.options.demographic_headers = r.message.demographic_headers;
                     }
                     state.errors = [];
+                    state.existingDNIs = []; // Resetear para edición manual
+                    state.showOnlyErrors = false;
                 } else {
                     state.rows = [];
                 }
@@ -581,6 +735,15 @@ document.addEventListener('DOMContentLoaded', function () {
             state.headers = data.headers || [];
             state.rows = data.rows || [];
             state.errors = data.errors || [];
+            state.showOnlyErrors = false;
+            
+            // Guardamos los DNIs existentes para validación en tiempo real sin llamar al backend
+            state.existingDNIs = data.existing_dnis || [];
+            
+            // Si el backend envía opciones actualizadas, las usamos
+            if (data.valid_options) {
+                state.options = { ...state.options, ...data.valid_options };
+            }
             
             showStep(2);
 
@@ -621,9 +784,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     ui.btnValidateContinue.addEventListener('click', () => {
         let gridData = [];
+        const seenDNIs = new Set(); // Conjunto para rastrear DNIs presentes
+
         if (state.gridApi) {
             state.gridApi.forEachNode(node => {
                 let row = { ...node.data };
+                // Eliminamos la propiedad de control interno antes de enviar
+                delete row._hasError; 
+
+                // Rastrear DNI para validación de eliminación
+                const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+                if (dni) {
+                    seenDNIs.add(dni);
+                }
 
                 // Mapear IDs temporales a nombres reales para el backend
                 state.newColumns.forEach(c => {
@@ -636,6 +809,10 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         } else {
             gridData = state.rows;
+            gridData.forEach(r => {
+                const dni = (r['Número de Documento (DNI)'] || '').toString().trim();
+                if (dni) seenDNIs.add(dni);
+            });
         }
 
         if (gridData.length === 0) {
@@ -643,15 +820,34 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        state.finalStats.total = gridData.length;
-        state.dataToProcess = JSON.stringify(gridData);
+        // Calcular cuántos se eliminarán
+        let deleteCount = 0;
+        if (state.existingDNIs && state.existingDNIs.length > 0) {
+            deleteCount = state.existingDNIs.filter(d => d != null && !seenDNIs.has(d.toString().trim())).length;
+        }
 
-        ui.btnFinish.disabled = false;
-        ui.btnFinish.textContent = 'Finalizar';
-        ui.btnBackToStep2.style.display = 'inline-block';
-        
-        renderProcessResult();
-        showStep(3);
+        const proceed = () => {
+            state.finalStats.total = gridData.length;
+            state.dataToProcess = JSON.stringify(gridData);
+
+            ui.btnFinish.disabled = false;
+            ui.btnFinish.textContent = 'Finalizar';
+            ui.btnBackToStep2.style.display = 'inline-block';
+            
+            renderProcessResult();
+            showStep(3);
+        };
+
+        if (deleteCount > 0) {
+            frappe.confirm(
+                `Atención: Se han detectado <b>${deleteCount}</b> contactos que no están en el archivo y serán <b>eliminados</b> (archivados).<br><br>¿Desea continuar con el proceso?`,
+                () => {
+                    proceed();
+                }
+            );
+        } else {
+            proceed();
+        }
     });
 
     function renderProcessResult() {

@@ -419,3 +419,55 @@
 #global-notification-bar.notification-error::after {
     background-color: #fff;
 }
+
+
+/* Scroll en contenedor de errores */
+#validation-summary ul {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 0;
+    padding-right: 8px;
+}
+
+/* Estilo personalizado de scrollbar para errores */
+#validation-summary ul::-webkit-scrollbar {
+    width: 6px;
+}
+#validation-summary ul::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+#validation-summary ul::-webkit-scrollbar-thumb {
+    background: #fc8181;
+    border-radius: 3px;
+}
+#validation-summary ul::-webkit-scrollbar-thumb:hover {
+    background: #f56565;
+}
+
+/* Estilo para filas con error en Ag-Grid */
+.ag-theme-alpine .ag-row.row-error-highlight {
+    background-color: #fff5f5 !important;
+}
+.ag-theme-alpine .ag-row-selected.row-error-highlight {
+    background-color: #fed7d7 !important;
+}
+
+/* Estilo para tarjeta de resumen de errores interactiva */
+.alert-error-clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.alert-error-clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(229, 62, 62, 0.2);
+}
+
+.alert-error-clickable.active-filter {
+    border: 2px solid #c53030;
+    background-color: #fed7d7 !important;
+    font-weight: 600;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+}

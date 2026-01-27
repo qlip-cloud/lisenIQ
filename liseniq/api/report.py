@@ -189,21 +189,13 @@ def get_engagement_responses():
         data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
         transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
         
-        # Definir las claves demográficas a excluir
-        demographic_keys = set(demographics_map.keys())
-        core_demographic_keys = {
-            'first_name', 'last_name', 'custom_dob', 'gender', 
-            'custom_academic_level', 'entry_date', 'country'
-        }
-        all_demographic_keys = demographic_keys | core_demographic_keys
+        # Definir solo los demográficos adicionales a excluir (no los core)
+        demographic_keys_to_exclude = set(demographics_map.keys())
         
-        # Filtrar los demográficos de los datos transformados
+        # Filtrar solo los demográficos adicionales de los datos transformados
         filtered_data = []
         for row in transformed_data:
-            filtered_row = {k: v for k, v in row.items() if k not in all_demographic_keys}
-            # Mantener user_id para poder relacionar con get_user_demographics
-            if 'user_id' in row:
-                filtered_row['user_id'] = row['user_id']
+            filtered_row = {k: v for k, v in row.items() if k not in demographic_keys_to_exclude}
             filtered_data.append(filtered_row)
         
         # Traducir las claves restantes

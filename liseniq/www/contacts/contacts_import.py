@@ -816,9 +816,15 @@ def validate_contacts():
 	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
 	company = contact_info.custom_company if contact_info else None
 	
-	existing_dnis = []
+	existing_contacts = []
 	if company:
-		existing_dnis = frappe.get_all("Contact", filters={"custom_company": company, "custom_is_deleted": 0}, pluck="custom_document_number")
+		# Modificación para traer nombre y email, necesario para el reporte de eliminación
+		existing_contacts = frappe.db.sql("""
+			SELECT c.custom_document_number as dni, c.first_name, c.last_name, e.email_id as email
+			FROM `tabContact` c
+			LEFT JOIN `tabContact Email` e ON e.parent = c.name AND e.is_primary = 1
+			WHERE c.custom_company = %s AND c.custom_is_deleted = 0
+		""", (company,), as_dict=True)
 
 	# Obtener opciones válidas para listas
 	options = get_grid_options()
@@ -861,6 +867,9 @@ def validate_contacts():
 		"errors": 0
 	}
 
+	# Lista simple de DNIs para validación rápida en este loop
+	existing_dnis_list = [c.get('dni') for c in existing_contacts if c.get('dni')]
+
 	for i, r in enumerate(rows[1:], start=2):
 		if not any(cell for cell in r): continue
 		row_dict = {}
@@ -894,10 +903,8 @@ def validate_contacts():
 
 		# Validar Duplicado en Base de Datos (por DNI)
 		dni = row_dict.get("Número de Documento (DNI)")
-		is_existing = False
 		if dni:
-			if dni in existing_dnis:
-				is_existing = True
+			if dni in existing_dnis_list:
 				stats["existing"] += 1
 			else:
 				stats["new"] += 1
@@ -915,7 +922,7 @@ def validate_contacts():
 		"rows": parsed, 
 		"errors": errors,
 		"stats": stats,
-		"existing_dnis": existing_dnis,
+		"existing_contacts": existing_contacts,
 		"valid_options": options
 	}
 

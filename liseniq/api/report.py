@@ -133,6 +133,89 @@ def custom_report_by_question_engagement(filters=None):
     return translated_data
 
 @frappe.whitelist()
+def get_user_demographics():
+    """
+    Retorna un array de objetos con el id del usuario y sus demográficos asociados
+    """
+    try:
+        query = """
+            SELECT 
+                cad.parent AS user_id,
+                cad.cad_demographic_type AS demographic_id,
+                cad.cad_value AS demographic_value
+            FROM `tabqp_IQ_ContactAdditionalDetail` cad
+            INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
+            WHERE dt.dt_object_type = 'Contacto'
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        
+        demographics_map = get_demographics_labels()
+        
+        user_demographics_dict = {}
+        for row in results:
+            user_id = row['user_id']
+            demographic_id = row['demographic_id']
+            demographic_value = row['demographic_value']
+            
+            if user_id not in user_demographics_dict:
+                user_demographics_dict[user_id] = {'user_id': user_id}
+            
+            # Traducir el demographic_id a su etiqueta legible
+            demographic_label = demographics_map.get(demographic_id, demographic_id)
+            user_demographics_dict[user_id][demographic_label] = demographic_value
+        
+        # Convertir el diccionario a un array de objetos
+        user_demographics_array = list(user_demographics_dict.values())
+        
+        return user_demographics_array
+
+    except Exception as e:
+        frappe.log_error(f"Error getting user demographics: {str(e)}")
+        return []
+
+@frappe.whitelist()
+def get_engagement_responses():
+    """
+    Retorna las respuestas de las encuestas de engagement sin demográficos
+    """
+    try:
+        valid_surveys = get_valid_engagement_surveys()
+        if not valid_surveys:
+            return []
+
+        all_questions_map = get_all_unique_questions(valid_surveys)
+        demographics_map = get_demographics_labels()
+
+        data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
+        transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+        
+        # Definir las claves demográficas a excluir
+        demographic_keys = set(demographics_map.keys())
+        core_demographic_keys = {
+            'first_name', 'last_name', 'custom_dob', 'gender', 
+            'custom_academic_level', 'entry_date', 'country'
+        }
+        all_demographic_keys = demographic_keys | core_demographic_keys
+        
+        # Filtrar los demográficos de los datos transformados
+        filtered_data = []
+        for row in transformed_data:
+            filtered_row = {k: v for k, v in row.items() if k not in all_demographic_keys}
+            # Mantener user_id para poder relacionar con get_user_demographics
+            if 'user_id' in row:
+                filtered_row['user_id'] = row['user_id']
+            filtered_data.append(filtered_row)
+        
+        # Traducir las claves restantes
+        translated_data = translate_keys(filtered_data, all_questions_map, demographics_map)
+
+        return translated_data
+
+    except Exception as e:
+        frappe.log_error(f"Error getting engagement responses: {str(e)}")
+        return []
+    
+@frappe.whitelist()
 def custom_report_by_question_yesterday(filters=None):
     """
     Reporte de las encuestas del día anterior donde cada pregunta está en un objeto separado

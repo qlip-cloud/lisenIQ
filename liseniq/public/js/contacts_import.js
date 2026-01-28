@@ -57,27 +57,27 @@ document.addEventListener('DOMContentLoaded', function () {
         currentStep: 1,
         file: null,
         headers: [],
-        rows: [], 				// Array de objetos
-        errors: [], 			// Errores de validación por fila
-        existingDNIs: [],       // Lista de DNIs (string) para chequeo rápido
-        existingContacts: [],   // Lista completa de objetos {dni, first_name, last_name, email}
+        rows: [], 				                // Array de objetos
+        errors: [], 			                // Errores de validación por fila
+        existingDNIs: [],                       // Lista de DNIs (string) para chequeo rápido
+        existingContacts: [],                   // Lista completa de objetos {dni, first_name, last_name, email}
         processResult: null,
-        mode: 'upload', 			// 'upload' o 'edit'
-        gridApi: null, 				// referencia al API de Ag-Grid
+        mode: 'upload', 			            // 'upload' o 'edit'
+        gridApi: null, 				            // referencia al API de Ag-Grid
         finalStats: { total: 0 },
-        dataToProcess: null, 		// Datos listos para enviar
-        options: {                  // Opciones para dropdowns y headers
+        dataToProcess: null, 		            // Datos listos para enviar
+        options: {                              // Opciones para dropdowns y headers
             document_types: [],
             languages: [],
             countries: [],
             genders: [],
             academic_levels: [],
             status: ['Activo', 'Inactivo'],
-            demographic_headers: [] // Nombres de columnas demográficas existentes
+            demographic_headers: []             // Nombres de columnas demográficas existentes
         },
-        newColumns: [], // { id: string, name: string }
+        newColumns: [],                         // { id: string, name: string }
         showOnlyErrors: false,
-        showDeleteList: false // Nuevo estado para mostrar lista de eliminación
+        showDeleteList: false                   // Nuevo estado para mostrar lista de eliminación
     };
 
     // Campos obligatorios para validación frontend
@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
             if (dni) {
-                // Validación de Formato DNI (Requerimiento)
+                // Validación de Formato DNI
                 const dniRegex = /^[a-zA-Z0-9]+$/;
                 if (!dniRegex.test(dni)) {
                     rowErrors.push(`DNI contiene caracteres inválidos (solo letras y números)`);
@@ -429,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            // Validación de Correos Duplicados (Requerimiento)
+            // Validación de Correos Duplicados
             const email = (row['Correo (Opcional)'] || '').toString().trim().toLowerCase();
             if (email && duplicateEmailsInFile.has(email)) {
                 rowErrors.push(`Correo ${email} duplicado en el archivo`);
@@ -484,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Control del botón Continuar
         ui.btnValidateContinue.disabled = hasErrors;
 
-        // --- Generación de HTML Resumen ---
+        // Actualizar resumen visual con conteo detallado
         let summaryHtml = '';
         
         const errorFilterClass = state.showOnlyErrors ? 'active-filter' : '';
@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
 
-        // Sección de lista de eliminados (Nuevo Requerimiento)
+        // Sección de lista de eliminados
         if (state.showDeleteList && deleteCount > 0) {
              summaryHtml += `
                 <div class="alert alert-secondary" style="background-color: #f1f3f5; border: 1px solid #d6d8db; color: #383d41; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
@@ -783,7 +783,7 @@ document.addEventListener('DOMContentLoaded', function () {
             state.showOnlyErrors = false;
             state.showDeleteList = false;
             
-            // Guardamos los contactos existentes (objetos completos) para validación y UI
+            // Guardamos los contactos existentes para validación y UI
             state.existingContacts = data.existing_contacts || [];
             // Mapeamos a solo DNI (strings) para búsqueda rápida
             state.existingDNIs = state.existingContacts.map(c => c.dni);

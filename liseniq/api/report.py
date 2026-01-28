@@ -157,13 +157,12 @@ def get_user_demographics():
             demographic_id = row['demographic_id']
             demographic_value = row['demographic_value']
             
-            if user_id not in user_demographics_dict:
-                user_demographics_dict[user_id] = {'user_id': user_id, 'demographics': {}}
+            #if user_id not in user_demographics_dict:
+            #    user_demographics_dict[user_id] = {'user_id': user_id, 'demographics': {}}
             
             # Traducir el demographic_id a su etiqueta legible
             demographic_label = demographics_map.get(demographic_id, demographic_id)
-            user_demographics_dict[user_id]['demographics'][demographic_label] = demographic_value
-        
+            user_demographics_dict[user_id] = {'user_id': user_id, 'demographic_id': demographic_label, 'demographic_value': demographic_value}
         # Convertir el diccionario a un array de objetos
         user_demographics_array = list(user_demographics_dict.values())
         

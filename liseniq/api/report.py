@@ -3,6 +3,12 @@ import frappe
 from frappe import _
 from datetime import datetime, timedelta
 
+"""
+TODO: 
+
+1. Implementar el reporte por tablas separadas para el reporte de medición de cultura organizacional
+2. Implementar funcionalidada de histórico para encuestas finalizadas en los nuevos reportes
+"""
 CATEGORIES = {
     "Sentido de propósito": "MI INSPIRACIÓN",
     "Trabajo trascendental": "MI INSPIRACIÓN",
@@ -154,6 +160,7 @@ def get_user_demographics():
         user_demographics_dict = {}
         for row in results:
             user_id = row['user_id']
+            user_document_number = frappe.db.get_value('Contact', user_id, 'custom_document_number') or ''
             demographic_id = row['demographic_id']
             demographic_value = row['demographic_value']
             
@@ -162,7 +169,7 @@ def get_user_demographics():
             
             # Traducir el demographic_id a su etiqueta legible
             demographic_label = demographics_map.get(demographic_id, demographic_id)
-            user_demographics_dict[user_id] = {'user_id': user_id, 'demographic_id': demographic_label, 'demographic_value': demographic_value}
+            user_demographics_dict[user_id] = {'user_id': user_document_number, 'demographic_id': demographic_label, 'demographic_value': demographic_value}
         # Convertir el diccionario a un array de objetos
         user_demographics_array = list(user_demographics_dict.values())
         

@@ -85,8 +85,8 @@
                         <div class="form-group">
                             <label for="survey-type-select">Público a participar</label>
                             <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
-                                <option value="all">Público Externo</option>
-                                <option value="selected">Contactos Cargados Previamente</option>
+                                <option value="all">Todos mis contactos</option>
+                                <option value="selected">Segmento de contactos</option>
                             </select>
                         </div>
                     </div>
@@ -113,7 +113,7 @@
                         <div class="col-md-10">
                             <div class="contacts-filter-section">
                                 <div class="form-group">
-                                    <label for="field-type-select">Tipo de Segmentación</label>
+                                    <label for="field-type-select">Segmentación</label>
                                     <select id="field-type-select" class="form-control form-select">
                                         <option value="" selected>Seleccionar tipo de segmentación...</option>
                                         {% for demo in contact_demographics %}
@@ -124,7 +124,7 @@
                                 
                                 <div class="categories-selection-container">
                                     <div class="categories-box">
-                                        <label>Categorías disponibles</label>
+                                        <label>Segmentos disponibles</label>
                                         <div id="available-categories" class="categories-list">
                                         </div>
                                     </div>
@@ -132,7 +132,7 @@
                                         <i class="fa fa-arrow-right"></i>
                                     </div>
                                     <div class="categories-box">
-                                        <label>Categorías seleccionadas</label>
+                                        <label>Segmentos seleccionados</label>
                                         <div id="selected-categories" class="categories-list"></div>
                                     </div>
                                 </div>
@@ -140,7 +140,7 @@
                         </div>
                         <div class="col-md-2">
                             <div class="contact-count-card">
-                                <span class="count-label">Número de contactos a enviar</span>
+                                <span class="count-label">Total de contactos a enviar</span>
                                 <div class="count-display">
                                     <span id="contact-count-number" class="count-number">0</span>
                                     <i id="view-contacts-btn" class="fa fa-eye view-contacts-icon" title="Ver contactos seleccionados"></i>

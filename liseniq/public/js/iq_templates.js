@@ -307,14 +307,28 @@ document.addEventListener('DOMContentLoaded', function () {
         const chkPrivate = formStep1.isPrivate;
         const chkPublic = formStep1.isPublic;
         const hiddenPublic = document.getElementById('tp_is_public_value');
+        const privateWarning = document.getElementById('private_template_warning');
 
         const syncPublicFlag = () => {
             if (hiddenPublic) hiddenPublic.value = (chkPublic && chkPublic.checked) ? '1' : '0';
         };
 
+        const togglePrivateWarning = () => {
+            if (privateWarning) {
+                if (!chkPrivate.checked) {
+                    privateWarning.classList.remove('d-none');
+                } else {
+                    privateWarning.classList.add('d-none');
+                }
+            }
+        };
+
         if (chkPublic) {
             chkPublic.addEventListener('change', () => {
-                if (chkPublic.checked && chkPrivate) chkPrivate.checked = false;
+                if (chkPublic.checked && chkPrivate) {
+                    chkPrivate.checked = false;
+                    togglePrivateWarning();
+                }
                 syncPublicFlag();
             });
         }
@@ -322,9 +336,12 @@ document.addEventListener('DOMContentLoaded', function () {
             chkPrivate.addEventListener('change', () => {
                 if (chkPrivate.checked && chkPublic) chkPublic.checked = false;
                 syncPublicFlag();
+                togglePrivateWarning();
             });
         }
+        
         syncPublicFlag();
+        togglePrivateWarning(); // Inicializa el estado basado en el HTML por defecto
     }
     
     function init() {

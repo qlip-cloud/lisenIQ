@@ -148,7 +148,7 @@ def get_user_demographics():
         surveys = get_valid_engagement_surveys()
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
-
+        demographics_labels = get_demographics_labels()
         for survey in finished_surveys:
             historical_data = get_historical_survey_data(survey['id'], {}, {})
             for hist_record in historical_data:
@@ -157,10 +157,11 @@ def get_user_demographics():
                     for demo_pair in demographics_data_str.split('||'):
                         if ':' in demo_pair:
                             demo_id, demo_value = demo_pair.split(':', 1)
+                            demo_label = demographics_labels.get(demo_id)
                             user_demographics_array.append({
                                 'user_id': hist_record.get('shd_document_number', ''),
                                 'survey_id': survey['survey_name'],
-                                'demographic_id': demo_id,
+                                'demographic_id': demo_label,
                                 'demographic_value': demo_value
                             })
 
@@ -186,10 +187,11 @@ def get_user_demographics():
             responses = frappe.db.sql(query, survey_names, as_dict=True)
             
             for response in responses:
+                demo_label = demographics_labels.get(response.get('demographic_id'))
                 user_demographics_array.append({
                     'user_id': response.get('custom_document_number', ''),
                     'survey_id': survey['survey_name'],
-                    'demographic_id': response.get('demographic_id', ''),
+                    'demographic_id': demo_label if demo_label else '',
                     'demographic_value': response.get('demographic_value', '')
                 })
 

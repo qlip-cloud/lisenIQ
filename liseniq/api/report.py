@@ -144,35 +144,55 @@ def get_user_demographics():
     Retorna un array de objetos con el id del usuario y sus demográficos asociados
     """
     try:
-        query = """
-            SELECT 
-                cad.parent AS user_id,
-                cad.cad_demographic_type AS demographic_id,
-                cad.cad_value AS demographic_value
-            FROM `tabqp_IQ_ContactAdditionalDetail` cad
-            INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
-            WHERE dt.dt_object_type = 'Contacto'
-        """
-        results = frappe.db.sql(query, as_dict=True)
-        
-        demographics_map = get_demographics_labels()
-        
-        user_demographics_dict = {}
-        for row in results:
-            user_id = row['user_id']
-            user_document_number = frappe.db.get_value('Contact', user_id, 'custom_document_number') or ''
-            demographic_id = row['demographic_id']
-            demographic_value = row['demographic_value']
+        user_demographics_array = []
+        surveys = get_valid_engagement_surveys()
+        finished_surveys = [s for s in surveys if s.get('in_history') == 1]
+        active_surveys = [s for s in surveys if s.get('in_history') != 1]
+
+        for survey in finished_surveys:
+            historical_data = get_historical_survey_data(survey['id'], {}, {})
+            for hist_record in historical_data:
+                demographics_data_str = hist_record.get('demographics_data', '')
+                if demographics_data_str:
+                    for demo_pair in demographics_data_str.split('||'):
+                        if ':' in demo_pair:
+                            demo_id, demo_value = demo_pair.split(':', 1)
+                            user_demographics_array.append({
+                                'user_id': hist_record.get('shd_document_number', ''),
+                                'survey_id': survey['survey_name'],
+                                'demographic_id': demo_id,
+                                'demographic_value': demo_value
+                            })
+
+        for survey in active_surveys:
+            survey_names = [survey['survey_name']]
+            survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
             
-            #if user_id not in user_demographics_dict:
-            #    user_demographics_dict[user_id] = {'user_id': user_id, 'demographics': {}}
+            query = f"""
+                SELECT 
+                    sr.user,
+                    c.custom_document_number,
+                    cad.cad_demographic_type AS demographic_id,
+                    cad.cad_value AS demographic_value
+                FROM `tabSurvey Response` sr
+                LEFT JOIN `tabContact` c ON c.name = sr.user
+                INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
+                INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
+                WHERE sr.survey IN ({survey_names_placeholder})
+                AND dt.dt_object_type = 'Contacto'
+                ORDER BY sr.survey, sr.creation DESC
+            """
             
-            # Traducir el demographic_id a su etiqueta legible
-            demographic_label = demographics_map.get(demographic_id, demographic_id)
-            user_demographics_dict[user_id] = {'user_id': user_document_number, 'demographic_id': demographic_label, 'demographic_value': demographic_value}
-        # Convertir el diccionario a un array de objetos
-        user_demographics_array = list(user_demographics_dict.values())
-        
+            responses = frappe.db.sql(query, survey_names, as_dict=True)
+            
+            for response in responses:
+                user_demographics_array.append({
+                    'user_id': response.get('custom_document_number', ''),
+                    'survey_id': survey['survey_name'],
+                    'demographic_id': response.get('demographic_id', ''),
+                    'demographic_value': response.get('demographic_value', '')
+                })
+
         return user_demographics_array
 
     except Exception as e:

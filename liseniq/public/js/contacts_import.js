@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         newColumns: [],                         // { id: string, name: string }
         showOnlyErrors: false,
+        showOnlyUpdating: false,                // Nuevo estado: mostrar solo actualizaciones
         showDeleteList: false                   // Nuevo estado para mostrar lista de eliminación
     };
 
@@ -494,14 +495,20 @@ document.addEventListener('DOMContentLoaded', function () {
         // Estilos para el botón de eliminar (similar a errores)
         const deleteFilterClass = state.showDeleteList ? 'active-filter' : '';
         const deleteDisplay = deleteCount > 0 ? 'block' : 'none';
+
+        // Estilos para el botón de actualizar (personalizados inline ya que no existen en CSS base)
+        const isUpdateActive = state.showOnlyUpdating;
+        const updateStyle = isUpdateActive 
+            ? 'border: 2px solid #856404; background-color: #ffeeba !important; font-weight: 600; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);' 
+            : 'background-color: #fff3cd; border-color: #ffeeba;';
         
         summaryHtml += `
             <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
                 <div class="alert alert-info" style="flex: 1; margin: 0; text-align: center;">
                     <strong>${newCount}</strong><br>Contactos a Crear
                 </div>
-                <div class="alert alert-warning" style="flex: 1; margin: 0; text-align: center; color: #856404; background-color: #fff3cd; border-color: #ffeeba;">
-                    <strong>${existingCount}</strong><br>Contactos a Actualizar
+                <div id="btn-toggle-updating" class="alert alert-warning" title="Click para filtrar actualizaciones" style="flex: 1; margin: 0; text-align: center; color: #856404; cursor: pointer; transition: all 0.2s ease; ${updateStyle}">
+                    <strong>${existingCount}</strong><br>${isUpdateActive ? 'Mostrar Todos' : 'Contactos a Actualizar'}
                 </div>
                 <div id="btn-toggle-deleted" class="alert alert-secondary alert-delete-clickable ${deleteFilterClass}" style="flex: 1; margin: 0; text-align: center; color: #383d41; background-color: #e2e3e5; border-color: #d6d8db; display: ${deleteDisplay};">
                     <strong>${deleteCount}</strong><br>Contactos a Eliminar
@@ -552,6 +559,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (toggleBtn) {
             toggleBtn.addEventListener('click', () => {
                 state.showOnlyErrors = !state.showOnlyErrors;
+                if (state.showOnlyErrors) {
+                    state.showOnlyUpdating = false;
+                }
                 state.gridApi.onFilterChanged(); 
                 validateRealTime(); 
             });
@@ -562,6 +572,18 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteBtn.addEventListener('click', () => {
                 state.showDeleteList = !state.showDeleteList;
                 validateRealTime(); // Re-renderizar para mostrar/ocultar lista
+            });
+        }
+
+        const updateBtn = document.getElementById('btn-toggle-updating');
+        if (updateBtn) {
+            updateBtn.addEventListener('click', () => {
+                state.showOnlyUpdating = !state.showOnlyUpdating;
+                if (state.showOnlyUpdating) {
+                    state.showOnlyErrors = false;
+                }
+                state.gridApi.onFilterChanged();
+                validateRealTime();
             });
         }
         
@@ -597,10 +619,17 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // Lógica de Filtro Externo
             isExternalFilterPresent: () => {
-                return state.showOnlyErrors;
+                return state.showOnlyErrors || state.showOnlyUpdating;
             },
             doesExternalFilterPass: (node) => {
-                return node.data && node.data._hasError;
+                if (state.showOnlyErrors) {
+                    return node.data && node.data._hasError;
+                }
+                if (state.showOnlyUpdating) {
+                    const dni = (node.data['Número de Documento (DNI)'] || '').toString().trim();
+                    return state.existingDNIs && state.existingDNIs.includes(dni);
+                }
+                return true;
             },
 
             onGridReady: (params) => {
@@ -627,6 +656,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (ui.fileInput) ui.fileInput.value = '';
         if (ui.dropzoneFilename) ui.dropzoneFilename.textContent = '';
         state.showOnlyErrors = false;
+        state.showOnlyUpdating = false;
         state.showDeleteList = false;
         
         setMode('upload');
@@ -686,6 +716,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     state.existingDNIs = []; 
                     state.existingContacts = []; 
                     state.showOnlyErrors = false;
+                    state.showOnlyUpdating = false;
                     state.showDeleteList = false;
                 } else {
                     state.rows = [];
@@ -781,6 +812,7 @@ document.addEventListener('DOMContentLoaded', function () {
             state.rows = data.rows || [];
             state.errors = data.errors || [];
             state.showOnlyErrors = false;
+            state.showOnlyUpdating = false;
             state.showDeleteList = false;
             
             // Guardamos los contactos existentes para validación y UI

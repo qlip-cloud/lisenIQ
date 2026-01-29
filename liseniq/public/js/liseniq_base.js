@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const openModalBtn = document.getElementById('btn-open-create-measurement-modal');
     const closeModalBtn = document.getElementById('btn-close-measurement-modal');
     const createBlankMeasurementBtn = document.getElementById('btn-blank-measurement');
+    const openTemplatestBtn = document.getElementById('btn-template-measurement');
 
     function toggleSidebar() {
         if (sidebar && overlay) {
@@ -47,6 +48,14 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = '/measurement/new_measurement';
         });
     }
+
+     if (openTemplatestBtn) {
+        openTemplatestBtn.addEventListener('click', () => {
+            window.location.href = '/iq-templates';
+        });
+    }
+
+    
 
     fetch('/api/method/liseniq.utils.login_util.get_user_company_name')
         .then(response => response.json())

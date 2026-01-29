@@ -670,7 +670,7 @@ document.addEventListener('DOMContentLoaded', function () {
             pagination: true,
             paginationPageSize: 20,
             theme: "legacy",
-            rowSelection: { mode: 'multiRow' },
+            // rowSelection: { mode: 'multiRow' },
             
             // Regla para estilizar filas con error
             rowClassRules: {
@@ -982,7 +982,7 @@ document.addEventListener('DOMContentLoaded', function () {
             state.dataToProcess = JSON.stringify(gridData);
 
             ui.btnFinish.disabled = false;
-            ui.btnFinish.textContent = 'Finalizar';
+            ui.btnFinish.textContent = 'Confirmar y cargar';
             ui.btnBackToStep2.style.display = 'inline-block';
             
             renderProcessResult();

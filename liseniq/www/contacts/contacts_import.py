@@ -159,6 +159,68 @@ def find_or_create_demographic_type(demographic_title):
 			"name"
 		)
 
+def _get_contacts_data_internal(company):
+	"""
+	Función auxiliar interna para obtener los datos de contactos formateados para el grid.
+	Se reutiliza en get_contacts_for_grid y validate_contacts.
+	"""
+	contacts = frappe.get_all("Contact", 
+		filters={
+			"custom_company": company, 
+			"custom_is_liseniq_contact": 1,
+			"custom_is_deleted": 0
+		},
+		fields=[
+			"name", "first_name", "last_name", "gender", "custom_dob",
+			"custom_country", "custom_document_type", "custom_document_number",
+			"custom_academic_level", "custom_entry_date", "custom_status",
+			"custom_language"
+		],
+		order_by="first_name asc"
+	)
+
+	maps = get_mapping_dicts()
+	demographic_headers = get_all_demographic_types()
+	grid_rows = []
+	
+	for c in contacts:
+		email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
+		
+		# Obtener demográficos
+		demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
+			filters={"parent": c.name},
+			fields=["cad_tag", "cad_value"]
+		)
+		
+		tipo_doc_label = maps["dt_export"].get(c.custom_document_type, c.custom_document_type)
+		pais_label = maps["country_export"].get(c.custom_country, c.custom_country)
+		idioma_label = maps["lang_export"].get(c.custom_language, c.custom_language)
+		academic_label = maps["academic_export"].get(c.custom_academic_level, c.custom_academic_level)
+
+		row = {
+			"Nombre": c.first_name,
+			"Apellido": c.last_name,
+			"Tipo de Documento": tipo_doc_label or "",
+			"Número de Documento (DNI)": c.custom_document_number,
+			"País": pais_label or "",
+			"Idioma": idioma_label or "",
+			"Estatus": c.custom_status,
+			"Género": c.gender,
+			"Fecha de Nacimiento": str(c.custom_dob) if c.custom_dob else "",
+			"Nivel Académico": academic_label or "",
+			"Correo (Opcional)": email or "",
+			"Fecha de Ingreso": str(c.custom_entry_date) if c.custom_entry_date else ""
+		}
+		
+		# Llenar columnas dinámicas
+		for demo in demographics:
+			if demo.cad_tag:
+				row[demo.cad_tag] = demo.cad_value
+
+		grid_rows.append(row)
+
+	return {"rows": grid_rows, "demographic_headers": demographic_headers}
+
 @frappe.whitelist(allow_guest=False)
 def get_contacts_for_grid():
 	try:
@@ -173,65 +235,7 @@ def get_contacts_for_grid():
 		if not contact_info or not contact_info.custom_company:
 			return {"rows": [], "demographic_headers": []}
 
-		user_company = contact_info.custom_company
-		
-		contacts = frappe.get_all("Contact", 
-			filters={
-				"custom_company": user_company, 
-				"custom_is_liseniq_contact": 1,
-				"custom_is_deleted": 0
-			},
-			fields=[
-				"name", "first_name", "last_name", "gender", "custom_dob",
-				"custom_country", "custom_document_type", "custom_document_number",
-				"custom_academic_level", "custom_entry_date", "custom_status",
-				"custom_language"
-			],
-			order_by="first_name asc"
-		)
-
-		maps = get_mapping_dicts()
-		demographic_headers = get_all_demographic_types() # Obtener lista completa actual
-		grid_rows = []
-		
-		for c in contacts:
-			email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
-			
-			# Obtener demográficos
-			demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
-				filters={"parent": c.name},
-				fields=["cad_tag", "cad_value"]
-			)
-			
-			tipo_doc_label = maps["dt_export"].get(c.custom_document_type, c.custom_document_type)
-			pais_label = maps["country_export"].get(c.custom_country, c.custom_country)
-			idioma_label = maps["lang_export"].get(c.custom_language, c.custom_language)
-			academic_label = maps["academic_export"].get(c.custom_academic_level, c.custom_academic_level)
-
-			row = {
-				"Nombre": c.first_name,
-				"Apellido": c.last_name,
-				"Tipo de Documento": tipo_doc_label or "",
-				"Número de Documento (DNI)": c.custom_document_number,
-				"País": pais_label or "",
-				"Idioma": idioma_label or "",
-				"Estatus": c.custom_status,
-				"Género": c.gender,
-				"Fecha de Nacimiento": str(c.custom_dob) if c.custom_dob else "",
-				"Nivel Académico": academic_label or "",
-				"Correo (Opcional)": email or "",
-				"Fecha de Ingreso": str(c.custom_entry_date) if c.custom_entry_date else ""
-			}
-			
-			# Llenar columnas dinámicas
-			for demo in demographics:
-				# Solo agregamos si el tag tiene valor
-				if demo.cad_tag:
-					row[demo.cad_tag] = demo.cad_value
-
-			grid_rows.append(row)
-
-		return {"rows": grid_rows, "demographic_headers": demographic_headers}
+		return _get_contacts_data_internal(contact_info.custom_company)
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: get_contacts_for_grid")
@@ -320,57 +324,13 @@ def download_template():
 		)
 
 		if contact_info and contact_info.custom_company:
-			user_company = contact_info.custom_company
-			contacts = frappe.get_all("Contact", 
-				filters={
-					"custom_company": user_company, 
-					"custom_is_liseniq_contact": 1
-				},
-				fields=[
-					"name", "first_name", "last_name", "gender", "custom_dob",
-					"custom_country", "custom_document_type", "custom_document_number",
-					"custom_academic_level", "custom_entry_date", "custom_status",
-					"custom_language"
-				],
-				order_by="first_name asc"
-			)
-
-			maps = get_mapping_dicts()
+			# Reutilizamos la lógica de obtención de datos interna
+			data = _get_contacts_data_internal(contact_info.custom_company)
 			
-			for c in contacts:
-				email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
-				
-				# Demográficos
-				demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
-					filters={"parent": c.name},
-					fields=["cad_tag", "cad_value"]
-				)
-				demo_dict = {d.cad_tag: d.cad_value for d in demographics}
-
-				# Mapeo de valores
-				tipo_doc_label = maps["dt_export"].get(c.custom_document_type, c.custom_document_type)
-				pais_label = maps["country_export"].get(c.custom_country, c.custom_country)
-				idioma_label = maps["lang_export"].get(c.custom_language, c.custom_language)
-				academic_label = maps["academic_export"].get(c.custom_academic_level, c.custom_academic_level)
-				
+			for row_dict in data['rows']:
 				row_values = []
 				for h in headers:
-					val = ""
-					if h == "Nombre": val = c.first_name
-					elif h == "Apellido": val = c.last_name
-					elif h == "Tipo de Documento": val = tipo_doc_label
-					elif h == "Número de Documento (DNI)": val = c.custom_document_number
-					elif h == "País": val = pais_label
-					elif h == "Idioma": val = idioma_label
-					elif h == "Estatus": val = c.custom_status
-					elif h == "Género": val = c.gender
-					elif h == "Fecha de Nacimiento": val = c.custom_dob
-					elif h == "Nivel Académico": val = academic_label
-					elif h == "Correo (Opcional)": val = email
-					elif h == "Fecha de Ingreso": val = c.custom_entry_date
-					elif h in demo_dict: val = demo_dict[h]
-					
-					row_values.append(val)
+					row_values.append(row_dict.get(h, ""))
 				
 				ws.append(row_values)
 
@@ -816,15 +776,12 @@ def validate_contacts():
 	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
 	company = contact_info.custom_company if contact_info else None
 	
-	existing_contacts = []
+	existing_grid_rows = []
 	if company:
-		# Modificación para traer nombre y email, necesario para el reporte de eliminación
-		existing_contacts = frappe.db.sql("""
-			SELECT c.custom_document_number as dni, c.first_name, c.last_name, e.email_id as email
-			FROM `tabContact` c
-			LEFT JOIN `tabContact Email` e ON e.parent = c.name AND e.is_primary = 1
-			WHERE c.custom_company = %s AND c.custom_is_deleted = 0
-		""", (company,), as_dict=True)
+		# Obtenemos TODOS los datos de contactos, formateados igual que para el grid
+		# Lo uso para en el frontend comparar campo a campo para detectar cambios reales
+		internal_data = _get_contacts_data_internal(company)
+		existing_grid_rows = internal_data.get("rows", [])
 
 	# Obtener opciones válidas para listas
 	options = get_grid_options()
@@ -860,15 +817,12 @@ def validate_contacts():
 		i = idx[col]
 		return str(r[i]).strip() if i < len(r) and r[i] else ""
 	
-	# Contadores de reporte
+	# Contadores de reporte preliminar
 	stats = {
 		"new": 0,
 		"existing": 0,
 		"errors": 0
 	}
-
-	# Lista simple de DNIs para validación rápida en este loop
-	existing_dnis_list = [c.get('dni') for c in existing_contacts if c.get('dni')]
 
 	for i, r in enumerate(rows[1:], start=2):
 		if not any(cell for cell in r): continue
@@ -885,7 +839,6 @@ def validate_contacts():
 				row_errors.append(f"Falta {field}")
 
 		# Validación de Listas (Selects)
-		# Mapeo campo -> key en options
 		field_map = {
 			"Tipo de Documento": "document_types",
 			"País": "countries",
@@ -900,14 +853,6 @@ def validate_contacts():
 			if val and option_key in options:
 				if val not in options[option_key]:
 					row_errors.append(f"'{val}' no es válido para {field_name}")
-
-		# Validar Duplicado en Base de Datos (por DNI)
-		dni = row_dict.get("Número de Documento (DNI)")
-		if dni:
-			if dni in existing_dnis_list:
-				stats["existing"] += 1
-			else:
-				stats["new"] += 1
 		
 		if row_errors:
 			stats["errors"] += 1
@@ -915,14 +860,14 @@ def validate_contacts():
 		
 		parsed.append(row_dict)
 
-	# Retornamos existing_dnis y options para que el frontend pueda seguir validando en tiempo real
+	# Retornamos existing_grid_rows con todos los datos en lugar de solo DNIs
 	return {
 		"ok": True, 
 		"headers": headers, 
 		"rows": parsed, 
 		"errors": errors,
 		"stats": stats,
-		"existing_contacts": existing_contacts,
+		"existing_grid_rows": existing_grid_rows,
 		"valid_options": options
 	}
 

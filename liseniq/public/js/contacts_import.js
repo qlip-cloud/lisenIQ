@@ -59,8 +59,7 @@ document.addEventListener('DOMContentLoaded', function () {
         headers: [],
         rows: [], 				                // Array de objetos
         errors: [], 			                // Errores de validación por fila
-        existingDNIs: [],                       // Lista de DNIs (string) para chequeo rápido
-        existingContacts: [],                   // Lista completa de objetos {dni, first_name, last_name, email}
+        existingMap: new Map(),                 // Mapa DNI Objeto Contacto completo
         processResult: null,
         mode: 'upload', 			            // 'upload' o 'edit'
         gridApi: null, 				            // referencia al API de Ag-Grid
@@ -77,8 +76,8 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         newColumns: [],                         // { id: string, name: string }
         showOnlyErrors: false,
-        showOnlyUpdating: false,                // Nuevo estado: mostrar solo actualizaciones
-        showDeleteList: false                   // Nuevo estado para mostrar lista de eliminación
+        showOnlyUpdating: false,                // Filtro para mostrar solo actualizaciones reales
+        showDeleteList: false                   // Filtro para mostrar lista de eliminación
     };
 
     // Campos obligatorios para validación frontend
@@ -328,6 +327,28 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => initAgGrid(), 100);
         }
     }
+    
+    // Función auxiliar para comparar si una fila tiene cambios reales respecto al existente
+    function isRowDifferent(row, existing) {
+        // Normalizar valores para comparación
+        const norm = (v) => (v === null || v === undefined) ? '' : String(v).trim();
+        
+        // Obtenemos todas las claves presentes en ambos objetos
+        const allKeys = new Set([...Object.keys(row), ...Object.keys(existing)]);
+        
+        for (let key of allKeys) {
+            // Ignorar campos internos o metadatos
+            if (key.startsWith('_') || key === 'row_id') continue;
+            
+            const valRow = norm(row[key]);
+            const valExisting = norm(existing[key]);
+            
+            if (valRow !== valExisting) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     // Función de Validación en Tiempo Real
     function validateRealTime() {
@@ -339,7 +360,8 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // Contadores para el resumen
         let newCount = 0;
-        let existingCount = 0;
+        let updateCount = 0;
+        let unchangedCount = 0;
 
         // Conjuntos para verificar duplicados
         const seenDNIs = new Set();
@@ -410,6 +432,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+            let isUpdate = false;
+            let isUnchanged = false;
+
             if (dni) {
                 // Validación de Formato DNI
                 const dniRegex = /^[a-zA-Z0-9]+$/;
@@ -417,9 +442,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     rowErrors.push(`DNI contiene caracteres inválidos (solo letras y números)`);
                 }
 
-                // Duplicado en DB
-                if (state.existingDNIs && state.existingDNIs.includes(dni)) {
-                    existingCount++;
+                // Duplicado en DB y Detección de Cambios
+                if (state.existingMap.has(dni)) {
+                    const existingData = state.existingMap.get(dni);
+                    // Comparar para ver si hay cambios reales
+                    if (isRowDifferent(row, existingData)) {
+                        updateCount++;
+                        isUpdate = true;
+                    } else {
+                        unchangedCount++;
+                        isUnchanged = true;
+                    }
                 } else {
                     newCount++;
                 }
@@ -429,6 +462,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     rowErrors.push(`DNI ${dni} duplicado en el archivo`);
                 }
             }
+
+            // Marcar estado de la fila para filtros
+            node.data._isUpdate = isUpdate;
+            node.data._isUnchanged = isUnchanged;
 
             // Validación de Correos Duplicados
             const email = (row['Correo (Opcional)'] || '').toString().trim().toLowerCase();
@@ -468,17 +505,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Cálculo de registros a eliminar
         let deletedContacts = [];
-        if (state.existingContacts && state.existingContacts.length > 0) {
-            // Filtramos los contactos completos que no están en el archivo
-            deletedContacts = state.existingContacts.filter(c => 
-                c.dni && !seenDNIs.has(c.dni.toString().trim())
-            );
+        if (state.existingMap.size > 0) {
+            // Filtramos los contactos que no están en el archivo
+            // Iteramos sobre el mapa de existentes
+            for (const [dni, contactData] of state.existingMap) {
+                if (!seenDNIs.has(dni)) {
+                    deletedContacts.push(contactData);
+                }
+            }
         }
         const deleteCount = deletedContacts.length;
 
         if (errorCount === 0 && state.showOnlyErrors) {
             state.showOnlyErrors = false;
             state.gridApi.onFilterChanged();
+        }
+
+        if (updateCount === 0 && state.showOnlyUpdating) {
+             state.showOnlyUpdating = false;
+             state.gridApi.onFilterChanged();
         }
 
 
@@ -492,28 +537,39 @@ document.addEventListener('DOMContentLoaded', function () {
         const errorFilterText = state.showOnlyErrors ? 'Mostrar Todos' : 'Con Errores';
         const errorDisplay = errorCount > 0 ? 'block' : 'none';
 
-        // Estilos para el botón de eliminar (similar a errores)
+        // Estilos para el botón de eliminar
         const deleteFilterClass = state.showDeleteList ? 'active-filter' : '';
         const deleteDisplay = deleteCount > 0 ? 'block' : 'none';
 
-        // Estilos para el botón de actualizar (personalizados inline ya que no existen en CSS base)
+        // Estilos para el botón de actualizar
         const isUpdateActive = state.showOnlyUpdating;
         const updateStyle = isUpdateActive 
             ? 'border: 2px solid #856404; background-color: #ffeeba !important; font-weight: 600; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);' 
             : 'background-color: #fff3cd; border-color: #ffeeba;';
+        const updateDisplay = updateCount > 0 ? 'block' : 'none';
         
+        // Bloque de "Sin Cambios" para dar feedback completo
+        const unchangedDisplay = unchangedCount > 0 ? 'block' : 'none';
+
         summaryHtml += `
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                <div class="alert alert-info" style="flex: 1; margin: 0; text-align: center;">
-                    <strong>${newCount}</strong><br>Contactos a Crear
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                <div class="alert alert-info" style="flex: 1; margin: 0; text-align: center; min-width: 140px;">
+                    <strong>${newCount}</strong><br>Crear Nuevos
                 </div>
-                <div id="btn-toggle-updating" class="alert alert-warning" title="Click para filtrar actualizaciones" style="flex: 1; margin: 0; text-align: center; color: #856404; cursor: pointer; transition: all 0.2s ease; ${updateStyle}">
-                    <strong>${existingCount}</strong><br>${isUpdateActive ? 'Mostrar Todos' : 'Contactos a Actualizar'}
+                
+                <div id="btn-toggle-updating" class="alert alert-warning" title="Click para filtrar actualizaciones reales" style="flex: 1; margin: 0; text-align: center; color: #856404; cursor: pointer; transition: all 0.2s ease; ${updateStyle} display: ${updateDisplay}; min-width: 140px;">
+                    <strong>${updateCount}</strong><br>${isUpdateActive ? 'Mostrar Todos' : 'Actualizar'}
                 </div>
-                <div id="btn-toggle-deleted" class="alert alert-secondary alert-delete-clickable ${deleteFilterClass}" style="flex: 1; margin: 0; text-align: center; color: #383d41; background-color: #e2e3e5; border-color: #d6d8db; display: ${deleteDisplay};">
-                    <strong>${deleteCount}</strong><br>Contactos a Eliminar
+
+                <div class="alert alert-light" style="flex: 1; margin: 0; text-align: center; color: #6c757d; background-color: #f8f9fa; border-color: #f8f9fa; display: ${unchangedDisplay}; min-width: 140px;">
+                    <strong>${unchangedCount}</strong><br>Sin Cambios
                 </div>
-                <div id="btn-toggle-errors" class="alert alert-danger alert-error-clickable ${errorFilterClass}" title="Click para filtrar errores" style="flex: 1; margin: 0; text-align: center; display: ${errorDisplay};">
+
+                <div id="btn-toggle-deleted" class="alert alert-secondary alert-delete-clickable ${deleteFilterClass}" style="flex: 1; margin: 0; text-align: center; color: #383d41; background-color: #e2e3e5; border-color: #d6d8db; display: ${deleteDisplay}; min-width: 140px;">
+                    <strong>${deleteCount}</strong><br>Eliminar
+                </div>
+                
+                <div id="btn-toggle-errors" class="alert alert-danger alert-error-clickable ${errorFilterClass}" title="Click para filtrar errores" style="flex: 1; margin: 0; text-align: center; display: ${errorDisplay}; min-width: 140px;">
                     <strong>${errorCount}</strong><br>${errorFilterText}
                 </div>
             </div>
@@ -527,9 +583,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     <ul class="deleted-contacts-list" style="margin-top: 0.5rem; padding-left: 1.2rem;">
             `;
             deletedContacts.forEach(c => {
+                // Adaptamos las claves a las que devuelve el nuevo backend
+                const nombre = c['Nombre'] || '';
+                const apellido = c['Apellido'] || '';
+                const dni = c['Número de Documento (DNI)'] || '';
+                const email = c['Correo (Opcional)'] || 'Sin correo';
+                
                 summaryHtml += `<li style="margin-bottom: 6px;">
-                    <strong>${c.first_name || ''} ${c.last_name || ''}</strong><br>
-                    <small style="color: #666;">DNI: ${c.dni} | Email: ${c.email || 'Sin correo'}</small>
+                    <strong>${nombre} ${apellido}</strong><br>
+                    <small style="color: #666;">DNI: ${dni} | Email: ${email}</small>
                 </li>`;
             });
             summaryHtml += `</ul></div>`;
@@ -626,8 +688,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     return node.data && node.data._hasError;
                 }
                 if (state.showOnlyUpdating) {
-                    const dni = (node.data['Número de Documento (DNI)'] || '').toString().trim();
-                    return state.existingDNIs && state.existingDNIs.includes(dni);
+                    // Filtrar solo los que están marcados como actualización real
+                    return node.data && node.data._isUpdate;
                 }
                 return true;
             },
@@ -713,8 +775,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         state.options.demographic_headers = r.message.demographic_headers;
                     }
                     state.errors = [];
-                    state.existingDNIs = []; 
-                    state.existingContacts = []; 
+                    state.existingMap = new Map();
+                    (r.message.rows || []).forEach(row => {
+                        const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+                        if (dni) {
+                            state.existingMap.set(dni, row);
+                        }
+                    });
+                    
                     state.showOnlyErrors = false;
                     state.showOnlyUpdating = false;
                     state.showDeleteList = false;
@@ -815,10 +883,14 @@ document.addEventListener('DOMContentLoaded', function () {
             state.showOnlyUpdating = false;
             state.showDeleteList = false;
             
-            // Guardamos los contactos existentes para validación y UI
-            state.existingContacts = data.existing_contacts || [];
-            // Mapeamos a solo DNI (strings) para búsqueda rápida
-            state.existingDNIs = state.existingContacts.map(c => c.dni);
+            // Guardamos los contactos existentes completos con el retun del backend 'existing_grid_rows'
+            state.existingMap = new Map();
+            (data.existing_grid_rows || []).forEach(row => {
+                 const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
+                 if (dni) {
+                     state.existingMap.set(dni, row);
+                 }
+            });
             
             if (data.valid_options) {
                 state.options = { ...state.options, ...data.valid_options };
@@ -867,6 +939,8 @@ document.addEventListener('DOMContentLoaded', function () {
             state.gridApi.forEachNode(node => {
                 let row = { ...node.data };
                 delete row._hasError; 
+                delete row._isUpdate;
+                delete row._isUnchanged;
 
                 const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
                 if (dni) {
@@ -895,8 +969,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         let deleteCount = 0;
-        if (state.existingDNIs && state.existingDNIs.length > 0) {
-            deleteCount = state.existingDNIs.filter(d => d != null && !seenDNIs.has(d.toString().trim())).length;
+        if (state.existingMap.size > 0) {
+            for (const dni of state.existingMap.keys()) {
+                if (!seenDNIs.has(dni)) {
+                    deleteCount++;
+                }
+            }
         }
 
         const proceed = () => {

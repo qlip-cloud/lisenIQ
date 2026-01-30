@@ -87,7 +87,7 @@ class MeasurementCreator {
                 timezone: 'America/Bogota',
                 questions: [],
                 contacts: {
-                    surveyType: 'all',
+                    surveyType: 'selected',
                     responseType: 'anonymous',
                     sendToAll: false,
                     filters: [],
@@ -178,11 +178,13 @@ class MeasurementCreator {
             // Participantes
             if (data.contacts) {
                 const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber /*, viewContactsBtn*/ } = this.ui.contactsStep;
-                if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'all';
+                if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'selected';
                 if (responseTypeSelect) responseTypeSelect.value = data.contacts.responseType || 'anonymous';
                 
                 if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                     selectedContactsSection?.classList.remove('d-none');
+                } else {
+                     selectedContactsSection?.classList.add('d-none');
                 }
 
                 this.state.measurementData.contacts.headers = Array.isArray(data.contacts.headers) && data.contacts.headers.length > 0
@@ -270,10 +272,12 @@ class MeasurementCreator {
         if (stepNumber === 2) {
             this.ui.navButtons.next2.disabled = this.state.measurementData.questions.length === 0;
         }
-        if (stepNumber === 3 && this.state.isEditMode) {
+        if (stepNumber === 3) {
             const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
             if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                 selectedContactsSection?.classList.remove('d-none');
+            } else if (surveyTypeSelect) {
+                selectedContactsSection?.classList.add('d-none');
             }
         }
         if (stepNumber === 4) {

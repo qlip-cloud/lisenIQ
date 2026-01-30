@@ -190,7 +190,8 @@ def get_user_demographics():
                 demo_label = demographics_labels.get(response.get('demographic_id'))
                 user_demographics_array.append({
                     'user_id': response.get('custom_document_number', ''),
-                    'survey_id': survey['survey_name'],
+                    'survey_id': survey['id'],
+                    'user_id-survey_id': f"{response.get('custom_document_number', '')}-{survey['id']}",
                     'demographic_id': demo_label if demo_label else '',
                     'demographic_value': response.get('demographic_value', '')
                 })
@@ -794,6 +795,7 @@ def process_historical_response_row_by_question(hist_record, survey, all_questio
         'company_id': company_data.get('company_id', ''),
         'company_name': company_data.get('company_name', ''),
         'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
+        'user_id-survey_id': f"{hist_record.get('shd_document_number', '')}-{survey_id_map.get(survey_name, '')}",
         'user_id': hist_record.get('shd_document_number', ''),
         'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
         'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
@@ -841,6 +843,7 @@ def process_response_row_by_question(response, all_questions_map, demographics_d
         'company_id': company_data.get('company_id', ''),
         'company_name': company_data.get('company_name', ''),
         'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
+        'user_id-survey_id': f"{response.get('custom_document_number', '')}-{survey_id_map.get(survey_name, '')}",
         'user_id': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),

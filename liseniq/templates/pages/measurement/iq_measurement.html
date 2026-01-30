@@ -85,8 +85,8 @@
                         <div class="form-group">
                             <label for="survey-type-select">Público a participar</label>
                             <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
-                                <option value="all">Todos mis contactos</option>
-                                <option value="selected">Segmento de contactos</option>
+                                <!-- <option value="all">Todos mis contactos</option> -->
+                                <option value="selected" selected>Segmento de contactos</option>
                             </select>
                         </div>
                     </div>
@@ -101,7 +101,7 @@
                     </div>
                 </div>
 
-                <div id="selected-contacts-section" class="mt-4 d-none">
+                <div id="selected-contacts-section" class="mt-4">
                     <div class="form-check mb-4">
                         <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check">
                         <label class="form-check-label" for="send-all-contacts-check">

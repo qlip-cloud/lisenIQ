@@ -528,7 +528,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
         // Control del botón Continuar
-        ui.btnValidateContinue.disabled = hasErrors;
+        // Se bloquea si hay errores o si no hay nada que procesar
+        const nothingToProcess = (newCount === 0 && updateCount === 0 && deleteCount === 0);
+        ui.btnValidateContinue.disabled = hasErrors || nothingToProcess;
 
         // Actualizar resumen visual con conteo detallado
         let summaryHtml = '';
@@ -608,10 +610,17 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             summaryHtml += `</ul></div>`;
         } else if (!hasErrors && !state.showDeleteList) {
-             summaryHtml += `
-            <div class="alert alert-success" style="background-color: #f0fff4; border: 1px solid #68d391; color: #276749; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                <i class="fa fa-check-circle"></i> Todos los datos son válidos. Listo para procesar.
-            </div>`;
+             if (nothingToProcess) {
+                summaryHtml += `
+                <div class="alert alert-warning" style="background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <i class="fa fa-info-circle"></i> No se han detectado cambios.
+                </div>`;
+             } else {
+                summaryHtml += `
+                <div class="alert alert-success" style="background-color: #f0fff4; border: 1px solid #68d391; color: #276749; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <i class="fa fa-check-circle"></i> Todos los datos son válidos. Listo para procesar.
+                </div>`;
+             }
         }
         
         ui.validationSummary.innerHTML = summaryHtml;
@@ -779,7 +788,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     (r.message.rows || []).forEach(row => {
                         const dni = (row['Número de Documento (DNI)'] || '').toString().trim();
                         if (dni) {
-                            state.existingMap.set(dni, row);
+                            // Clono el objeto para tener una copia inalterada en el mapa  y dejar que el Grid modifique su propia copia.
+                            state.existingMap.set(dni, { ...row });
                         }
                     });
                     

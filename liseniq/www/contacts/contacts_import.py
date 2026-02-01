@@ -247,9 +247,32 @@ def download_template():
 		from openpyxl import Workbook
 		from openpyxl.styles import Font
 		
-		# Obtener datos actuales para pre-llenar si fuera necesario, 
-		# o simplemente para obtener headers consistentes
-		demographic_headers = get_all_demographic_types()
+		# Obtener contexto del usuario y compañía primero
+		user = frappe.session.user
+		contact_info = frappe.db.get_value(
+			"Contact", 
+			{"user": user, "custom_is_liseniq_contact": 0}, 
+			["name", "custom_company"], 
+			as_dict=True
+		)
+
+		company = contact_info.custom_company if contact_info else None
+		demographic_headers = []
+
+		if company:
+			# Obtener headers demográficos solo de los contactos existentes y activos de la empresa
+			used_tags = frappe.db.sql("""
+				SELECT DISTINCT d.cad_tag
+				FROM `tabqp_IQ_ContactAdditionalDetail` d
+				INNER JOIN `tabContact` c ON d.parent = c.name
+				WHERE c.custom_company = %s
+				AND c.custom_is_liseniq_contact = 1
+				AND c.custom_is_deleted = 0
+				AND d.cad_tag IS NOT NULL AND d.cad_tag != ''
+				ORDER BY d.cad_tag ASC
+			""", (company,), as_dict=True)
+			
+			demographic_headers = [d.cad_tag for d in used_tags]
 
 		wb = Workbook()
 		ws = wb.active
@@ -278,7 +301,7 @@ def download_template():
 			for idx, val in enumerate(data_list, start=1):
 				ws_opts[f"{col_letter}{idx}"] = val
 
-		# Construir Headers: Estándar + Dinámicos
+		# Construir Headers: Estándar + Dinámicos Filtrados
 		headers = list(STANDARD_COLUMNS) + demographic_headers
 		
 		ws.append(headers)
@@ -314,18 +337,8 @@ def download_template():
 		if "Estatus" in col_map: dv_status.add(f"{get_column_letter(col_map['Estatus'])}{start_row}:{get_column_letter(col_map['Estatus'])}{end_row}")
 		if "Nivel Académico" in col_map: dv_academic.add(f"{get_column_letter(col_map['Nivel Académico'])}{start_row}:{get_column_letter(col_map['Nivel Académico'])}{end_row}")
 
-	
-		user = frappe.session.user
-		contact_info = frappe.db.get_value(
-			"Contact", 
-			{"user": user, "custom_is_liseniq_contact": 0}, 
-			["name", "custom_company"], 
-			as_dict=True
-		)
-
-		if contact_info and contact_info.custom_company:
-			# Reutilizamos la lógica de obtención de datos interna
-			data = _get_contacts_data_internal(contact_info.custom_company)
+		if company:
+			data = _get_contacts_data_internal(company)
 			
 			for row_dict in data['rows']:
 				row_values = []
@@ -339,7 +352,7 @@ def download_template():
 		output.seek(0)
 		
 		timestamp = frappe.utils.now_datetime().strftime("%Y%m%d_%H%M")
-		frappe.local.response['filename'] = f"Plantilla_Contactos_Dinamica_{timestamp}.xlsx"
+		frappe.local.response['filename'] = f"Plantilla_Contactos_{timestamp}.xlsx"
 		frappe.local.response["filecontent"] = output.read()
 		frappe.local.response["type"] = "download"
 

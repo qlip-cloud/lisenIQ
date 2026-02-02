@@ -156,13 +156,12 @@ def get_user_demographics():
                 if demographics_data_str:
                     for demo_pair in demographics_data_str.split('||'):
                         if ':' in demo_pair:
-                            demo_id, demo_value = demo_pair.split(':', 1)
-                            demo_label = demographics_labels.get(demo_id)
+                            demo_tag, demo_value = demo_pair.split(':', 1)
                             user_demographics_array.append({
                                 'user_id': hist_record.get('shd_document_number', ''),
                                 'survey_id': survey['id'],
                                 'user_id-survey_id': f"{hist_record.get('shd_document_number', '')}-{survey['id']}",
-                                'demographic_id': demo_label,
+                                'demographic_id': demo_tag,
                                 'demographic_value': demo_value
                             })
 
@@ -175,6 +174,7 @@ def get_user_demographics():
                     sr.user,
                     c.custom_document_number,
                     cad.cad_demographic_type AS demographic_id,
+                    cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
                 FROM `tabSurvey Response` sr
                 LEFT JOIN `tabContact` c ON c.name = sr.user
@@ -188,12 +188,11 @@ def get_user_demographics():
             responses = frappe.db.sql(query, survey_names, as_dict=True)
             
             for response in responses:
-                demo_label = demographics_labels.get(response.get('demographic_id'))
                 user_demographics_array.append({
                     'user_id': response.get('custom_document_number', ''),
                     'survey_id': survey['id'],
                     'user_id-survey_id': f"{response.get('custom_document_number', '')}-{survey['id']}",
-                    'demographic_id': demo_label if demo_label else '',
+                    'demographic_id': response.get('demographic_tag', ''),
                     'demographic_value': response.get('demographic_value', '')
                 })
 
@@ -374,7 +373,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 shd.shd_company,
                 shd.shd_measurement_response,
                 GROUP_CONCAT(
-                    CONCAT(cdh.cdh_demographic_type, ':', cdh.cdh_value)
+                    CONCAT(cdh.cdh_tag, ':', cdh.cdh_value)
                     SEPARATOR '||'
                 ) as demographics_data
             FROM `tabqp_IQ_SurveyHistoricData` shd

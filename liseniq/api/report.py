@@ -160,7 +160,8 @@ def get_user_demographics():
                             demo_label = demographics_labels.get(demo_id)
                             user_demographics_array.append({
                                 'user_id': hist_record.get('shd_document_number', ''),
-                                'survey_id': survey['survey_name'],
+                                'survey_id': survey['id'],
+                                'user_id-survey_id': f"{hist_record.get('shd_document_number', '')}-{survey['id']}",
                                 'demographic_id': demo_label,
                                 'demographic_value': demo_value
                             })

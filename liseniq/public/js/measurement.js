@@ -87,7 +87,7 @@ class MeasurementCreator {
                 timezone: 'America/Bogota',
                 questions: [],
                 contacts: {
-                    surveyType: 'all',
+                    surveyType: 'selected',
                     responseType: 'anonymous',
                     sendToAll: false,
                     filters: [],
@@ -178,11 +178,13 @@ class MeasurementCreator {
             // Participantes
             if (data.contacts) {
                 const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber /*, viewContactsBtn*/ } = this.ui.contactsStep;
-                if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'all';
+                if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'selected';
                 if (responseTypeSelect) responseTypeSelect.value = data.contacts.responseType || 'anonymous';
                 
                 if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                     selectedContactsSection?.classList.remove('d-none');
+                } else {
+                     selectedContactsSection?.classList.add('d-none');
                 }
 
                 this.state.measurementData.contacts.headers = Array.isArray(data.contacts.headers) && data.contacts.headers.length > 0
@@ -270,10 +272,12 @@ class MeasurementCreator {
         if (stepNumber === 2) {
             this.ui.navButtons.next2.disabled = this.state.measurementData.questions.length === 0;
         }
-        if (stepNumber === 3 && this.state.isEditMode) {
+        if (stepNumber === 3) {
             const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
             if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                 selectedContactsSection?.classList.remove('d-none');
+            } else if (surveyTypeSelect) {
+                selectedContactsSection?.classList.add('d-none');
             }
         }
         if (stepNumber === 4) {
@@ -444,6 +448,21 @@ class MeasurementCreator {
             isValid = false;
             this.showValidationError(startDate, 'Este campo es obligatorio.');
         }
+        
+        // Validar que la fecha de inicio no sea anterior al día actual
+        if (startDate && startDate.value) {
+            const selectedDate = new Date(startDate.value);
+            const now = new Date();
+            // Normalizamos las fechas al inicio del día (00:00:00) para permitir la fecha actual
+            const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+            const currentDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            if (selectedDay < currentDay) {
+                isValid = false;
+                this.showValidationError(startDate, 'La fecha de inicio no puede ser anterior al día actual.');
+            }
+        }
+
         if (timezone && timezone.dataset.required === 'true' && !timezone.value) {
             isValid = false;
             this.showValidationError(timezone, 'Este campo es obligatorio.');

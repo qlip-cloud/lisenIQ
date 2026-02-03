@@ -8,15 +8,15 @@ import random
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.utils import get_column_letter
 
-# Definición de columnas base (Orden lógico sugerido)
-REQUIRED_COLUMNS = [
+# Definición de columnas base
+STANDARD_COLUMNS = [
 	"Nombre", "Apellido", "Tipo de Documento", "Número de Documento (DNI)",
 	"País", "Idioma", "Estatus", "Género", 
 	"Fecha de Nacimiento", "Nivel Académico", "Correo (Opcional)", 
 	"Fecha de Ingreso"
 ]
 
-# Campos que NO pueden estar vacíos para la validación estricta
+# Campos que no pueden estar vacíos
 MANDATORY_FIELDS = [
 	"Nombre", 
 	"Apellido", 
@@ -37,11 +37,35 @@ LATAM_COUNTRIES = [
 ]
 
 def get_context(context):
+	# Validar si hay un proceso de carga masiva activo para la empresa
+	try:
+		user = frappe.session.user
+		contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+		
+		if contact_info and contact_info.custom_company:
+			# Verificar logs con estado Pendiente o Procesando
+			is_active = frappe.db.exists("qp_IQ_UploadLog", {
+				"ul_company": contact_info.custom_company,
+				"ul_status": ["in", ["Pendiente", "Procesando"]]
+			})
+			
+			if is_active:
+				# Redireccionar a la lista de contactos si hay proceso activo
+				frappe.local.response["type"] = "redirect"
+				frappe.local.response["location"] = "/contacts"
+				return
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Error validando proceso activo en Carga Masiva")
+
 	context.page_title = _("Carga masiva de Contactos")
 	context.no_cache = 1
 	context.no_breadcrumbs = True
 	context.is_navbar_custom = True
 	return context
+
+def get_all_demographic_types():
+	"""Retorna una lista de títulos de demográficos existentes en el sistema."""
+	return [d.dt_title for d in frappe.get_all("qp_IQ_DemographicType", filters={"dt_object_type": "Contacto"}, fields=["dt_title"], order_by="dt_title asc")]
 
 def get_mapping_dicts():
 	"""
@@ -83,8 +107,7 @@ def get_mapping_dicts():
 @frappe.whitelist()
 def get_grid_options():
 	"""
-	Retorna las listas de opciones para los selectores del frontend (Ag-Grid).
-	Devuelve las descripciones/nombres visibles que el backend mapeará posteriormente a IDs.
+	Retorna las opciones para selectores y la lista de columnas dinámicas de demográficos.
 	"""
 	try:
 		return {
@@ -93,7 +116,8 @@ def get_grid_options():
 			"countries": sorted(LATAM_COUNTRIES),
 			"genders": [d.gender for d in frappe.get_all("Gender", fields=["gender"], order_by="gender asc")],
 			"academic_levels": [d.al_title for d in frappe.get_all("qp_IQ_AcademicLevel", fields=["al_title"], order_by="al_title asc")],
-			"status": ["Activo", "Inactivo"]
+			"status": ["Activo", "Inactivo"],
+			"demographic_headers": get_all_demographic_types() # Lista de columnas dinámicas
 		}
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Error obteniendo opciones para Grid")
@@ -135,6 +159,68 @@ def find_or_create_demographic_type(demographic_title):
 			"name"
 		)
 
+def _get_contacts_data_internal(company):
+	"""
+	Función auxiliar interna para obtener los datos de contactos formateados para el grid.
+	Se reutiliza en get_contacts_for_grid y validate_contacts.
+	"""
+	contacts = frappe.get_all("Contact", 
+		filters={
+			"custom_company": company, 
+			"custom_is_liseniq_contact": 1,
+			"custom_is_deleted": 0
+		},
+		fields=[
+			"name", "first_name", "last_name", "gender", "custom_dob",
+			"custom_country", "custom_document_type", "custom_document_number",
+			"custom_academic_level", "custom_entry_date", "custom_status",
+			"custom_language"
+		],
+		order_by="first_name asc"
+	)
+
+	maps = get_mapping_dicts()
+	demographic_headers = get_all_demographic_types()
+	grid_rows = []
+	
+	for c in contacts:
+		email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
+		
+		# Obtener demográficos
+		demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
+			filters={"parent": c.name},
+			fields=["cad_tag", "cad_value"]
+		)
+		
+		tipo_doc_label = maps["dt_export"].get(c.custom_document_type, c.custom_document_type)
+		pais_label = maps["country_export"].get(c.custom_country, c.custom_country)
+		idioma_label = maps["lang_export"].get(c.custom_language, c.custom_language)
+		academic_label = maps["academic_export"].get(c.custom_academic_level, c.custom_academic_level)
+
+		row = {
+			"Nombre": c.first_name,
+			"Apellido": c.last_name,
+			"Tipo de Documento": tipo_doc_label or "",
+			"Número de Documento (DNI)": c.custom_document_number,
+			"País": pais_label or "",
+			"Idioma": idioma_label or "",
+			"Estatus": c.custom_status,
+			"Género": c.gender,
+			"Fecha de Nacimiento": str(c.custom_dob) if c.custom_dob else "",
+			"Nivel Académico": academic_label or "",
+			"Correo (Opcional)": email or "",
+			"Fecha de Ingreso": str(c.custom_entry_date) if c.custom_entry_date else ""
+		}
+		
+		# Llenar columnas dinámicas
+		for demo in demographics:
+			if demo.cad_tag:
+				row[demo.cad_tag] = demo.cad_value
+
+		grid_rows.append(row)
+
+	return {"rows": grid_rows, "demographic_headers": demographic_headers}
+
 @frappe.whitelist(allow_guest=False)
 def get_contacts_for_grid():
 	try:
@@ -147,75 +233,13 @@ def get_contacts_for_grid():
 		)
 		
 		if not contact_info or not contact_info.custom_company:
-			return {"rows": [], "max_demographics": 1}
+			return {"rows": [], "demographic_headers": []}
 
-		user_company = contact_info.custom_company
-		
-		contacts = frappe.get_all("Contact", 
-			filters={
-				"custom_company": user_company, 
-				"custom_is_liseniq_contact": 1
-			},
-			fields=[
-				"name", "first_name", "last_name", "gender", "custom_dob",
-				"custom_country", "custom_document_type", "custom_document_number",
-				"custom_academic_level", "custom_entry_date", "custom_status",
-				"custom_language"
-			],
-			order_by="first_name asc"
-		)
-
-		maps = get_mapping_dicts()
-		grid_rows = []
-		max_demos = 1
-		
-		for c in contacts:
-			email = frappe.db.get_value("Contact Email", {"parent": c.name, "is_primary": 1}, "email_id")
-			
-			demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail", 
-				filters={"parent": c.name},
-				fields=["cad_tag", "cad_value"]
-			)
-			
-			if len(demographics) > max_demos:
-				max_demos = len(demographics)
-
-			tipo_doc_label = maps["dt_export"].get(c.custom_document_type, c.custom_document_type)
-			pais_label = maps["country_export"].get(c.custom_country, c.custom_country)
-			idioma_label = maps["lang_export"].get(c.custom_language, c.custom_language)
-			academic_label = maps["academic_export"].get(c.custom_academic_level, c.custom_academic_level)
-
-			row = {
-				"Nombre": c.first_name,
-				"Apellido": c.last_name,
-				"Tipo de Documento": tipo_doc_label or "",
-				"Número de Documento (DNI)": c.custom_document_number,
-				"País": pais_label or "",
-				"Idioma": idioma_label or "",
-				"Estatus": c.custom_status,
-				"Género": c.gender,
-				"Fecha de Nacimiento": str(c.custom_dob) if c.custom_dob else "",
-				"Nivel Académico": academic_label or "",
-				"Correo (Opcional)": email or "",
-				"Fecha de Ingreso": str(c.custom_entry_date) if c.custom_entry_date else ""
-			}
-			
-			for i, demo in enumerate(demographics):
-				idx = i + 1
-				row[f"Demográfico_{idx}"] = demo.cad_tag
-				row[f"Dato_{idx}"] = demo.cad_value
-
-			if not demographics:
-				row["Demográfico_1"] = ""
-				row["Dato_1"] = ""
-
-			grid_rows.append(row)
-
-		return {"rows": grid_rows, "max_demographics": max_demos}
+		return _get_contacts_data_internal(contact_info.custom_company)
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: get_contacts_for_grid")
-		return {"rows": [], "max_demographics": 1}
+		return {"rows": [], "demographic_headers": []}
 
 @frappe.whitelist(allow_guest=False)
 def download_template():
@@ -223,9 +247,32 @@ def download_template():
 		from openpyxl import Workbook
 		from openpyxl.styles import Font
 		
-		data_result = get_contacts_for_grid()
-		rows = data_result.get("rows", [])
-		max_demos = data_result.get("max_demographics", 1)
+		# Obtener contexto del usuario y compañía primero
+		user = frappe.session.user
+		contact_info = frappe.db.get_value(
+			"Contact", 
+			{"user": user, "custom_is_liseniq_contact": 0}, 
+			["name", "custom_company"], 
+			as_dict=True
+		)
+
+		company = contact_info.custom_company if contact_info else None
+		demographic_headers = []
+
+		if company:
+			# Obtener headers demográficos solo de los contactos existentes y activos de la empresa
+			used_tags = frappe.db.sql("""
+				SELECT DISTINCT d.cad_tag
+				FROM `tabqp_IQ_ContactAdditionalDetail` d
+				INNER JOIN `tabContact` c ON d.parent = c.name
+				WHERE c.custom_company = %s
+				AND c.custom_is_liseniq_contact = 1
+				AND c.custom_is_deleted = 0
+				AND d.cad_tag IS NOT NULL AND d.cad_tag != ''
+				ORDER BY d.cad_tag ASC
+			""", (company,), as_dict=True)
+			
+			demographic_headers = [d.cad_tag for d in used_tags]
 
 		wb = Workbook()
 		ws = wb.active
@@ -254,10 +301,8 @@ def download_template():
 			for idx, val in enumerate(data_list, start=1):
 				ws_opts[f"{col_letter}{idx}"] = val
 
-		headers = list(REQUIRED_COLUMNS)
-		for i, range_val in enumerate(range(1, max_demos + 1)):
-			headers.append(f"Demográfico_{range_val}")
-			headers.append(f"Dato_{range_val}")
+		# Construir Headers: Estándar + Dinámicos Filtrados
+		headers = list(STANDARD_COLUMNS) + demographic_headers
 		
 		ws.append(headers)
 		for cell in ws[1]:
@@ -281,9 +326,9 @@ def download_template():
 		ws.add_data_validation(dv_status)
 		ws.add_data_validation(dv_academic)
 
-		col_map = {name: i+1 for i, name in enumerate(REQUIRED_COLUMNS)}
+		col_map = {name: i+1 for i, name in enumerate(headers)}
 		start_row = 2
-		end_row = 1000
+		end_row = 5000 # Rango extendido para data existente
 
 		if "Tipo de Documento" in col_map: dv_doctype.add(f"{get_column_letter(col_map['Tipo de Documento'])}{start_row}:{get_column_letter(col_map['Tipo de Documento'])}{end_row}")
 		if "País" in col_map: dv_country.add(f"{get_column_letter(col_map['País'])}{start_row}:{get_column_letter(col_map['País'])}{end_row}")
@@ -292,15 +337,15 @@ def download_template():
 		if "Estatus" in col_map: dv_status.add(f"{get_column_letter(col_map['Estatus'])}{start_row}:{get_column_letter(col_map['Estatus'])}{end_row}")
 		if "Nivel Académico" in col_map: dv_academic.add(f"{get_column_letter(col_map['Nivel Académico'])}{start_row}:{get_column_letter(col_map['Nivel Académico'])}{end_row}")
 
-		for r_dict in rows:
-			row_values = []
-			for col in REQUIRED_COLUMNS:
-				val = r_dict.get(col, "")
-				row_values.append(val)
-			for i in range(1, max_demos + 1):
-				row_values.append(r_dict.get(f"Demográfico_{i}", ""))
-				row_values.append(r_dict.get(f"Dato_{i}", ""))
-			ws.append(row_values)
+		if company:
+			data = _get_contacts_data_internal(company)
+			
+			for row_dict in data['rows']:
+				row_values = []
+				for h in headers:
+					row_values.append(row_dict.get(h, ""))
+				
+				ws.append(row_values)
 
 		output = io.BytesIO()
 		wb.save(output)
@@ -400,21 +445,61 @@ def update_contact_fields(contact_doc, data, status, demo_map=None):
 	
 	contact_doc.save(ignore_permissions=True)
 
-def process_contacts_background(rows, user):
+def create_upload_log(file_name, total_rows, user, company):
+	"""
+	Crea el registro de Upload Log con estatus 'Pendiente'
+	"""
+	log = frappe.new_doc("qp_IQ_UploadLog")
+	log.ul_file_name = file_name
+	log.ul_status = "Pendiente"
+	log.ul_total_rows = total_rows
+	log.ul_processed_rows = 0
+	log.ul_success_count = 0
+	log.ul_error_count = 0
+	log.ul_owner = user
+	log.ul_company = company
+	log.insert(ignore_permissions=True)
+	return log.name
+
+def process_contacts_background(log_name, rows, user):
 	"""
 	Procesa los contactos en segundo plano.
-	Genera notificación en qp_IQ_PortalNotification al finalizar.
+	Actualiza el registro qp_IQ_UploadLog a medida que avanza.
 	"""
-	results = {"creados": 0, "actualizados": 0, "ignorados": 0, "errores": []}
-	
 	try:
+		# Obtener log doc
+		log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+		log_doc.ul_status = "Procesando"
+		log_doc.ul_started_at = frappe.utils.now()
+		log_doc.ul_error_log = "[]" # Inicializar como lista vacía JSON
+		log_doc.save(ignore_permissions=True)
+		frappe.db.commit()
+
 		contact_info = frappe.db.get_value("Contact", {"user": user, "custom_is_liseniq_contact": 0}, ["name", "custom_company"], as_dict=True)
 		if not contact_info or not contact_info.custom_company:
-			frappe.log_error("No se pudo determinar la compañía del usuario", "Process Contacts Error")
+			log_doc.ul_status = "Fallido"
+			log_doc.ul_completed_at = frappe.utils.now()
+			log_doc.ul_error_log = json.dumps([{"fila": 0, "error": "No se pudo determinar la compañía del usuario"}])
+			log_doc.save(ignore_permissions=True)
 			return
 
 		user_company = contact_info.custom_company
+
+		existing_contacts_map = {}
+		active_contacts = frappe.get_all("Contact", 
+			filters={
+				"custom_company": user_company, 
+				"custom_is_liseniq_contact": 1,
+				"custom_is_deleted": 0 
+			}, 
+			fields=["name", "custom_document_number"]
+		)
+		for c in active_contacts:
+			if c.custom_document_number:
+				existing_contacts_map[str(c.custom_document_number).strip()] = c.name
 		
+		processed_dnis_in_file = set()
+
 		# Obtener mapas (incluyendo el nuevo mapa de demográficos)
 		maps = get_mapping_dicts()
 		dt_map = maps["dt_import"]
@@ -430,9 +515,14 @@ def process_contacts_background(rows, user):
 				try: return datetime.strptime(value, "%d/%m/%Y").date()
 				except: return None
 
+		success_count = 0
+		error_count = 0
+		processed_count = 0
+		error_list = []
+
 		for i, r in enumerate(rows, start=1):
 			try:
-				# Extracción y limpieza de datos
+				# Extracción y limpieza de datos básicos
 				tipo_doc_raw = (r.get("Tipo de Documento") or "").strip()
 				tipo_doc_id = dt_map.get(tipo_doc_raw, tipo_doc_raw)
 				pais_raw = (r.get("País") or "").strip()
@@ -447,7 +537,10 @@ def process_contacts_background(rows, user):
 				numero_doc = (r.get("Número de Documento (DNI)") or "").strip()
 				estatus = (r.get("Estatus") or "").strip()
 				correo = (r.get("Correo (Opcional)") or "").strip()
-				
+
+				if numero_doc:
+					processed_dnis_in_file.add(numero_doc)
+
 				fecha_nac = parse_date(r.get("Fecha de Nacimiento"))
 				fecha_ing = parse_date(r.get("Fecha de Ingreso"))
 				
@@ -478,15 +571,13 @@ def process_contacts_background(rows, user):
 					"demographics": []
 				}
 				
-				# Recolectar demográficos
-				for key, val in r.items():
-					if key.startswith("Demográfico_"):
-						idx = key.split("_")[1]
-						val_key = f"Dato_{idx}"
-						d_val = (r.get(val_key) or "").strip()
-						val_clean = (val or "").strip()
-						if val_clean and d_val:
-							data["demographics"].append({"type": val_clean, "value": d_val})
+				# Recolectar demográficos dinámicos
+				for col_name, val in r.items():
+					clean_col = col_name.strip()
+					clean_val = str(val or "").strip()
+					
+					if clean_col not in STANDARD_COLUMNS and clean_col and clean_val:
+						data["demographics"].append({"type": clean_col, "value": clean_val})
 
 				# Verificar si existe
 				contact_name = None
@@ -495,11 +586,13 @@ def process_contacts_background(rows, user):
 
 				if contact_name:
 					contact_doc = frappe.get_doc("Contact", contact_name)
+
+					if contact_doc.custom_is_deleted:
+						contact_doc.custom_is_deleted = 0
+						contact_doc.save(ignore_permissions=True)
+						
 					if check_if_modified(contact_doc, data, estatus or contact_doc.custom_status):
 						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status, demo_map)
-						results["actualizados"] += 1
-					else:
-						results["ignorados"] += 1
 				else:
 					new_doc = frappe.new_doc("Contact")
 					new_doc.first_name = nombre
@@ -512,6 +605,7 @@ def process_contacts_background(rows, user):
 					new_doc.custom_academic_level = nivel_acad_id
 					new_doc.custom_status = estatus or "Activo"
 					new_doc.custom_is_liseniq_contact = 1
+					new_doc.custom_is_deleted = 0
 					
 					new_doc.custom_dob = data['birthdate']
 					new_doc.custom_entry_date = data['entryDate']
@@ -523,7 +617,6 @@ def process_contacts_background(rows, user):
 					new_doc.insert(ignore_permissions=True)
 					
 					if data['demographics']:
-						# Validar metadata antes de insertar hijos
 						if new_doc.meta.get_field(CHILD_TABLE_FIELD):
 							for d in data['demographics']:
 								demo_id = demo_map.get(d['type'])
@@ -536,21 +629,69 @@ def process_contacts_background(rows, user):
 								child.cad_value = d['value']
 							
 							new_doc.save(ignore_permissions=True)
-					
-					results["creados"] += 1
+				
+				success_count += 1
 
 			except Exception as e:
-				frappe.log_error(frappe.get_traceback(), f"Error procesando fila {i} en carga masiva")
-				results["errores"].append({"fila": i, "error": str(e)})
+				error_count += 1
+				# Agregar al log de errores JSON
+				error_entry = {"fila": i, "error": str(e)}
+				error_list.append(error_entry)
 
-		# Crear Notificación de Portal (Sin realtime)
+			# Actualizar progreso periódicamente (cada 5 registros) para no saturar DB
+			processed_count += 1
+			if processed_count % 5 == 0:
+				log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+				log_doc.ul_processed_rows = processed_count
+				log_doc.ul_success_count = success_count
+				log_doc.ul_error_count = error_count
+				# Actualizar JSON de errores incrementalmente si es necesario, 
+				# pero por eficiencia lo guardamos completo o en chunks. 
+				# Aquí guardamos el estado actual.
+				log_doc.ul_error_log = json.dumps(error_list)
+				log_doc.save(ignore_permissions=True)
+				frappe.db.commit()
+
+		delete_count = 0
+		try:
+			existing_dnis_set = set(existing_contacts_map.keys())
+			missing_dnis = existing_dnis_set - processed_dnis_in_file
+			
+			for missing_dni in missing_dnis:
+				contact_name_to_delete = existing_contacts_map[missing_dni]
+				frappe.db.set_value("Contact", contact_name_to_delete, "custom_is_deleted", 1)
+				delete_count += 1
+				
+		except Exception as e:
+			# Loguear error de eliminación pero no detener el proceso general si ya se procesaron filas
+			error_list.append({"fila": "N/A", "error": f"Error en proceso de eliminación lógica: {str(e)}"})
+
+		# Finalización
+		log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+		log_doc.ul_processed_rows = processed_count
+		log_doc.ul_success_count = success_count
+		log_doc.ul_error_count = error_count
+		log_doc.ul_completed_at = frappe.utils.now()
+		log_doc.ul_error_log = json.dumps(error_list)
+
+		if error_count == 0:
+			log_doc.ul_status = "Completado"
+		elif success_count == 0 and error_count > 0:
+			log_doc.ul_status = "Fallido"
+		else:
+			log_doc.ul_status = "Completado con errores"
+		
+		log_doc.save(ignore_permissions=True)
+
+		# Crear Notificación de Portal
 		try:
 			notification = frappe.new_doc("qp_IQ_PortalNotification")
 			notification.pn_user = user
 			notification.pn_title = "Carga Masiva de Contactos"
-			notification.pn_message = f"Proceso de carga masiva finalizado con éxito. Creados: {results['creados']}, Actualizados: {results['actualizados']}, Errores: {len(results['errores'])}."
+			notification.pn_message = f"Carga finalizada ({log_doc.ul_status})\n\n✅ Exitosos: {success_count}\n❌ Fallidos: {error_count}\n🗑️ Contactos eliminados: {delete_count}"
+			
 			notification.pn_route = "/contacts"
-			notification.pn_type = "Info"
+			notification.pn_type = "Info" if error_count == 0 else "Warning"
 			notification.pn_is_read = 0
 			notification.insert(ignore_permissions=True)
 		except Exception as e:
@@ -558,6 +699,14 @@ def process_contacts_background(rows, user):
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: process_contacts_background")
+		# Intentar marcar como fallido el log si algo catastrófico ocurre
+		try:
+			log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
+			log_doc.ul_status = "Fallido"
+			log_doc.ul_error_log = json.dumps([{"fila": 0, "error": f"Error fatal de sistema: {str(e)}"}])
+			log_doc.save(ignore_permissions=True)
+		except:
+			pass
 
 @frappe.whitelist(allow_guest=False)
 def upload_contacts():
@@ -565,7 +714,7 @@ def upload_contacts():
 	fileobj = frappe.local.request.files.get('file')
 	if not fileobj: frappe.throw(_("No se envió ningún archivo"))
 
-	filename = fileobj.filename or ""
+	filename = fileobj.filename or "Carga_Archivo.xlsx"
 	ext = filename.split('.')[-1].lower()
 	rows = []
 	try:
@@ -606,22 +755,49 @@ def upload_contacts():
 			row_dict[h] = get_val(r, h)
 		rows_dicts.append(row_dict)
 
-	# Encolar proceso
+	# Obtener compañía del usuario para el log
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	company = contact_info.custom_company if contact_info else None
+
+	if not company:
+		frappe.throw(_("No se pudo determinar la compañía del usuario"))
+
+	# Crear Log
+	log_name = create_upload_log(filename, len(rows_dicts), user, company)
+
+	# Encolar proceso pasando el log_name
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',
 		timeout=3600,
+		log_name=log_name,
 		rows=rows_dicts,
-		user=frappe.session.user
+		user=user
 	)
 	
-	return {"message": {"total_rows": len(rows_dicts), "queued": True}, "status": "queued"}
+	return {"message": {"total_rows": len(rows_dicts), "queued": True, "log_name": log_name}, "status": "queued"}
 
 @frappe.whitelist(allow_guest=False)
 def validate_contacts():
 	if not frappe.request: frappe.throw(_("No hay request disponible"))
 	fileobj = frappe.local.request.files.get('file')
-	if not fileobj: frappe.throw(_("Error de validación: No se detectó ningún archivo adjunto. Si está en modo 'Editar en línea', esto no debería ocurrir."))
+	if not fileobj: frappe.throw(_("Error de validación: No se detectó ningún archivo adjunto."))
+
+	# Obtener información del usuario para validaciones contra DB
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	company = contact_info.custom_company if contact_info else None
+	
+	existing_grid_rows = []
+	if company:
+		# Obtengo TODOS los datos de contactos, formateados igual que para el grid
+		# Lo uso para en el frontend comparar campo a campo para detectar cambios reales
+		internal_data = _get_contacts_data_internal(company)
+		existing_grid_rows = internal_data.get("rows", [])
+
+	# Obtener opciones válidas para listas
+	options = get_grid_options()
 
 	filename = fileobj.filename or ""
 	ext = filename.split('.')[-1].lower()
@@ -644,7 +820,20 @@ def validate_contacts():
 
 	if not rows: return {"ok": False, "error": "El archivo está vacío"}
 
-	headers = [h.strip() if h else "" for h in rows[0]]
+	# Validaciones preliminares
+	# Validar que la celda A1 (Columna 1, Fila 1) no esté vacía
+	if not rows[0] or not rows[0][0] or not str(rows[0][0]).strip():
+		return {"ok": False, "error": _("La celda ubicada en la columna 1, fila 1 no puede estar vacía.")}
+
+	headers = [str(h).strip() if h else "" for h in rows[0]]
+
+	# Validar que los demográficos tengan nombre
+	if "Fecha de Ingreso" in headers:
+		fi_index = headers.index("Fecha de Ingreso")
+		for i in range(fi_index + 1, len(headers)):
+			if not headers[i]:
+				return {"ok": False, "error": _("Columna sin nombre en la posición {0} - Los campos demográficos deben tener un encabezado válido.").format(i+1)}
+
 	idx = {h: i for i, h in enumerate(headers)}
 	parsed = []
 	errors = []
@@ -654,6 +843,13 @@ def validate_contacts():
 		i = idx[col]
 		return str(r[i]).strip() if i < len(r) and r[i] else ""
 	
+	# Contadores de reporte preliminar
+	stats = {
+		"new": 0,
+		"existing": 0,
+		"errors": 0
+	}
+
 	for i, r in enumerate(rows[1:], start=2):
 		if not any(cell for cell in r): continue
 		row_dict = {}
@@ -661,31 +857,112 @@ def validate_contacts():
 			val = get_val(r, h)
 			row_dict[h] = val
 		
-		# Validación estricta
 		row_errors = []
+		
+		# Campos Obligatorios
 		for field in MANDATORY_FIELDS:
 			if not row_dict.get(field):
-				row_errors.append(field)
+				row_errors.append(f"Falta {field}")
 
-		parsed.append(row_dict)
-		if row_errors: 
+		# Validación de Listas (Selects)
+		field_map = {
+			"Tipo de Documento": "document_types",
+			"País": "countries",
+			"Idioma": "languages",
+			"Estatus": "status",
+			"Género": "genders",
+			"Nivel Académico": "academic_levels"
+		}
+		
+		for field_name, option_key in field_map.items():
+			val = row_dict.get(field_name)
+			if val and option_key in options:
+				if val not in options[option_key]:
+					row_errors.append(f"'{val}' no es válido para {field_name}")
+		
+		if row_errors:
+			stats["errors"] += 1
 			errors.append({"fila": i, "errores": row_errors})
+		
+		parsed.append(row_dict)
 
-	return {"ok": True, "headers": headers, "rows": parsed, "errors": errors}
+	# Retornamos existing_grid_rows con todos los datos en lugar de solo DNIs
+	return {
+		"ok": True, 
+		"headers": headers, 
+		"rows": parsed, 
+		"errors": errors,
+		"stats": stats,
+		"existing_grid_rows": existing_grid_rows,
+		"valid_options": options
+	}
 
 @frappe.whitelist(allow_guest=False)
-def upload_contacts_json(rows_json):
+def upload_contacts_json(rows_json, file_name=None):
 	import json as _json
 	try: rows = _json.loads(rows_json)
 	except: frappe.throw(_("JSON inválido"))
+
+	# Obtener compañía
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	company = contact_info.custom_company if contact_info else None
+
+	if not company:
+		frappe.throw(_("No se pudo determinar la compañía del usuario"))
+
+	# Determinar nombre del archivo
+	final_file_name = file_name or "Edición en Linea"
+
+	# Crear Log con nombre del archivo recibido o "Edición en Linea"
+	log_name = create_upload_log(final_file_name, len(rows), user, company)
 
 	# Encolar proceso
 	frappe.enqueue(
 		method=process_contacts_background,
 		queue='long',
 		timeout=3600,
+		log_name=log_name,
 		rows=rows,
-		user=frappe.session.user
+		user=user
 	)
 	
-	return {"message": {"total_rows": len(rows), "queued": True}, "status": "queued"}
+	return {"message": {"total_rows": len(rows), "queued": True, "log_name": log_name}, "status": "queued"}
+
+@frappe.whitelist(allow_guest=False)
+def check_upload_status():
+	"""
+	Verifica el estado de la carga más reciente de la compañía,
+	sea activa o ya finalizada.
+	"""
+	user = frappe.session.user
+	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+	if not contact_info or not contact_info.custom_company:
+		return {"active": False}
+
+	company = contact_info.custom_company
+
+	# Obtener el último log de carga de esta compañía (por fecha de creación descendente)
+	last_log = frappe.get_all(
+		"qp_IQ_UploadLog",
+		filters={"ul_company": company},
+		fields=["name", "ul_status", "ul_processed_rows", "ul_total_rows", "ul_file_name", "ul_success_count", "ul_error_count"],
+		order_by="creation desc",
+		limit=1
+	)
+
+	if not last_log:
+		return {"active": False}
+
+	log = last_log[0]
+	is_active = log.ul_status in ["Pendiente", "Procesando"]
+
+	return {
+		"active": is_active,
+		"status": log.ul_status,
+		"processed": log.ul_processed_rows,
+		"total": log.ul_total_rows,
+		"success": log.ul_success_count,
+		"error": log.ul_error_count,
+		"file_name": log.ul_file_name
+	}

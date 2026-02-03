@@ -3,11 +3,17 @@ import frappe
 from frappe import _
 from datetime import datetime, timedelta
 
+"""
+TODO: 
+
+1. Implementar el reporte por tablas separadas para el reporte de medición de cultura organizacional
+2. Implementar funcionalidada de histórico para encuestas finalizadas en los nuevos reportes
+"""
 CATEGORIES = {
     "Sentido de propósito": "MI INSPIRACIÓN",
     "Trabajo trascendental": "MI INSPIRACIÓN",
     "Me Conocen": "MI INSPIRACIÓN",
-    "Mi lider": "LOS LÍDERES",
+    "Mi líder": "LOS LÍDERES",
     "Apoyo": "LOS LÍDERES",
     "Nuestros lideres": "LOS LÍDERES",
     "Oportunidades de crecimiento en mi Rol": "MI DESARROLLO Y APRENDIZAJE",
@@ -29,15 +35,8 @@ CATEGORIES = {
     "Relaciones": "HUMANISTA",
     "Comunicación": "HUMANISTA",
     "Innovación": "COMPETITIVA",
-    "Logros": "COMPETITIVA",
+    "Logro": "COMPETITIVA",
     "Liderazgo": "COMPETITIVA",
-    "Integridad": "CULTURA CARVAJAL",
-    "Respeto": "CULTURA CARVAJAL",
-    "Orientación al cliente": "CULTURA CARVAJAL",
-    "Compromiso social": "CULTURA CARVAJAL",
-    "Protección y cuidado de la vida": "CULTURA CARVAJAL",
-    "Compromiso con los resultados": "CULTURA CARVAJAL",
-    "Innovación": "CULTURA CARVAJAL",
 }
 
 CARVAJAL_COMPANIES = {
@@ -116,7 +115,127 @@ def custom_report_by_question(filters=None):
 
     return translated_data
 
+@frappe.whitelist()
+def custom_report_by_question_engagement(filters=None):
 
+    filters = filters or {}
+    
+    # Obtener todas las encuestas válidas
+    valid_surveys = get_valid_engagement_surveys()
+    
+    if not valid_surveys:
+        frappe.throw(_("No se encontraron encuestas válidas en qp_IQ_Survey"))
+
+    # Obtener todas las preguntas únicas de todas las encuestas
+    all_questions_map = get_all_unique_questions(valid_surveys)
+    demographics_map = get_demographics_labels()
+
+
+    data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
+    transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+    translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
+
+
+    return translated_data
+
+@frappe.whitelist()
+def get_user_demographics():
+    """
+    Retorna un array de objetos con el id del usuario y sus demográficos asociados
+    """
+    try:
+        user_demographics_array = []
+        surveys = get_valid_engagement_surveys()
+        finished_surveys = [s for s in surveys if s.get('in_history') == 1]
+        active_surveys = [s for s in surveys if s.get('in_history') != 1]
+        demographics_labels = get_demographics_labels()
+        for survey in finished_surveys:
+            historical_data = get_historical_survey_data(survey['id'], {}, {})
+            for hist_record in historical_data:
+                demographics_data_str = hist_record.get('demographics_data', '')
+                if demographics_data_str:
+                    for demo_pair in demographics_data_str.split('||'):
+                        if ':' in demo_pair:
+                            demo_tag, demo_value = demo_pair.split(':', 1)
+                            user_demographics_array.append({
+                                'user_id': hist_record.get('shd_document_number', ''),
+                                'survey_id': survey['id'],
+                                'user_id-survey_id': f"{hist_record.get('shd_document_number', '')}-{survey['id']}",
+                                'demographic_id': demo_tag,
+                                'demographic_value': demo_value
+                            })
+
+        for survey in active_surveys:
+            survey_names = [survey['survey_name']]
+            survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
+            
+            query = f"""
+                SELECT 
+                    sr.user,
+                    c.custom_document_number,
+                    cad.cad_demographic_type AS demographic_id,
+                    cad.cad_tag AS demographic_tag,
+                    cad.cad_value AS demographic_value
+                FROM `tabSurvey Response` sr
+                LEFT JOIN `tabContact` c ON c.name = sr.user
+                INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
+                INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
+                WHERE sr.survey IN ({survey_names_placeholder})
+                AND dt.dt_object_type = 'Contacto'
+                ORDER BY sr.survey, sr.creation DESC
+            """
+            
+            responses = frappe.db.sql(query, survey_names, as_dict=True)
+            
+            for response in responses:
+                user_demographics_array.append({
+                    'user_id': response.get('custom_document_number', ''),
+                    'survey_id': survey['id'],
+                    'user_id-survey_id': f"{response.get('custom_document_number', '')}-{survey['id']}",
+                    'demographic_id': response.get('demographic_tag', ''),
+                    'demographic_value': response.get('demographic_value', '')
+                })
+
+        return user_demographics_array
+
+    except Exception as e:
+        frappe.log_error(f"Error getting user demographics: {str(e)}")
+        return []
+
+@frappe.whitelist()
+def get_engagement_responses():
+    """
+    Retorna las respuestas de las encuestas de engagement sin demográficos
+    """
+    try:
+        valid_surveys = get_valid_engagement_surveys()
+        if not valid_surveys:
+            return []
+
+        all_questions_map = get_all_unique_questions(valid_surveys)
+        demographics_map = get_demographics_labels()
+
+        data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
+        transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+        
+        # Definir solo los demográficos adicionales a excluir (no los core)
+        demographic_keys_to_exclude = set(demographics_map.keys())
+        
+        # Filtrar solo los demográficos adicionales de los datos transformados
+        filtered_data = []
+        for row in transformed_data:
+            filtered_row = {k: v for k, v in row.items() if k not in demographic_keys_to_exclude}
+            filtered_data.append(filtered_row)
+        
+        # Traducir las claves restantes
+        translated_data = translate_keys(filtered_data, all_questions_map, demographics_map)
+
+        return translated_data
+
+    except Exception as e:
+        frappe.log_error(f"Error getting engagement responses: {str(e)}")
+        return []
+    
 @frappe.whitelist()
 def custom_report_by_question_yesterday(filters=None):
     """
@@ -160,6 +279,8 @@ def get_valid_surveys():
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
+            LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
+            WHERE LOWER(st.qnc_category) = 'cultura'
             ORDER BY s.name
         """
         results = frappe.db.sql(query, as_dict=True)
@@ -168,6 +289,32 @@ def get_valid_surveys():
         frappe.log_error(f"Error getting valid surveys: {str(e)}")
         return []
 
+def get_valid_engagement_surveys():
+    try:
+        query = """
+            SELECT 
+                s.name as survey_name,
+                s.survey_json,
+                iq.name as id,
+                iq.su_name,
+                iq.su_owner,
+                iq.su_in_history as in_history,
+                tp.tp_name as template_name,
+                c.name as company_id,
+                c.co_name as company_name
+            FROM `tabSurvey` s
+            INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
+            LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
+            LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
+            LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
+            WHERE LOWER(st.qnc_category) = 'engagement'
+            ORDER BY s.name
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        return results
+    except Exception as e:
+        frappe.log_error(f"Error getting valid engagement surveys: {str(e)}")
+        return []
 
 def get_all_unique_questions(valid_surveys):
     """
@@ -226,7 +373,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 shd.shd_company,
                 shd.shd_measurement_response,
                 GROUP_CONCAT(
-                    CONCAT(cdh.cdh_demographic_type, ':', cdh.cdh_value)
+                    CONCAT(cdh.cdh_tag, ':', cdh.cdh_value)
                     SEPARATOR '||'
                 ) as demographics_data
             FROM `tabqp_IQ_SurveyHistoricData` shd
@@ -648,6 +795,7 @@ def process_historical_response_row_by_question(hist_record, survey, all_questio
         'company_id': company_data.get('company_id', ''),
         'company_name': company_data.get('company_name', ''),
         'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
+        'user_id-survey_id': f"{hist_record.get('shd_document_number', '')}-{survey_id_map.get(survey_name, '')}",
         'user_id': hist_record.get('shd_document_number', ''),
         'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
         'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
@@ -695,6 +843,7 @@ def process_response_row_by_question(response, all_questions_map, demographics_d
         'company_id': company_data.get('company_id', ''),
         'company_name': company_data.get('company_name', ''),
         'survey_expected_responses': survey_expected_responses_map.get(survey_name, 0),
+        'user_id-survey_id': f"{response.get('custom_document_number', '')}-{survey_id_map.get(survey_name, '')}",
         'user_id': response.get('custom_document_number', ''),
         'first_name': response.get('first_name', ''),
         'last_name': response.get('last_name', ''),

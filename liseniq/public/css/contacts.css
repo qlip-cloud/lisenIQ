@@ -360,3 +360,138 @@
     font-weight: 600;
     font-size: 1rem;
 }
+
+/* ESTILOS DE BARRA DE NOTIFICACIÓN DE CARGA MASIVA */
+#global-notification-bar {
+    position: fixed;
+    top: 90px;
+    right: 20px;
+    background-color: #7B24FF;
+    color: #ffffff;
+    padding: 16px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(123, 36, 255, 0.25);
+    z-index: 9999;
+    min-width: 320px;
+    max-width: 450px;
+    display: none;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    overflow: hidden; 
+}
+
+#global-notification-bar.show {
+    display: flex;
+    align-items: center;
+    opacity: 1;
+    transform: translateY(0);
+    z-index: 1;
+}
+
+/* Estilo del texto */
+#global-notification-message {
+    position: relative;
+    z-index: 2;
+    font-weight: 500;
+    font-size: 0.9rem;
+    width: 100%;
+    white-space: pre-line;
+    line-height: 1.4;
+}
+
+/* Barra de progreso (Borde inferior que aumenta) */
+#global-notification-bar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 5px;
+    background-color: #03BF3C;
+    width: var(--progress, 0%);
+    transition: width 0.5s linear;
+    z-index: 1;
+}
+
+#global-notification-bar.notification-error {
+    background-color: #E95E5E;
+}
+#global-notification-bar.notification-error::after {
+    background-color: #fff;
+}
+
+
+/* Scroll en contenedor de errores */
+#validation-summary ul {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 0;
+    padding-right: 8px;
+}
+
+/* Scroll específico más alto para la lista de eliminados */
+#validation-summary ul.deleted-contacts-list {
+    max-height: 300px;
+}
+
+/* Estilo personalizado de scrollbar para errores */
+#validation-summary ul::-webkit-scrollbar {
+    width: 6px;
+}
+#validation-summary ul::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+#validation-summary ul::-webkit-scrollbar-thumb {
+    background: #fc8181;
+    border-radius: 3px;
+}
+#validation-summary ul::-webkit-scrollbar-thumb:hover {
+    background: #f56565;
+}
+
+/* Estilo para filas con error en Ag-Grid */
+.ag-theme-alpine .ag-row.row-error-highlight {
+    background-color: #fff5f5 !important;
+}
+.ag-theme-alpine .ag-row-selected.row-error-highlight {
+    background-color: #fed7d7 !important;
+}
+
+/* Estilo para tarjeta de resumen de errores interactiva */
+.alert-error-clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.alert-error-clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(229, 62, 62, 0.2);
+}
+
+.alert-error-clickable.active-filter {
+    border: 2px solid #c53030;
+    background-color: #fed7d7 !important;
+    font-weight: 600;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+}
+
+/* Nuevo estilo para tarjeta de resumen de eliminación interactiva */
+.alert-delete-clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.alert-delete-clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(56, 61, 65, 0.2);
+}
+
+.alert-delete-clickable.active-filter {
+    border: 2px solid #d6d8db;
+    background-color: #d6d8db !important;
+    font-weight: 600;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+}

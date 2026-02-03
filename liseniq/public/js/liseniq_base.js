@@ -1,4 +1,6 @@
 let notificationTimeout;
+// Variable para controlar el intervalo de actualización automática
+let notificationInterval; 
 
 document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('app-sidebar');
@@ -10,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const openModalBtn = document.getElementById('btn-open-create-measurement-modal');
     const closeModalBtn = document.getElementById('btn-close-measurement-modal');
     const createBlankMeasurementBtn = document.getElementById('btn-blank-measurement');
+    const openTemplatestBtn = document.getElementById('btn-template-measurement');
 
     function toggleSidebar() {
         if (sidebar && overlay) {
@@ -45,6 +48,14 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = '/measurement/new_measurement';
         });
     }
+
+     if (openTemplatestBtn) {
+        openTemplatestBtn.addEventListener('click', () => {
+            window.location.href = '/iq-templates';
+        });
+    }
+
+    
 
     fetch('/api/method/liseniq.utils.login_util.get_user_company_name')
         .then(response => response.json())
@@ -97,19 +108,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Logica de Notificaciones
+    // Inicializar lógica de notificaciones
     initNotifications();
 });
 
 function initNotifications() {
     const btnNotifications = document.getElementById('btn-notifications');
     const notificationDropdown = document.getElementById('notification-dropdown');
-    const notificationBadge = document.getElementById('notification-badge');
-    
-    // 1. Cargar conteo inicial
-    updateNotificationCount();
 
-    // 2. Event Listener para abrir/cerrar dropdown
+    // 1. Carga inicial
+    checkNewNotifications();
+
+    // 2. Configurar intervalo para buscar notificaciones cada 60 segundos
+    if (notificationInterval) clearInterval(notificationInterval);
+    notificationInterval = setInterval(checkNewNotifications, 30000);
+
+    // 3. Event Listener para abrir/cerrar dropdown
     if (btnNotifications && notificationDropdown) {
         btnNotifications.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -119,12 +133,13 @@ function initNotifications() {
 
             notificationDropdown.classList.toggle('d-none');
             
+            // Si abrimos el menú, forzamos una carga de la lista para asegurar que esté actualizada
             if (!notificationDropdown.classList.contains('d-none')) {
                 loadNotificationsList();
             }
         });
 
-        // 3. Cerrar al hacer clic fuera
+        // 4. Cerrar al hacer clic fuera
         document.addEventListener('click', function(e) {
             if (!notificationDropdown.classList.contains('d-none') && 
                 !btnNotifications.contains(e.target) && 
@@ -135,48 +150,69 @@ function initNotifications() {
     }
 }
 
-function updateNotificationCount() {
-    // Metodo para contar notificaciones no leídas
-    fetch('/api/method/liseniq.utils.api_notification.get_unread_notifications')
-        .then(response => response.json())
-        .then(data => {
-            const notifications = data.message || [];
-            const count = notifications.length;
-            const badge = document.getElementById('notification-badge');
-            
-            if (badge) {
-                if (count > 0) {
-                    badge.textContent = count > 99 ? '99+' : count;
-                    badge.classList.remove('d-none');
-                } else {
-                    badge.classList.add('d-none');
-                }
-            }
-        })
-        .catch(err => console.error('Error fetching notification count:', err));
+async function checkNewNotifications() {
+    try {
+
+        const countResponse = await fetch('/api/method/liseniq.utils.api_notification.get_unread_notification_count');
+        const countData = await countResponse.json();
+        const unreadCount = countData.message || 0;
+
+        // Actualizar el indicador visual (Badge)
+        updateBadgeUI(unreadCount);
+
+        if (unreadCount > 0) {
+            loadNotificationsList();
+        } else {
+            showEmptyNotificationState();
+        }
+
+    } catch (error) {
+        console.error('Error verificando nuevas notificaciones:', error);
+    }
+}
+
+function updateBadgeUI(count) {
+    const badge = document.getElementById('notification-badge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+}
+
+function showEmptyNotificationState() {
+    const listContainer = document.getElementById('notification-list');
+    if (listContainer) {
+        listContainer.innerHTML = `
+            <div class="text-center p-4 text-muted">
+                <small>No tienes notificaciones nuevas</small>
+            </div>`;
+    }
 }
 
 function loadNotificationsList() {
     const listContainer = document.getElementById('notification-list');
     if (!listContainer) return;
 
-    listContainer.innerHTML = '<div class="text-center p-3 text-muted"><i class="fa fa-spinner fa-spin"></i> Cargando...</div>';
+    // Solo mostrar loading si la lista está vacía actualmente
+    if (listContainer.children.length === 0 || listContainer.innerText.includes('No tienes notificaciones')) {
+        listContainer.innerHTML = '<div class="text-center p-3 text-muted"><i class="fa fa-spinner fa-spin"></i> Cargando...</div>';
+    }
 
-    // Metodo para buscar notificaciones no leídas
     fetch('/api/method/liseniq.utils.api_notification.get_unread_notifications')
         .then(response => response.json())
         .then(data => {
             const notifications = data.message || [];
-            listContainer.innerHTML = ''; // Limpiar loader
-
+            
             if (notifications.length === 0) {
-                listContainer.innerHTML = `
-                    <div class="text-center p-4 text-muted">
-                        <small>No tienes notificaciones nuevas</small>
-                    </div>`;
+                showEmptyNotificationState();
                 return;
             }
 
+            listContainer.innerHTML = ''; // Limpiar loader
             notifications.forEach(notif => {
                 const item = document.createElement('div');
                 item.className = 'notification-item';
@@ -194,37 +230,32 @@ function loadNotificationsList() {
             });
         })
         .catch(err => {
-            console.error('Error loading notifications:', err);
+            console.error('Error loading notifications list:', err);
             listContainer.innerHTML = '<div class="text-center p-3 text-danger"><small>Error al cargar</small></div>';
         });
 }
 
-// Función global para ser llamada desde el onclick en el HTML generado
+// Función global para marcar como leída
 window.markAsRead = function(notificationName) {
     const item = document.getElementById(`notif-${notificationName}`);
     if (item) {
-        // Feedback visual inmediato (opacidad)
         item.style.opacity = '0.5';
     }
 
-    // Metodo para marcar como leída
     fetch(`/api/method/liseniq.utils.api_notification.mark_notification_as_read?notification_name=${encodeURIComponent(notificationName)}`)
         .then(response => response.json())
         .then(data => {
             if (data.message && data.message.status === 'success') {
-                // Eliminar del DOM con animación simple
                 if (item) {
                     item.remove();
-                    // Verificar si quedan elementos
+                    // Si ya no quedan elementos en la lista visual, mostrar mensaje vacío
                     const listContainer = document.getElementById('notification-list');
                     if (listContainer && listContainer.children.length === 0) {
-                        listContainer.innerHTML = `
-                            <div class="text-center p-4 text-muted">
-                                <small>No tienes notificaciones nuevas</small>
-                            </div>`;
+                        showEmptyNotificationState();
                     }
                 }
-                updateNotificationCount();
+                // Actualizar el conteo general nuevamente
+                checkNewNotifications();
                 showGlobalNotification('Notificación marcada como leída', 'success', 3000);
             } else {
                 showGlobalNotification('Error al eliminar notificación', 'error');
@@ -238,14 +269,12 @@ window.markAsRead = function(notificationName) {
         });
 };
 
-
 function showGlobalNotification(message, type, duration = 5000) {
     const notificationBar = document.getElementById('global-notification-bar');
     const notificationMessage = document.getElementById('global-notification-message');
 
     if (!notificationBar || !notificationMessage) {
         console.error('Elementos de la barra de notificación no encontrados en el DOM.');
-        alert(message); 
         return;
     }
 

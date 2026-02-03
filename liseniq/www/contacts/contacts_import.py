@@ -833,7 +833,6 @@ def validate_contacts():
 		for i in range(fi_index + 1, len(headers)):
 			if not headers[i]:
 				return {"ok": False, "error": _("Columna sin nombre en la posición {0} - Los campos demográficos deben tener un encabezado válido.").format(i+1)}
-	# ----------------------------------------------------------------
 
 	idx = {h: i for i, h in enumerate(headers)}
 	parsed = []

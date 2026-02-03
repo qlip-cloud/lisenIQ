@@ -48,6 +48,9 @@
 
         <!-- Área principal con dropzone -->
         <div id="upload-area" style="margin-top:18px;max-width:900px;">
+            <!-- Contenedor para errores de validación inicial (Paso 1) -->
+            <div id="step1-error-summary"></div>
+            
             <input id="file-input" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
             <div id="dropzone" class="dropzone" style="background:#fff;border:1px dashed #e6e6e6;border-radius:10px;padding:28px;text-align:center;cursor:pointer;max-width:900px;">
                 <i class="fa fa-cloud-upload" style="font-size:28px;color:#7B24FF;margin-bottom:8px;display:block;"></i>

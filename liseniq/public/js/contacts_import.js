@@ -111,6 +111,7 @@ document.addEventListener('DOMContentLoaded', function () {
         optUpload: document.getElementById('opt-upload'),
         optEdit: document.getElementById('opt-edit'),
         uploadArea: document.getElementById('upload-area'),
+        step1ErrorSummary: document.getElementById('step1-error-summary'),
         btnAddRow: document.getElementById('btn-add-row'),
         btnAddColumn: document.getElementById('btn-add-column')
     };
@@ -602,7 +603,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (hasErrors) {
             summaryHtml += `
                 <div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                    <strong>Errores de validación detectados:</strong><br>
+                    <strong>Errores:</strong><br>
                     <ul>
             `;
             validationErrors.forEach(e => {
@@ -726,6 +727,7 @@ document.addEventListener('DOMContentLoaded', function () {
         state.file = null;
         if (ui.fileInput) ui.fileInput.value = '';
         if (ui.dropzoneFilename) ui.dropzoneFilename.textContent = '';
+        if (ui.step1ErrorSummary) ui.step1ErrorSummary.innerHTML = ''; // Limpiar errores previos
         state.showOnlyErrors = false;
         state.showOnlyUpdating = false;
         state.showDeleteList = false;
@@ -736,6 +738,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     ui.optEdit.addEventListener('click', () => {
         setMode('edit');
+        if (ui.step1ErrorSummary) ui.step1ErrorSummary.innerHTML = ''; // Limpiar errores previos
         fetchExistingContacts();
     });
 
@@ -850,6 +853,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         state.file = f;
         ui.dropzoneFilename.textContent = `${f.name} · ${Math.round(f.size/1024)} KB`;
+        if (ui.step1ErrorSummary) ui.step1ErrorSummary.innerHTML = ''; // Limpiar errores al cambiar archivo
         ui.btnContinue.disabled = false;
     }
 
@@ -867,6 +871,9 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         
+        // Limpiar errores previos
+        if (ui.step1ErrorSummary) ui.step1ErrorSummary.innerHTML = '';
+
         ui.btnContinue.disabled = true;
         ui.btnContinue.textContent = 'Validando...';
         const fd = new FormData();
@@ -883,7 +890,18 @@ document.addEventListener('DOMContentLoaded', function () {
             ui.btnContinue.textContent = 'Continuar';
             const data = res.message || res;
             if (!data.ok) {
-                alert(data.error || 'Error de validación');
+                if (ui.step1ErrorSummary) {
+                    let summaryHtml = `
+                    <div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                        <strong>Error:</strong><br>
+                        <ul>
+                            <li>${data.error || 'Error de validación desconocido'}</li>
+                        </ul>
+                    </div>`;
+                    ui.step1ErrorSummary.innerHTML = summaryHtml;
+                } else {
+                    alert(data.error || 'Error de validación');
+                }
                 return;
             }
             state.headers = data.headers || [];

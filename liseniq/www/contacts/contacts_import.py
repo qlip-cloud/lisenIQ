@@ -791,7 +791,7 @@ def validate_contacts():
 	
 	existing_grid_rows = []
 	if company:
-		# Obtenemos TODOS los datos de contactos, formateados igual que para el grid
+		# Obtengo TODOS los datos de contactos, formateados igual que para el grid
 		# Lo uso para en el frontend comparar campo a campo para detectar cambios reales
 		internal_data = _get_contacts_data_internal(company)
 		existing_grid_rows = internal_data.get("rows", [])
@@ -820,7 +820,20 @@ def validate_contacts():
 
 	if not rows: return {"ok": False, "error": "El archivo está vacío"}
 
-	headers = [h.strip() if h else "" for h in rows[0]]
+	# Validaciones preliminares
+	# Validar que la celda A1 (Columna 1, Fila 1) no esté vacía
+	if not rows[0] or not rows[0][0] or not str(rows[0][0]).strip():
+		return {"ok": False, "error": _("La celda ubicada en la columna 1, fila 1 no puede estar vacía.")}
+
+	headers = [str(h).strip() if h else "" for h in rows[0]]
+
+	# Validar que los demográficos tengan nombre
+	if "Fecha de Ingreso" in headers:
+		fi_index = headers.index("Fecha de Ingreso")
+		for i in range(fi_index + 1, len(headers)):
+			if not headers[i]:
+				return {"ok": False, "error": _("Columna sin nombre en la posición {0} - Los campos demográficos deben tener un encabezado válido.").format(i+1)}
+
 	idx = {h: i for i, h in enumerate(headers)}
 	parsed = []
 	errors = []

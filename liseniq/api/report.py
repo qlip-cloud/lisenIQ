@@ -8,6 +8,7 @@ TODO:
 
 1. Implementar el reporte por tablas separadas para el reporte de medición de cultura organizacional
 2. Implementar funcionalidada de histórico para encuestas finalizadas en los nuevos reportes
+3. En las funciones para datos históricos, validar primero si la encuesta está en histórico antes de consultar los datos históricos, si no, consultar los datos en tiempo real
 """
 CATEGORIES = {
     "Sentido de propósito": "MI INSPIRACIÓN",
@@ -15,7 +16,7 @@ CATEGORIES = {
     "Me Conocen": "MI INSPIRACIÓN",
     "Mi líder": "LOS LÍDERES",
     "Apoyo": "LOS LÍDERES",
-    "Nuestros lideres": "LOS LÍDERES",
+    "Nuestros líderes": "LOS LÍDERES",
     "Oportunidades de crecimiento en mi Rol": "MI DESARROLLO Y APRENDIZAJE",
     "Oportunidades de desarrollo en la Organización": "MI DESARROLLO Y APRENDIZAJE",
     "Cultura de Aprendizaje": "MI DESARROLLO Y APRENDIZAJE",
@@ -62,6 +63,15 @@ VEDANTA_BIENESTAR = {
     "Mental": "PILAR PERSONAL",
     "Física": "PILAR PERSONAL",
     "Financiera": "PILAR PERSONAL",
+}
+
+TEMAS_INDICE_DE_ENGAGEMENT = {
+    "Si me ofrecieran un trabajo en condiciones similares en otra empresa, me quedaría donde estoy": "MI INSPIRACIÓN",
+    "Le recomendaría a un amigo o familiar que trabaje en esta organización": "EL AMBIENTE LABORAL POSITIVO",
+    "Siento compromiso y orgullo de trabajar en esta organización": "MI TRABAJO",
+    "Hago parte de un equipo de alto desempeño en la organización": "MI EQUIPO",
+    "Me veo aprendiendo y creciendo en esta organización en el futuro": "MI DESARROLLO Y APRENDIZAJE",
+    "Los líderes en esta organización me inspiran": "LOS LÍDERES"
 }
 
 @frappe.whitelist()
@@ -976,6 +986,12 @@ def get_question_variables_map():
                 basado en el mapeo de CATEGORIES
                 """
                 tema = CATEGORIES.get(variable, '')
+                mapping[question_text] = {
+                    'variable': variable,
+                    'tema': tema
+                }
+            if variable=='Índice de Engagement':
+                tema = TEMAS_INDICE_DE_ENGAGEMENT.get(question_text, '')
                 mapping[question_text] = {
                     'variable': variable,
                     'tema': tema

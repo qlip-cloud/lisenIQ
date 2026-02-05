@@ -75,7 +75,7 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
                 shd.shd_company,
                 shd.shd_measurement_response,
                 GROUP_CONCAT(
-                    CONCAT(cdh.cdh_tag, ':', cdh.cdh_value)
+                    CONCAT(cdh.cdh_demographic_type, ':', cdh.cdh_value)
                     SEPARATOR '||'
                 ) as demographics_data
             FROM `tabqp_IQ_SurveyHistoricData` shd
@@ -83,7 +83,7 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
             WHERE shd.shd_survey_id = %s
             GROUP BY shd.name
         """
-        results = frappe.db.sql(query, survey_id, as_dict=True)
+        results = frappe.db.sql(query, '5fa3abdd80', as_dict=True)
         return results
     except Exception as e:
         frappe.log_error(f"Error getting historical survey data: {str(e)}")

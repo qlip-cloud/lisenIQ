@@ -74,7 +74,7 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
                 shd.shd_company,
                 shd.shd_measurement_response,
                 GROUP_CONCAT(
-                    CONCAT(cdh.cdh_demographic_type, ':', cdh.cdh_value)
+                    CONCAT(cdh.cdh_tag, ':', cdh.cdh_value)
                     SEPARATOR '||'
                 ) as demographics_data
             FROM `tabqp_IQ_SurveyHistoricData` shd
@@ -110,9 +110,8 @@ def process_historical_response_row(hist_record, question_map, demographics_map)
     if demographics_data_str:
         for demo_pair in demographics_data_str.split('||'):
             if ':' in demo_pair:
-                demo_id, demo_value = demo_pair.split(':', 1)
-                if demo_id in demographics_map:
-                    row[demo_id] = demo_value
+                demo_tag, demo_value = demo_pair.split(':', 1)
+                row[demo_tag] = demo_value
 
     # Procesar respuestas de la encuesta
     response_json = hist_record.get('shd_measurement_response', '{}')
@@ -375,15 +374,14 @@ def get_bulk_demographics(users_list, demographics_map):
     query = f"""
         SELECT 
             c.name,
-            cad.cad_demographic_type as cad_id,
+            cad.cad_tag as cad_tag,
             cad.cad_value
         FROM `tabContact` c
         INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
         WHERE c.name IN ({users_placeholder})
-        AND cad.cad_demographic_type IN ({', '.join(['%s'] * len(demographics_map))})
     """
     
-    params = users_list + list(demographics_map.keys())
+    params = users_list 
     
     try:
         results = frappe.db.sql(query, params, as_dict=True)
@@ -394,7 +392,7 @@ def get_bulk_demographics(users_list, demographics_map):
     demographics_data = {}
     for result in results:
         user = result.get('name')
-        tag = result.get('cad_id')
+        tag = result.get('cad_tag')
         value = result.get('cad_value')
         
         if user and tag and value:

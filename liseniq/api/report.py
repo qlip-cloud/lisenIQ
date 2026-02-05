@@ -66,7 +66,7 @@ VEDANTA_BIENESTAR = {
 
 TEMAS_INDICE_DE_ENGAGEMENT = {
     "Si me ofrecieran un trabajo en condiciones similares en otra empresa, me quedaría donde estoy": "MI INSPIRACIÓN",
-    "Le recomendaría a un amigo o familiar que trabaje en esta organización": "EL AMBIENTE LABORAL POSITIVO",
+    "Le recomendaría a un amigo o familiar que trabaje en esta organización": "AMBIENTE LABORAL POSITIVO",
     "Siento compromiso y orgullo de trabajar en esta organización": "MI TRABAJO",
     "Hago parte de un equipo de alto desempeño en la organización": "MI EQUIPO",
     "Me veo aprendiendo y creciendo en esta organización en el futuro": "MI DESARROLLO Y APRENDIZAJE",
@@ -309,7 +309,7 @@ def get_demographics_from_contacts():
     try:
         query = """
             SELECT DISTINCT
-                cad.tag as demographic_tag
+                cad.cad_tag as demographic_tag
                 from `tabqp_IQ_ContactAdditionalDetail` cad
             """
         results = frappe.db.sql(query, as_dict=True)

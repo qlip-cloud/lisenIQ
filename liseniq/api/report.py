@@ -7,8 +7,7 @@ from datetime import datetime, timedelta
 TODO: 
 
 1. Implementar el reporte por tablas separadas para el reporte de medición de cultura organizacional
-2. Implementar funcionalidada de histórico para encuestas finalizadas en los nuevos reportes
-3. En las funciones para datos históricos, validar primero si la encuesta está en histórico antes de consultar los datos históricos, si no, consultar los datos en tiempo real
+2. Agregar todos los subdemográficos y cuando no exista el dato, colocar NA
 """
 CATEGORIES = {
     "Sentido de propósito": "MI INSPIRACIÓN",
@@ -158,32 +157,55 @@ def get_user_demographics():
         surveys = get_valid_engagement_surveys()
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
-        demographics_labels = get_demographics_labels()
+        demographics_labels_from_historic = get_demographics_from_historic()
+        demographics_labels_from_contacts = get_demographics_from_contacts()
+        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts))
+        
+        # Procesar encuestas finalizadas
         for survey in finished_surveys:
             historical_data = get_historical_survey_data(survey['id'], {}, {})
             for hist_record in historical_data:
+                user_id = hist_record.get('shd_document_number', '')
+                
+                # Crear un diccionario con los demográficos del usuario
+                user_demographics = {}
                 demographics_data_str = hist_record.get('demographics_data', '')
                 if demographics_data_str:
                     for demo_pair in demographics_data_str.split('||'):
                         if ':' in demo_pair:
                             demo_tag, demo_value = demo_pair.split(':', 1)
-                            user_demographics_array.append({
-                                'user_id': hist_record.get('shd_document_number', ''),
-                                'survey_id': survey['id'],
-                                'user_id-survey_id': f"{hist_record.get('shd_document_number', '')}-{survey['id']}",
-                                'demographic_id': demo_tag,
-                                'demographic_value': demo_value
-                            })
+                            user_demographics[demo_tag] = demo_value
+                
+                # Agregar todos los demográficos (con valor o "NA")
+                for demo_tag in all_demographics_labels:
+                    user_demographics_array.append({
+                        'user_id': user_id,
+                        'survey_id': survey['id'],
+                        'user_id-survey_id': f"{user_id}-{survey['id']}",
+                        'demographic_id': demo_tag,
+                        'demographic_value': user_demographics.get(demo_tag, 'NA')
+                    })
 
+        # Procesar encuestas activas
         for survey in active_surveys:
             survey_names = [survey['survey_name']]
             survey_names_placeholder = ', '.join(['%s'] * len(survey_names))
             
-            query = f"""
+            # Obtener todos los usuarios únicos de la encuesta
+            users_query = f"""
+                SELECT DISTINCT
+                    c.custom_document_number
+                FROM `tabSurvey Response` sr
+                LEFT JOIN `tabContact` c ON c.name = sr.user
+                WHERE sr.survey IN ({survey_names_placeholder})
+                AND c.custom_document_number IS NOT NULL
+            """
+            users = frappe.db.sql(users_query, survey_names, as_dict=True)
+            
+            # Obtener demográficos de los usuarios de esta encuesta
+            demographics_query = f"""
                 SELECT 
-                    sr.user,
                     c.custom_document_number,
-                    cad.cad_demographic_type AS demographic_id,
                     cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
                 FROM `tabSurvey Response` sr
@@ -192,19 +214,31 @@ def get_user_demographics():
                 INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
                 WHERE sr.survey IN ({survey_names_placeholder})
                 AND dt.dt_object_type = 'Contacto'
-                ORDER BY sr.survey, sr.creation DESC
             """
             
-            responses = frappe.db.sql(query, survey_names, as_dict=True)
+            responses = frappe.db.sql(demographics_query, survey_names, as_dict=True)
             
+            # Organizar demográficos por usuario
+            user_demographics_map = {}
             for response in responses:
-                user_demographics_array.append({
-                    'user_id': response.get('custom_document_number', ''),
-                    'survey_id': survey['id'],
-                    'user_id-survey_id': f"{response.get('custom_document_number', '')}-{survey['id']}",
-                    'demographic_id': response.get('demographic_tag', ''),
-                    'demographic_value': response.get('demographic_value', '')
-                })
+                user_id = response.get('custom_document_number', '')
+                if user_id not in user_demographics_map:
+                    user_demographics_map[user_id] = {}
+                user_demographics_map[user_id][response.get('demographic_tag', '')] = response.get('demographic_value', '')
+            
+            # Crear registros para todos los usuarios y todos los demográficos
+            for user_record in users:
+                user_id = user_record.get('custom_document_number', '')
+                user_demographics = user_demographics_map.get(user_id, {})
+                
+                for demo_tag in all_demographics_labels:
+                    user_demographics_array.append({
+                        'user_id': user_id,
+                        'survey_id': survey['id'],
+                        'user_id-survey_id': f"{user_id}-{survey['id']}",
+                        'demographic_id': demo_tag,
+                        'demographic_value': user_demographics.get(demo_tag, 'NA')
+                    })
 
         return user_demographics_array
 
@@ -271,6 +305,31 @@ def custom_report_by_question_yesterday(filters=None):
 
     return translated_data
 
+def get_demographics_from_contacts():
+    try:
+        query = """
+            SELECT DISTINCT
+                cad.tag as demographic_tag
+                from `tabqp_IQ_ContactAdditionalDetail` cad
+            """
+        results = frappe.db.sql(query, as_dict=True)
+        return [row['demographic_tag'] for row in results]
+    except Exception as e:
+        frappe.log_error(f"Error getting demographics: {str(e)}")
+        return []
+    
+def get_demographics_from_historic():
+    try:
+        query = """
+            SELECT DISTINCT
+                cdh.cdh_tag as demographic_tag
+                from `tabqp_IQ_ContactDetailHistoric` cdh
+            """
+        results = frappe.db.sql(query, as_dict=True)
+        return [row['demographic_tag'] for row in results]
+    except Exception as e:
+        frappe.log_error(f"Error getting demographics from historic: {str(e)}")
+        return []
 
 def get_valid_surveys():
     try:

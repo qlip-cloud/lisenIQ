@@ -83,7 +83,7 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
             WHERE shd.shd_survey_id = %s
             GROUP BY shd.name
         """
-        results = frappe.db.sql(query, '5fa3abdd80', as_dict=True)
+        results = frappe.db.sql(query, survey_id, as_dict=True)
         return results
     except Exception as e:
         frappe.log_error(f"Error getting historical survey data: {str(e)}")
@@ -106,14 +106,6 @@ def process_historical_response_row(hist_record, question_map, demographics_map)
         'entry_date': hist_record.get('shd_entry_date', ''),
     }
 
-    # Procesar datos demográficos del registro histórico
-    demographics_data_str = hist_record.get('demographics_data', '')
-    if demographics_data_str:
-        for demo_pair in demographics_data_str.split('||'):
-            if ':' in demo_pair:
-                demo_tag, demo_value = demo_pair.split(':', 1)
-                row[demo_tag] = demo_value
-
     # Procesar respuestas de la encuesta
     response_json = hist_record.get('shd_measurement_response', '{}')
     parsed_responses = parse_response_json(response_json)
@@ -121,6 +113,18 @@ def process_historical_response_row(hist_record, question_map, demographics_map)
     # Inicializar todas las preguntas con valores vacíos y llenar las que tienen respuesta
     for qid in question_map.keys():
         row[qid] = parsed_responses.get(qid, '')
+
+    # Inicializar TODOS los campos demográficos con valores vacíos
+    for demographic_id in demographics_map.keys():
+        row[demographic_id] = ''
+
+    # Sobrescribir con los valores del registro histórico
+    demographics_data_str = hist_record.get('demographics_data', '')
+    if demographics_data_str:
+        for demo_pair in demographics_data_str.split('||'):
+            if ':' in demo_pair:
+                demo_type, demo_value = demo_pair.split(':', 1)
+                row[demo_type] = demo_value
 
     return row
 
@@ -253,13 +257,13 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
     demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
 
     for response in responses:
-        row = process_response_row(response, question_map, demographics_data)
+        row = process_response_row(response, question_map, demographics_map, demographics_data)
         data.append(row)
 
     return data
 
 
-def process_response_row(response, question_map, demographics_data):
+def process_response_row(response, question_map, demographics_map, demographics_data):
     """
     Procesa una fila individual de respuesta
     """
@@ -283,6 +287,11 @@ def process_response_row(response, question_map, demographics_data):
     for qid in question_map.keys():
         row[qid] = parsed_responses.get(qid, '')
 
+    # Inicializar TODOS los campos demográficos con valores vacíos
+    for demographic_id in demographics_map.keys():
+        row[demographic_id] = ''
+
+    # Sobrescribir con los valores que el usuario tiene
     user_demographics = demographics_data.get(user, {})
     for demographic_id in user_demographics:
         row[demographic_id] = user_demographics[demographic_id]

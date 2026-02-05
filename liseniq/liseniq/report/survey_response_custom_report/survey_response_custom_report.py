@@ -17,13 +17,14 @@ def execute(filters=None):
     survey_json = getattr(survey_doc, "survey_json", "{}") or "{}"
     
 
+    survey_status = get_survey_status(survey_name)
+
     question_map = get_question_labels(survey_json)
-    demographics_map = get_demographics_labels()
+    demographics_map = get_demographics_labels_by_status(survey_status)
 
     columns = build_columns(question_map, demographics_map)
     
     # Verificar si la encuesta está finalizada
-    survey_status = get_survey_status(survey_name)
     data = get_survey_data(survey_name, question_map, demographics_map, survey_status)
 
     return columns, data
@@ -331,6 +332,51 @@ def get_question_labels(survey_json):
                     mapping[name] = title or name
 
     return mapping
+
+
+def get_demographics_labels_by_status(survey_status):
+    """
+    Obtiene las etiquetas de los campos demográficos según el estado de la encuesta.
+    Si está en históricos, busca en ContactDetailHistoric.
+    Si no, busca en ContactAdditionalDetail.
+    """
+    is_historical = survey_status.get('in_history') == 1
+    
+    if is_historical:
+        return get_demographics_labels_from_historic()
+    else:
+        return get_demographics_labels()
+
+
+def get_demographics_labels_from_historic():
+    """
+    Obtiene las etiquetas de los campos demográficos
+    que tienen al menos un valor en ContactDetailHistoric.
+    """
+    try:
+        query = """
+            SELECT dem.name, dem.dt_title
+            FROM `tabqp_IQ_DemographicType` dem
+            WHERE dem.dt_object_type = 'Contacto'
+            AND EXISTS (
+                SELECT 1
+                FROM `tabqp_IQ_ContactDetailHistoric` cdh
+                WHERE cdh.cdh_demographic_type = dem.name
+                LIMIT 1
+            )
+            ORDER BY dem.name
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        
+        mapping = {}
+        for row in results:
+            mapping[row.name] = row.dt_title or row.name
+            
+        return mapping
+
+    except Exception as e:
+        frappe.log_error(f"Error getting demographics labels from historic: {str(e)}")
+        return {}
 
 
 def get_demographics_labels():

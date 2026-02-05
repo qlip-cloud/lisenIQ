@@ -341,6 +341,7 @@ def get_demographics_labels_by_status(survey_status):
     Si no, busca en ContactAdditionalDetail.
     """
     is_historical = survey_status.get('in_history') == 1
+    print(f"Survey is historical: {is_historical}")
     
     if is_historical:
         return get_demographics_labels_from_historic()
@@ -355,23 +356,17 @@ def get_demographics_labels_from_historic():
     """
     try:
         query = """
-            SELECT dem.name, dem.dt_title
-            FROM `tabqp_IQ_DemographicType` dem
-            WHERE dem.dt_object_type = 'Contacto'
-            AND EXISTS (
-                SELECT 1
-                FROM `tabqp_IQ_ContactDetailHistoric` cdh
-                WHERE cdh.cdh_demographic_type = dem.name
-                LIMIT 1
-            )
-            ORDER BY dem.name
+            SELECT DISTINCT
+                cdh.cdh_tag as demographic_tag, cdh.cdh_demographic_type as demographic_id
+                from `tabqp_IQ_ContactDetailHistoric` cdh
         """
         results = frappe.db.sql(query, as_dict=True)
         
         mapping = {}
         for row in results:
-            mapping[row.name] = row.dt_title or row.name
-            
+            mapping[row.demographic_id] = row.demographic_tag
+        
+        print(f"Historic demographics mapping: {mapping}")
         return mapping
 
     except Exception as e:
@@ -386,23 +381,16 @@ def get_demographics_labels():
     """
     try:
         query = """
-            SELECT dem.name, dem.dt_title
-            FROM `tabqp_IQ_DemographicType` dem
-            WHERE dem.dt_object_type = 'Contacto'
-            AND EXISTS (
-                SELECT 1
-                FROM `tabqp_IQ_ContactAdditionalDetail` cad
-                WHERE cad.cad_demographic_type = dem.name
-                LIMIT 1
-            )
-            ORDER BY dem.name
+            SELECT DISTINCT
+                cad.cad_tag as demographic_tag, cad.cad_demographic_type as demographic_id
+                from `tabqp_IQ_ContactAdditionalDetail` cad
         """
         results = frappe.db.sql(query, as_dict=True)
         
         mapping = {}
         for row in results:
-            mapping[row.name] = row.dt_title or row.name
-            
+            mapping[row.demographic_id] = row.demographic_tag
+        print(f"Demographics mapping: {mapping}")
         return mapping
 
     except Exception as e:

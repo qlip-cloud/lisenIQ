@@ -19,7 +19,8 @@ def execute(filters=None):
 
     survey_status = get_survey_status(survey_name)
 
-    question_map = get_question_labels(survey_json)
+    # Obtener question_map desde las respuestas reales y qp_IQ_Question
+    question_map = get_question_labels_from_responses(survey_name, survey_status)
     
     # Obtener demographics_map basado en los usuarios específicos de esta encuesta
     demographics_map = get_demographics_labels_by_status(survey_status, survey_name)
@@ -343,6 +344,114 @@ def get_question_labels(survey_json):
                     mapping[name] = title or name
 
     return mapping
+
+
+def get_question_labels_from_responses(survey_name, survey_status):
+    """
+    Obtiene las etiquetas de las preguntas desde las respuestas reales de los usuarios.
+    Extrae los IDs de preguntas de los response_json y busca sus títulos en qp_IQ_Question.
+    """
+    question_ids = set()
+    
+    # Si la encuesta está en históricos
+    if survey_status.get('in_history') == 1:
+        survey_id = survey_status.get('survey_id', '')
+        if survey_id:
+            question_ids = get_question_ids_from_historic(survey_id)
+    else:
+        # Si la encuesta está activa, obtener de Survey Response
+        question_ids = get_question_ids_from_survey_responses(survey_name)
+    
+    # Buscar los títulos de las preguntas en qp_IQ_Question
+    return get_question_titles_from_db(question_ids)
+
+
+def get_question_ids_from_historic(survey_id):
+    """
+    Obtiene todos los IDs de preguntas únicos desde los datos históricos.
+    """
+    try:
+        query = """
+            SELECT shd.shd_measurement_response
+            FROM `tabqp_IQ_SurveyHistoricData` shd
+            WHERE shd.shd_survey_id = %s
+        """
+        results = frappe.db.sql(query, survey_id, as_dict=True)
+        
+        question_ids = set()
+        for result in results:
+            response_json = result.get('shd_measurement_response', '{}')
+            parsed = parse_response_json(response_json)
+            if isinstance(parsed, dict):
+                question_ids.update(parsed.keys())
+        
+        return question_ids
+    except Exception as e:
+        frappe.log_error(f"Error getting question IDs from historic: {str(e)}")
+        return set()
+
+
+def get_question_ids_from_survey_responses(survey_name):
+    """
+    Obtiene todos los IDs de preguntas únicos desde las respuestas de la encuesta.
+    """
+    try:
+        query = """
+            SELECT sr.response_json
+            FROM `tabSurvey Response` sr
+            WHERE sr.survey = %s
+        """
+        results = frappe.db.sql(query, survey_name, as_dict=True)
+        
+        question_ids = set()
+        for result in results:
+            response_json = result.get('response_json', '{}')
+            parsed = parse_response_json(response_json)
+            if isinstance(parsed, dict):
+                question_ids.update(parsed.keys())
+        
+        return question_ids
+    except Exception as e:
+        frappe.log_error(f"Error getting question IDs from survey responses: {str(e)}")
+        return set()
+
+
+def get_question_titles_from_db(question_ids):
+    """
+    Busca los títulos de las preguntas en qp_IQ_Question.
+    """
+    if not question_ids:
+        return {}
+    
+    try:
+        question_ids_list = list(question_ids)
+        placeholders = ', '.join(['%s'] * len(question_ids_list))
+        
+        query = f"""
+            SELECT 
+                q.name as question_id,
+                q.qn_statement as question_title
+            FROM `tabqp_IQ_Question` q
+            WHERE q.name IN ({placeholders})
+        """
+        results = frappe.db.sql(query, question_ids_list, as_dict=True)
+        
+        mapping = {}
+        for row in results:
+            qid = row.get('question_id')
+            title = row.get('question_title', qid)
+            mapping[qid] = title or qid
+        
+        # Para las preguntas que no se encontraron en la BD, usar el ID como título
+        for qid in question_ids:
+            if qid not in mapping:
+                mapping[qid] = qid
+        
+        return mapping
+    except Exception as e:
+        frappe.log_error(f"Error getting question titles from DB: {str(e)}")
+        # Si falla, retornar un mapping con los IDs como títulos
+        return {qid: qid for qid in question_ids}
 
 
 def get_demographics_labels_by_status(survey_status, survey_name):

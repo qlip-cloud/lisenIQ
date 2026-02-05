@@ -20,7 +20,9 @@ def execute(filters=None):
     survey_status = get_survey_status(survey_name)
 
     question_map = get_question_labels(survey_json)
-    demographics_map = get_demographics_labels_by_status(survey_status)
+    
+    # Obtener demographics_map basado en los usuarios específicos de esta encuesta
+    demographics_map = get_demographics_labels_by_status(survey_status, survey_name)
 
     columns = build_columns(question_map, demographics_map)
     
@@ -343,63 +345,93 @@ def get_question_labels(survey_json):
     return mapping
 
 
-def get_demographics_labels_by_status(survey_status):
+def get_demographics_labels_by_status(survey_status, survey_name):
     """
     Obtiene las etiquetas de los campos demográficos según el estado de la encuesta.
-    Si está en históricos, busca en ContactDetailHistoric.
-    Si no, busca en ContactAdditionalDetail.
+    Si está en históricos, busca en ContactDetailHistoric para ese survey_id.
+    Si no, busca en ContactAdditionalDetail para los usuarios de esa encuesta.
     """
     is_historical = survey_status.get('in_history') == 1
-    print(f"Survey is historical: {is_historical}")
     
     if is_historical:
-        return get_demographics_labels_from_historic()
+        survey_id = survey_status.get('survey_id', '')
+        return get_demographics_labels_from_historic(survey_id)
     else:
-        return get_demographics_labels()
+        # Obtener usuarios de esta encuesta específica
+        users_list = get_survey_users(survey_name)
+        return get_demographics_labels(users_list)
 
 
-def get_demographics_labels_from_historic():
+def get_survey_users(survey_name):
     """
-    Obtiene las etiquetas de los campos demográficos
-    que tienen al menos un valor en ContactDetailHistoric.
+    Obtiene la lista de usuarios únicos que respondieron una encuesta.
     """
     try:
         query = """
-            SELECT DISTINCT
-                cdh.cdh_tag as demographic_tag, cdh.cdh_demographic_type as demographic_id
-                from `tabqp_IQ_ContactDetailHistoric` cdh
+            SELECT DISTINCT sr.user
+            FROM `tabSurvey Response` sr
+            WHERE sr.survey = %s AND sr.user IS NOT NULL
         """
-        results = frappe.db.sql(query, as_dict=True)
+        results = frappe.db.sql(query, survey_name, as_dict=True)
+        return [r.user for r in results]
+    except Exception as e:
+        frappe.log_error(f"Error getting survey users: {str(e)}")
+        return []
+
+
+def get_demographics_labels_from_historic(survey_id):
+    """
+    Obtiene las etiquetas de los campos demográficos que tienen al menos un valor 
+    en ContactDetailHistoric para un survey_id específico.
+    """
+    if not survey_id:
+        return {}
+    
+    try:
+        query = """
+            SELECT DISTINCT
+                cdh.cdh_tag as demographic_tag, 
+                cdh.cdh_demographic_type as demographic_id
+            FROM `tabqp_IQ_ContactDetailHistoric` cdh
+            INNER JOIN `tabqp_IQ_SurveyHistoricData` shd ON shd.name = cdh.parent
+            WHERE shd.shd_survey_id = %s
+        """
+        results = frappe.db.sql(query, survey_id, as_dict=True)
         
         mapping = {}
         for row in results:
             mapping[row.demographic_id] = row.demographic_tag
         
-        print(f"Historic demographics mapping: {mapping}")
         return mapping
 
-    except Exception as e:
+    except Exception as e:        
         frappe.log_error(f"Error getting demographics labels from historic: {str(e)}")
         return {}
 
 
-def get_demographics_labels():
+def get_demographics_labels(users_list):
     """
-    Obtiene las etiquetas de los campos demográficos
-    que tienen al menos un valor en ContactAdditionalDetail.
+    Obtiene las etiquetas de los campos demográficos que tienen al menos un valor 
+    en ContactAdditionalDetail para una lista específica de usuarios.
     """
+    if not users_list:
+        return {}
+    
     try:
-        query = """
+        users_placeholder = ', '.join(['%s'] * len(users_list))
+        query = f"""
             SELECT DISTINCT
-                cad.cad_tag as demographic_tag, cad.cad_demographic_type as demographic_id
-                from `tabqp_IQ_ContactAdditionalDetail` cad
+                cad.cad_tag as demographic_tag, 
+                cad.cad_demographic_type as demographic_id
+            FROM `tabqp_IQ_ContactAdditionalDetail` cad
+            WHERE cad.parent IN ({users_placeholder})
         """
-        results = frappe.db.sql(query, as_dict=True)
+        results = frappe.db.sql(query, users_list, as_dict=True)
         
         mapping = {}
         for row in results:
             mapping[row.demographic_id] = row.demographic_tag
-        print(f"Demographics mapping: {mapping}")
+        
         return mapping
 
     except Exception as e:

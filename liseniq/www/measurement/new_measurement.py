@@ -43,7 +43,13 @@ def get_context(context):
 
             # Datos de participantes
             recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": doc.name})
-            survey_type = "selected" if recipients_count > 0 else "all"
+            
+            # Detectar si es tipo anónimo puro basado en custom link y sin destinatarios obligatorios
+            if doc.su_custom_generate_public_link and recipients_count == 0 and doc.su_is_anonymous:
+                 survey_type = "anonymous_link"
+            else:
+                 survey_type = "selected" if recipients_count > 0 else "all"
+                 
             response_type = "anonymous" if doc.su_is_anonymous else "identified"
 
             # Construir lista de contactos para el modal en edición
@@ -132,8 +138,6 @@ def get_context(context):
         except Exception as e:
             frappe.log_error(f"No se pudieron cargar las preguntas de la plantilla {template_name}: {e}", "Error en new_measurement.py")
             context.preloaded_questions_json = "[]"
-    else:
-        context.preloaded_questions_json = "[]"
     # Exponer el nombre de la plantilla
     context.template_name = template_name or None
     if template_name:
@@ -389,6 +393,10 @@ def save_measurement(data):
         data = json.loads(data)
         email_data = data.get("email_customization") or {}
         email_use_default = bool(data.get("email_use_default"))
+        
+        # Variable para almacenar la referencia al documento final
+        final_survey_name = None
+
         # Modo edición
         if data.get("is_edit_mode") and data.get("doc_name"):
             survey = frappe.get_doc("qp_IQ_Survey", data["doc_name"])
@@ -434,38 +442,42 @@ def save_measurement(data):
 
             survey.save(ignore_permissions=True)
             frappe.db.commit()
+            
+            final_survey_name = survey.name
 
-            contacts_data = data.get("contacts", {})
-            new_contacts = contacts_data.get("list", [])
-            if new_contacts:
-                # Obtener contactos ya existentes en la medición
-                existing_recipients = frappe.get_all(
-                    "qp_IQ_SurveyRecipient",
-                    filters={"sr_survey": survey.name},
-                    fields=["sr_contact"]
-                )
-                existing_contact_names = set(r["sr_contact"] for r in existing_recipients if r["sr_contact"])
-                rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
-
-                for contact in new_contacts:
-                    contact_name = contact.get("name")
-                    if not contact_name or contact_name in existing_contact_names:
-                        continue
-
-                    # Validar si ya respondió la encuesta (por cualquier medio)
-                    has_responded = frappe.db.exists(
-                        "Survey Response",
-                        {"survey": survey.su_name, "user": contact_name}
+            # Solo actualizar contactos si NO es anónimo
+            if data.get("contacts", {}).get("surveyType") != "anonymous_link":
+                contacts_data = data.get("contacts", {})
+                new_contacts = contacts_data.get("list", [])
+                if new_contacts:
+                    # Obtener contactos ya existentes en la medición
+                    existing_recipients = frappe.get_all(
+                        "qp_IQ_SurveyRecipient",
+                        filters={"sr_survey": survey.name},
+                        fields=["sr_contact"]
                     )
-                    if has_responded:
-                        continue
+                    existing_contact_names = set(r["sr_contact"] for r in existing_recipients if r["sr_contact"])
+                    rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
 
-                    frappe.get_doc({
-                        "doctype": "qp_IQ_SurveyRecipient",
-                        "sr_survey": survey.name,
-                        "sr_contact": contact_name,
-                        "sr_status": rs_not_sent
-                    }).insert(ignore_permissions=True)
+                    for contact in new_contacts:
+                        contact_name = contact.get("name")
+                        if not contact_name or contact_name in existing_contact_names:
+                            continue
+
+                        # Validar si ya respondió la encuesta
+                        has_responded = frappe.db.exists(
+                            "Survey Response",
+                            {"survey": survey.su_name, "user": contact_name}
+                        )
+                        if has_responded:
+                            continue
+
+                        frappe.get_doc({
+                            "doctype": "qp_IQ_SurveyRecipient",
+                            "sr_survey": survey.name,
+                            "sr_contact": contact_name,
+                            "sr_status": rs_not_sent
+                        }).insert(ignore_permissions=True)
             frappe.db.commit()
 
             # Enviar de inmediato links a pendientes si la medición ya fue lanzada
@@ -474,295 +486,295 @@ def save_measurement(data):
             except Exception:
                 frappe.log_error(frappe.get_traceback(), "save_measurement.send_pending_links_on_edit")
 
-            return {"status": "success", "message": f"Medición '{survey.su_name}' actualizada exitosamente.", "docname": survey.name}
-
         # Modo nueva encuesta o creación
-        question_types_map = {qt.name: qt.qnt_type_name for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name"])}
-        
-        user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
-        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        else:
+            question_types_map = {qt.name: qt.qnt_type_name for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name"])}
+            
+            user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
+            user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
-        manual_question_map = {}
-        if data.get("questions"):
-            for q in data["questions"]:
-                if q.get("id", "").startswith("manual-"):
-                    question_text = q["text"]
-                    existing_question = frappe.db.exists("qp_IQ_Question", {"qn_statement": question_text, "qn_owner": user_company})
+            manual_question_map = {}
+            if data.get("questions"):
+                for q in data["questions"]:
+                    if q.get("id", "").startswith("manual-"):
+                        question_text = q["text"]
+                        existing_question = frappe.db.exists("qp_IQ_Question", {"qn_statement": question_text, "qn_owner": user_company})
 
-                    if existing_question:
-                        manual_question_map[q["id"]] = existing_question
-                    else:
-                        new_question = frappe.new_doc("qp_IQ_Question")
-                        new_question.qn_statement = question_text
-                        new_question.qn_type = q["type"]
-                        new_question.qn_creator = user_contact
-                        new_question.qn_owner = user_company
-                        
-                        if q.get("demographic"):
-                            demographic_name = frappe.db.exists("qp_IQ_DemographicType", {"dt_title": q["demographic"]})
-                            if not demographic_name:
-                                demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
-                                demographic_doc.dt_title = q["demographic"]
-                                demographic_doc.dt_object_type = "Pregunta"
-                                demographic_doc.insert(ignore_permissions=True)
-                                demographic_name = demographic_doc.name
-                            new_question.qn_demographic = demographic_name
-
-                        if q.get("options"):
-                            if q.get("typeName") == "Likert" or (isinstance(q.get("options")[0], dict) and "value" in q["options"][0]):
-                                for opt in q["options"]:
-                                    new_question.append("qn_response_options", {
-                                        "qo_option_text": opt["text"] if isinstance(opt, dict) else opt,
-                                        "qo_option_value": opt["value"] if isinstance(opt, dict) and "value" in opt else opt,
-                                        "qo_url": (opt.get("url") if isinstance(opt, dict) and "url" in opt else None)
-                                    })
-                            else:
-                                for opt_text in q["options"]:
-                                    new_question.append("qn_response_options", {"qo_option_text": opt_text, "qo_option_value": opt_text})
-                        
-                        if q.get("negative_statement"): new_question.qn_statement_negative = q["negative_statement"]
-                        if q.get("positive_statement"): new_question.qn_statement_positive = q["positive_statement"]
-                        if q.get("nps_min") is not None: new_question.qn_nps_min = q["nps_min"]
-                        if q.get("nps_max") is not None: new_question.qn_nps_max = q["nps_max"]
+                        if existing_question:
+                            manual_question_map[q["id"]] = existing_question
+                        else:
+                            new_question = frappe.new_doc("qp_IQ_Question")
+                            new_question.qn_statement = question_text
+                            new_question.qn_type = q["type"]
+                            new_question.qn_creator = user_contact
+                            new_question.qn_owner = user_company
                             
-                        new_question.insert(ignore_permissions=True)
-                        manual_question_map[q["id"]] = new_question.name
+                            if q.get("demographic"):
+                                demographic_name = frappe.db.exists("qp_IQ_DemographicType", {"dt_title": q["demographic"]})
+                                if not demographic_name:
+                                    demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
+                                    demographic_doc.dt_title = q["demographic"]
+                                    demographic_doc.dt_object_type = "Pregunta"
+                                    demographic_doc.insert(ignore_permissions=True)
+                                    demographic_name = demographic_doc.name
+                                new_question.qn_demographic = demographic_name
 
-        surveyjs_doc_name = None
-        if data.get("questions"):
-            elements = []
+                            if q.get("options"):
+                                if q.get("typeName") == "Likert" or (isinstance(q.get("options")[0], dict) and "value" in q["options"][0]):
+                                    for opt in q["options"]:
+                                        new_question.append("qn_response_options", {
+                                            "qo_option_text": opt["text"] if isinstance(opt, dict) else opt,
+                                            "qo_option_value": opt["value"] if isinstance(opt, dict) and "value" in opt else opt,
+                                            "qo_url": (opt.get("url") if isinstance(opt, dict) and "url" in opt else None)
+                                        })
+                                else:
+                                    for opt_text in q["options"]:
+                                        new_question.append("qn_response_options", {"qo_option_text": opt_text, "qo_option_value": opt_text})
+                            
+                            if q.get("negative_statement"): new_question.qn_statement_negative = q["negative_statement"]
+                            if q.get("positive_statement"): new_question.qn_statement_positive = q["positive_statement"]
+                            if q.get("nps_min") is not None: new_question.qn_nps_min = q["nps_min"]
+                            if q.get("nps_max") is not None: new_question.qn_nps_max = q["nps_max"]
+                                
+                            new_question.insert(ignore_permissions=True)
+                            manual_question_map[q["id"]] = new_question.name
 
-            LIKERT_ICON_MAP = {
-                5: "/files/aiq - totalmente de acuerdo.png",
-                4: "/files/aiq - de acuerdo.png",
-                3: "/files/aiq - ni de acuerdo ni desacuerdo.png",
-                2: "/files/aiq - desacuerdo.png",
-                1: "/files/aiq - totalmente desacuerdo.png",
-            }
-            for q in data["questions"]:
-                question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
-                
-                question_type_title = question_types_map.get(q["type"])
-                
-                surveyjs_type = "text"
-                if question_type_title == "Selección Múltiple":
-                    surveyjs_type = "radiogroup"
-                elif question_type_title == "Abierta":
-                    surveyjs_type = "comment"
-                elif question_type_title == "NPS":
-                    surveyjs_type = "rating"
-                elif question_type_title == "Likert":
-                    surveyjs_type = "imagepicker"
-                elif question_type_title == "Likert Visual":
-                    surveyjs_type = "imagepicker"
+            surveyjs_doc_name = None
+            if data.get("questions"):
+                elements = []
 
-                element = {
-                    "type": surveyjs_type,
-                    "name": question_name,
-                    "title": q["text"],
-                    "isRequired": "true"
+                LIKERT_ICON_MAP = {
+                    5: "/files/aiq - totalmente de acuerdo.png",
+                    4: "/files/aiq - de acuerdo.png",
+                    3: "/files/aiq - ni de acuerdo ni desacuerdo.png",
+                    2: "/files/aiq - desacuerdo.png",
+                    1: "/files/aiq - totalmente desacuerdo.png",
+                }
+                for q in data["questions"]:
+                    question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
+                    
+                    question_type_title = question_types_map.get(q["type"])
+                    
+                    surveyjs_type = "text"
+                    if question_type_title == "Selección Múltiple":
+                        surveyjs_type = "radiogroup"
+                    elif question_type_title == "Abierta":
+                        surveyjs_type = "comment"
+                    elif question_type_title == "NPS":
+                        surveyjs_type = "rating"
+                    elif question_type_title == "Likert":
+                        surveyjs_type = "imagepicker"
+                    elif question_type_title == "Likert Visual":
+                        surveyjs_type = "imagepicker"
+
+                    element = {
+                        "type": surveyjs_type,
+                        "name": question_name,
+                        "title": q["text"],
+                        "isRequired": "true"
+                    }
+
+                    # Se mantienen separadas opciones, por si requieren personalizaciones distintas
+                    if question_type_title == "Likert":
+                        choices = []
+                        try:
+                            if question_name:
+                                q_doc = frappe.get_doc("qp_IQ_Question", question_name)
+                                if q_doc and q_doc.qn_response_options:
+                                    for opt in q_doc.qn_response_options:
+                                        try:
+                                            val_int = int(opt.qo_option_value)
+                                        except Exception:
+                                            val_int = None
+                                        # Asignar URL personalizada si existe, sino usar el mapa por defecto doble check
+                                        image_url = getattr(opt, "qo_url", None) or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
+                                        choices.append({
+                                            "text": opt.qo_option_text,
+                                            "value": opt.qo_option_value,
+                                            "imageLink": image_url
+                                        })
+                        except Exception:
+                            choices = []
+                        element["choices"] = choices
+                        element["showLabel"] = True
+                        element["multiSelect"] = False
+                        element["imageFit"] = "contain"
+                        element["imageHeight"] = 32
+                        element["imageWidth"] = 32
+                        element["choicesOrder"] = "none"
+
+                    elif question_type_title == "Likert Visual":
+                        choices = []
+                        try:
+                            if question_name:
+                                q_doc = frappe.get_doc("qp_IQ_Question", question_name)
+                                if q_doc and q_doc.qn_response_options:
+                                    choices = [
+                                        {
+                                            "text": opt.qo_option_text,
+                                            "value": opt.qo_option_value,
+                                            "imageLink": opt.qo_url
+                                        }
+                                        for opt in q_doc.qn_response_options
+                                        if getattr(opt, "qo_url", None)
+                                    ]
+                        except Exception:
+                            choices = []
+                        element["choices"] = choices
+                        element["showLabel"] = True
+                        element["multiSelect"] = False
+                        element["imageFit"] = "contain"
+                        element["imageHeight"] = 32
+                        element["imageWidth"] = 32
+                        element["choicesOrder"] = "none"
+
+                    elif question_type_title == "Selección Múltiple" and q.get("options"):
+                        element["choices"] = q["options"]
+                    elif question_type_title == "NPS":
+                        element["rateMin"] = q.get("nps_min", 1)
+                        element["rateMax"] = q.get("nps_max", 10)
+
+                    elements.append(element)
+
+                survey_json_content = {
+                    "title": data["name"],
+                    "description": "",
+                    "pages": [
+                        {
+                            "name": "page1",
+                            "elements": elements
+                        }
+                    ]
                 }
 
-                # Se mantienen separadas opciones, por si requieren personalizaciones distintas
-                if question_type_title == "Likert":
-                    choices = []
-                    try:
-                        if question_name:
-                            q_doc = frappe.get_doc("qp_IQ_Question", question_name)
-                            if q_doc and q_doc.qn_response_options:
-                                for opt in q_doc.qn_response_options:
-                                    try:
-                                        val_int = int(opt.qo_option_value)
-                                    except Exception:
-                                        val_int = None
-                                    # Asignar URL personalizada si existe, sino usar el mapa por defecto doble check
-                                    image_url = getattr(opt, "qo_url", None) or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
-                                    choices.append({
-                                        "text": opt.qo_option_text,
-                                        "value": opt.qo_option_value,
-                                        "imageLink": image_url
-                                    })
-                    except Exception:
-                        choices = []
-                    element["choices"] = choices
-                    element["showLabel"] = True
-                    element["multiSelect"] = False
-                    element["imageFit"] = "contain"
-                    element["imageHeight"] = 32
-                    element["imageWidth"] = 32
-                    element["choicesOrder"] = "none"
+                surveyjs_doc = frappe.new_doc("Survey")
+                surveyjs_doc.name = data["name"]
+                surveyjs_doc.title = data["name"]
+                surveyjs_doc.survey_json = json.dumps(survey_json_content)
+                surveyjs_doc.insert(ignore_permissions=True)
+                surveyjs_doc_name = surveyjs_doc.name
 
-                elif question_type_title == "Likert Visual":
-                    choices = []
-                    try:
-                        if question_name:
-                            q_doc = frappe.get_doc("qp_IQ_Question", question_name)
-                            if q_doc and q_doc.qn_response_options:
-                                choices = [
-                                    {
-                                        "text": opt.qo_option_text,
-                                        "value": opt.qo_option_value,
-                                        "imageLink": opt.qo_url
-                                    }
-                                    for opt in q_doc.qn_response_options
-                                    if getattr(opt, "qo_url", None)
-                                ]
-                    except Exception:
-                        choices = []
-                    element["choices"] = choices
-                    element["showLabel"] = True
-                    element["multiSelect"] = False
-                    element["imageFit"] = "contain"
-                    element["imageHeight"] = 32
-                    element["imageWidth"] = 32
-                    element["choicesOrder"] = "none"
+                web_form_route = data["name"].lower().replace(" ", "-")           
+                web_form = frappe.new_doc("Web Form")
+                web_form.title = data["name"]
+                web_form.route = web_form_route
+                web_form.doc_type = "Survey Response"
+                web_form.module = "Frappe Survey"
+                web_form.client_script = WEB_FORM_CLIENT_SCRIPT
+                web_form.custom_css = WEB_FORM_CUSTOM_CSS
+                web_form.published = 1
 
-                elif question_type_title == "Selección Múltiple" and q.get("options"):
-                    element["choices"] = q["options"]
-                elif question_type_title == "NPS":
-                    element["rateMin"] = q.get("nps_min", 1)
-                    element["rateMax"] = q.get("nps_max", 10)
+                survey_response_meta = frappe.get_meta("Survey Response")
+                fieldtype_mapping = {
+                    "Long Text": "Text Editor"
+                }
+                for field in survey_response_meta.fields:
+                    if field.fieldtype not in ["Section Break", "Column Break", "Tab Break"]:
+                        web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
+                        web_form.append("web_form_fields", {
+                            "fieldname": field.fieldname,
+                            "fieldtype": web_form_fieldtype,
+                            "label": field.label,
+                            "reqd": field.reqd,
+                            "options": field.options,
+                            "hidden": field.hidden,
+                            "read_only": field.read_only,
+                            "default": field.default,
+                            "description": field.description,
+                        })
 
-                elements.append(element)
+                web_form.insert(ignore_permissions=True)
 
-            survey_json_content = {
-                "title": data["name"],
-                "description": "",
-                "pages": [
-                    {
-                        "name": "page1",
-                        "elements": elements
-                    }
-                ]
-            }
+            user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+            if not user_contact_info:
+                message = "El usuario actual no tiene una compañía asignada para definir la propiedad de la medición."
+                frappe.log_error(message, "Error en save_measurement")
+                return {"status": "error", "message": message}
+            user_company = user_contact_info
+            
+            default_status_text = "Programada"
+            status_name = frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": default_status_text}, "name")
+            
+            if not status_name:
+                status_doc = frappe.new_doc("qp_IQ_SurveyStatus")
+                status_doc.se_status = default_status_text
+                status_doc.insert(ignore_permissions=True)
+                status_name = status_doc.name
+            
+            survey = frappe.new_doc("qp_IQ_Survey")
+            survey.su_name = data["name"]
+            survey.su_owner = user_company
+            survey.su_start_date = data.get("startDate")
+            survey.su_end_date = data.get("endDate")
+            survey.su_timezone = data.get("timezone")
+            
+            template_cache_key = f"measurement_template:{frappe.session.user}"
+            template_name = (
+                data.get("template_name")
+                or frappe.request.args.get("template")
+                or getattr(frappe.local, "template_name", None)
+                or frappe.cache().get_value(template_cache_key)
+            )
+            if template_name:
+                survey.su_template = template_name
+                frappe.cache().delete_value(template_cache_key)
+            
+            contacts_data = data.get("contacts", {})
+            survey_type = contacts_data.get("surveyType")
+            response_type = contacts_data.get("responseType")
 
-            surveyjs_doc = frappe.new_doc("Survey")
-            surveyjs_doc.name = data["name"]
-            surveyjs_doc.title = data["name"]
-            surveyjs_doc.survey_json = json.dumps(survey_json_content)
-            surveyjs_doc.insert(ignore_permissions=True)
-            surveyjs_doc_name = surveyjs_doc.name
+            # Agrego logica para forzar anónimo y URL pública en caso de enlace anónimo
+            if survey_type == 'anonymous_link':
+                survey.su_is_anonymous = 1
+                survey.su_custom_generate_public_link = 1
+            else:
+                # Para encuestas de contactos ('selected' o 'all'), siempre su_is_anonymous = 0
+                # para forzar la generación de tokens y el seguimiento.
+                survey.su_is_anonymous = 0 
+                
+                if survey_type == 'all':
+                    survey.su_custom_generate_public_link = 0
+                elif survey_type == 'selected':
+                    survey.su_custom_generate_public_link = 1
 
-            web_form_route = data["name"].lower().replace(" ", "-")           
-            web_form = frappe.new_doc("Web Form")
-            web_form.title = data["name"]
-            web_form.route = web_form_route
-            web_form.doc_type = "Survey Response"
-            web_form.module = "Frappe Survey"
-            web_form.client_script = WEB_FORM_CLIENT_SCRIPT
-            web_form.custom_css = WEB_FORM_CUSTOM_CSS
-            web_form.published = 1
+            survey.su_status = status_name
+            if data.get("reminders"):
+                survey.su_send_reminders = 1
+                survey.su_reminder_frequency = data["reminders"]["frequency"]
+                survey.su_reminder_max = data["reminders"]["max"]
+            else:
+                survey.su_send_reminders = 0
 
-            survey_response_meta = frappe.get_meta("Survey Response")
-            fieldtype_mapping = {
-                "Long Text": "Text Editor"
-            }
-            for field in survey_response_meta.fields:
-                if field.fieldtype not in ["Section Break", "Column Break", "Tab Break"]:
-                    web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
-                    web_form.append("web_form_fields", {
-                        "fieldname": field.fieldname,
-                        "fieldtype": web_form_fieldtype,
-                        "label": field.label,
-                        "reqd": field.reqd,
-                        "options": field.options,
-                        "hidden": field.hidden,
-                        "read_only": field.read_only,
-                        "default": field.default,
-                        "description": field.description,
-                    })
+            # Personalización de correos en creación
+            survey.su_invitation_subject = email_data.get("invitation_subject")
+            survey.su_invitation_body = email_data.get("invitation_body")
+            survey.su_reminder_subject = email_data.get("reminder_subject")
+            survey.su_reminder_body = email_data.get("reminder_body")
+            survey.su_default_notif = "1" if email_use_default else "0"
 
-            web_form.insert(ignore_permissions=True)
+            if data.get("questions"):
+                for q in data["questions"]:
+                    question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
+                    if question_name:
+                        survey.append("su_questions", {"sq_question": question_name})
 
-        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
-        if not user_contact_info:
-            message = "El usuario actual no tiene una compañía asignada para definir la propiedad de la medición."
-            frappe.log_error(message, "Error en save_measurement")
-            return {"status": "error", "message": message}
-        user_company = user_contact_info
-        
-        default_status_text = "Programada"
-        status_name = frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": default_status_text}, "name")
-        
-        if not status_name:
-            status_doc = frappe.new_doc("qp_IQ_SurveyStatus")
-            status_doc.se_status = default_status_text
-            status_doc.insert(ignore_permissions=True)
-            status_name = status_doc.name
-        
-        survey = frappe.new_doc("qp_IQ_Survey")
-        survey.su_name = data["name"]
-        survey.su_owner = user_company
-        survey.su_start_date = data.get("startDate")
-        survey.su_end_date = data.get("endDate")
-        survey.su_timezone = data.get("timezone")
-        # Fallbacks para obtener el template usado
-        template_cache_key = f"measurement_template:{frappe.session.user}"
-        template_name = (
-            data.get("template_name")
-            or frappe.request.args.get("template")
-            or getattr(frappe.local, "template_name", None)
-            or frappe.cache().get_value(template_cache_key)
-        )
-        if template_name:
-            survey.su_template = template_name
-            frappe.cache().delete_value(template_cache_key)
-        contacts_data = data.get("contacts", {})
-        survey_type = contacts_data.get("surveyType")
-        response_type = contacts_data.get("responseType")
-
-        survey.su_is_anonymous = 1 if response_type == 'anonymous' else 0
-
-        # Por ahora, no se genera link público para encuestas de tipo 'all' (Público Externo)
-        if survey_type == 'all':
-            survey.su_custom_generate_public_link = 0
-        # Se genera un link genérico para encuestas con contactos seleccionados
-        elif survey_type == 'selected':
-            survey.su_custom_generate_public_link = 1
-
-
-        survey.su_status = status_name
-        if data.get("reminders"):
-            survey.su_send_reminders = 1
-            survey.su_reminder_frequency = data["reminders"]["frequency"]
-            survey.su_reminder_max = data["reminders"]["max"]
-        else:
-            survey.su_send_reminders = 0
-
-        # Personalización de correos en creación
-        survey.su_invitation_subject = email_data.get("invitation_subject")
-        survey.su_invitation_body = email_data.get("invitation_body")
-        survey.su_reminder_subject = email_data.get("reminder_subject")
-        survey.su_reminder_body = email_data.get("reminder_body")
-        survey.su_default_notif = "1" if email_use_default else "0"
-
-        if data.get("questions"):
-            for q in data["questions"]:
-                question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
-                if question_name:
-                    survey.append("su_questions", {"sq_question": question_name})
-
-        survey.insert(ignore_permissions=True)
-        frappe.db.commit()
-
-        # Se elimina la llamada directa, ahora se gestiona por el hook 'on_update'
-        # if survey.custom_generate_public_link:
-        #     if generate_public_link_for_survey(survey, "after_save"):
-        #         survey.save(ignore_permissions=True)
-        #         frappe.db.commit()
-
-        if survey_type == 'selected' and contacts_data.get("list"):
-            contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]
-            if contact_names:
-                rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
-                for contact_name in contact_names:
-                    frappe.get_doc({
-                        "doctype": "qp_IQ_SurveyRecipient",
-                        "sr_survey": survey.name,
-                        "sr_contact": contact_name,
-                        "sr_status": rs_not_sent
-                    }).insert(ignore_permissions=True)
+            survey.insert(ignore_permissions=True)
             frappe.db.commit()
+
+            final_survey_name = survey.name
+
+            if survey_type == 'selected' and contacts_data.get("list"):
+                contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]
+                if contact_names:
+                    rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
+                    for contact_name in contact_names:
+                        frappe.get_doc({
+                            "doctype": "qp_IQ_SurveyRecipient",
+                            "sr_survey": survey.name,
+                            "sr_contact": contact_name,
+                            "sr_status": rs_not_sent
+                        }).insert(ignore_permissions=True)
+                frappe.db.commit()
 
         frappe.db.commit()
         return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}

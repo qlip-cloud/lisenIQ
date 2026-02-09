@@ -85,8 +85,8 @@
                         <div class="form-group">
                             <label for="survey-type-select">Público a participar</label>
                             <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
-                                <!-- <option value="all">Todos mis contactos</option> -->
                                 <option value="selected" selected>Segmento de contactos</option>
+                                <option value="anonymous_link">Medición Anónima</option>
                             </select>
                         </div>
                     </div>
@@ -94,8 +94,8 @@
                         <div class="form-group">
                             <label for="response-type-select">¿Quiere saber los detalles de quien respondió?</label>
                             <select id="response-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
-                                <!-- <option value="anonymous">Anónima</option> -->
                                 <option value="identified">No Anónima</option>
+                                <option value="anonymous">Anónima</option>
                             </select>
                         </div>
                     </div>

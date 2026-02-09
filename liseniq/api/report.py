@@ -153,13 +153,16 @@ def get_user_demographics():
     Retorna un array de objetos con el id del usuario y sus demográficos asociados
     """
     try:
+        core_demographics = [
+            'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
+        ]
         user_demographics_array = []
         surveys = get_valid_engagement_surveys()
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
         demographics_labels_from_historic = get_demographics_from_historic()
         demographics_labels_from_contacts = get_demographics_from_contacts()
-        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts))
+        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts + core_demographics))
         
         # Procesar encuestas finalizadas
         for survey in finished_surveys:
@@ -185,6 +188,16 @@ def get_user_demographics():
                         'demographic_id': demo_tag,
                         'demographic_value': user_demographics.get(demo_tag, 'NA')
                     })
+                
+                for core_demo in core_demographics:
+                    if core_demo not in user_demographics:
+                        user_demographics_array.append({
+                            'user_id': user_id,
+                            'survey_id': survey['id'],
+                            'user_id-survey_id': f"{user_id}-{survey['id']}",
+                            'demographic_id': core_demo,
+                            'demographic_value': hist_record.get(f'shd_{core_demo[7:]}', 'NA')
+                        })
 
         # Procesar encuestas activas
         for survey in active_surveys:
@@ -206,12 +219,18 @@ def get_user_demographics():
             demographics_query = f"""
                 SELECT 
                     c.custom_document_number,
+                    c.custom_dob,
+                    c.gender,
+                    c.custom_entry_date,
+                    c.custom_country,
+                    a.al_title AS custom_academic_level,
                     cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
                 FROM `tabSurvey Response` sr
                 LEFT JOIN `tabContact` c ON c.name = sr.user
                 INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
                 INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
+                LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
                 WHERE sr.survey IN ({survey_names_placeholder})
                 AND dt.dt_object_type = 'Contacto'
             """
@@ -225,6 +244,11 @@ def get_user_demographics():
                 if user_id not in user_demographics_map:
                     user_demographics_map[user_id] = {}
                 user_demographics_map[user_id][response.get('demographic_tag', '')] = response.get('demographic_value', '')
+                user_demographics_map[user_id]['custom_dob'] = response.get('custom_dob', '')
+                user_demographics_map[user_id]['gender'] = response.get('gender', '')
+                user_demographics_map[user_id]['custom_entry_date'] = response.get('custom_entry_date', '')
+                user_demographics_map[user_id]['custom_country'] = response.get('custom_country', '')
+                user_demographics_map[user_id]['custom_academic_level'] = response.get('custom_academic_level', '')
             
             # Crear registros para todos los usuarios y todos los demográficos
             for user_record in users:
@@ -255,10 +279,13 @@ def get_cultura_responses():
             return []
         all_questions_map = get_all_unique_questions(valid_surveys)
         demographics_map = get_demographics_labels()
+        core_demographics = [
+            'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
+        ]
         data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
         transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
 
-        demographics_to_exclude = set(demographics_map.keys())
+        demographics_to_exclude = set(demographics_map.keys()).union(set(core_demographics))
         filtered_data = []
         for row in transformed_data:
             filtered_row = {k: v for k, v in row.items() if k not in demographics_to_exclude}
@@ -283,7 +310,10 @@ def get_user_demographics_cultura():
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
         demographics_labels_from_historic = get_demographics_from_historic()
         demographics_labels_from_contacts = get_demographics_from_contacts()
-        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts))
+        core_demographics = [
+            'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
+        ]
+        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts+core_demographics))
         
         # Procesar encuestas finalizadas
         for survey in finished_surveys:
@@ -309,6 +339,15 @@ def get_user_demographics_cultura():
                         'demographic_id': demo_tag,
                         'demographic_value': user_demographics.get(demo_tag, 'NA')
                     })
+                for core_demo in core_demographics:
+                    if core_demo not in user_demographics:
+                        user_demographics_array.append({
+                            'user_id': user_id,
+                            'survey_id': survey['id'],
+                            'user_id-survey_id': f"{user_id}-{survey['id']}",
+                            'demographic_id': core_demo,
+                            'demographic_value': hist_record.get(f'shd_{core_demo[7:]}', 'NA')
+                         })
 
         # Procesar encuestas activas
         for survey in active_surveys:
@@ -330,12 +369,18 @@ def get_user_demographics_cultura():
             demographics_query = f"""
                 SELECT 
                     c.custom_document_number,
+                    c.custom_dob,
+                    c.gender,
+                    c.custom_entry_date,
+                    c.custom_country,
+                    a.al_title AS custom_academic_level,
                     cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
                 FROM `tabSurvey Response` sr
                 LEFT JOIN `tabContact` c ON c.name = sr.user
                 INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
                 INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
+                LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
                 WHERE sr.survey IN ({survey_names_placeholder})
                 AND dt.dt_object_type = 'Contacto'
             """
@@ -382,12 +427,15 @@ def get_engagement_responses():
 
         all_questions_map = get_all_unique_questions(valid_surveys)
         demographics_map = get_demographics_labels()
+        core_demographics = [
+            'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
+        ]
 
         data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
         transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
         
         # Definir solo los demográficos adicionales a excluir (no los core)
-        demographic_keys_to_exclude = set(demographics_map.keys())
+        demographic_keys_to_exclude = set(demographics_map.keys()).union(set(core_demographics))
         
         # Filtrar solo los demográficos adicionales de los datos transformados
         filtered_data = []

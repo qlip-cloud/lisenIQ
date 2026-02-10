@@ -351,7 +351,8 @@ def generate_public_link_for_survey(doc, method):
 
         if doc.su_is_anonymous:
             base_url = frappe.utils.get_url(web_form_route)
-            unique_url = f"{base_url}?new=1&token={token}"
+            # Eliminar token de la URL visible para encuestas anónimas
+            unique_url = f"{base_url}?new=1"
         else:
             base_url = frappe.utils.get_url('/iq-register')
             unique_url = f"{base_url}?token={token}&uq=true"

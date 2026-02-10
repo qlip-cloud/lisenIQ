@@ -22,7 +22,25 @@ def process_survey_response(doc, method):
     # frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
 
     is_anonymous_survey = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_is_anonymous")
-    if not is_anonymous_survey and doc.user == "Anonimo":
+
+    # Verificar si existe un token pendiente de procesar antes de bloquear por usuario 'Anonimo'.
+    has_pending_token = False
+    
+    # Buscar token en el JSON
+    try:
+        resp_check = json.loads(doc.response_json or "{}")
+        if resp_check.get("__token"):
+            has_pending_token = True
+    except Exception:
+        pass
+
+    # Buscar si el campo user contiene un token JWT (contiene puntos y es largo)
+    if not has_pending_token:
+        if doc.user and doc.user != "Anonimo" and "." in doc.user and len(doc.user) > 20:
+             has_pending_token = True
+
+    # Solo lanzar error si NO es anónima, el usuario es "Anonimo" Y NO hay token para resolver la identidad
+    if not is_anonymous_survey and doc.user == "Anonimo" and not has_pending_token:
         frappe.throw("No se permiten respuestas anónimas para esta encuesta.")
 
     try:
@@ -272,4 +290,3 @@ def process_survey_response(doc, method):
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Error en process_survey_response")
         raise
-

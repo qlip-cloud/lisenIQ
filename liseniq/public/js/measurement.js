@@ -181,7 +181,10 @@ class MeasurementCreator {
                 if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'selected';
                 if (responseTypeSelect) responseTypeSelect.value = data.contacts.responseType || 'anonymous';
                 
-                if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
+                // Ajuste para el modo anónimo en edición
+                if (surveyTypeSelect && surveyTypeSelect.value === 'anonymous_link') {
+                    selectedContactsSection?.classList.add('d-none');
+                } else if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                     selectedContactsSection?.classList.remove('d-none');
                 } else {
                      selectedContactsSection?.classList.add('d-none');
@@ -198,7 +201,6 @@ class MeasurementCreator {
                     const safeCount = this.state.measurementData.contacts.list.length;
                     contactCountNumber.textContent = String(safeCount);
                 }
-                // viewContactsBtn?.classList.add('d-none'); 
             }
 
             // Recordatorios
@@ -252,13 +254,7 @@ class MeasurementCreator {
         }
 
         const { surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect, availableCategories, selectedCategories } = this.ui.contactsStep;
-        [surveyTypeSelect, responseTypeSelect, /* sendAllContactsCheck, */ /* fieldTypeSelect */].forEach(el => el && (el.disabled = true));
-
-        /*
-        [availableCategories, selectedCategories].forEach(box => {
-            if (box) box.style.pointerEvents = 'none';
-        });
-        */
+        [surveyTypeSelect, responseTypeSelect].forEach(el => el && (el.disabled = true));
     }
 
     showStep(stepNumber) {
@@ -276,7 +272,8 @@ class MeasurementCreator {
             const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
             if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
                 selectedContactsSection?.classList.remove('d-none');
-            } else if (surveyTypeSelect) {
+            } else {
+                // Ocultar sección de contactos si es anónimo o default
                 selectedContactsSection?.classList.add('d-none');
             }
         }
@@ -508,8 +505,13 @@ class MeasurementCreator {
     validateStep3() {
         if (this.state.isEditMode) return true;
         const { surveyTypeSelect } = this.ui.contactsStep;
-        const { list: contactsList } = this.state.measurementData.contacts;
+        
+        // Si es enlace anónimo no valido contactos
+        if (surveyTypeSelect.value === 'anonymous_link') {
+            return true;
+        }
 
+        const { list: contactsList } = this.state.measurementData.contacts;
         if (surveyTypeSelect.value === 'selected' && contactsList.length === 0) {
             showGlobalNotification('Debe seleccionar al menos un participante para continuar.', 'error');
             return false;
@@ -537,11 +539,50 @@ class MeasurementCreator {
     }
 
     handleSurveyTypeChange() {
-        const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
-        if (surveyTypeSelect.value === 'selected') {
+        const { surveyTypeSelect, selectedContactsSection, responseTypeSelect } = this.ui.contactsStep;
+        const { useDefaultCheck } = this.ui.personalizationStep;
+        const { sendRemindersCheck, remindersSection } = this.ui.reviewStep;
+        
+        // Lógica de aislamiento para el flujo anónimo
+        if (surveyTypeSelect.value === 'anonymous_link') {
+            selectedContactsSection.classList.add('d-none');
+            
+            // Forzar respuesta anónima y deshabilitar selector
+            responseTypeSelect.value = 'anonymous';
+            responseTypeSelect.disabled = true;
+            this.state.measurementData.contacts.list = [];
+
+            // Bloquear plantilla por defecto y recordatorios
+            // Usar plantilla por defecto: Checked y Disabled
+            if (useDefaultCheck) {
+                useDefaultCheck.checked = true;
+                useDefaultCheck.disabled = true;
+                this.applyEmailCustomizationToggle(); // Ocultar campos de personalización
+                this.state.wasUsingDefault = true;
+            }
+
+            // Enviar recordatorios: Unchecked y Disabled
+            if (sendRemindersCheck) {
+                sendRemindersCheck.checked = false;
+                sendRemindersCheck.disabled = true;
+                if (remindersSection) remindersSection.classList.add('d-none');
+            }
+
+        } else if (surveyTypeSelect.value === 'selected') {
             selectedContactsSection.classList.remove('d-none');
+            responseTypeSelect.disabled = false;
+            
+            // Restaurar controles si el usuario cambia de opción
+            if (useDefaultCheck) useDefaultCheck.disabled = false;
+            if (sendRemindersCheck) sendRemindersCheck.disabled = false;
+
         } else {
             selectedContactsSection.classList.add('d-none');
+            responseTypeSelect.disabled = false;
+
+            // Restaurar controles si el usuario cambia de opción
+            if (useDefaultCheck) useDefaultCheck.disabled = false;
+            if (sendRemindersCheck) sendRemindersCheck.disabled = false;
         }
         this.updateContactCount();
     }
@@ -603,13 +644,19 @@ class MeasurementCreator {
     }
 
     async updateContactCount() {
-        const { sendAllContactsCheck, selectedCategories, contactCountNumber } = this.ui.contactsStep;
+        const { sendAllContactsCheck, selectedCategories, contactCountNumber, surveyTypeSelect } = this.ui.contactsStep;
         
         contactCountNumber.innerHTML = `<i class="fa fa-spinner fa-spin"></i>`;
         
         if (!this.state.isEditMode) {
             this.state.measurementData.contacts.list = [];
             this.state.measurementData.contacts.headers = [];
+        }
+
+        // No contar contactos si es enlace anónimo
+        if (surveyTypeSelect.value === 'anonymous_link') {
+             contactCountNumber.textContent = 'N/A';
+             return;
         }
 
         let filters = [];
@@ -853,19 +900,35 @@ class MeasurementCreator {
         if (this.state.isEditMode) {
             const dataEl = document.getElementById('measurement-data');
             const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
-            surveyType.textContent = data?.contacts?.surveyType === 'selected' ? 'Contactos Cargados Previamente' : 'Público Externo';
+            
+            // Texto para modo edición
+            if (data?.contacts?.surveyType === 'anonymous_link') {
+                surveyType.textContent = 'Medición Anónima';
+            } else if (data?.contacts?.surveyType === 'selected') {
+                surveyType.textContent = 'Contactos Cargados Previamente';
+            } else {
+                surveyType.textContent = 'Público Externo';
+            }
+
             responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
             questionsCount.textContent = (data?.questions || []).length;
 
             const listLen = this.state.measurementData.contacts.list?.length || 0;
             contactCount.textContent = listLen;
-            if (viewContactsBtn) viewContactsBtn.style.display = listLen > 0 ? 'inline-block' : 'none';
+            if (viewContactsBtn) viewContactsBtn.style.display = (listLen > 0 && data?.contacts?.surveyType !== 'anonymous_link') ? 'inline-block' : 'none';
         } else {
             surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
             responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
             questionsCount.textContent = this.state.measurementData.questions.length;
-            contactCount.textContent = this.state.measurementData.contacts.list.length;
-            this.ui.reviewStep.viewContactsBtn.style.display = 'inline-block';
+            
+            // Revisión en modo anónimo
+            if (surveyTypeSelect.value === 'anonymous_link') {
+                contactCount.textContent = "N/A";
+                if (viewContactsBtn) viewContactsBtn.style.display = 'none';
+            } else {
+                contactCount.textContent = this.state.measurementData.contacts.list.length;
+                this.ui.reviewStep.viewContactsBtn.style.display = 'inline-block';
+            }
         }
 
         questionsList.innerHTML = '';

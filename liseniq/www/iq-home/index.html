@@ -75,21 +75,30 @@
                         </p>
                     </div>
                     <div class="card-footer">
-                        <div class="progress-info">
-                            <i class="fa fa-user-o progress-icon"></i>
-                            <span class="progress-text">{{ m.completed }} / {{ m.total }}</span>
-                        </div>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="--progress-width: {{ m.percentage }}%;"></div>
-                        </div>
-                        <div class="results-row">
-                            <div class="percentage-display">{{ m.percentage }}%</div>
-                            {% if m.status == "Finalizada" %}
-                            <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
-                                <i class="fa fa-bar-chart"></i>
-                            </a>
-                            {% endif %}
-                        </div>
+                        {% if m.is_anonymous %}
+                            <div class="d-flex align-items-center" style="gap: 8px; margin-top: 5px; color: #6c757d;">
+                                <i class="fa fa-user-o progress-icon"></i>
+                                <span style="font-size: 0.9rem; font-weight: 500;">
+                                    {{ m.completed }} respuesta(s)
+                                </span>
+                            </div>
+                        {% else %}
+                            <div class="progress-info">
+                                <i class="fa fa-user-o progress-icon"></i>
+                                <span class="progress-text">{{ m.completed }} / {{ m.total }}</span>
+                            </div>
+                            <div class="progress-container">
+                                <div class="progress-bar" style="--progress-width: {{ m.percentage }}%;"></div>
+                            </div>
+                            <div class="results-row">
+                                <div class="percentage-display">{{ m.percentage }}%</div>
+                                {% if m.status == "Finalizada" %}
+                                <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
+                                    <i class="fa fa-bar-chart"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

@@ -156,13 +156,16 @@ def get_user_demographics():
         core_demographics = [
             'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
         ]
+        core_hist_demographics = [
+            'dob', 'gender', 'entry_date', 'country', 'academic_level'
+        ]
         user_demographics_array = []
         surveys = get_valid_engagement_surveys()
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
         demographics_labels_from_historic = get_demographics_from_historic()
         demographics_labels_from_contacts = get_demographics_from_contacts()
-        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts + core_demographics))
+        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts))
         
         # Procesar encuestas finalizadas
         for survey in finished_surveys:
@@ -189,14 +192,14 @@ def get_user_demographics():
                         'demographic_value': user_demographics.get(demo_tag, 'NA')
                     })
                 
-                for core_demo in core_demographics:
+                for core_demo in core_hist_demographics:
                     if core_demo not in user_demographics:
                         user_demographics_array.append({
                             'user_id': user_id,
                             'survey_id': survey['id'],
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
-                            'demographic_id': core_demo,
-                            'demographic_value': hist_record.get(f'shd_{core_demo[7:]}', 'NA')
+                            'demographic_id': f'custom_{core_demo}' if core_demo in ['dob', 'entry_date', 'country'] else core_demo,
+                            'demographic_value': hist_record.get(f'shd_{core_demo}', 'NA')
                         })
 
         # Procesar encuestas activas
@@ -280,7 +283,7 @@ def get_cultura_responses():
         all_questions_map = get_all_unique_questions(valid_surveys)
         demographics_map = get_demographics_labels()
         core_demographics = [
-            'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
+            'custom_dob', 'gender', 'entry_date', 'country', 'custom_academic_level'
         ]
         data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
         transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
@@ -313,7 +316,10 @@ def get_user_demographics_cultura():
         core_demographics = [
             'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
         ]
-        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts+core_demographics))
+        core_hist_demographics = [
+            'dob', 'gender', 'entry_date', 'country', 'academic_level'
+        ]
+        all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts))
         
         # Procesar encuestas finalizadas
         for survey in finished_surveys:
@@ -339,14 +345,14 @@ def get_user_demographics_cultura():
                         'demographic_id': demo_tag,
                         'demographic_value': user_demographics.get(demo_tag, 'NA')
                     })
-                for core_demo in core_demographics:
+                for core_demo in core_hist_demographics:
                     if core_demo not in user_demographics:
                         user_demographics_array.append({
                             'user_id': user_id,
                             'survey_id': survey['id'],
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
-                            'demographic_id': core_demo,
-                            'demographic_value': hist_record.get(f'shd_{core_demo[7:]}', 'NA')
+                            'demographic_id': f'custom_{core_demo}' if core_demo in ['dob', 'entry_date', 'country'] else core_demo,
+                            'demographic_value': hist_record.get(f'shd_{core_demo}', 'NA')
                          })
 
         # Procesar encuestas activas
@@ -408,6 +414,15 @@ def get_user_demographics_cultura():
                         'demographic_id': demo_tag,
                         'demographic_value': user_demographics.get(demo_tag, 'NA')
                     })
+                for core_demo in core_demographics:
+                    if core_demo not in user_demographics:
+                        user_demographics_array.append({
+                            'user_id': user_id,
+                            'survey_id': survey['id'],
+                            'user_id-survey_id': f"{user_id}-{survey['id']}",
+                            'demographic_id': core_demo,
+                             'demographic_value': user_demographics.get(core_demo, 'NA')
+                         })
 
         return user_demographics_array
 
@@ -428,7 +443,7 @@ def get_engagement_responses():
         all_questions_map = get_all_unique_questions(valid_surveys)
         demographics_map = get_demographics_labels()
         core_demographics = [
-            'custom_dob', 'gender', 'custom_entry_date', 'custom_country', 'custom_academic_level'
+            'custom_dob', 'gender', 'entry_date', 'country', 'custom_academic_level'
         ]
 
         data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)

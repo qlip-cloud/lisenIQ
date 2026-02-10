@@ -46,7 +46,7 @@ def get_context(context):
         surveys = frappe.get_all(
             "qp_IQ_Survey",
             filters=query_filters,
-            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link", "modified", "creation"],
+            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link", "su_is_anonymous", "modified", "creation"],
             order_by="modified desc"
         )
     except frappe.DoesNotExistError:
@@ -56,12 +56,21 @@ def get_context(context):
 
     measurements_data = []
     for survey in surveys:
-        total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
-        total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
+        is_anonymous = bool(survey.su_is_anonymous)
+        
+        if is_anonymous:
+            # Para anónimas, contamos las respuestas directas ya que no hay destinatarios predefinidos obligatorios
+            total_responses = frappe.db.count("Survey Response", {"survey": survey.su_name})
+            total_recipients = 0 # No aplica total de destinatarios en anónimas abiertas
+            percentage = 0
+        else:
+            # Lógica original para encuestas dirigidas
+            total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
+            total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
 
-        percentage = 0
-        if total_recipients > 0:
-            percentage = round((total_responses / total_recipients) * 100)
+            percentage = 0
+            if total_recipients > 0:
+                percentage = round((total_responses / total_recipients) * 100)
 
         status_doc = frappe.get_doc("qp_IQ_SurveyStatus", survey.su_status)
         status_text = status_doc.se_status if status_doc else "Desconocido"
@@ -78,7 +87,8 @@ def get_context(context):
             "completed": total_responses,
             "total": total_recipients,
             "percentage": percentage,
-            "public_link": survey.su_public_link
+            "public_link": survey.su_public_link,
+            "is_anonymous": is_anonymous
         })
 
     context.measurements = measurements_data

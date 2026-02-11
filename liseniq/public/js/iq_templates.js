@@ -149,10 +149,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>`;
                 }
                 
+                // Mostrar ambos enunciados si existen
+                let statementsHtml = `<p class="review-question-text">${frappe.utils.escape_html(question.text)}</p>`;
+                if (question.text_others) {
+                    statementsHtml = `
+                        <div class="mb-2">
+                             <p class="review-question-text mb-1"><strong class="text-muted small">Yo:</strong> ${frappe.utils.escape_html(question.text)}</p>
+                             <p class="review-question-text"><strong class="text-muted small">Otros:</strong> ${frappe.utils.escape_html(question.text_others)}</p>
+                        </div>
+                    `;
+                }
+
                 questionReviewItem.innerHTML = `
                     <div class="review-question-header">
                         <span class="review-question-number">${index + 1}</span>
-                        <p class="review-question-text">${frappe.utils.escape_html(question.text)}</p>
+                        ${statementsHtml}
                     </div>
                     <div class="review-question-details">
                         <span>Tipo: ${frappe.utils.escape_html(questionDisplayName)}</span>
@@ -179,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
             for (const q of manualQuestions) {
                 const questionDoc = {
                     qn_statement: q.text,
+                    qn_statement_others: q.text_others || null,
                     qn_type: q.type,
                     qn_category: formStep1.category.value,
                     qn_status: 'Activa',
@@ -286,6 +298,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const templateName = formStep1.name.value.trim();
                 templateNameBreadcrumb.textContent = templateName;
                 if (templateNameBreadcrumbRev) templateNameBreadcrumbRev.textContent = templateName;
+                
+                // Configurar QuestionBuilder según categoría seleccionada
+                const selectedCategoryOption = formStep1.category.options[formStep1.category.selectedIndex];
+                const categoryText = selectedCategoryOption ? selectedCategoryOption.text.trim() : '';
+                questionBuilder.setCategory(categoryText);
+
                 showStep(2);
             }
         });

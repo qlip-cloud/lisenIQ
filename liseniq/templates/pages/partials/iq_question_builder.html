@@ -1,6 +1,6 @@
 {% if not is_edit_mode %}
 <div class="mt-4 mb-5">
-    <button id="btn-open-question-bank" class="btn btn-outline-dark">Ver Biblioteca de preguntas</button>
+    <button id="btn-open-question-bank" class="btn btn-purple-main">Ver Biblioteca de preguntas</button>
 </div>
 {% endif %}
 
@@ -15,6 +15,13 @@
             <input type="text" class="form-control" id="new_question_text" placeholder="Ingresa el enunciado de la pregunta...">
             <small id="new_question_text_error" class="form-error-message d-none">Este campo es requerido.</small>
         </div>
+    </div>
+
+    <div id="leadership-statement-container" class="form-group d-none mt-3">
+        <label for="new_question_text_others">Enunciado para Evaluadores (El evaluado...)</label>
+        <p class="text-muted small mb-1">Este enunciado lo verán los pares, reportes y jefes.</p>
+        <input type="text" class="form-control" id="new_question_text_others" placeholder="Ej: Fomenta el desarrollo de su equipo...">
+        <small id="new_question_text_others_error" class="form-error-message d-none"></small>
     </div>
 
     <div class="row mt-3">

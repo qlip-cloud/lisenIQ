@@ -34,6 +34,10 @@ export class QuestionBuilder {
         this.demographicDebounceTimer = null;
         this.onQuestionsUpdate = onQuestionsUpdate;
         this.isReadOnly = false;
+        
+        // Estado para Liderazgo
+        this.isLeadershipMode = false;
+        this.currentCategoryName = '';
 
         this.ui = this._mapUI();
         this._initializeEventListeners();
@@ -41,6 +45,33 @@ export class QuestionBuilder {
 
         if (this.ui.questionForm && this.ui.questionForm.text) {
             this.resetAddQuestionForm();
+        }
+    }
+
+    setCategory(categoryName) {
+        this.currentCategoryName = categoryName;
+        this.isLeadershipMode = (categoryName && categoryName.trim() === 'Liderazgo');
+        this._updateUIForCategory();
+    }
+
+    _updateUIForCategory() {
+        const { questionForm } = this.ui;
+        const textLabel = document.querySelector('label[for="new_question_text"]');
+        
+        if (this.isLeadershipMode) {
+            // Mostrar campo extra y cambiar labels
+            if (questionForm.leadershipContainer) {
+                questionForm.leadershipContainer.classList.remove('d-none');
+            }
+            if (textLabel) textLabel.textContent = "Enunciado Autoevaluación";
+            if (questionForm.text) questionForm.text.placeholder = "Ej: Fomento el desarrollo de mi equipo...";
+        } else {
+            // Ocultar campo extra y revertir labels
+            if (questionForm.leadershipContainer) {
+                questionForm.leadershipContainer.classList.add('d-none');
+            }
+            if (textLabel) textLabel.textContent = "Texto de la Pregunta / Enunciado Principal";
+            if (questionForm.text) questionForm.text.placeholder = "";
         }
     }
 
@@ -87,6 +118,9 @@ export class QuestionBuilder {
             },
             questionForm: {
                 text: document.getElementById('new_question_text'),
+                textOthers: document.getElementById('new_question_text_others'), 
+                leadershipContainer: document.getElementById('leadership-statement-container'),
+
                 type: document.getElementById('new_question_type'),
                 demographic: document.getElementById('new_question_demographic'),
                 demographicResults: document.querySelector('#new_question_demographic + .autocomplete-results'),
@@ -172,7 +206,11 @@ export class QuestionBuilder {
             this.addManualQuestion();
         });
         questionForm.listContainer?.addEventListener('click', (e) => this.handleQuestionListActions(e));
+        
+        // Limpiar errores en inputs de texto
         questionForm.text?.addEventListener('input', () => this._clearValidationError(questionForm.text));
+        questionForm.textOthers?.addEventListener('input', () => this._clearValidationError(questionForm.textOthers));
+
         questionForm.type?.addEventListener('change', () => this.handleQuestionTypeChange());
         buttons.addOption?.addEventListener('click', () => {
             if (this.isReadOnly) return;
@@ -295,13 +333,24 @@ export class QuestionBuilder {
                 <p><strong>Escala:</strong> de ${frappe.utils.escape_html(npsMin)} a ${frappe.utils.escape_html(npsMax)}</p>
             </div>`;
         }
+
+        // Mostrar ambos enunciados si es Liderazgo
+        let statementsHtml = `<p class="question-item-text">${frappe.utils.escape_html(question.text)}</p>`;
+        if (question.text_others) {
+            statementsHtml = `
+                <div class="mb-2">
+                    <p class="question-item-text mb-1"><strong class="text-muted" style="font-size:0.8em">Yo:</strong> ${frappe.utils.escape_html(question.text)}</p>
+                    <p class="question-item-text"><strong class="text-muted" style="font-size:0.8em">Otros:</strong> ${frappe.utils.escape_html(question.text_others)}</p>
+                </div>
+            `;
+        }
         
         questionCard.innerHTML = `
             <div class="question-item-header">
                 <div class="question-item-main">
                     <div class="question-item-number">${index + 1}</div>
                     <div class="question-item-content">
-                        <p class="question-item-text">${frappe.utils.escape_html(question.text)}</p>
+                        ${statementsHtml}
                         <p class="question-item-type">Tipo: ${frappe.utils.escape_html(questionDisplayName)}</p>
                     </div>
                 </div>
@@ -328,7 +377,8 @@ export class QuestionBuilder {
                 method: 'liseniq.www.iq-templates.index.get_bank_data',
                 args: {
                     keyword: this.bankState.searchKeyword,
-                    demographic: this.bankState.activeDemographic
+                    demographic: this.bankState.activeDemographic,
+                    template_category: this.currentCategoryName // Pasar la categoría actual para filtro Liderazgo
                 }
             });
             
@@ -443,13 +493,28 @@ export class QuestionBuilder {
                     </div>`;
             }
 
+            // Renderizado condicional del texto de la pregunta
+            let questionTextHtml = `<p class="question-text">${frappe.utils.escape_html(q.text)}</p>`;
+            
+            // Si es liderazgo y tiene texto para otros, mostrar ambos
+            if (this.isLeadershipMode && q.text_others) {
+                 questionTextHtml = `
+                    <div class="mb-1">
+                        <strong class="text-muted small">Yo:</strong> <span class="question-text" style="font-size:0.85rem">${frappe.utils.escape_html(q.text)}</span>
+                    </div>
+                    <div>
+                        <strong class="text-muted small">Otros:</strong> <span class="question-text small" style="font-size:0.85rem">${frappe.utils.escape_html(q.text_others)}</span>
+                    </div>
+                 `;
+            }
+
             card.innerHTML = `
                 <div class="bank-question-card-main">
                     <div class="add-icon ${isSelected ? 'selected' : ''}" title="${isSelected ? 'Quitar' : 'Agregar'}">
-                        <i class="fa ${isSelected ? 'fa-check' : 'fa-plus'}"></i>
+                        <i class="fa ${isSelected ? 'fa-check' : 'fa-check'}"></i>
                     </div>
                     <div class="card-content">
-                        <p class="question-text">${frappe.utils.escape_html(q.text)}</p>
+                        ${questionTextHtml}
                     </div>
                 </div>
                 ${optionsPreviewHtml}
@@ -480,10 +545,22 @@ export class QuestionBuilder {
             selectedQuestions.forEach((q, index) => {
                 const item = document.createElement('div');
                 item.className = 'selected-question-item';
+                
+                // Texto de pregunta seleccionada
+                let itemTextHtml = `<p class="item-text">${frappe.utils.escape_html(q.text)}</p>`;
+                if (this.isLeadershipMode && q.text_others) {
+                     itemTextHtml = `
+                        <div class="item-text mb-2">
+                            <div><strong class="text-muted small">Yo:</strong> ${frappe.utils.escape_html(q.text)}</div>
+                            <div><strong class="text-muted small">Otros:</strong> ${frappe.utils.escape_html(q.text_others)}</div>
+                        </div>
+                     `;
+                }
+
                 item.innerHTML = `
                     <div class="item-number">${index + 1}</div>
                     <div class="item-content">
-                        <p class="item-text">${frappe.utils.escape_html(q.text)}</p>
+                        ${itemTextHtml}
                         <div class="item-details">
                             <span class="category-tag-selected">• ${frappe.utils.escape_html(q.demographic_name || 'General')}</span>
                             <span>${frappe.utils.escape_html(q.type_name)}</span>
@@ -513,11 +590,12 @@ export class QuestionBuilder {
                     this.questions.push({ 
                         id: questionToAdd.name,
                         text: questionToAdd.text,
+                        text_others: questionToAdd.text_others,
                         type: questionToAdd.qn_type,
                         typeName: questionToAdd.type_name,
                         category_name: questionToAdd.category_name,
                         demographic: questionToAdd.demographic_name,
-                        options: options
+                        options: options,
                     });
                 }
             }
@@ -532,6 +610,7 @@ export class QuestionBuilder {
         if (!qf || !qf.text) return;
 
         qf.text.value = '';
+        if (qf.textOthers) qf.textOthers.value = ''; // Resetear campo otros
         if (qf.type) qf.type.value = '';
         if (qf.demographic) qf.demographic.value = '';
         
@@ -564,7 +643,7 @@ export class QuestionBuilder {
         if (qf.bipolarSection) qf.bipolarSection.classList.add('d-none');
         if (qf.npsSection) qf.npsSection.classList.add('d-none');
         
-        [qf.text, qf.type, qf.demographic, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax]
+        [qf.text, qf.textOthers, qf.type, qf.demographic, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax]
             .filter(Boolean)
             .forEach(field => this._clearValidationError(field));
     }
@@ -576,12 +655,19 @@ export class QuestionBuilder {
         const selectedOption = qf.type.options[qf.type.selectedIndex];
         const questionTypeName = selectedOption ? selectedOption.text.trim() : '';
 
-        [qf.text, qf.type, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax].forEach(field => this._clearValidationError(field));
+        [qf.text, qf.textOthers, qf.type, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax].forEach(field => this._clearValidationError(field));
 
         if (!qf.text.value.trim()) {
             this._showValidationError(qf.text, 'Este campo es requerido.');
             isValid = false;
         }
+
+        // Validación condicional para Liderazgo
+        if (this.isLeadershipMode && qf.textOthers && !qf.textOthers.value.trim()) {
+             this._showValidationError(qf.textOthers, 'Este campo es requerido para evaluaciones de Liderazgo.');
+             isValid = false;
+        }
+
         if (!qf.type.value) {
             this._showValidationError(qf.type, 'Este campo es requerido.');
             isValid = false;
@@ -667,6 +753,7 @@ export class QuestionBuilder {
         const newQuestion = { 
             id: `manual-${Date.now()}`, 
             text: qf.text.value.trim(), 
+            text_others: this.isLeadershipMode && qf.textOthers ? qf.textOthers.value.trim() : null,
             type: qf.type.value, 
             typeName: questionTypeName, 
             demographic: qf.demographic.value.trim(),

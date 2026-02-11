@@ -623,7 +623,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 shd.shd_document_number,
                 shd.shd_country,
                 shd.shd_entry_date,
-                shd.shd_academic_level,
+                al.al_title AS shd_academic_level,
                 shd.shd_dob,
                 shd.shd_gender,
                 shd.shd_company,
@@ -634,6 +634,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 ) as demographics_data
             FROM `tabqp_IQ_SurveyHistoricData` shd
             LEFT JOIN `tabqp_IQ_ContactDetailHistoric` cdh ON cdh.parent = shd.name
+            LEFT JOIN `tabqp_IQ_AcademicLevel` al ON al.name = shd.shd_academic_level
             WHERE shd.shd_survey_id = %s
             GROUP BY shd.name
         """

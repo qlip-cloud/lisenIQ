@@ -99,7 +99,7 @@ def custom_report(filters=None):
 
 
 @frappe.whitelist()
-def custom_report_by_question(filtecustom_academic_levelrs=None):
+def custom_report_by_question(filters=None):
     """
     Reporte de todas las encuestas donde cada pregunta está en un objeto separado
     con los datos demográficos repetidos

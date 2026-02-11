@@ -38,6 +38,7 @@ def get_context(context):
 
                 question_data = {
                     "text": q_doc.qn_statement,
+                    "text_others": q_doc.qn_statement_others,
                     "type_name": type_name,
                     "category_name": q_category_name,
                     "demographic_name": demographic_name,

@@ -63,7 +63,7 @@ export class QuestionBuilder {
             if (questionForm.leadershipContainer) {
                 questionForm.leadershipContainer.classList.remove('d-none');
             }
-            if (textLabel) textLabel.textContent = "Enunciado Autoevaluación";
+            if (textLabel) textLabel.textContent = "Texto de la Pregunta / Enunciado Autoevaluación (Evaluado)";
             if (questionForm.text) questionForm.text.placeholder = "Ej: Fomento el desarrollo de mi equipo...";
         } else {
             // Ocultar campo extra y revertir labels

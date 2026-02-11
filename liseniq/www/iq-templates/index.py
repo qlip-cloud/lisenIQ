@@ -271,11 +271,15 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
     if demographic:
         question_filters['qn_demographic'] = demographic
 
-    # Lógica de filtrado especial para Liderazgo
-    if template_category == "Liderazgo":
-        leadership_cat_name = frappe.db.get_value("qp_IQ_QuestionCategory", {"qnc_category": "Liderazgo"}, "name")
-        if leadership_cat_name:
+    # Obtener el ID de la categoría "Liderazgo" si existe
+    leadership_cat_name = frappe.db.get_value("qp_IQ_QuestionCategory", {"qnc_category": "Liderazgo"}, "name")
+
+    if leadership_cat_name:
+        # Si se seleccionó la categoría "Liderazgo", filtrar solo por esa categoría. De lo contrario, excluir esa categoría.
+        if template_category == "Liderazgo":
             question_filters['qn_category'] = leadership_cat_name
+        else:
+            question_filters['qn_category'] = ['!=', leadership_cat_name]
 
     questions = frappe.get_list(
         "qp_IQ_Question",

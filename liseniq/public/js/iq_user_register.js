@@ -141,9 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
             args: formData,
             callback: (r) => {
                 if (r.message && r.message.status === 'success') {
-                    // Registro exitoso
-                    submitButton.textContent = '¡Registro exitoso!';  
-                    //window.location.href = `${window.location.origin}/iq_home`;
+                    // Registro exitoso - Mostrar mensaje y opción de volver
+                    showSuccessMessage();
                 } else if (r.message && r.message.status === 'error') {
                     // Error conocido del servidor
                     showError(errorElement, r.message.message || 'Ocurrió un error al procesar tu solicitud.');
@@ -190,9 +189,77 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+    
     function showError(errorElement, message) {
         errorElement.textContent = message;
         errorElement.style.display = 'block';
+    }
+
+    function showSuccessMessage() {
+        // Ocultar el formulario
+        form.style.display = 'none';
+        
+        // Crear o mostrar el mensaje de éxito
+        let successContainer = document.getElementById('success-message-container');
+        if (!successContainer) {
+            successContainer = document.createElement('div');
+            successContainer.id = 'success-message-container';
+            successContainer.style.cssText = 'text-align: center; padding: 40px 20px;';
+            
+            const successIcon = document.createElement('div');
+            successIcon.innerHTML = '<span class="material-symbols-outlined" style="font-size: 64px; color: #4CAF50;">check_circle</span>';
+            
+            const successTitle = document.createElement('h2');
+            successTitle.textContent = '¡Registro exitoso!';
+            successTitle.style.cssText = 'color: #4CAF50; margin: 20px 0;';
+            
+            const successMessage = document.createElement('p');
+            successMessage.textContent = 'Se ha enviado un correo electrónico de confirmación a tu dirección de email.';
+            successMessage.style.cssText = 'font-size: 16px; margin: 20px 0; color: #666;';
+            
+            const backButton = document.createElement('button');
+            backButton.textContent = 'Volver al formulario';
+            backButton.className = 'btn btn-primary';
+            backButton.style.cssText = 'margin-top: 20px; padding: 10px 30px; cursor: pointer;';
+            backButton.onclick = resetForm;
+            
+            successContainer.appendChild(successIcon);
+            successContainer.appendChild(successTitle);
+            successContainer.appendChild(successMessage);
+            successContainer.appendChild(backButton);
+            
+            form.parentElement.insertBefore(successContainer, form);
+        } else {
+            successContainer.style.display = 'block';
+        }
+    }
+
+    function resetForm() {
+        // Limpiar todos los campos
+        firstNameInput.value = '';
+        lastNameInput.value = '';
+        emailInput.value = '';
+        companyInput.value = '';
+        passwordInput.value = '';
+        confirmPasswordInput.value = '';
+        termsCheckbox.checked = false;
+        
+        // Remover errores
+        document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+        document.querySelectorAll('[id$="-error"]').forEach(el => el.style.display = 'none');
+        
+        // Ocultar mensaje de éxito
+        const successContainer = document.getElementById('success-message-container');
+        if (successContainer) {
+            successContainer.style.display = 'none';
+        }
+        
+        // Mostrar formulario
+        form.style.display = 'block';
+        
+        // Restablecer botón
+        submitButton.disabled = true;
+        submitButton.textContent = 'Registrar';
     }
 
     function validateForm() {

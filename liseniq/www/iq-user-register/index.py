@@ -115,20 +115,14 @@ def send_listenaiq_welcome_email(user, company):
                 </p>
 
                 <p>
-                    <a href="{login_url}" style="color: #1f6feb;">
+                    <a href="{login_url}" style="color: #1f6feb; text-decoration: none;">
                         {login_url}
                     </a>
                 </p>
 
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="{login_url}" 
-                       style="background-color: #1f6feb; 
-                              color: #ffffff; 
-                              padding: 12px 25px; 
-                              text-decoration: none; 
-                              border-radius: 5px; 
-                              display: inline-block;
-                              font-weight: bold;">
+                       style='margin-top: 20px; padding: 10px 30px; cursor: pointer; background: #6c2fff !important; color: #fff !important; font-size: 18px !important; font-family: "Rubik", sans-serif !important; font-weight: 500 !important; border: none !important; border-radius: 8px !important; padding: 14px 48px !important; cursor: pointer !important; transition: background 0.2s !important; text-align: center !important;'>
                         Comenzar con la plataforma
                     </a>
                 </div>

@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!successContainer) {
             successContainer = document.createElement('div');
             successContainer.id = 'success-message-container';
-            successContainer.style.cssText = 'text-align: center; padding: 40px 20px;';
+            successContainer.style.cssText = 'text-align: center; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;';
             
             const successIcon = document.createElement('div');
             successIcon.innerHTML = '<span class="material-symbols-outlined" style="font-size: 64px; color: #4CAF50;">check_circle</span>';
@@ -220,13 +220,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const backButton = document.createElement('button');
             backButton.textContent = 'Volver al formulario';
             backButton.className = 'btn btn-primary';
-            backButton.style.cssText = 'margin-top: 20px; padding: 10px 30px; cursor: pointer;';
+            backButton.style.cssText = 'margin-top: 20px; padding: 10px 30px; cursor: pointer; color: #6c2fff !important; background: #fff !important; font-size: 18px !important; font-family: "Rubik", sans-serif !important; font-weight: 500 !important; border: 2px solid #6c2fff !important; border-radius: 8px !important; padding: 14px 48px !important; cursor: pointer !important; transition: background 0.2s !important; text-align: center !important;';
             backButton.onclick = resetForm;
-            
+
+            const loginButton = document.createElement('button');
+            loginButton.textContent = 'Ir a Iniciar Sesión';
+            loginButton.className = 'btn btn-secondary';
+            loginButton.style.cssText = 'margin-top: 20px; margin-left: 10px; padding: 10px 30px; cursor: pointer; background: #6c2fff !important; color: #fff !important; font-size: 18px !important; font-family: "Rubik", sans-serif !important; font-weight: 500 !important; border: none !important; border-radius: 8px !important; padding: 14px 48px !important; cursor: pointer !important; transition: background 0.2s !important; text-align: center !important; display: inline-block !important;';
+            loginButton.onclick = function() {
+                window.location.href = '/login'; 
+            };
             successContainer.appendChild(successIcon);
             successContainer.appendChild(successTitle);
             successContainer.appendChild(successMessage);
             successContainer.appendChild(backButton);
+            successContainer.appendChild(loginButton);
             
             form.parentElement.insertBefore(successContainer, form);
         } else {

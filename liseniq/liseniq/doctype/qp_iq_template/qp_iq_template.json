@@ -27,8 +27,9 @@
   },
   {
    "fieldname": "tp_category",
-   "fieldtype": "Data",
-   "label": "Category"
+   "fieldtype": "Link",
+   "label": "Category",
+   "options": "qp_IQ_QuestionCategory"
   },
   {
    "fieldname": "tp_owner",
@@ -90,7 +91,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-05 21:54:46.305770",
+ "modified": "2026-02-12 10:15:12.795039",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Template",

@@ -118,6 +118,7 @@ def get_questions_from_template(template_name):
         question_data = {
             "id": q_doc.name,
             "text": q_doc.qn_statement,
+            "text_others": q_doc.qn_statement_others,
             "type": q_doc.qn_type,
             "typeName": type_name,
             "demographic": demographic_name,
@@ -182,6 +183,11 @@ def create_question_from_template_wizard(question_data):
         question_doc = frappe.new_doc("qp_IQ_Question")
         
         question_doc.qn_statement = data.get("qn_statement")
+        
+        # Guardar el enunciado para evaluadores
+        if data.get("qn_statement_others"):
+            question_doc.qn_statement_others = data.get("qn_statement_others")
+
         question_doc.qn_type = data.get("qn_type")
         question_doc.qn_category = data.get("qn_category")
         question_doc.qn_status = data.get("qn_status", "Activa")
@@ -243,7 +249,7 @@ def create_question_from_template_wizard(question_data):
         frappe.throw(f"Ocurrió un error al crear la pregunta: {str(e)}")
 
 @frappe.whitelist()
-def get_bank_data(keyword=None, demographic=None):
+def get_bank_data(keyword=None, demographic=None, template_category=None):
     OPTIONS_BASED_TYPES = [
         'Selección Múltiple', 
         'Selección Única', 
@@ -265,6 +271,16 @@ def get_bank_data(keyword=None, demographic=None):
     if demographic:
         question_filters['qn_demographic'] = demographic
 
+    # Obtener el ID de la categoría "Liderazgo" si existe
+    leadership_cat_name = frappe.db.get_value("qp_IQ_QuestionCategory", {"qnc_category": "Liderazgo"}, "name")
+
+    if leadership_cat_name:
+        # Si se seleccionó la categoría "Liderazgo", filtrar solo por esa categoría. De lo contrario, excluir esa categoría.
+        if template_category == "Liderazgo":
+            question_filters['qn_category'] = leadership_cat_name
+        else:
+            question_filters['qn_category'] = ['!=', leadership_cat_name]
+
     questions = frappe.get_list(
         "qp_IQ_Question",
         filters=question_filters,
@@ -273,7 +289,10 @@ def get_bank_data(keyword=None, demographic=None):
             ['qp_is_public', '=', 1]
         ],
         fields=[
-            "name", "qn_statement as text", "qn_category", "qn_type", "qn_nps_min",
+            "name", 
+            "qn_statement as text", 
+            "qn_statement_others as text_others",
+            "qn_category", "qn_type", "qn_nps_min",
             "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic"
         ],
         ignore_permissions=True

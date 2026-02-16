@@ -41,7 +41,16 @@
                             <div class="review-question-item">
                                 <div class="review-question-header">
                                     <span class="review-question-number">{{ loop.index }}</span>
-                                    <p class="review-question-text">{{ question.text }}</p>
+                                    <div class="w-100">
+                                         {% if question.text_others %}
+                                            <div class="mb-2">
+                                                 <p class="review-question-text mb-1"><strong class="text-muted small">Yo:</strong> {{ question.text }}</p>
+                                                 <p class="review-question-text"><strong class="text-muted small">Otros:</strong> {{ question.text_others }}</p>
+                                            </div>
+                                         {% else %}
+                                            <p class="review-question-text">{{ question.text }}</p>
+                                         {% endif %}
+                                    </div>
                                 </div>
                                 <div class="review-question-details">
                                     <span>Tipo: {{ question.type_name }}</span>

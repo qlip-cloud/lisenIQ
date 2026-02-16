@@ -33,6 +33,23 @@ def register_user(first_name, last_name, email, company_name, password, accept_t
     except Exception as e:
         frappe.log_error(f"Error validando contraseña: {str(e)}", "Password Validation Error")
     
+    # Creación solo de la compañía
+    try:
+        company = frappe.get_doc({
+            "doctype": "qp_IQ_Company",
+            "co_name": company_name,
+            "co_admin_email": email,
+            "co_accept_terms": 1,
+            "co_accept_privacy_policy": 1
+        })
+        company.insert(ignore_permissions=True)
+        frappe.db.commit()
+    except Exception as e:
+        frappe.db.rollback()
+        return {"status": "error", "message": f"Error al crear la compañía: {str(e)}"}
+    
+    # Pre-registro del usuario para que luego se ejecute la integración con B2C al momento de la creación del usuario en el sistema (hook on document User)
+
     try:
       user = frappe.get_doc({
       "doctype": "User",
@@ -47,35 +64,9 @@ def register_user(first_name, last_name, email, company_name, password, accept_t
       user.new_password = password
 
       user.insert(ignore_permissions=True)
-      try:
-          company = frappe.get_doc({
-              "doctype": "qp_IQ_Company",
-              "co_name": company_name,
-              "co_admin_name": user.full_name,
-              "co_admin_email": email,
-              "co_accept_terms": 1,
-              "co_accept_privacy_policy": 1
-          })
-          company.insert(ignore_permissions=True)
-          frappe.db.commit()
-          send_listenaiq_welcome_email(user, company)
-      except Exception as e:
-          user.delete(ignore_permissions=True)
-          frappe.db.rollback()
-          return {"status": "error", "message": f"Error al crear la compañía: {str(e)}"}
-      try:
-          contact = frappe.get_doc('Contact', filters={'email_id': email})
-          if contact:
-              contact.custom_is_liseniq_contact = 1
-              contact.custom_company = company.name
-              contact.save(ignore_permissions=True)
-      except Exception as e:
-          pass  # No hacemos nada si no encontramos un contacto, el usuario se creó correctamente
-      
     except Exception as e:
-        frappe.db.rollback()
-        return {"status": "error", "message": f"Error al crear el usuario: {str(e)}"}
-    return {"status": "success", "message": "Usuario registrado exitosamente."}
+        pass
+    return {"status": "success", "message": "Se ha creado la compañía y enviado un correo de invitación al usuario."}
 
 
 

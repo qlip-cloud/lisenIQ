@@ -108,7 +108,10 @@ doc_events = {
 	},
 	"User": {
 		"on_update": "liseniq.utils.user_hooks.link_company_after_b2c"
-	}
+	},
+  "Contact": {
+		"on_update": "liseniq.utils.user_hooks.link_contact_to_company"
+	},
 }
 
 # doc_events = {

@@ -76,11 +76,18 @@
                     </div>
                     <div class="card-footer">
                         {% if m.is_anonymous %}
-                            <div class="d-flex align-items-center" style="gap: 8px; margin-top: 5px; color: #6c757d;">
-                                <i class="fa fa-user-o progress-icon"></i>
-                                <span style="font-size: 0.9rem; font-weight: 500;">
-                                    {{ m.completed }} respuesta(s)
-                                </span>
+                            <div class="results-row" style="margin-top: 5px;">
+                                <div class="d-flex align-items-center" style="gap: 8px; color: #6c757d;">
+                                    <i class="fa fa-user-o progress-icon"></i>
+                                    <span style="font-size: 0.9rem; font-weight: 500;">
+                                        {{ m.completed }} respuesta(s)
+                                    </span>
+                                </div>
+                                {% if m.status == "Finalizada" %}
+                                <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
+                                    <i class="fa fa-bar-chart"></i>
+                                </a>
+                                {% endif %}
                             </div>
                         {% else %}
                             <div class="progress-info">

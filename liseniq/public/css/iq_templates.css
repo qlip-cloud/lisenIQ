@@ -280,3 +280,5 @@
 .visual-file-preview img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; margin-right: 6px; }
 .visual-file-preview { display: flex; align-items: center; gap: 0.5rem; }
 .visual-option-input-row.is-uploading { opacity: 0.6; pointer-events: none; }
+#btn-close-modal { outline: none !important; box-shadow: none !important; border: none !important; }
+#btn-close-modal:focus, #btn-close-modal:active { outline: none !important; box-shadow: none !important; border: none !important; }

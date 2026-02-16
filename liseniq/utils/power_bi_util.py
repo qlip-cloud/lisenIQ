@@ -16,10 +16,19 @@ AAD_SCOPE = "https://analysis.windows.net/powerbi/api/.default"
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
-def _conf() -> Dict[str, Any]:
-    # Leer la primera configuración del DocType qp_IQ_PBI
+def _conf(pbi_id_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Obtiene la configuración de Power BI.
+    Si se pasa pbi_id_name, busca ese registro específico.
+    """
+    filters = {}
+    if pbi_id_name:
+        filters = {"pbi_id_name": pbi_id_name}
+
+    # Leer configuración del DocType qp_IQ_PBI
     records = frappe.get_all(
         "qp_IQ_PBI",
+        filters=filters,
         fields=[
             "name",
             "pbi_tenant_id",
@@ -34,8 +43,11 @@ def _conf() -> Dict[str, Any]:
         ],
         limit=1,
     )
+    
     if not records:
-        raise frappe.ValidationError("No existe registro de configuración Power BI en qp_IQ_PBI.")
+        msg = f"No existe configuración Power BI en qp_IQ_PBI para el ID: {pbi_id_name}" if pbi_id_name else "No existe registro de configuración Power BI en qp_IQ_PBI."
+        raise frappe.ValidationError(msg)
+        
     rec = records[0]
     doc = frappe.get_doc("qp_IQ_PBI", rec["name"])
 
@@ -54,11 +66,12 @@ def _conf() -> Dict[str, Any]:
         "authority_host": rec.get("pbi_authority_host"),
         "api_base": (rec.get("pbi_url_base") or "https://api.powerbi.com"),
         "template": rec.get("pbi_template"),
+        "pbi_id_name": rec.get("pbi_id_name")
     }
     required = ("tenant_id", "client_id", "client_secret", "workspace_id", "report_id", "authority_host", "api_base")
     missing = [k for k in required if not cfg.get(k)]
     if missing:
-        raise frappe.ValidationError(f"Faltan claves en qp_IQ_PBI: {', '.join(missing)}")
+        raise frappe.ValidationError(f"Faltan claves en qp_IQ_PBI ({rec['name']}): {', '.join(missing)}")
     return cfg
 
 def _cache_get(key: str) -> Optional[Dict[str, Any]]:
@@ -73,13 +86,16 @@ def _cache_get(key: str) -> Optional[Dict[str, Any]]:
 def _cache_set(key: str, value: Dict[str, Any]) -> None:
     frappe.cache().set_value(key, json.dumps(value))
 
-def get_access_token(force_refresh: bool = False) -> Dict[str, Any]:
-    cache_key = "pbi_access_token"
+def get_access_token(force_refresh: bool = False, pbi_id_name: Optional[str] = None) -> Dict[str, Any]:
+    suffix = pbi_id_name if pbi_id_name else "default"
+    cache_key = f"pbi_access_token::{suffix}"
+    
     if not force_refresh:
         cached = _cache_get(cache_key)
         if cached and int(cached.get("exp", 0)) > int(_now_utc().timestamp()) + 60:
             return cached
-    cfg = _conf()
+            
+    cfg = _conf(pbi_id_name)
     tenant_id = cfg["tenant_id"]
     client_id = cfg["client_id"]
     client_secret = cfg["client_secret"]
@@ -88,7 +104,6 @@ def get_access_token(force_refresh: bool = False) -> Dict[str, Any]:
     token_data: Dict[str, Any]
     
     if MSAL_AVAILABLE:
-        
         try:
             app = msal.ConfidentialClientApplication(client_id=client_id, client_credential=client_secret, authority=authority)
             result = app.acquire_token_for_client(scopes=[AAD_SCOPE])
@@ -98,9 +113,7 @@ def get_access_token(force_refresh: bool = False) -> Dict[str, Any]:
             exp = int((_now_utc() + timedelta(seconds=max(expires_in - 120, 300))).timestamp())
             token_data = {"token": result["access_token"], "exp": exp}
             _cache_set(cache_key, token_data)
-            
             return token_data
-        
         except Exception as ex:
             frappe.log_error(f"MSAL falló al autenticar: {ex}", "Power BI Auth (MSAL)")
     
@@ -131,12 +144,12 @@ def get_access_token(force_refresh: bool = False) -> Dict[str, Any]:
 def _auth_headers(bearer: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json", "Accept": "application/json"}
 
-def get_report(report_id: Optional[str] = None, workspace_id: Optional[str] = None) -> Dict[str, Any]:
-    cfg = _conf()
+def get_report(report_id: Optional[str] = None, workspace_id: Optional[str] = None, pbi_id_name: Optional[str] = None) -> Dict[str, Any]:
+    cfg = _conf(pbi_id_name)
     workspace_id = workspace_id or cfg["workspace_id"]
     report_id = report_id or cfg["report_id"]
     api_base = cfg["api_base"].rstrip("/")
-    bearer = get_access_token().get("token")
+    bearer = get_access_token(pbi_id_name=pbi_id_name).get("token")
     url = f"{api_base}/v1.0/myorg/groups/{workspace_id}/reports/{report_id}"
     try:
         resp = requests.get(url, headers=_auth_headers(bearer), timeout=15)
@@ -154,14 +167,17 @@ def get_report(report_id: Optional[str] = None, workspace_id: Optional[str] = No
         frappe.log_error(f"Fallo al obtener reporte {report_id} en grupo {workspace_id}: {ex}", "Power BI GET Report")
         raise
 
-def generate_embed_token(report_id: Optional[str] = None, workspace_id: Optional[str] = None, access_level: str = "View") -> Dict[str, Any]:
-    cfg = _conf()
+def generate_embed_token(report_id: Optional[str] = None, 
+                         workspace_id: Optional[str] = None, 
+                         access_level: str = "View",
+                         pbi_id_name: Optional[str] = None) -> Dict[str, Any]:
+    cfg = _conf(pbi_id_name)
     workspace_id = workspace_id or cfg["workspace_id"]
     report_id = report_id or cfg["report_id"]
     api_base = cfg["api_base"].rstrip("/")
-    bearer = get_access_token().get("token")
-    report_info = get_report(report_id=report_id, workspace_id=workspace_id)
-    dataset_id = report_info.get("datasetId") or cfg.get("dataset_id")
+    bearer = get_access_token(pbi_id_name=pbi_id_name).get("token")
+    report_info = get_report(report_id=report_id, workspace_id=workspace_id, pbi_id_name=pbi_id_name)
+    dataset_id = report_info.get("datasetId") 
     
     try:
         body_v2: Dict[str, Any] = {
@@ -204,13 +220,13 @@ def generate_embed_token(report_id: Optional[str] = None, workspace_id: Optional
         frappe.log_error(f"Fallo GenerateToken para reporte {report_id}: {ex}", "Power BI GenerateToken")
         raise
 
-def build_embed_url(report_id: Optional[str] = None, workspace_id: Optional[str] = None) -> str:
-    cfg = _conf()
+def build_embed_url(report_id: Optional[str] = None, workspace_id: Optional[str] = None, pbi_id_name: Optional[str] = None) -> str:
+    cfg = _conf(pbi_id_name)
     workspace_id = workspace_id or cfg["workspace_id"]
     report_id = report_id or cfg["report_id"]
     
     try:
-        info = get_report(report_id=report_id, workspace_id=workspace_id)
+        info = get_report(report_id=report_id, workspace_id=workspace_id, pbi_id_name=pbi_id_name)
         
         if info and info.get("embedUrl"):
             return info["embedUrl"]
@@ -223,10 +239,15 @@ def build_embed_url(report_id: Optional[str] = None, workspace_id: Optional[str]
 def get_embed_config(report_id: Optional[str] = None,
                      workspace_id: Optional[str] = None,
                      access_level: str = "View",
-                     filter_company: Optional[str] = None) -> Dict[str, Any]:
-    cfg = _conf()
+                     filter_company: Optional[str] = None,
+                     pbi_id_name: Optional[str] = None) -> Dict[str, Any]:
+    
+    # Obtener configuración base para asegurar que tenemos los IDs si no se pasaron
+    cfg = _conf(pbi_id_name)
     report_id = report_id or cfg["report_id"]
     workspace_id = workspace_id or cfg["workspace_id"]
+    
+    # El cache key debe ser específico para este reporte/configuración
     cache_key = f"pbi_embed_token::{workspace_id}::{report_id}"
     cached = _cache_get(cache_key)
     now_epoch = int(_now_utc().timestamp())
@@ -237,7 +258,7 @@ def get_embed_config(report_id: Optional[str] = None,
         token_expiration = cached["tokenExpiration"]
         dataset_id = cached.get("datasetId")
     else:
-        token_info = generate_embed_token(report_id=report_id, workspace_id=workspace_id, access_level=access_level)
+        token_info = generate_embed_token(report_id=report_id, workspace_id=workspace_id, access_level=access_level, pbi_id_name=pbi_id_name)
         embed_token = token_info["token"]
         token_expiration = token_info.get("expiration")
         dataset_id = token_info.get("datasetId")
@@ -251,7 +272,7 @@ def get_embed_config(report_id: Optional[str] = None,
             pass
         _cache_set(cache_key, {"token": embed_token, "tokenExpiration": token_expiration, "datasetId": dataset_id, "exp": exp_epoch})
     
-    embed_url = build_embed_url(report_id=report_id, workspace_id=workspace_id)
+    embed_url = build_embed_url(report_id=report_id, workspace_id=workspace_id, pbi_id_name=pbi_id_name)
     
     result = {
         "reportId": report_id,
@@ -262,7 +283,7 @@ def get_embed_config(report_id: Optional[str] = None,
         "datasetId": dataset_id
     }
 
-    if filter_company: # and cfg.get("template"):
+    if filter_company: 
         result["filters"] = [{
             "$schema": "http://powerbi.com/product/schema#basicFilter",
             "target": {

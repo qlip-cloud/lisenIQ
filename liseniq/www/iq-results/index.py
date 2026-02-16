@@ -125,30 +125,33 @@ def get_power_bi_embed_config(report_id: Optional[str] = None,
     try:
         company = _get_user_company()
         
-        # Determinar qué configuración PBI usar basado en la plantilla de la medición
-        pbi_id_target = None
+        # Determinar qué configuración PBI usar basado en el MNEMONICO
+        pbi_mnemonico_target = "PBICU" # Default fallback
+
         if survey_docname:
             # Obtener el ID de la plantilla de la medición
             template_id = frappe.db.get_value("qp_IQ_Survey", survey_docname, "su_template")
             
             if template_id:
                 # Obtener el nombre de la plantilla
-                template_name = frappe.db.get_value("qp_IQ_Template", template_id, "tp_name")
+                category_link_name = frappe.db.get_value("qp_IQ_Template", template_id, "tp_category")
                 
-                if template_name:
-                    if "Cultura" in template_name:
-                        pbi_id_target = "PBI Cultura"
-                    elif "Engagement" in template_name:
-                        pbi_id_target = "PBI Engagement"
-            else:
-                # Si no hay plantilla (medición sin plantilla), usar por defecto PBI Cultura
-                pbi_id_target = "PBI Cultura"
+                if category_link_name:
+                    # Obtener el nombre real de la categoría
+                    category_name = frappe.db.get_value("qp_IQ_QuestionCategory", category_link_name, "qnc_category") or ""
+                    
+                    # Lógica de asignación de mnemónico según categoría
+                    if "Cultura" in category_name:
+                        pbi_mnemonico_target = "PBICU"
+                    elif "Engagement" in category_name:
+                        pbi_mnemonico_target = "PBIEN"
 
+        # Llamamos a la utilidad pasando el pbi_mnemonico
         cfg = power_bi_util.get_embed_config(report_id=report_id,
                                              workspace_id=workspace_id,
                                              access_level=access_level,
                                              filter_company=company,
-                                             pbi_id_name=pbi_id_target)
+                                             pbi_mnemonico=pbi_mnemonico_target)
         if survey_docname:
             cfg["survey_docname"] = survey_docname
         return cfg

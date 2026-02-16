@@ -21,29 +21,23 @@ def link_company_after_b2c(doc, method):
     company_doc.co_admin_name = doc.full_name
     company_doc.save(ignore_permissions=True)
 
-    frappe.enqueue(
-        "liseniq.utils.user_hooks.link_contact_to_company",
-        queue="short",
-        user=doc.name,
-        company=company_doc.name,
-        enqueue_after_commit=True
-    )
 
     frappe.db.commit()
 
 
-def link_contact_to_company(user, company):
+def link_contact_to_company(doc, method):
 
-    contact_name = frappe.db.get_value(
-        "Contact",
-        {"user": user},
+    if doc.custom_is_liseniq_contact == 1:
+        return
+    company_name = frappe.db.get_value(
+        "qp_IQ_Company",
+        {"co_admin_email": doc.email_id},
         "name"
     )
 
-    if not contact_name:
+    if not company_name:
         return
-
-    contact_doc = frappe.get_doc("Contact", contact_name)
-    contact_doc.custom_is_liseniq_contact = 0
-    contact_doc.custom_company = company
-    contact_doc.save(ignore_permissions=True)
+    
+    # Enlazar contacto
+    doc.custom_company = company_name
+    doc.save(ignore_permissions=True)

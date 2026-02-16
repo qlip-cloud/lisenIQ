@@ -4,8 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastNameInput = document.getElementById('last_name');
     const emailInput = document.getElementById('email');
     const companyInput = document.getElementById('company_name');
-    const passwordInput = document.getElementById('password');
-    const confirmPasswordInput = document.getElementById('confirm_password');
+    //const passwordInput = document.getElementById('password');
+    //const confirmPasswordInput = document.getElementById('confirm_password');
     const termsCheckbox = document.getElementById('terms-and-conditions-checkbox');
     const errorElement = document.getElementById('general-error');
     const submitButton = document.getElementById('btn-submit');
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         validateForm();
     });
-
+    /*
     passwordInput.addEventListener('input', function() {
         const passwordErrorElement = document.getElementById('password-error');
         const regex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/; // Al menos 8 caracteres, una letra y un número
@@ -96,11 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         validateForm();
     });
-    
+    */
     termsCheckbox.addEventListener('change', function() {
         validateForm();
     });
-
+    /*
     // Funcionalidad para mostrar/ocultar contraseñas
     const passwordToggleIcons = document.querySelectorAll('.input-icon-div');
     
@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-
+    */
     form.addEventListener('submit', function(event) {
         event.preventDefault();
         submitButton.disabled = true;
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             last_name: lastNameInput.value.trim(),
             email: emailInput.value.trim(),
             company_name: companyInput.value.trim(),
-            password: passwordInput.value,
+            //password: passwordInput.value,
             accept_terms: termsCheckbox.checked
         };
 
@@ -210,11 +210,11 @@ document.addEventListener('DOMContentLoaded', () => {
             successIcon.innerHTML = '<span class="material-symbols-outlined" style="font-size: 64px; color: #4CAF50;">check_circle</span>';
             
             const successTitle = document.createElement('h2');
-            successTitle.textContent = '¡Registro exitoso!';
+            successTitle.textContent = '¡Pre-Registro exitoso!';
             successTitle.style.cssText = 'color: #4CAF50; margin: 20px 0;';
             
             const successMessage = document.createElement('p');
-            successMessage.textContent = 'Se ha enviado un correo electrónico de confirmación a tu dirección de email.';
+            successMessage.textContent = 'Has iniciado el proceso de registro en ListenAIQ. Te hemos enviado un correo electrónico con las instrucciones para completar tu registro. Revisa tu bandeja de entrada (y la carpeta de spam) para continuar.';
             successMessage.style.cssText = 'font-size: 16px; margin: 20px 0; color: #666;';
             
             const backButton = document.createElement('button');
@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             successContainer.appendChild(successTitle);
             successContainer.appendChild(successMessage);
             successContainer.appendChild(backButton);
-            successContainer.appendChild(loginButton);
+            //successContainer.appendChild(loginButton);
             
             form.parentElement.insertBefore(successContainer, form);
         } else {
@@ -248,8 +248,8 @@ document.addEventListener('DOMContentLoaded', () => {
         lastNameInput.value = '';
         emailInput.value = '';
         companyInput.value = '';
-        passwordInput.value = '';
-        confirmPasswordInput.value = '';
+        //passwordInput.value = '';
+        //confirmPasswordInput.value = '';
         termsCheckbox.checked = false;
         
         // Remover errores
@@ -275,12 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const isLastNameValid = lastNameInput.value.trim() !== '';
         const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
         const isCompanyValid = companyInput.value.trim() !== '';
-        const isPasswordValid = passwordInput.value.length >= 8;
-        const isConfirmPasswordValid = confirmPasswordInput.value === passwordInput.value && confirmPasswordInput.value !== '';
+        //const isPasswordValid = passwordInput.value.length >= 8;
+        //const isConfirmPasswordValid = confirmPasswordInput.value === passwordInput.value && confirmPasswordInput.value !== '';
         const isTermsChecked = termsCheckbox.checked;
 
         const isFormValid = isFirstNameValid && isLastNameValid && isEmailValid && 
-                           isCompanyValid && isPasswordValid && isConfirmPasswordValid && isTermsChecked;
+                           isCompanyValid && isTermsChecked;
 
         submitButton.disabled = !isFormValid;
     }

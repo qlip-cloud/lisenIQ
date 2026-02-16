@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "pbi_id_name",
+  "pbi_mnemonico",
   "column_break_2",
   "pbi_tenant_id",
   "pbi_client_id",
@@ -41,6 +42,10 @@
   {
    "fieldname": "pbi_report_id",
    "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
    "label": "PBI Report ID"
   },
   {
@@ -61,6 +66,10 @@
   {
    "fieldname": "pbi_id_name",
    "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
    "label": "PBI ID"
   },
   {
@@ -70,11 +79,16 @@
   {
    "fieldname": "column_break_7",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pbi_mnemonico",
+   "fieldtype": "Data",
+   "label": "PBI Mnem\u00f3nico"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-19 11:24:45.348654",
+ "modified": "2026-02-16 09:25:01.726892",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_PBI",

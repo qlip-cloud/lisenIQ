@@ -44,6 +44,6 @@ def link_contact_to_company(user, company):
         return
 
     contact_doc = frappe.get_doc("Contact", contact_name)
-    contact_doc.custom_is_liseniq_contact = 1
+    contact_doc.custom_is_liseniq_contact = 0
     contact_doc.custom_company = company
     contact_doc.save(ignore_permissions=True)

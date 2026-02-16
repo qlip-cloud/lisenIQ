@@ -12,8 +12,8 @@ def get_context(context):
 
 
 @frappe.whitelist(allow_guest=True)
-def register_user(first_name, last_name, email, company_name, password, accept_terms):
-    if not (first_name and last_name and email and company_name and password):
+def register_user(first_name, last_name, email, company_name, accept_terms):
+    if not (first_name and last_name and email and company_name and accept_terms):
         return {"status": "error", "message": "Todos los campos son obligatorios."}
 
     if not accept_terms:
@@ -21,17 +21,6 @@ def register_user(first_name, last_name, email, company_name, password, accept_t
     
     if frappe.db.exists("User", {"email": email}):
         return {"status": "error", "message": "Ya existe un usuario con este correo electrónico."}
-    
-    try:
-        result = test_password_strength(password, user_inputs=[email, first_name, last_name])
-        if result.get('feedback', {}).get('password_policy_validation_passed') == False:
-            suggestions = result.get('feedback', {}).get('suggestions', [])
-            message = "La contraseña no cumple con los requisitos de seguridad."
-            if suggestions:
-                message += " " + " ".join(suggestions)
-            return {"status": "error", "message": message}
-    except Exception as e:
-        frappe.log_error(f"Error validando contraseña: {str(e)}", "Password Validation Error")
     
     # Creación solo de la compañía
     try:
@@ -58,10 +47,6 @@ def register_user(first_name, last_name, email, company_name, password, accept_t
       "email": email,
       "enabled": 1,
       })
-
-      user.flags.no_welcome_mail = True
-      user.flags.no_password_notification = True
-      user.new_password = password
 
       user.insert(ignore_permissions=True)
     except Exception as e:

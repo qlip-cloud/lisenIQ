@@ -124,10 +124,31 @@ def get_power_bi_embed_config(report_id: Optional[str] = None,
         frappe.throw(_("No autorizado"), frappe.PermissionError)
     try:
         company = _get_user_company()
+        
+        # Determinar qué configuración PBI usar basado en la plantilla de la medición
+        pbi_id_target = None
+        if survey_docname:
+            # Obtener el ID de la plantilla de la medición
+            template_id = frappe.db.get_value("qp_IQ_Survey", survey_docname, "su_template")
+            
+            if template_id:
+                # Obtener el nombre de la plantilla
+                template_name = frappe.db.get_value("qp_IQ_Template", template_id, "tp_name")
+                
+                if template_name:
+                    if "Cultura" in template_name:
+                        pbi_id_target = "PBI Cultura"
+                    elif "Engagement" in template_name:
+                        pbi_id_target = "PBI Engagement"
+            else:
+                # Si no hay plantilla (medición sin plantilla), usar por defecto PBI Cultura
+                pbi_id_target = "PBI Cultura"
+
         cfg = power_bi_util.get_embed_config(report_id=report_id,
                                              workspace_id=workspace_id,
                                              access_level=access_level,
-                                             filter_company=company)
+                                             filter_company=company,
+                                             pbi_id_name=pbi_id_target)
         if survey_docname:
             cfg["survey_docname"] = survey_docname
         return cfg

@@ -65,7 +65,7 @@ def global_website_context(context):
     # Validación de Invitado
     if user == "Guest":
         context.access_error_message = _("Debe iniciar sesión para acceder.")
-        frappe.log_error(title="Acceso al portal fallido", message="Usuario Guest intentó acceder al portal.")
+        # frappe.log_error(title="Acceso al portal fallido", message="Usuario Guest intentó acceder al portal.")
         return context
 
     # Obtener datos del Contacto

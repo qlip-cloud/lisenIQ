@@ -1,11 +1,14 @@
 import frappe
 from frappe import _
+from liseniq.utils.login_util import global_website_context
 
 
 def get_context(context):
 
     if frappe.session.user == "Guest":
         frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+    
+    context = global_website_context(context)
 
     template_name = frappe.request.args.get('name')
     if not template_name:
@@ -58,6 +61,7 @@ def get_context(context):
     except frappe.DoesNotExistError:
         frappe.throw(f"La plantilla {template_name} no fue encontrada.", title="Error")
 
+    # Configuración base de la página
     context.page_title = f"Ver Modelo: {template_doc.tp_name}"
     context.no_cache = 1
     context.is_navbar_custom = True

@@ -25,6 +25,7 @@ def link_company_after_b2c(doc, method):
         "liseniq.utils.user_hooks.link_contact_to_company",
         email=doc.email,
         queue="default",
+        enqueue_after_commit=True,
         timeout=300
     )
 

@@ -3,20 +3,24 @@ import json
 from frappe import _
 from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
 from liseniq.utils.api_survey import generate_public_link_for_survey
+from liseniq.utils.login_util import global_website_context
 
 def get_context(context):
 
     if frappe.session.user == "Guest":
         frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
 
+    context = global_website_context(context)
+
+    # Configuración base de la página
     context.no_cache = 1
-    context.page_title = "Crear Medición"
+    context.page_title = _("Crear Medición")
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
 
     measurement_name = frappe.request.args.get('name')
     context.is_edit_mode = bool(measurement_name)
-    context.page_title = "Editar Medición" if context.is_edit_mode else "Crear Medición"
+    context.page_title = _("Editar Medición") if context.is_edit_mode else _("Crear Medición")
     context.measurement_data_json = "null"
 
     # Modo edición: cargar datos existentes

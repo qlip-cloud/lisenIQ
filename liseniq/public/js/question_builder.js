@@ -703,8 +703,8 @@ export class QuestionBuilder {
                 isValid = false;
             }
             parsed.forEach((opt, i) => {
-                if (!opt.value || !opt.text || !opt.url) {
-                    showGlobalNotification(`La opción #${i + 1} debe incluir Valor, Texto y Archivo (imagen).`, 'error', 3000);
+                if (!opt.value || !opt.text) {
+                    showGlobalNotification(`La pregunta #${i + 1} debe incluir Valor y Texto.`, 'error', 3000);
                     isValid = false;
                 }
             });
@@ -773,7 +773,7 @@ export class QuestionBuilder {
                 value: row.querySelector('.visual-option-value')?.value.trim(),
                 text: row.querySelector('.visual-option-text')?.value.trim(),
                 url: row.querySelector('.visual-option-url-input')?.value.trim(),
-            })).filter(opt => opt.value && opt.text && opt.url);
+            })).filter(opt => opt.value && opt.text);
         }
 
         if (NPS_SCALE_TYPES.includes(questionTypeName)) {

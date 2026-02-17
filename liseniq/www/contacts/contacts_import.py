@@ -7,6 +7,7 @@ import json
 import random
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.utils import get_column_letter
+from liseniq.utils.login_util import global_website_context
 
 # Definición de columnas base
 STANDARD_COLUMNS = [
@@ -57,6 +58,9 @@ def get_context(context):
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Error validando proceso activo en Carga Masiva")
 
+	context = global_website_context(context)
+    
+	# Configuración base de la página
 	context.page_title = _("Carga masiva de Contactos")
 	context.no_cache = 1
 	context.no_breadcrumbs = True
@@ -64,14 +68,10 @@ def get_context(context):
 	return context
 
 def get_all_demographic_types():
-	"""Retorna una lista de títulos de demográficos existentes en el sistema."""
 	return [d.dt_title for d in frappe.get_all("qp_IQ_DemographicType", filters={"dt_object_type": "Contacto"}, fields=["dt_title"], order_by="dt_title asc")]
 
 def get_mapping_dicts():
-	"""
-	Retorna diccionarios para mapear ID -> Nombre (para exportar) 
-	y Nombre -> ID (para importar).
-	"""
+
 	# Tipo de Documento
 	doc_types = frappe.get_all("qp_IQ_DocumentType", fields=["name", "dt_name"])
 	dt_id_to_name = {d.name: d.dt_name for d in doc_types}

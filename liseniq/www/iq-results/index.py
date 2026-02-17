@@ -126,7 +126,7 @@ def get_power_bi_embed_config(report_id: Optional[str] = None,
         company = _get_user_company()
         
         # Determinar qué configuración PBI usar basado en el MNEMONICO
-        pbi_mnemonico_target = "PBICU" # Default fallback
+        pbi_mnemonico_target = "PBICU"
 
         if survey_docname:
             # Obtener el ID de la plantilla de la medición

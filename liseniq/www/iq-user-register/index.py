@@ -12,8 +12,8 @@ def get_context(context):
 
 
 @frappe.whitelist(allow_guest=True)
-def register_user(first_name, last_name, email, company_name, accept_terms):
-    if not (first_name and last_name and email and company_name and accept_terms):
+def register_user(first_name, last_name, email, company_name, tax_id, accept_terms):
+    if not (first_name and last_name and email and company_name and tax_id and accept_terms):
         return {"status": "error", "message": "Todos los campos son obligatorios."}
 
     if not accept_terms:
@@ -28,6 +28,7 @@ def register_user(first_name, last_name, email, company_name, accept_terms):
             "doctype": "qp_IQ_Company",
             "co_name": company_name,
             "co_admin_email": email,
+            "co_tax_id": tax_id,
             "co_accept_terms": 1,
             "co_accept_privacy_policy": 1
         })

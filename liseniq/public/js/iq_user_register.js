@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastNameInput = document.getElementById('last_name');
     const emailInput = document.getElementById('email');
     const companyInput = document.getElementById('company_name');
+    const taxIdInput = document.getElementById('tax_id');
     //const passwordInput = document.getElementById('password');
     //const confirmPasswordInput = document.getElementById('confirm_password');
     const termsCheckbox = document.getElementById('terms-and-conditions-checkbox');
@@ -56,6 +57,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             this.classList.remove('input-error');
             companyErrorElement.style.display = 'none';
+        }
+        validateForm();
+    });
+    taxIdInput.addEventListener('blur', function() {
+        const taxIdErrorElement = document.getElementById('tax-id-error');
+        if (this.value.trim() === '') {
+            this.classList.add('input-error');
+              showError(taxIdErrorElement, 'El número de identificación tributaria es obligatorio.');
+        } else {
+            this.classList.remove('input-error');
+            taxIdErrorElement.style.display = 'none';
         }
         validateForm();
     });
@@ -132,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
             last_name: lastNameInput.value.trim(),
             email: emailInput.value.trim(),
             company_name: companyInput.value.trim(),
+            tax_id: taxIdInput.value.trim(),
             //password: passwordInput.value,
             accept_terms: termsCheckbox.checked
         };
@@ -248,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lastNameInput.value = '';
         emailInput.value = '';
         companyInput.value = '';
+        taxIdInput.value = '';
         //passwordInput.value = '';
         //confirmPasswordInput.value = '';
         termsCheckbox.checked = false;
@@ -279,8 +293,10 @@ document.addEventListener('DOMContentLoaded', () => {
         //const isConfirmPasswordValid = confirmPasswordInput.value === passwordInput.value && confirmPasswordInput.value !== '';
         const isTermsChecked = termsCheckbox.checked;
 
+        const isTaxIdValid = taxIdInput.value.trim() !== '';
+
         const isFormValid = isFirstNameValid && isLastNameValid && isEmailValid && 
-                           isCompanyValid && isTermsChecked;
+                           isCompanyValid && isTaxIdValid && isTermsChecked;
 
         submitButton.disabled = !isFormValid;
     }

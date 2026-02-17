@@ -65,6 +65,7 @@ def global_website_context(context):
     # Validación de Invitado
     if user == "Guest":
         context.access_error_message = _("Debe iniciar sesión para acceder.")
+        frappe.log_error(title="Acceso al portal fallido", message="Usuario Guest intentó acceder al portal.")
         return context
 
     # Obtener datos del Contacto
@@ -77,15 +78,17 @@ def global_website_context(context):
     
     if not contact:
         context.access_error_message = _("El usuario no se encuentra registrado o no tiene permisos de acceso (Contacto no encontrado).")
-        frappe.log_error(title="Portal Access Fail", message=f"User {user} has no Contact linked.")
+        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin contacto asociado.")
         return context
 
     if not contact.custom_company:
         context.access_error_message = _("El usuario no tiene una compañía asignada. Contacte al administrador.")
+        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin compañía asignada.")
         return context
 
     if contact.custom_is_liseniq_contact:
         context.access_error_message = _("Su usuario no tiene perfil administrativo para acceder a este portal.")
+        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin perfil administrativo.")
         return context
 
     context.has_portal_access = True

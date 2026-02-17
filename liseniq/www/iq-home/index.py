@@ -10,7 +10,7 @@ def get_context(context):
 
     # Configuración base de la página
     context.no_cache = 1
-    context.page_title = "Inicio"
+    context.page_title = _("Inicio")
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
     context.show_summary_section = False

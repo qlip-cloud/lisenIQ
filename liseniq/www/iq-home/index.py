@@ -1,27 +1,28 @@
 import frappe
 from frappe.utils import getdate, formatdate
 from frappe import _
+from liseniq.utils.login_util import global_website_context
 
 
 def get_context(context):
 
-    if frappe.session.user == "Guest":
-        frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
+    context = global_website_context(context)
 
+    # Configuración base de la página
     context.no_cache = 1
     context.page_title = "Inicio"
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
-
     context.show_summary_section = False
 
-    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
-
-
-    if not user_company:
+    if not context.get("has_portal_access"):
         context.measurements = []
-        frappe.log_error("El usuario actual no tiene una compañía asignada.", "Error en iq-home/index.py")
         return context
+
+    user_company = context.get("liseniq_company_name")
+    
+    if not user_company:
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
     try:
         survey_statuses = frappe.get_all("qp_IQ_SurveyStatus", fields=["name", "se_status"], order_by="se_status")
@@ -59,12 +60,10 @@ def get_context(context):
         is_anonymous = bool(survey.su_is_anonymous)
         
         if is_anonymous:
-            # Para anónimas, contamos las respuestas directas ya que no hay destinatarios predefinidos obligatorios
             total_responses = frappe.db.count("Survey Response", {"survey": survey.su_name})
-            total_recipients = 0 # No aplica total de destinatarios en anónimas abiertas
+            total_recipients = 0 
             percentage = 0
         else:
-            # Lógica original para encuestas dirigidas
             total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
             total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
 
@@ -98,10 +97,5 @@ def get_context(context):
         {"status": "En Proceso", "bar1_height": 85, "bar2_height": 40},
         {"status": "En Proceso", "bar1_height": 60, "bar2_height": 45}
     ]
-
-    context.update({
-        "is_navbar_custom": True,
-        "no_cache": 1
-    })
      
     return context

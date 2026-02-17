@@ -1,6 +1,7 @@
 import frappe
 import json
 from frappe import _
+from liseniq.utils.login_util import global_website_context
 
 
 def get_context(context):
@@ -8,7 +9,10 @@ def get_context(context):
     if frappe.session.user == "Guest":
         frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
 
-    context.page_title = "Plantillas"
+    context = global_website_context(context)
+
+    # Configuración base de la página
+    context.page_title = _("Plantillas")
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
     context.no_cache = 1

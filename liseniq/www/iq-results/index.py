@@ -3,14 +3,19 @@ from frappe.utils import getdate, formatdate
 from frappe import _
 from liseniq.utils import power_bi_util
 from typing import Optional
+from liseniq.utils.login_util import global_website_context
+
 
 def get_context(context):
 
     if frappe.session.user == "Guest":
         frappe.throw(_("Cliente aún no ha sido registrado. Por favor comunique al Administrador."), frappe.PermissionError)
 
+    context = global_website_context(context)
+
+    # Configuración base de la página
     context.no_cache = 1
-    context.page_title = "Resultados"
+    context.page_title = _("Resultados")
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
 

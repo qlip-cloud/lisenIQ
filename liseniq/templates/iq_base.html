@@ -13,7 +13,7 @@
 
 {% block content %}
 
-    {%if frappe.session.user != "Guest" %}
+    {% if has_portal_access %}
         <header class="mobile-header d-lg-none p-3 d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
                 <img src="/assets/liseniq/images/qlip_logo.png" alt="Logo Qlip" class="mr-2" style="height: 32px;">
@@ -43,7 +43,6 @@
                             <li class="nav-item"><a href="/iq-templates" class="nav-link {% if frappe.request.path.startswith('/iq-templates') %}active-link{% endif %}"><i class="fa fa-file-text-o fa-fw mr-3"></i>Plantillas</a></li>
                             <li class="nav-item"><a href="/iq-results" class="nav-link {% if frappe.request.path == '/iq-results' %}active-link{% endif %}"><i class="fa fa-bar-chart fa-fw mr-3"></i>Resultados</a></li>
                             <li class="nav-item"><a href="/contacts" class="nav-link {% if frappe.request.path == '/contacts' %}active-link{% endif %}"><i class="fa fa-users fa-fw mr-3"></i>Contactos</a></li>
-                            <!-- <li class="nav-item"><a href="/configuracion" class="nav-link"><i class="fa fa-cog fa-fw mr-3"></i>Configuración</a></li> -->
                             <li class="nav-item">
                                 <a href="#" id="sidebar-logout-link" class="nav-link">
                                     <i class="fa fa-sign-out fa-fw mr-3"></i>Salir
@@ -94,13 +93,29 @@
             </div>
         </div>
     {% else %}
-        <div class="row">
-            <div class="col-12">
-                <div class="alert alert-danger" role="alert" style="padding: 2rem; border-radius: 8px;">
-                    <h4 class="alert-heading" style="font-weight: bold;">Usuario no Encontrado</h4>
-                    <p>El correo <strong>{{ frappe.session.user }}</strong> no se encuentra registrado en el sistema.</p>
-                    <hr>
-                    <p class="mb-0">Por favor, póngase en contacto con el administrador para verificar sus datos.</p>
+        <div class="container" style="height: 100vh; display: flex; align-items: center; justify-content: center;">
+            <div class="row w-100 justify-content-center">
+                <div class="col-md-8 col-lg-6">
+                    <div class="alert alert-danger shadow-sm" role="alert" style="padding: 2.5rem; border-radius: 12px; background-color: #fff; border: 1px solid #ffcaca;">
+                        <div class="text-center mb-4">
+                            <i class="fa fa-lock" style="font-size: 3rem; color: #dc3545;"></i>
+                        </div>
+                        <h4 class="alert-heading text-center mb-3" style="font-weight: 700; color: #dc3545;">Acceso Restringido</h4>
+                        <p class="text-center mb-4" style="font-size: 1.1rem; color: #495057;">
+                            {{ access_error_message or "El usuario no se encuentra registrado o no tiene permisos de acceso." }}
+                        </p>
+                        
+                        <div class="d-flex justify-content-center mt-4">
+                             <a href="#" id="btn-access-denied-logout" class="btn btn-outline-danger px-4">Intentar con otra cuenta</a>
+                        </div>
+                        
+                        {% if frappe.session.user != "Guest" %}
+                        <hr class="my-4">
+                        <p class="mb-0 text-center text-muted small">
+                            Sesión iniciada como: <strong>{{ frappe.session.user }}</strong>
+                        </p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>

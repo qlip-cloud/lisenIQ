@@ -14,6 +14,6 @@ def get_context(context):
         survey = frappe.db.get_value("qp_IQ_Survey", {"su_public_token": token}, "su_name")
         if survey:
             survey_name = survey
-    context.survey_name = survey_name or "Medición Cultura"
+    context.survey_name = survey_name or ""
 
     return context

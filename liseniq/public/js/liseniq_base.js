@@ -55,8 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    
-
     fetch('/api/method/liseniq.utils.login_util.get_user_company_name')
         .then(response => response.json())
         .then(data => {
@@ -71,6 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const avatar = document.getElementById('iq-header-avatar');
     const userMenu = document.getElementById('iq-header-user-menu');
     const logoutBtn = document.getElementById('iq-header-logout');
+    const sidebarLogoutLink = document.getElementById('sidebar-logout-link');
+    const accessDeniedBtn = document.getElementById('btn-access-denied-logout');
 
     if (avatar && userMenu) {
         avatar.addEventListener('click', function(e) {
@@ -87,25 +87,40 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            fetch('/api/method/logout', { method: 'GET' })
-                .then(() => {
-                    window.location.href = '/login';
-                });
+    // Manejo seguro del logout (limpieza de sesión y redirección)
+    const handleLogout = function(e) {
+        if(e) e.preventDefault();
+        
+        localStorage.clear();
+        sessionStorage.clear();
+
+        fetch('/api/method/logout', { 
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        })
+        .then(() => {
+            window.location.replace('/login');
+        })
+        .catch((err) => {
+            console.error('Error durante logout:', err);
+            window.location.replace('/login');
         });
+    };
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
     }
 
-    const sidebarLogoutLink = document.getElementById('sidebar-logout-link');
     if (sidebarLogoutLink) {
-        sidebarLogoutLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            fetch('/api/method/logout', { method: 'GET' })
-                .then(() => {
-                    window.location.href = '/login';
-                });
-        });
+        sidebarLogoutLink.addEventListener('click', handleLogout);
+    }
+
+    if (accessDeniedBtn) {
+        accessDeniedBtn.addEventListener('click', handleLogout);
     }
 
     // Inicializar lógica de notificaciones

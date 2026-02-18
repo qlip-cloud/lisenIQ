@@ -8,6 +8,7 @@
   "qn_creator",
   "qp_sec_question",
   "qn_statement",
+  "qn_statement_others",
   "qn_helper_text",
   "qn_type",
   "qp_col_1",
@@ -162,11 +163,16 @@
    "fieldname": "qp_is_public",
    "fieldtype": "Check",
    "label": "Pregunta Publica"
+  },
+  {
+   "fieldname": "qn_statement_others",
+   "fieldtype": "Small Text",
+   "label": "Texto de la Pregunta / Enunciado Principal / Terceros"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-06 16:16:31.906173",
+ "modified": "2026-02-11 08:27:07.282419",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

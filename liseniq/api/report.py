@@ -159,6 +159,13 @@ def get_user_demographics():
         core_hist_demographics = [
             'dob', 'gender', 'entry_date', 'country', 'academic_level'
         ]
+        demographics_labels_map = {
+            'dob': 'Fecha de Nacimiento',
+            'gender': 'Género',
+            'entry_date': 'Fecha de Ingreso',
+            'country': 'País',
+            'academic_level': 'Nivel Académico'
+        }
         user_demographics_array = []
         surveys = get_valid_engagement_surveys()
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
@@ -198,7 +205,7 @@ def get_user_demographics():
                             'user_id': user_id,
                             'survey_id': survey['id'],
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
-                            'demographic_id': f'custom_{core_demo}' if core_demo in ['dob', 'entry_date', 'country'] else core_demo,
+                            'demographic_id': demographics_labels_map.get(core_demo, core_demo),
                             'demographic_value': hist_record.get(f'shd_{core_demo}', 'NA')
                         })
 
@@ -247,11 +254,11 @@ def get_user_demographics():
                 if user_id not in user_demographics_map:
                     user_demographics_map[user_id] = {}
                 user_demographics_map[user_id][response.get('demographic_tag', '')] = response.get('demographic_value', '')
-                user_demographics_map[user_id]['custom_dob'] = response.get('custom_dob', '')
-                user_demographics_map[user_id]['gender'] = response.get('gender', '')
-                user_demographics_map[user_id]['custom_entry_date'] = response.get('custom_entry_date', '')
-                user_demographics_map[user_id]['custom_country'] = response.get('custom_country', '')
-                user_demographics_map[user_id]['custom_academic_level'] = response.get('custom_academic_level', '')
+                user_demographics_map[user_id]['Fecha de Nacimiento'] = response.get('custom_dob', '')
+                user_demographics_map[user_id]['Género'] = response.get('gender', '')
+                user_demographics_map[user_id]['Fecha de Ingreso'] = response.get('custom_entry_date', '')
+                user_demographics_map[user_id]['País'] = response.get('custom_country', '')
+                user_demographics_map[user_id]['Nivel Académico'] = response.get('custom_academic_level', '')
             
             # Crear registros para todos los usuarios y todos los demográficos
             for user_record in users:
@@ -319,6 +326,18 @@ def get_user_demographics_cultura():
         core_hist_demographics = [
             'dob', 'gender', 'entry_date', 'country', 'academic_level'
         ]
+        demographics_labels_map = {
+            'dob': 'Fecha de Nacimiento',
+            'custom_dob': 'Fecha de Nacimiento',
+            'gender': 'Género',
+            'entry_date': 'Fecha de Ingreso',
+            'custom_entry_date': 'Fecha de Ingreso',
+            'country': 'País',
+            'custom_country': 'País',
+            'academic_level': 'Nivel Académico',
+            'custom_academic_level': 'Nivel Académico'
+        }
+
         all_demographics_labels = list(set(demographics_labels_from_historic + demographics_labels_from_contacts))
         
         # Procesar encuestas finalizadas
@@ -351,7 +370,7 @@ def get_user_demographics_cultura():
                             'user_id': user_id,
                             'survey_id': survey['id'],
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
-                            'demographic_id': f'custom_{core_demo}' if core_demo in ['dob', 'entry_date', 'country'] else core_demo,
+                            'demographic_id': demographics_labels_map.get(core_demo, f'custom_{core_demo}' if core_demo in ['dob', 'entry_date', 'country'] else core_demo),
                             'demographic_value': hist_record.get(f'shd_{core_demo}', 'NA')
                          })
 
@@ -420,7 +439,7 @@ def get_user_demographics_cultura():
                             'user_id': user_id,
                             'survey_id': survey['id'],
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
-                            'demographic_id': core_demo,
+                            'demographic_id': demographics_labels_map.get(core_demo, core_demo),
                              'demographic_value': user_demographics.get(core_demo, 'NA')
                          })
 
@@ -623,7 +642,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 shd.shd_document_number,
                 shd.shd_country,
                 shd.shd_entry_date,
-                shd.shd_academic_level,
+                al.al_title AS shd_academic_level,
                 shd.shd_dob,
                 shd.shd_gender,
                 shd.shd_company,
@@ -634,6 +653,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 ) as demographics_data
             FROM `tabqp_IQ_SurveyHistoricData` shd
             LEFT JOIN `tabqp_IQ_ContactDetailHistoric` cdh ON cdh.parent = shd.name
+            LEFT JOIN `tabqp_IQ_AcademicLevel` al ON al.name = shd.shd_academic_level
             WHERE shd.shd_survey_id = %s
             GROUP BY shd.name
         """

@@ -1,5 +1,8 @@
 import frappe
+from frappe import _
 
+
+# Función para obtener el nombre de la compañía del usuario y cachearlo en sesión
 @frappe.whitelist()
 def get_user_company_name(user=None):
 
@@ -45,3 +48,56 @@ def set_company_name_on_session_creation(login_manager):
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "liseniq: set_company_name_on_session_creation")
 
+# Función para inyectar contexto global en páginas del portal
+# Valida que el usuario no sea Guest, que tenga una compañía asignada y que sea un contacto administrativo (custom_is_liseniq_contact=0).
+def global_website_context(context):
+
+    if context is None:
+        context = frappe._dict()
+
+    user = frappe.session.user
+    
+    # Valores por defecto
+    context.has_portal_access = False
+    context.access_error_message = ""
+    context.liseniq_company_name = ""
+
+    # Validación de Invitado
+    if user == "Guest":
+        context.access_error_message = _("Debe iniciar sesión para acceder.")
+        # frappe.log_error(title="Acceso al portal fallido", message="Usuario Guest intentó acceder al portal.")
+        return context
+
+    # Obtener datos del Contacto
+    contact = frappe.db.get_value(
+        "Contact", 
+        {"user": user}, 
+        ["name", "custom_company", "custom_is_liseniq_contact"], 
+        as_dict=True
+    )
+    
+    if not contact:
+        context.access_error_message = _("El usuario no se encuentra registrado o no tiene permisos de acceso (Contacto no encontrado).")
+        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin contacto asociado.")
+        return context
+
+    if not contact.custom_company:
+        context.access_error_message = _("El usuario no tiene una compañía asignada. Contacte al administrador.")
+        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin compañía asignada.")
+        return context
+
+    if contact.custom_is_liseniq_contact:
+        context.access_error_message = _("Su usuario no tiene perfil administrativo para acceder a este portal.")
+        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin perfil administrativo.")
+        return context
+
+    context.has_portal_access = True
+    context.liseniq_company_name = contact.custom_company
+    
+    return context
+
+def check_access_and_redirect():
+    context = frappe._dict()
+    global_website_context(context)
+    if not context.has_portal_access:
+        frappe.throw(context.access_error_message, frappe.PermissionError)

@@ -105,6 +105,9 @@ doc_events = {
 	},
 	"qp_IQ_Survey": {
 		"on_update": "liseniq.utils.api_survey.generate_public_link_for_survey_hook"
+	},
+	"User": {
+		"on_update": "liseniq.utils.user_hooks.link_company_after_b2c"
 	}
 }
 
@@ -214,6 +217,10 @@ user_data_fields = [
 website_context = {
 	"*": "liseniq.utils.global_website_context"
 }
+
+# Función para inyectar contexto global en páginas del portal
+update_website_context = "liseniq.utils.login_util.global_website_context"
+
 
 page_css = {
     # "iq_templates/index": "public/css/iq_templates.css",

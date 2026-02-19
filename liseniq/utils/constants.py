@@ -32,6 +32,12 @@ const buildRegisterUrl = function(token, msg) {
   return url;
 };
 
+// Ocultar navbars antes de que cargue el webform
+frappe.web_form.before_load = () => {
+  $("nav").hide();
+  $(".navbar").hide();
+};
+
 frappe.web_form.after_load = () => {
   $(".page-header-actions-block").hide();
   $(".page-header").hide();
@@ -361,7 +367,7 @@ const submit_response = function (data) {
 WEB_FORM_CUSTOM_CSS = """
 
 /* Ocultar elementos innecesarios */
-.navbar {
+nav, .navbar {
     display: none !important;
 }
 

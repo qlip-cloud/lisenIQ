@@ -1,5 +1,5 @@
 import frappe
-
+from frappe.core.doctype.user.user import create_contact
 def link_company_after_b2c(doc, method):
 
     company_name = frappe.db.get_value(
@@ -20,19 +20,25 @@ def link_company_after_b2c(doc, method):
     # Enlazar usuario
     company_doc.co_admin_name = doc.full_name
     company_doc.save(ignore_permissions=True)
-
+    frappe.log_error(f"Linked {doc.name} to company {company_name}", "liseniq: link_company_after_b2c")
     frappe.enqueue(
         "liseniq.utils.user_hooks.link_contact_to_company",
-        email=doc.email,
+        user_id=doc.name,
         queue="default",
         enqueue_after_commit=True,
         timeout=300
     )
 
 
-def link_contact_to_company(email):
+def link_contact_to_company(user_id):
+    contact_exists = frappe.db.exists("Contact", {"user": user_id})
+    frappe.log_error(f"Contact exists for {user_id}: {contact_exists}", "liseniq: link_contact_to_company")
+    if not contact_exists:
+        user_doc = frappe.get_doc("User", user_id)
+        create_contact(user_doc)
 
-    doc = frappe.get_doc("Contact", {"email_id": email})
+
+    doc = frappe.get_doc("Contact", {"user": user_id})
     if doc.get("custom_is_liseniq_contact") == 1:
         return
     

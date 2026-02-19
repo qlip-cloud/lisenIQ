@@ -1,5 +1,5 @@
 import frappe
-from frappe.core.doctype.user.user import create_contact
+
 def link_company_after_b2c(doc, method):
 
     company_name = frappe.db.get_value(
@@ -23,55 +23,48 @@ def link_company_after_b2c(doc, method):
 
     frappe.enqueue(
         "liseniq.utils.user_hooks.link_contact_to_company",
-        user_id=doc.name,
+        email=doc.email,
         queue="default",
         enqueue_after_commit=True,
-        timeout=300
+        timeout=300,
+        at_front=False,
+        now=False
     )
 
 
-def link_contact_to_company(user_id):
-    # Primero buscar contacto vinculado al usuario
-    contact_name = frappe.db.get_value("Contact", {"user": user_id}, "name")
+def link_contact_to_company(email, retry_count=0):
+    # Obtener el contacto, si aun no existe, se esperará a que se cree en el proceso de registro de ERPNext
+    max_retries = 5
     
-    # Si no existe, buscar por email
-    if not contact_name:
-        contact_name = frappe.db.get_value("Contact", {"email_id": user_id}, "name")
-    
-    # Si aún no existe, intentar crearlo
-    if not contact_name:
-        try:
-            user_doc = frappe.get_doc("User", user_id)
-            contact = create_contact(user_doc, ignore_mandatory=True)
-            if contact:
-                contact_name = contact.name
-        except Exception as e:
-            frappe.log_error(f"Error creating contact for {user_id}: {str(e)}", "liseniq: link_contact_to_company")
-            return
-    
-    if not contact_name:
-        frappe.log_error(f"Could not find or create contact for {user_id}", "liseniq: link_contact_to_company")
+    contact_exists = frappe.db.exists("Contact", {"email_id": email})
+    if not contact_exists:
+        # Si el contacto aún no existe y no hemos excedido los reintentos, volver a encolar
+        if retry_count < max_retries:
+            frappe.enqueue(
+                "liseniq.utils.user_hooks.link_contact_to_company",
+                email=email,
+                retry_count=retry_count + 1,
+                queue="default",
+                enqueue_after_commit=True,
+                timeout=300,
+                at_front=False,
+                now=False
+            )
         return
     
-    doc = frappe.get_doc("Contact", contact_name)
-    
-    # Vincular el usuario al contacto si no está vinculado
-    if not doc.user:
-        doc.user = user_id
-    
+    doc = frappe.get_doc("Contact", {"email_id": email})
     if doc.get("custom_is_liseniq_contact") == 1:
-        doc.save(ignore_permissions=True)
         return
     
     company_name = frappe.db.get_value(
         "qp_IQ_Company",
-        {"co_admin_email": user_id},
+        {"co_admin_email": doc.email_id},
         "name"
     )
 
     if not company_name:
         return
     
-    # Enlazar contacto a la compañía
+    # Enlazar contacto
     doc.custom_company = company_name
     doc.save(ignore_permissions=True)

@@ -1,5 +1,5 @@
 import frappe
-from frappe.core.doctype.user.user import create_contact
+
 def link_company_after_b2c(doc, method):
 
     company_name = frappe.db.get_value(
@@ -20,25 +20,39 @@ def link_company_after_b2c(doc, method):
     # Enlazar usuario
     company_doc.co_admin_name = doc.full_name
     company_doc.save(ignore_permissions=True)
-    frappe.log_error(f"Linked {doc.name} to company {company_name}", "liseniq: link_company_after_b2c")
+
     frappe.enqueue(
         "liseniq.utils.user_hooks.link_contact_to_company",
-        user_id=doc.name,
+        email=doc.email,
         queue="default",
         enqueue_after_commit=True,
-        timeout=300
+        timeout=300,
+        at_front=False,
+        now=False
     )
 
 
-def link_contact_to_company(user_id):
-    contact_exists = frappe.db.exists("Contact", {"user": user_id})
-    frappe.log_error(f"Contact exists for {user_id}: {contact_exists}", "liseniq: link_contact_to_company")
+def link_contact_to_company(email, retry_count=0):
+    # Obtener el contacto, si aun no existe, se esperará a que se cree en el proceso de registro de ERPNext
+    max_retries = 5
+    
+    contact_exists = frappe.db.exists("Contact", {"email_id": email})
     if not contact_exists:
-        user_doc = frappe.get_doc("User", user_id)
-        create_contact(user_doc)
-
-
-    doc = frappe.get_doc("Contact", {"user": user_id})
+        # Si el contacto aún no existe y no hemos excedido los reintentos, volver a encolar
+        if retry_count < max_retries:
+            frappe.enqueue(
+                "liseniq.utils.user_hooks.link_contact_to_company",
+                email=email,
+                retry_count=retry_count + 1,
+                queue="default",
+                enqueue_after_commit=True,
+                timeout=300,
+                at_front=False,
+                now=False
+            )
+        return
+    
+    doc = frappe.get_doc("Contact", {"email_id": email})
     if doc.get("custom_is_liseniq_contact") == 1:
         return
     

@@ -27,7 +27,6 @@ def link_company_after_b2c(doc, method):
         queue="default",
         enqueue_after_commit=True,
         timeout=300,
-        at_front=False,
         now=False
     )
 
@@ -47,7 +46,6 @@ def link_contact_to_company(email, retry_count=0):
                 queue="default",
                 enqueue_after_commit=True,
                 timeout=300,
-                at_front=False,
                 now=False
             )
         return

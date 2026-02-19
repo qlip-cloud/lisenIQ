@@ -108,6 +108,9 @@ doc_events = {
 	},
 	"User": {
 		"after_insert": "liseniq.utils.user_hooks.link_company_after_b2c"
+	},
+	"Contact": {
+		"after_insert": "liseniq.utils.user_hooks.link_contact_after_create"
 	}
 }
 

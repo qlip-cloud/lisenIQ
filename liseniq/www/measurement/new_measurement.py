@@ -42,7 +42,9 @@ def get_context(context):
                     "demographic": demo_title,
                     "options": options,
                     "nps_min": q_doc.qn_nps_min,
-                    "nps_max": q_doc.qn_nps_max
+                    "nps_max": q_doc.qn_nps_max,
+                    "qp_others": q_doc.get("qp_others", 0),
+                    "qp_none_above": q_doc.get("qp_none_above", 0)
                 })
 
             # Datos de participantes
@@ -111,7 +113,7 @@ def get_context(context):
         context.contact_demographics = []
 
     try:
-        allowed_question_types = ["Likert", "Abierta", "NPS", "Selección Múltiple"]
+        allowed_question_types = ["Likert", "Abierta", "NPS", "Selección Múltiple", "Likert Visual", "Casilla de verificación"]
         context.question_types = frappe.get_all(
             "qp_IQ_QuestionType",
             filters={"qnt_type_name": ["in", allowed_question_types]},
@@ -539,6 +541,10 @@ def save_measurement(data):
                             if q.get("positive_statement"): new_question.qn_statement_positive = q["positive_statement"]
                             if q.get("nps_min") is not None: new_question.qn_nps_min = q["nps_min"]
                             if q.get("nps_max") is not None: new_question.qn_nps_max = q["nps_max"]
+
+                            # Guardado de opciones personalizadas Checkbox
+                            if q.get("qp_others"): new_question.qp_others = 1
+                            if q.get("qp_none_above"): new_question.qp_none_above = 1
                                 
                             new_question.insert(ignore_permissions=True)
                             manual_question_map[q["id"]] = new_question.name
@@ -570,6 +576,8 @@ def save_measurement(data):
                         surveyjs_type = "imagepicker"
                     elif question_type_title == "Likert Visual":
                         surveyjs_type = "imagepicker"
+                    elif question_type_title == "Casilla de verificación":
+                        surveyjs_type = "checkbox"
 
                     element = {
                         "type": surveyjs_type,
@@ -634,6 +642,16 @@ def save_measurement(data):
 
                     elif question_type_title == "Selección Múltiple" and q.get("options"):
                         element["choices"] = q["options"]
+                        
+                    elif question_type_title == "Casilla de verificación" and q.get("options"):
+                        element["choices"] = q["options"]
+                        if q.get("qp_others"):
+                            element["hasOther"] = True
+                            element["otherText"] = "Otros"
+                        if q.get("qp_none_above"):
+                            element["hasNone"] = True
+                            element["noneText"] = "Ninguna de las anteriores"
+
                     elif question_type_title == "NPS":
                         element["rateMin"] = q.get("nps_min", 1)
                         element["rateMax"] = q.get("nps_max", 10)

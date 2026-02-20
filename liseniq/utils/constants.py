@@ -43,6 +43,8 @@ frappe.web_form.after_load = () => {
   $(".page-header").hide();
   $(".web-form-container").hide();
   $(".web-form-footer").hide();
+  $("nav").hide();
+  $("navbar").hide();
   
   $(".breadcrumb-container").hide();
   

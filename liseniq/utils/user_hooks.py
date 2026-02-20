@@ -43,7 +43,28 @@ def link_contact_after_create(doc, method):
     if not company_name:
         return
     
+
     # Enlazar contacto a la compañía (solo si no está ya enlazado)
     if not doc.custom_company:
         doc.custom_company = company_name
         doc.save(ignore_permissions=True)
+
+    # Crear un nuevo cliente en ERPNext para esta compañía 
+
+    company_doc = frappe.get_doc("qp_IQ_Company", company_name)
+    customer = frappe.get_doc({
+        "doctype": "Customer",
+        "customer_name": company_doc.co_name,
+        "customer_type": "Company",
+        "customer_group": "Todas las categorías de clientes",
+        "territory": "Todos los Territorios",
+        "tax_id": company_doc.co_tax_id
+    })
+    customer.insert(ignore_permissions=True)
+
+    # Enlazar el cliente al contacto
+    doc.append("links", {
+        "link_doctype": "Customer",
+        "link_name": customer.name
+    })
+    doc.save(ignore_permissions=True)

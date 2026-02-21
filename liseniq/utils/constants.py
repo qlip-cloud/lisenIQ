@@ -43,6 +43,8 @@ frappe.web_form.after_load = () => {
   $(".page-header").hide();
   $(".web-form-container").hide();
   $(".web-form-footer").hide();
+  $("nav").hide();
+  $("navbar").hide();
   
   $(".breadcrumb-container").hide();
   
@@ -449,6 +451,21 @@ nav, .navbar {
 .sv_main .sv_p_root .sv_q .sv_q_radiogroup_inline,
 .sv_main .sv_p_root .sv_q .sv_q_imagepicker_inline {
     text-align: center !important;
+}
+
+/* Hacer más ancha la visualización de números en la escala NPS */
+.sd-rating__item, .sv_q_rating_item {
+    min-width: 3.5rem !important;
+}
+
+/* Ajustar el tamaño y margen de los textos MIN y MAX en la escala NPS */
+.sd-rating__min-text, 
+.sd-rating__max-text,
+.sv_q_rating_min_text, 
+.sv_q_rating_max_text {
+    font-size: 0.75rem !important;
+    margin-bottom: 0.5rem !important;
+    display: inline-block;
 }
 
 /* Estilos para selección */

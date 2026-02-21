@@ -136,17 +136,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 let optionsHtml = '';
 
                 if (question.options && question.options.length > 0) {
-                    optionsHtml = `<div class="review-question-options">
-                        ${question.options.map(opt => {
-                            if (typeof opt === 'object' && (opt.url || opt.text)) {
-                                const url = opt.url ? `<img src="${frappe.utils.escape_html(opt.url)}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">` : '';
-                                const text = opt.text || '';
-                                return `<div class="review-question-option">${url}${frappe.utils.escape_html(text)}</div>`;
-                            }
-                            const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
-                            return `<div class="review-question-option">${frappe.utils.escape_html(optionText)}</div>`;
-                        }).join('')}
-                    </div>`;
+                    let optionsInnerHtml = question.options.map(opt => {
+                        if (typeof opt === 'object' && (opt.url || opt.text)) {
+                            const url = opt.url ? `<img src="${frappe.utils.escape_html(opt.url)}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">` : '';
+                            const text = opt.text || '';
+                            return `<div class="review-question-option">${url}${frappe.utils.escape_html(text)}</div>`;
+                        }
+                        const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
+                        return `<div class="review-question-option">${frappe.utils.escape_html(optionText)}</div>`;
+                    }).join('');
+
+                    if (questionDisplayName === 'Casilla de verificación') {
+                        if (question.qp_others) optionsInnerHtml += `<div class="review-question-option" style="font-style:italic;">Otros</div>`;
+                        if (question.qp_none_above) optionsInnerHtml += `<div class="review-question-option" style="font-style:italic;">Ninguna de las anteriores</div>`;
+                    }
+
+                    optionsHtml = `<div class="review-question-options">${optionsInnerHtml}</div>`;
                 }
                 
                 // Mostrar ambos enunciados si existen
@@ -199,6 +204,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     qn_nps_min: q.nps_min,
                     qn_nps_max: q.nps_max,
                     qn_demographic: q.demographic,
+                    qp_others: q.qp_others ? 1 : 0,
+                    qp_none_above: q.qp_none_above ? 1 : 0
                 };
                 if (q.options) {
                     if (q.typeName === 'Likert') {

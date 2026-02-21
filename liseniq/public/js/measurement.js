@@ -950,10 +950,17 @@ class MeasurementCreator {
         let optionsHtml = '';
 
         if (question.options && question.options.length > 0) {
-            optionsHtml = `<div class="review-question-options">${question.options.map(opt => {
+            let optionsInnerHtml = question.options.map(opt => {
                 const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
                 return `<div class="review-question-option">${frappe.utils.escape_html(optionText)}</div>`;
-            }).join('')}</div>`;
+            }).join('');
+            
+            if (displayName === 'Casilla de verificación') {
+                if (question.qp_others) optionsInnerHtml += `<div class="review-question-option" style="font-style:italic;">Otros</div>`;
+                if (question.qp_none_above) optionsInnerHtml += `<div class="review-question-option" style="font-style:italic;">Ninguna de las anteriores</div>`;
+            }
+
+            optionsHtml = `<div class="review-question-options">${optionsInnerHtml}</div>`;
         }
 
         item.innerHTML = `

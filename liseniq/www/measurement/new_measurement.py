@@ -31,7 +31,10 @@ def get_context(context):
             questions = []
             for q_link in (doc.su_questions or []):
                 q_doc = frappe.get_doc("qp_IQ_Question", q_link.sq_question)
-                type_name = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, "qnt_type_name")
+                
+                t_data = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, ["qnt_type_name", "qnt_mnemonico"], as_dict=True) if q_doc.qn_type else None
+                type_name = t_data.qnt_type_name if t_data else "No definido"
+
                 demo_title = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else None
                 options = [opt.qo_option_text for opt in (q_doc.qn_response_options or [])]
                 questions.append({
@@ -113,11 +116,13 @@ def get_context(context):
         context.contact_demographics = []
 
     try:
-        allowed_question_types = ["Likert", "Abierta", "NPS", "Selección Múltiple", "Likert Visual", "Casilla de verificación"]
+        # Filtramos estrictamente por los mnemónicos
         context.question_types = frappe.get_all(
             "qp_IQ_QuestionType",
-            filters={"qnt_type_name": ["in", allowed_question_types]},
-            fields=["name", "qnt_type_name"],
+            filters={
+                "qnt_mnemonico": ["in", ["text_area", "text_short", "check_group", "scale_likert", "scale_emoji", "score_nps", "radio_group"]]
+            },
+            fields=["name", "qnt_type_name", "qnt_mnemonico"],
             order_by="qnt_type_name"
         )
     except frappe.DoesNotExistError:
@@ -494,7 +499,8 @@ def save_measurement(data):
 
         # Modo nueva encuesta o creación
         else:
-            question_types_map = {qt.name: qt.qnt_type_name for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name"])}
+            # Traemos un mapa completo de los tipos de preguntas para utilizar el Mnemónico
+            question_types_map = {qt.name: qt for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name", "qnt_mnemonico"])}
             
             user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
             user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
@@ -526,6 +532,7 @@ def save_measurement(data):
                                 new_question.qn_demographic = demographic_name
 
                             if q.get("options"):
+                                # Verificamos si es Likert utilizando su lógica o si es diccionario con value
                                 if q.get("typeName") == "Likert" or (isinstance(q.get("options")[0], dict) and "value" in q["options"][0]):
                                     for opt in q["options"]:
                                         new_question.append("qn_response_options", {
@@ -563,21 +570,23 @@ def save_measurement(data):
                 for q in data["questions"]:
                     question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
                     
-                    question_type_title = question_types_map.get(q["type"])
+                    # Extraer toda la información mapeada para validar mediante Mnemónico
+                    qt_info = question_types_map.get(q["type"], {})
+                    question_type_mnemonic = qt_info.get("qnt_mnemonico")
                     
                     surveyjs_type = "text"
-                    if question_type_title == "Selección Múltiple":
+                    if question_type_mnemonic == "radio_group":
                         surveyjs_type = "radiogroup"
-                    elif question_type_title == "Abierta":
+                    elif question_type_mnemonic == "text_area":
                         surveyjs_type = "comment"
-                    elif question_type_title == "NPS":
+                    elif question_type_mnemonic == "score_nps":
                         surveyjs_type = "rating"
-                    elif question_type_title == "Likert":
+                    elif question_type_mnemonic in ["scale_likert", "scale_emoji"]:
                         surveyjs_type = "imagepicker"
-                    elif question_type_title == "Likert Visual":
-                        surveyjs_type = "imagepicker"
-                    elif question_type_title == "Casilla de verificación":
+                    elif question_type_mnemonic == "check_group":
                         surveyjs_type = "checkbox"
+                    elif question_type_mnemonic == "text_short":
+                        surveyjs_type = "text"
 
                     element = {
                         "type": surveyjs_type,
@@ -586,8 +595,8 @@ def save_measurement(data):
                         "isRequired": "true"
                     }
 
-                    # Se mantienen separadas opciones, por si requieren personalizaciones distintas
-                    if question_type_title == "Likert":
+                    # Configuraciones especiales según el mnemónico
+                    if question_type_mnemonic == "scale_likert":
                         choices = []
                         try:
                             if question_name:
@@ -598,7 +607,7 @@ def save_measurement(data):
                                             val_int = int(opt.qo_option_value)
                                         except Exception:
                                             val_int = None
-                                        # Asignar URL personalizada si existe, sino usar el mapa por defecto doble check
+                                        # Asignar URL personalizada si existe, sino usar el mapa por defecto
                                         image_url = getattr(opt, "qo_url", None) or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
                                         choices.append({
                                             "text": opt.qo_option_text,
@@ -615,7 +624,7 @@ def save_measurement(data):
                         element["imageWidth"] = 32
                         element["choicesOrder"] = "none"
 
-                    elif question_type_title == "Likert Visual":
+                    elif question_type_mnemonic == "scale_emoji":
                         choices = []
                         try:
                             if question_name:
@@ -640,11 +649,12 @@ def save_measurement(data):
                         element["imageWidth"] = 32
                         element["choicesOrder"] = "none"
 
-                    elif question_type_title == "Selección Múltiple" and q.get("options"):
+                    elif question_type_mnemonic == "radio_group" and q.get("options"):
                         element["choices"] = q["options"]
                         
-                    elif question_type_title == "Casilla de verificación" and q.get("options"):
-                        element["choices"] = q["options"]
+                    elif question_type_mnemonic == "check_group":
+                        if q.get("options"):
+                            element["choices"] = q["options"]
                         if q.get("qp_others"):
                             element["hasOther"] = True
                             element["otherText"] = "Otros"
@@ -652,9 +662,15 @@ def save_measurement(data):
                             element["hasNone"] = True
                             element["noneText"] = "Ninguna de las anteriores"
 
-                    elif question_type_title == "NPS":
+                    elif question_type_mnemonic == "score_nps":
                         element["rateMin"] = q.get("nps_min", 1)
                         element["rateMax"] = q.get("nps_max", 10)
+                        element["minRateDescription"] = "NADA PROBABLE"
+                        element["maxRateDescription"] = "MUY PROBABLE"
+                        element["rateDescriptionLocation"] = "top"
+                        
+                    elif question_type_mnemonic == "text_short":
+                        element["maxLength"] = 70
 
                     elements.append(element)
 

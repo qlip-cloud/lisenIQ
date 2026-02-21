@@ -453,6 +453,21 @@ nav, .navbar {
     text-align: center !important;
 }
 
+/* Hacer más ancha la visualización de números en la escala NPS */
+.sd-rating__item, .sv_q_rating_item {
+    min-width: 3.5rem !important;
+}
+
+/* Ajustar el tamaño y margen de los textos MIN y MAX en la escala NPS */
+.sd-rating__min-text, 
+.sd-rating__max-text,
+.sv_q_rating_min_text, 
+.sv_q_rating_max_text {
+    font-size: 0.75rem !important;
+    margin-bottom: 0.5rem !important;
+    display: inline-block;
+}
+
 /* Estilos para selección */
 .sv_qstn .sv_q_imgsel label > input:checked + div {
     background-color: #d1f0ea !important;

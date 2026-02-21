@@ -27,7 +27,9 @@
   "qn_positive_statement",
   "qn_negative_statement",
   "qn_nps_min",
-  "qn_nps_max"
+  "qn_nps_max",
+  "qp_others",
+  "qp_none_above"
  ],
  "fields": [
   {
@@ -168,11 +170,23 @@
    "fieldname": "qn_statement_others",
    "fieldtype": "Small Text",
    "label": "Texto de la Pregunta / Enunciado Principal / Terceros"
+  },
+  {
+   "default": "0",
+   "fieldname": "qp_others",
+   "fieldtype": "Check",
+   "label": "Permitir \"Otros\""
+  },
+  {
+   "default": "0",
+   "fieldname": "qp_none_above",
+   "fieldtype": "Check",
+   "label": "Permitir \"Ninguna\""
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-11 08:27:07.282419",
+ "modified": "2026-02-19 11:43:42.964867",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

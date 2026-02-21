@@ -38,11 +38,13 @@ def get_context(context):
         context.question_categories = []
 
     try:
-        allowed_question_types = ["Likert", "Abierta", "NPS", "Selección Múltiple", "Likert Visual"]
+        # Filtramos estrictamente por los mnemónicos
         question_types = frappe.get_all(
             "qp_IQ_QuestionType",
-            filters={"qnt_type_name": ["in", allowed_question_types]},
-            fields=["name", "qnt_type_name"],
+            filters={
+                "qnt_mnemonico": ["in", ["text_area", "text_short", "check_group", "scale_likert", "scale_emoji", "score_nps", "radio_group"]]
+            },
+            fields=["name", "qnt_type_name", "qnt_mnemonico"],
             order_by="qnt_type_name",
             ignore_permissions=True
         )

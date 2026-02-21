@@ -103,11 +103,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .then(() => {
-            window.location.replace('/login');
+            window.location.replace('/');
         })
         .catch((err) => {
             console.error('Error durante logout:', err);
-            window.location.replace('/login');
+            window.location.replace('/');
         });
     };
 

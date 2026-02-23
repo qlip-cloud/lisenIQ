@@ -125,7 +125,101 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Inicializar lógica de notificaciones
     initNotifications();
+    
+    // Inicializar lógica de onboarding
+    initOnboarding();
 });
+
+function initOnboarding() {
+    // Modal de Bienvenida
+    const modal = document.getElementById('welcomeModal');
+    const btnOpen = document.getElementById('btn-open-welcome');
+    const btnClose = document.getElementById('closeWelcomeModal');
+    const btnDecline = document.getElementById('btnDeclineModal');
+    const btnTakeTour = document.getElementById('btnTakeTour');
+
+    // Función para abrir el modal
+    function openModal() {
+        if (modal) {
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Evitar scroll del body
+        }
+    }
+
+    // Función para cerrar el modal
+    function closeModal() {
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = ''; // Restaurar scroll del body
+        }
+    }
+
+    const driver = window.driver.js.driver;
+    const driverObj = driver({
+        showProgress: false,
+        onDestroyed: function() {
+          frappe.call('liseniq.utils.login_util.set_first_login_false')    
+        },
+        steps: [
+            { element: '#home-sec', popover: { title: 'Inicio', description: 'Aquí podrás ver las mediciones que tienes disponibles y crear nuevas mediciones.', side: "left", align: 'start' }},
+            { element: '#templates-sec', popover: { title: 'Plantillas', description: 'Aquí podrás ver las plantillas disponibles para crear nuevas mediciones.', side: "bottom", align: 'start' }},
+            { element: '#results-sec', popover: { title: 'Resultados', description: 'Aquí podrás ver los resultados de las mediciones que hayas realizado.', side: "bottom", align: 'start' }},
+            { element: '#contacts-sec', popover: { title: 'Contactos', description: 'Aquí podrás cargar o importar los contactos que participarán en tus mediciones. Puedes hacerlo manualmente o  por carga masiva', side: "left", align: 'start' }},
+            { popover: { title: 'Has terminado el tour', description: 'Ahora puedes comenzar a usar la aplicación.' } }
+        ]
+    });
+
+    if (btnOpen) {
+        btnOpen.addEventListener('click', function() {
+            if (driverObj) {
+                driverObj.drive();
+            }
+        });
+    }
+
+    // Cerrar modal con el botón X
+    if (btnClose) {
+        btnClose.addEventListener('click', closeModal);
+    }
+
+    // Cerrar modal con el botón "Ahora no"
+    if (btnDecline) {
+        btnDecline.addEventListener('click', closeModal);
+    }
+
+    // Cerrar modal al hacer clic fuera del contenido
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }
+
+    // Cerrar modal con la tecla Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal && modal.classList.contains('active')) {
+            closeModal();
+        }
+    });
+
+    // Botón "Tomar el tour" - iniciar el recorrido
+    if (btnTakeTour) {
+        btnTakeTour.addEventListener('click', function() {
+            closeModal();
+            // Iniciar el tour con driver.js
+            if (driverObj) {
+                driverObj.drive();
+            }
+        });
+    }
+
+    const firstLoginInput = document.getElementById('firstLogin');
+    console.log('Valor de firstLogin:', firstLoginInput ? firstLoginInput.value : 'Elemento no encontrado');
+    if (firstLoginInput && firstLoginInput.value === true) {
+        openModal();
+    }
+}
 
 function initNotifications() {
     const btnNotifications = document.getElementById('btn-notifications');

@@ -114,7 +114,7 @@ def set_first_login_false():
             try:
                 contact_doc = frappe.get_doc("Contact", contact_name)
                 contact_doc.custom_first_login = False
-                contact_doc.save()
+                contact_doc.save(ignore_permissions=True)
                 frappe.db.commit()
             except Exception as e:
                 frappe.log_error(frappe.get_traceback(), "liseniq: set_first_login_false")

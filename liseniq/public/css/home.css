@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap');
 .home-container {
     display: flex;
     flex-direction: column;
@@ -344,6 +345,158 @@
     color:#fff;
 }
 
+/* Estilos del Modal Personalizado */
+.custom-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.custom-modal-overlay.active {
+    display: flex;
+}
+
+
+.custom-modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease;
+}
+
+.custom-modal-header {
+    padding: 1.5rem 1.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.custom-modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--brand-primary, #7B24FF);
+}
+
+.custom-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.5s, color 0.5s;
+}
+
+.custom-modal-close:hover {
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+.custom-modal-body {
+    padding: 1.5rem;
+    color: #495057;
+    line-height: 1.6;
+}
+
+.custom-modal-body p {
+    margin: 0 0 1rem;
+}
+
+.custom-modal-body p:last-child {
+    margin-bottom: 0;
+}
+
+.custom-modal-footer {
+    padding: 1rem 1.5rem 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn-modal-secondary,
+.btn-modal-primary {
+    padding: 0.5rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-modal-secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.btn-modal-secondary:hover {
+    background-color: #5a6268;
+}
+
+.btn-modal-primary {
+    background-color: var(--brand-primary, #7B24FF);
+    color: #fff;
+}
+
+.btn-modal-primary:hover {
+    background-color: #6920d6;
+}
+
+.btn-open-welcome-modal {
+    background-color: var(--brand-primary, #7B24FF);
+    color: #fff;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-open-welcome-modal:hover {
+    background-color: #6920d6;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
 @media (max-width: 768px) {
     .home-container {
         gap: 2.5rem;
@@ -354,4 +507,97 @@
     .measurements-grid {
         grid-template-columns: 1fr;
     }
+    
+    .custom-modal {
+        width: 95%;
+        margin: 1rem;
+    }
+    
+    .custom-modal-title {
+        font-size: 1.1rem;
+    }
+}
+
+/* Estilos para popover tour */
+/* Class assigned to popover wrapper */
+.driver-popover {
+    background-color: #fff;
+    border: 1px solid var(--brand-border-color, #e9ecef);
+    border-radius: 12px;
+    padding: 1rem;
+    max-width: 300px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    font-family: 'Rubik', sans-serif !important;
+}
+
+/* Arrow pointing towards the highlighted element */
+.driver-popover-arrow {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    position: absolute;
+}
+
+/* Title and description */
+.driver-popover-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--brand-primary, #7B24FF);
+    margin: 0 0 0.5rem 0;
+}
+.driver-popover-description {
+    font-size: 0.9rem;
+    color: var(--text-color-secondary, #6c757d);
+    margin: 0;
+}
+
+/* Close button displayed on the top right corner */
+.driver-popover-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+/* Footer of the popover displaying progress and navigation buttons */
+.driver-popover-footer {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-top: 1rem !important;
+}   
+.driver-popover-progress-text {
+    font-size: 0.8rem;
+    color: var(--text-color-secondary, #6c757d);
+}
+.driver-popover-prev-btn {
+    background: none !important;
+    border: none !important;
+    color: var(--brand-primary, #7B24FF) !important;
+    cursor: pointer !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.8rem !important;
+}
+.driver-popover-next-btn {
+    background: var(--brand-primary, #7B24FF) !important;
+    border: none !important;
+    color: #fff !important;
+    cursor: pointer !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.8rem !important;
+    border-radius: 4px !important;
+    text-shadow: none !important;
+
 }

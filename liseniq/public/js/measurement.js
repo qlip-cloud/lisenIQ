@@ -672,7 +672,7 @@ class MeasurementCreator {
 
     addLeaderToNetwork(leader) {
         if (this.state.measurementData.leadershipNetwork.some(n => n.leader.id === leader.id)) {
-            showGlobalNotification('Este líder ya ha sido añadido a la evaluación.', 'error');
+            showGlobalNotification('Este colaborador ya ha sido añadido a la evaluación.', 'error');
             return;
         }
         
@@ -702,7 +702,7 @@ class MeasurementCreator {
             card.innerHTML = `
                 <div class="leadership-network-header">
                     <h5>Evaluación 360°: ${frappe.utils.escape_html(network.leader.name_display)}</h5>
-                    ${this.state.isEditMode ? '' : `<button type="button" class="btn btn-sm btn-outline-danger btn-remove-leader" data-id="${network.leader.id}"><i class="fa fa-trash"></i> Quitar Líder</button>`}
+                    ${this.state.isEditMode ? '' : `<button type="button" class="btn btn-sm btn-outline-danger btn-remove-leader" data-id="${network.leader.id}"><i class="fa fa-trash"></i> Quitar Colaborador</button>`}
                 </div>
                 <div class="leadership-network-body">
                     ${this.state.isEditMode ? '' : `

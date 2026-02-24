@@ -160,12 +160,16 @@ function initOnboarding() {
         onDestroyed: function() {
           frappe.call('liseniq.utils.login_util.set_first_login_false')    
         },
+        nextBtnText: 'Siguiente',
+        prevBtnText: 'Anterior',
+        closeBtnText: 'Cerrar',
+        doneBtnText: 'Listo',
         steps: [
-            { element: '#home-sec', popover: { title: 'Inicio', description: 'Aquí podrás ver las mediciones que tienes disponibles y crear nuevas mediciones.', side: "left", align: 'start' }},
-            { element: '#templates-sec', popover: { title: 'Plantillas', description: 'Aquí podrás ver las plantillas disponibles para crear nuevas mediciones.', side: "bottom", align: 'start' }},
+            { element: '#home-sec', popover: { title: 'Inicio', description: 'Aquí podrás visualizar todas las mediciones que haz creado, su estado y crear nuevas.', side: "left", align: 'start' }},
+            { element: '#templates-sec', popover: { title: 'Plantillas', description: 'Aquí podrás crear y visualizar las plantillas de preguntas para crear nuevas mediciones.', side: "bottom", align: 'start' }},
             { element: '#results-sec', popover: { title: 'Resultados', description: 'Aquí podrás ver los resultados de las mediciones que hayas realizado.', side: "bottom", align: 'start' }},
             { element: '#contacts-sec', popover: { title: 'Contactos', description: 'Aquí podrás cargar o importar los contactos que participarán en tus mediciones. Puedes hacerlo manualmente o  por carga masiva', side: "left", align: 'start' }},
-            { popover: { title: 'Has terminado el tour', description: 'Ahora puedes comenzar a usar la aplicación.' } }
+            { popover: { title: 'Has terminado el tour', description: 'Ahora puedes comenzar a usar la plataforma.' } }
         ]
     });
 

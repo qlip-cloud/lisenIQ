@@ -87,14 +87,14 @@
   },
   {
    "fieldname": "sr_evaluating_to",
-   "fieldtype": "Data",
-   "label": "Evaluador Asignado"
+   "fieldtype": "Link",
+   "label": "Evaluador Asignado",
+   "options": "Contact"
   },
   {
    "fieldname": "sr_evaluation_role",
-   "fieldtype": "Select",
-   "label": "Rol del Evaluador",
-   "options": "Autoevaluaci\u00f3n\nL\u00edder/Jefe\nPar/Igual\nPersona a Cargo"
+   "fieldtype": "Data",
+   "label": "Rol del Evaluador"
   },
   {
    "fieldname": "sr_general_section",
@@ -126,7 +126,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-24 08:18:28.519510",
+ "modified": "2026-02-24 11:22:22.406133",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

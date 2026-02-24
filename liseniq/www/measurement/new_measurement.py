@@ -77,6 +77,7 @@ def get_context(context):
 
             measurement_data = {
                 "name": doc.su_name,
+                "isLeadership": doc.get("su_is_leadership", 0),
                 "startDate": doc.su_start_date,
                 "endDate": doc.su_end_date,
                 "timezone": doc.su_timezone,
@@ -444,6 +445,8 @@ def save_measurement(data):
                 survey.su_reminder_frequency = None
                 survey.su_reminder_max = None
 
+            survey.su_is_leadership = 1 if data.get("is_leadership") else 0
+
             # Personalización de correos en edición
             survey.su_invitation_subject = email_data.get("invitation_subject")
             survey.su_invitation_body = email_data.get("invitation_body")
@@ -742,6 +745,7 @@ def save_measurement(data):
             survey = frappe.new_doc("qp_IQ_Survey")
             survey.su_name = data["name"]
             survey.su_owner = user_company
+            survey.su_is_leadership = 1 if data.get("is_leadership") else 0
             survey.su_start_date = data.get("startDate")
             survey.su_end_date = data.get("endDate")
             survey.su_timezone = data.get("timezone")

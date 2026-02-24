@@ -44,6 +44,14 @@
                         </select>
                         <small id="measurement-timezone-error" class="form-error-message d-none"></small>
                     </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="measurement-is-leadership" {{ "disabled" if is_edit_mode }}>
+                            <label class="form-check-label" for="measurement-is-leadership" style="font-weight: 500; color: #212529;">
+                                Es una medición de Liderazgo
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

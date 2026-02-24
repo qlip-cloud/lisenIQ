@@ -28,6 +28,7 @@ class MeasurementCreator {
                 startDate: document.getElementById('measurement-start-date'),
                 endDate: document.getElementById('measurement-end-date'),
                 timezone: document.getElementById('measurement-timezone'),
+                isLeadership: document.getElementById('measurement-is-leadership'),
             },
             contactsStep: {
                 surveyTypeSelect: document.getElementById('survey-type-select'),
@@ -82,6 +83,7 @@ class MeasurementCreator {
             currentEmailType: 'invitation',
             measurementData: {
                 name: '',
+                isLeadership: false,
                 startDate: '',
                 endDate: '',
                 timezone: 'America/Bogota',
@@ -158,12 +160,20 @@ class MeasurementCreator {
             if (data.startDate) this.ui.step1Form.startDate.value = String(data.startDate).slice(0, 16);
             if (data.endDate) this.ui.step1Form.endDate.value = String(data.endDate).slice(0, 16);
             if (data.timezone) this.ui.step1Form.timezone.value = data.timezone;
+            if (this.ui.step1Form.isLeadership) {
+                this.ui.step1Form.isLeadership.checked = !!data.isLeadership;
+            }
 
             this.state.measurementData.name = data.name || '';
+            this.state.measurementData.isLeadership = !!data.isLeadership;
             this.state.measurementData.startDate = this.ui.step1Form.startDate.value;
             this.state.measurementData.endDate = this.ui.step1Form.endDate.value;
             this.state.measurementData.timezone = this.ui.step1Form.timezone.value;
             this.updateBreadcrumbs();
+
+            if (this.state.measurementData.isLeadership) {
+                this.questionBuilder.setCategory('Liderazgo');
+            }
 
             // Preguntas (visualización)
             if (data.questions) {
@@ -293,6 +303,14 @@ class MeasurementCreator {
         navButtons.next1?.addEventListener('click', async () => {
             if (await this.validateStep1()) {
                 this.state.measurementData.name = step1Form.name.value.trim();
+                this.state.measurementData.isLeadership = step1Form.isLeadership ? step1Form.isLeadership.checked : false;
+                
+                if (this.state.measurementData.isLeadership) {
+                    this.questionBuilder.setCategory('Liderazgo');
+                } else {
+                    this.questionBuilder.setCategory('');
+                }
+
                 this.updateBreadcrumbs();
                 this.showStep(2);
             }
@@ -842,6 +860,7 @@ class MeasurementCreator {
 
         const basePayload = {
             name: this.state.measurementData.name,
+            is_leadership: this.state.measurementData.isLeadership,
             startDate: step1Form.startDate.value,
             endDate: step1Form.endDate.value,
             email_customization: emailCustomization,

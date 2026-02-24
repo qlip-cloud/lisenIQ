@@ -17,6 +17,7 @@
   "su_status",
   "su_type",
   "su_is_anonymous",
+  "su_is_leadership",
   "su_in_history",
   "column_break_2",
   "su_timezone",
@@ -84,7 +85,7 @@
    "default": "0",
    "fieldname": "su_is_anonymous",
    "fieldtype": "Check",
-   "label": "Es An\u00f3nima"
+   "label": "\u00bfEs An\u00f3nima?"
   },
   {
    "fieldname": "su_respondents_template",
@@ -263,12 +264,18 @@
    "default": "0",
    "fieldname": "su_in_history",
    "fieldtype": "Check",
-   "label": "En Historial"
+   "label": "\u00bfEn Historial?"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_is_leadership",
+   "fieldtype": "Check",
+   "label": "\u00bfEs Liderazgo?"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-16 09:33:16.018042",
+ "modified": "2026-02-24 07:47:10.533436",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

@@ -779,7 +779,7 @@ export class QuestionBuilder {
             type: qf.type.value, 
             typeName: questionTypeName, 
             demographic: qf.demographic.value.trim(),
-            category_name: 'Manual' 
+            category_name: this.isLeadershipMode ? 'Liderazgo' : 'Manual' 
         };
 
         if (questionTypeName === LIKERT_TYPE_NAME) {

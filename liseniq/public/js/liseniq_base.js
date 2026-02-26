@@ -160,6 +160,7 @@ function initOnboarding() {
         onDestroyed: function() {
           frappe.call('liseniq.utils.login_util.set_first_login_false')    
         },
+        overlayColor: 'rgba(123, 36, 255, 0.20)',
         nextBtnText: 'Siguiente',
         prevBtnText: 'Anterior',
         closeBtnText: 'Cerrar',
@@ -168,7 +169,7 @@ function initOnboarding() {
             { element: '#home-sec', popover: { title: 'Inicio', description: 'Aquí podrás visualizar todas las mediciones que haz creado, su estado y crear nuevas.', side: "left", align: 'start' }},
             { element: '#templates-sec', popover: { title: 'Plantillas', description: 'Aquí podrás crear y visualizar las plantillas de preguntas para crear nuevas mediciones.', side: "bottom", align: 'start' }},
             { element: '#results-sec', popover: { title: 'Resultados', description: 'Aquí podrás ver los resultados de las mediciones que hayas realizado.', side: "bottom", align: 'start' }},
-            { element: '#contacts-sec', popover: { title: 'Contactos', description: 'Aquí podrás cargar o importar los contactos que participarán en tus mediciones. Puedes hacerlo manualmente o  por carga masiva', side: "left", align: 'start' }},
+            { element: '#contacts-sec', popover: { title: 'Contactos', description: 'Aquí podrás cargar o importar los contactos que participarán en tus mediciones. Puedes hacerlo manualmente o  por carga masivamente.', side: "left", align: 'start' }},
             { popover: { title: 'Has terminado el tour', description: 'Ahora puedes comenzar a usar la plataforma.' } }
         ]
     });

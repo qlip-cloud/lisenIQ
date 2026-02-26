@@ -96,6 +96,14 @@ def global_website_context(context):
     context.liseniq_company_name = contact.custom_company
 		
     context.first_login = contact.custom_first_login
+		
+    tours_list = frappe.get_all(
+        "qp_IQ_Tour",
+        filters={"parent": contact.name},
+        fields=["tour_name", "completed"]
+    )
+    
+    context.user_tours = {t.tour_name: t.completed for t in tours_list}
     
     return context
 

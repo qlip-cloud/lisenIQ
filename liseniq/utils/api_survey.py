@@ -19,12 +19,67 @@ def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
     return datetime.now(tz)
 
 @frappe.whitelist(allow_guest=True)
-def get_public_survey(survey_name):
+def get_public_survey(survey_name, token=None, dni=None):
   try:
-    survey_data = frappe.db.get("Survey", survey_name, ["survey_json", "theme_json"])
+    survey_data = frappe.db.get_value("Survey", survey_name, ["survey_json", "theme_json"], as_dict=True)
     if not survey_data:
         frappe.throw("Encuesta no encontrada.")
         
+    # Verificar si es una medición de Liderazgo (360) para aplicar cambios dinámicos de preguntas
+    survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_is_leadership", "su_owner"], as_dict=True)
+    
+    if survey_doc and survey_doc.su_is_leadership:
+        recipient = None
+        
+        # Intentar obtener el destinatario por medio del token
+        if token and token != "Anonimo":
+            secret = _get_jwt_secret()
+            try:
+                payload = jwt.decode(token, secret, algorithms=["HS256"])
+                rid = payload.get("rid")
+                if rid:
+                    recipient = frappe.db.get_value("qp_IQ_SurveyRecipient", rid, ["sr_evaluation_role", "sr_evaluating_to", "sr_contact"], as_dict=True)
+                else:
+                    recipient = frappe.db.get_value("qp_IQ_SurveyRecipient", {"sr_token": token}, ["sr_evaluation_role", "sr_evaluating_to", "sr_contact"], as_dict=True)
+            except Exception:
+                pass
+        
+        # Si no hay token personalizado, buscar por DNI
+        if not recipient and dni:
+            contact_name = frappe.db.get_value("Contact", {"custom_document_number": dni, "custom_company": survey_doc.su_owner}, "name")
+            if contact_name:
+                recipients = frappe.get_all(
+                    "qp_IQ_SurveyRecipient", 
+                    filters={"sr_survey": survey_doc.name, "sr_contact": contact_name, "sr_status": ["!=", "Responded"]}, 
+                    fields=["sr_evaluation_role", "sr_evaluating_to", "sr_contact"],
+                    limit_page_length=1
+                )
+                if recipients:
+                    recipient = recipients[0]
+        
+        if recipient:
+            # Validar si cumple condición de Autoevaluación
+            is_auto = (recipient.sr_evaluation_role == "Autoevaluación" and recipient.sr_evaluating_to == recipient.sr_contact)
+            
+            # Si evalúa a un tercero, reemplazar enunciado por qn_statement_others
+            if not is_auto:
+                parsed_json = json.loads(survey_data.survey_json)
+                survey_questions = frappe.get_all("qp_IQ_SurveyQuestion", filters={"parent": survey_doc.name}, fields=["sq_question"])
+                
+                q_dict = {}
+                for sq in survey_questions:
+                    other_stmt = frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_statement_others")
+                    if other_stmt:
+                        q_dict[sq.sq_question] = other_stmt
+                        
+                for page in parsed_json.get("pages", []):
+                    for el in page.get("elements", []):
+                        q_name = el.get("name")
+                        if q_name in q_dict:
+                            el["title"] = q_dict[q_name]
+                
+                survey_data["survey_json"] = json.dumps(parsed_json)
+                
     return survey_data
   except Exception as e:
     frappe.log_error(frappe.get_traceback(), 'Error en get_public_survey')

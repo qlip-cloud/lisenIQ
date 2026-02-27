@@ -191,8 +191,16 @@ def get_context(context):
         context.timezones = []
 
     template_name = frappe.request.args.get('template')
+    template_is_leadership = False
     if template_name:
         try:
+            # Identificar si la plantilla corresponde a Liderazgo
+            cat_id = frappe.db.get_value("qp_IQ_Template", template_name, "tp_category")
+            if cat_id:
+                cat_name = frappe.db.get_value("qp_IQ_QuestionCategory", cat_id, "qnc_category")
+                if cat_name == "Liderazgo":
+                    template_is_leadership = True
+
             questions = frappe.call(
                 'liseniq.www.iq-templates.index.get_questions_from_template',
                 template_name=template_name
@@ -202,6 +210,7 @@ def get_context(context):
             frappe.log_error(f"No se pudieron cargar las preguntas de la plantilla {template_name}: {e}", "Error en new_measurement.py")
             context.preloaded_questions_json = "[]"
     
+    context.template_is_leadership = template_is_leadership
     context.template_name = template_name or None
     if template_name:
         frappe.cache().set_value(f"measurement_template:{frappe.session.user}", template_name)

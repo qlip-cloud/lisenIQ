@@ -2,6 +2,7 @@
 
     <div id="preloaded-questions-data" data-questions='{{ preloaded_questions_json | e if preloaded_questions_json else "[]" }}' style="display: none;"></div>
     <div id="measurement-data" data-measurement='{{ measurement_data_json | e if measurement_data_json else "null" }}' style="display: none;"></div>
+    <div id="template-is-leadership-data" data-is-leadership='{{ 1 if template_is_leadership else 0 }}' style="display: none;"></div>
 
     <div id="measurement-stepper-container" class="mb-5"></div>
 

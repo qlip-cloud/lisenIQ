@@ -230,11 +230,18 @@ const show_completed_message = function (msg) {
 const load_survey = function (survey_name, cachedResponses) {
   $(".web-form-container").toggle(false);
   $('<div id="surveyElement"></div>').appendTo($(".page_content"));
+  
+  const urlParams = urlParamsGlobal;
+  const token = urlParams.get("token");
+  const doc_id = localStorage.getItem("liseniq_doc_id");
+
   frappe
     .call({
       method: "liseniq.utils.api_survey.get_public_survey",
       args: {
         survey_name: frappe.web_form.title,
+        token: token || null,
+        dni: doc_id || null
       },
     })
     .then((r) => {

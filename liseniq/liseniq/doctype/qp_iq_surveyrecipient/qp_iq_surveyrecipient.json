@@ -38,7 +38,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Contacto Evaluado",
+   "label": "Contacto / Evaluado",
    "options": "Contact"
   },
   {
@@ -126,7 +126,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-24 11:22:22.406133",
+ "modified": "2026-02-26 18:39:46.775199",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

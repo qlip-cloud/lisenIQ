@@ -160,6 +160,17 @@ class MeasurementCreator {
                 console.error("Error al parsear las preguntas precargadas:", e);
             }
         }
+
+        // Marcar automáticamente como Liderazgo si la plantilla proviene de esa categoría
+        const leadershipDataEl = document.getElementById('template-is-leadership-data');
+        if (leadershipDataEl && leadershipDataEl.dataset.isLeadership === '1') {
+            if (this.ui.step1Form.isLeadership) {
+                this.ui.step1Form.isLeadership.checked = true;
+                this.ui.step1Form.isLeadership.disabled = true;
+            }
+            this.state.measurementData.isLeadership = true;
+            this.questionBuilder.setCategory('Liderazgo');
+        }
     }
 
     loadMeasurementForEdit() {

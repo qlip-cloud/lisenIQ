@@ -748,8 +748,8 @@ document.addEventListener('DOMContentLoaded', function () {
             doneBtnText: 'Listo',
             steps: [
                 { popover: { title: 'Nombre', description: 'Los datos demográficos son las variables con las que puedes segmentar la información de los resultados. Recomendamos configurarlos conforme a tus necesidades, para poder generar reportes con alto valor.', side: "left", align: 'start' }},
-                { element: '#demographics-table thead tr:first-child', popover: { title: 'Tag', description: 'Selecciona o crea los demográficos que vas a asignarle al contacto para posteriormente segmentar los resultados.', side: "bottom", align: 'start' }},
-                { element: '#demographics-table thead tr:nth-child(2)', popover: { title: 'Valor', description: 'Crea el nombre o la variable dentro de cada demográfico.', side: "bottom", align: 'start' }}
+                { element: '#thead-tag:first-child', popover: { title: 'Tag', description: 'Selecciona o crea los demográficos que vas a asignarle al contacto para posteriormente segmentar los resultados.', side: "bottom", align: 'start' }},
+                { element: '#thead-row:first-child', popover: { title: 'Valor', description: 'Crea el nombre o la variable dentro de cada demográfico.', side: "bottom", align: 'start' }}
             ]
         });
        

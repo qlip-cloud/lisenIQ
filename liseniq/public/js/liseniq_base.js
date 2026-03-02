@@ -173,8 +173,8 @@ function initOnboarding() {
         ]
     });
 
-    if (btnOpen) {
-        btnOpen.addEventListener('click', function() {
+    if (btnTakeTour) {
+        btnTakeTour.addEventListener('click', function() {
             if (driverObj) {
                 driverObj.drive();
             }
@@ -208,33 +208,42 @@ function initOnboarding() {
     });
 
     // Botón "Tomar el tour" - iniciar el recorrido
-    if (btnTakeTour) {
-        btnTakeTour.addEventListener('click', function() {
+    if (btnOpen) {
+        btnOpen.addEventListener('click', function() {
             closeModal();
             // Iniciar el tour con driver.js
-            const route = frappe.get_route();
+             const route = window.location.pathname.split('/').filter(part => part); 
             const routeString = route.join('/');
-
-            console.log("Ruta actual:", routeString);
-
-            if (routeString === "contacts/contacts-import") {
-                startContactsImportTour();
+            console.log('Ruta actual:', routeString);
+            if (routeString === "contacts/contacts_import" || routeString === "contacts/contacts-import") {
+                if (typeof window.startContactsImportTour === 'function') {
+                    window.startContactsImportTour();
+                } else {
+                    driverObj.drive();
+                }
             } 
             else if (routeString === "contacts") {
-                startContactsDemographicsTour();
-            }
-            else if (route[0] === "measurement") {
-                startMeasurementTour();
-            }
-            else {
-                // Tour general
-                if (driverObj) {
+                if (typeof window.startContactsDemographicsTour === 'function') {
+                    window.startContactsDemographicsTour();
+                } else {
                     driverObj.drive();
                 }
             }
+            else if (routeString === "measurement/new_measurement") {
+                if (typeof window.startMeasurementTour === 'function') {
+                    window.startMeasurementTour();
+                } else {
+                    driverObj.drive();
+                }
+            }
+            else {
+                driverObj.drive();
+            }
         });
     }
-
+    const route = window.location.pathname.split('/').filter(part => part); 
+            const routeString = route.join('/');
+            console.log('Ruta actual:', routeString);
     const firstLoginInput = document.getElementById('firstLogin');
     console.log('Valor de firstLogin:', firstLoginInput ? firstLoginInput.value : 'Elemento no encontrado');
     if (firstLoginInput && firstLoginInput.value === true) {

@@ -1094,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Tour de introducción
-    function startContactsImportTour() {
+    window.startContactsImportTour = function() {
         const driver = window.driver.js.driver;
         const contactsTourObj = driver({
             showProgress: false,

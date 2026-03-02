@@ -1177,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         new MeasurementCreator();
     }
      // Tour de introducción
-    function startIntroTour() {
+    function startMeasurementTour() {
         const driver = window.driver.js.driver;
         const measurementTourObj = driver({
             showProgress: false,
@@ -1204,6 +1204,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const tourName = 'measurement_creation_tour';
     const hasCompletedTour = userTours[tourName];
     if (!hasCompletedTour){
-        startIntroTour();
+        startMeasurementTour();
     }
 });

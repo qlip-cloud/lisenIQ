@@ -1094,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Tour de introducción
-    function startIntroTour() {
+    function startContactsImportTour() {
         const driver = window.driver.js.driver;
         const contactsTourObj = driver({
             showProgress: false,
@@ -1118,6 +1118,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const tourName = 'contacts_import';
     const hasCompletedTour = userTours[tourName];
     if (!hasCompletedTour){
-        startIntroTour();
+        startContactsImportTour();
     }
 });

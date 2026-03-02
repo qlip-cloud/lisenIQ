@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Iniciar tour automáticamente al mostrar el step 3 (demográficos)
         if (step === 3) {
             setTimeout(() => {
-                startIntroTour();
+                startContactsDemographicsTour();
             }, 300);
         }
     };
@@ -734,7 +734,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     init();
     // Tour de introducción
-    function startIntroTour() {
+    function startContactsDemographicsTour() {
         const driver = window.driver.js.driver;
         const demographicsTourObj = driver({
             showProgress: false,

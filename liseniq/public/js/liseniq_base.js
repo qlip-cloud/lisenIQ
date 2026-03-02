@@ -129,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar lógica de onboarding
     initOnboarding();
 });
-
 function initOnboarding() {
     // Modal de Bienvenida
     const modal = document.getElementById('welcomeModal');
@@ -213,8 +212,25 @@ function initOnboarding() {
         btnTakeTour.addEventListener('click', function() {
             closeModal();
             // Iniciar el tour con driver.js
-            if (driverObj) {
-                driverObj.drive();
+            const route = frappe.get_route();
+            const routeString = route.join('/');
+
+            console.log("Ruta actual:", routeString);
+
+            if (routeString === "contacts/contacts-import") {
+                startContactsImportTour();
+            } 
+            else if (routeString === "contacts") {
+                startContactsDemographicsTour();
+            }
+            else if (route[0] === "measurement") {
+                startMeasurementTour();
+            }
+            else {
+                // Tour general
+                if (driverObj) {
+                    driverObj.drive();
+                }
             }
         });
     }

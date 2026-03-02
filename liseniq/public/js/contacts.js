@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Iniciar tour automáticamente al mostrar el step 3 (demográficos)
         if (step === 3) {
             setTimeout(() => {
-                startContactsDemographicsTour();
+                startContactsDemographicsTour(true);
             }, 300);
         }
     };
@@ -734,7 +734,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     init();
     // Tour de introducción
-    function startContactsDemographicsTour() {
+    window.startContactsDemographicsTour = function(autoshow=false) {
         const driver = window.driver.js.driver;
         const demographicsTourObj = driver({
             showProgress: false,
@@ -747,7 +747,7 @@ document.addEventListener('DOMContentLoaded', function () {
             closeBtnText: 'Cerrar',
             doneBtnText: 'Listo',
             steps: [
-                { popover: { title: 'Nombre', description: 'Los datos demográficos son las variables con las que puedes segmentar la información de los resultados. Recomendamos configurarlos conforme a tus necesidades, para poder generar reportes con alto valor.', side: "left", align: 'start' }},
+                { popover: { title: 'Datos Demográficos', description: 'Los datos demográficos son las variables con las que puedes segmentar la información de los resultados. Recomendamos configurarlos conforme a tus necesidades, para poder generar reportes con alto valor.', side: "left", align: 'start' }},
                 { element: '#thead-tag', popover: { title: 'Tag', description: 'Selecciona o crea los demográficos que vas a asignarle al contacto para posteriormente segmentar los resultados.', side: "bottom", align: 'start' }},
                 { element: '#thead-value', popover: { title: 'Valor', description: 'Crea el nombre o la variable dentro de cada demográfico.', side: "bottom", align: 'start' }}
             ]
@@ -756,7 +756,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const userTours = JSON.parse(document.getElementById("tours-data").textContent);
         const tourName = 'contacts_demographics_tour';
         const hasCompletedTour = userTours[tourName];
-        if (!hasCompletedTour){
+        if (!hasCompletedTour && autoshow){
+            demographicsTourObj.drive();
+        }
+        if(!autoshow){
             demographicsTourObj.drive();
         }
     }

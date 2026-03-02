@@ -1177,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         new MeasurementCreator();
     }
      // Tour de introducción
-    function startMeasurementTour() {
+    window.startMeasurementTour = function() {
         const driver = window.driver.js.driver;
         const measurementTourObj = driver({
             showProgress: false,

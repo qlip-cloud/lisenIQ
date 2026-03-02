@@ -214,23 +214,26 @@ function initOnboarding() {
             // Iniciar el tour con driver.js
             const route = frappe.get_route();
             const routeString = route.join('/');
-
-            console.log("Ruta actual:", routeString);
-
-            if (routeString === "contacts/contacts-import") {
+            
+            console.log("Route array:", route);
+            console.log("Route string:", routeString);
+            console.log("Window pathname:", window.location.pathname);
+            
+            if (routeString === "contacts/contacts_import" || routeString === "contacts/contacts-import") {
+                console.log("Iniciando tour de importación de contactos");
                 startContactsImportTour();
             } 
             else if (routeString === "contacts") {
+                console.log("Iniciando tour de demografía de contactos");
                 startContactsDemographicsTour();
             }
             else if (route[0] === "measurement") {
+                console.log("Iniciando tour de measurement");
                 startMeasurementTour();
             }
             else {
-                // Tour general
-                if (driverObj) {
-                    driverObj.drive();
-                }
+                console.log("Iniciando tour general");
+                driverObj.drive();
             }
         });
     }

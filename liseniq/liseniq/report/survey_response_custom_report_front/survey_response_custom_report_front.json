@@ -10,7 +10,7 @@
  "idx": 0,
  "is_standard": "Yes",
  "javascript": "",
- "modified": "2026-02-27 14:45:38.667812",
+ "modified": "2026-03-03 11:48:26.873214",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "Survey Response Custom Report Front",
@@ -23,6 +23,9 @@
  "roles": [
   {
    "role": "System Manager"
+  },
+  {
+   "role": "All"
   }
  ]
 }

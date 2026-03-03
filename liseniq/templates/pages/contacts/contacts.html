@@ -1,5 +1,7 @@
 <div class="main-content-padding">
-
+    <<script id="tours-data" type="application/json">
+        {{ user_tours | tojson }}
+    </script>
     <div id="contacts-list-view">
         <div class="page-actions-header">
             <button id="btn-new-contact" class="btn btn-purple-main">Nuevo Contacto</button>
@@ -206,8 +208,8 @@
                     <table class="demographics-table">
                         <thead>
                             <tr>
-                                <th>Tag</th>
-                                <th>Valor</th>
+                                <th id="thead-tag">Tag</th>
+                                <th id="thead-value">Valor</th>
                                 <th></th>
                             </tr>
                         </thead>

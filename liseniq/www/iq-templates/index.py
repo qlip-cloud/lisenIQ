@@ -116,7 +116,10 @@ def get_questions_from_template(template_name):
     for tq in template_doc.tp_questions:
         q_doc = frappe.get_doc("qp_IQ_Question", tq.tq_question)
         
-        type_name = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, "qnt_type_name") if q_doc.qn_type else "No definido"
+        t_data = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, ["qnt_type_name", "qnt_mnemonico"], as_dict=True) if q_doc.qn_type else None
+        type_name = t_data.qnt_type_name if t_data else "No definido"
+        mnemonic = t_data.qnt_mnemonico if t_data else None
+
         demographic_name = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else None
 
         question_data = {
@@ -130,11 +133,13 @@ def get_questions_from_template(template_name):
             "positive_statement": q_doc.qn_positive_statement,
             "nps_min": q_doc.qn_nps_min,
             "nps_max": q_doc.qn_nps_max,
+            "qp_others": q_doc.get("qp_others", 0),
+            "qp_none_above": q_doc.get("qp_none_above", 0),
             "options": []
         }
 
         if q_doc.qn_response_options:
-            if type_name == "Likert":
+            if mnemonic == "scale_likert" or type_name == "Likert":
                 options = [
                     {
                         "text": opt.qo_option_text,
@@ -143,7 +148,7 @@ def get_questions_from_template(template_name):
                     }
                     for opt in q_doc.qn_response_options
                 ]
-            elif type_name == "Likert Visual":
+            elif mnemonic == "scale_emoji" or type_name == "Likert Visual":
                 options = [
                     {"text": opt.qo_option_text, "value": opt.qo_option_value, "url": opt.qo_url}
                     for opt in q_doc.qn_response_options
@@ -199,6 +204,8 @@ def create_question_from_template_wizard(question_data):
         question_doc.qn_positive_statement = data.get("qn_positive_statement")
         question_doc.qn_creator = user_contact
         question_doc.qn_owner = user_company
+        question_doc.qp_others = data.get("qp_others", 0)
+        question_doc.qp_none_above = data.get("qp_none_above", 0)
         
         demographic_title = data.get("qn_demographic")
         if demographic_title:
@@ -254,14 +261,18 @@ def create_question_from_template_wizard(question_data):
 
 @frappe.whitelist()
 def get_bank_data(keyword=None, demographic=None, template_category=None):
+    # Tipos que usan opciones basados en sus nombres clásicos (por si acaso como fallback)
     OPTIONS_BASED_TYPES = [
         'Selección Múltiple', 
+        'Casilla de verificación',
         'Selección Única', 
         'Likert', 
         'Escala de frecuencia', 
         'Ranking (Calificación o Prioridad)',
         'Likert Visual'
     ]
+
+    OPTIONS_BASED_MNEMONICS = ['radio_group', 'check_group', 'scale_likert', 'scale_emoji']
 
     user_company = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
     if not user_company:
@@ -297,7 +308,8 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
             "qn_statement as text", 
             "qn_statement_others as text_others",
             "qn_category", "qn_type", "qn_nps_min",
-            "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic"
+            "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic",
+            "qp_others", "qp_none_above"
         ],
         ignore_permissions=True
     )
@@ -309,17 +321,24 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
             q["category_name"] = "General"
 
         if q.get("qn_type"):
-            q["type_name"] = frappe.db.get_value("qp_IQ_QuestionType", q["qn_type"], "qnt_type_name")
+            t_data = frappe.db.get_value("qp_IQ_QuestionType", q["qn_type"], ["qnt_type_name", "qnt_mnemonico"], as_dict=True)
+            if t_data:
+                q["type_name"] = t_data.qnt_type_name
+                mnemonic = t_data.qnt_mnemonico
+            else:
+                q["type_name"] = "No definido"
+                mnemonic = None
         else:
             q["type_name"] = "No definido"
+            mnemonic = None
         
         if q.get("qn_demographic"):
             q["demographic_name"] = frappe.db.get_value("qp_IQ_DemographicType", q["qn_demographic"], "dt_title")
         else:
             q["demographic_name"] = None
 
-        if q.get("type_name") in OPTIONS_BASED_TYPES:
-            if q.get("type_name") in ("Likert Visual", "Likert"):
+        if mnemonic in OPTIONS_BASED_MNEMONICS or q.get("type_name") in OPTIONS_BASED_TYPES:
+            if mnemonic in ("scale_emoji", "scale_likert") or q.get("type_name") in ("Likert Visual", "Likert"):
                 options = frappe.get_all(
                     "qp_IQ_QuestionOption",
                     filters={'parent': q.name, 'parenttype': 'qp_IQ_Question'},

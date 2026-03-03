@@ -1,8 +1,9 @@
-const OPTIONS_BASED_TYPES = ['Selección Múltiple', 'Likert'];
+const OPTIONS_BASED_TYPES = ['Selección Múltiple', 'Likert', 'Casilla de verificación'];
 const BIPOLAR_SCALE_TYPES = [];
 const NPS_SCALE_TYPES = ['NPS'];
 const LIKERT_TYPE_NAME = 'Likert';
 const LIKERT_VISUAL_TYPE_NAME = 'Likert Visual';
+const CHECKBOX_TYPE_NAME = 'Casilla de verificación';
 const LIKERT_ICON_MAP = {
     5: "/files/aiq - totalmente de acuerdo.png",
     4: "/files/aiq - de acuerdo.png",
@@ -317,11 +318,18 @@ export class QuestionBuilder {
                     }).join('')}
                 </div>`;
             } else if (OPTIONS_BASED_TYPES.includes(questionDisplayName)) {
+                let optionsItemsHtml = question.options.map(opt => {
+                    const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
+                    return `<div class="question-option-item">${frappe.utils.escape_html(optionText)}</div>`;
+                }).join('');
+                
+                if (questionDisplayName === CHECKBOX_TYPE_NAME) {
+                    if (question.qp_others) optionsItemsHtml += `<div class="question-option-item" style="font-style:italic;">Otros</div>`;
+                    if (question.qp_none_above) optionsItemsHtml += `<div class="question-option-item" style="font-style:italic;">Ninguna de las anteriores</div>`;
+                }
+
                 additionalInfoHtml = `<div class="question-item-options-list">
-                    ${question.options.map(opt => {
-                        const optionText = (typeof opt === 'object' && opt.text) ? opt.text : opt;
-                        return `<div class="question-option-item">${frappe.utils.escape_html(optionText)}</div>`;
-                    }).join('')}
+                    ${optionsItemsHtml}
                 </div>`;
             }
         }
@@ -448,12 +456,17 @@ export class QuestionBuilder {
             card.setAttribute('data-id', q.name);
 
             let optionsPreviewHtml = '';
-            // Preview para Selección Múltiple (texto plano)
-            if (q.type_name === 'Selección Múltiple' && Array.isArray(q.options) && q.options.length > 0) {
+            // Preview para Selección Múltiple y Casilla de verificación (texto plano)
+            if ((q.type_name === 'Selección Múltiple' || q.type_name === CHECKBOX_TYPE_NAME) && Array.isArray(q.options) && q.options.length > 0) {
+                let optionsListHtml = q.options.map(opt => `<div>- ${frappe.utils.escape_html(opt)}</div>`).join('');
+                if (q.type_name === CHECKBOX_TYPE_NAME) {
+                    if (q.qp_others) optionsListHtml += `<div>- <em>Otros</em></div>`;
+                    if (q.qp_none_above) optionsListHtml += `<div>- <em>Ninguna de las anteriores</em></div>`;
+                }
                 optionsPreviewHtml = `
                     <div class="options-preview">
                         <strong>Opciones de respuesta</strong>
-                        ${q.options.map(opt => `<div>- ${frappe.utils.escape_html(opt)}</div>`).join('')}
+                        ${optionsListHtml}
                     </div>`;
             }
             // Preview para Likert (preferir opciones con url del backend; fallback a íconos por defecto)
@@ -596,6 +609,8 @@ export class QuestionBuilder {
                         category_name: questionToAdd.category_name,
                         demographic: questionToAdd.demographic_name,
                         options: options,
+                        qp_others: questionToAdd.qp_others || 0,
+                        qp_none_above: questionToAdd.qp_none_above || 0
                     });
                 }
             }
@@ -643,6 +658,13 @@ export class QuestionBuilder {
         if (qf.bipolarSection) qf.bipolarSection.classList.add('d-none');
         if (qf.npsSection) qf.npsSection.classList.add('d-none');
         
+        // Limpiar checkboxes extra si existen
+        let togglesContainer = document.getElementById('checkbox-extra-toggles');
+        if (togglesContainer) {
+            togglesContainer.innerHTML = '';
+            togglesContainer.classList.add('d-none');
+        }
+
         [qf.text, qf.textOthers, qf.type, qf.demographic, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax]
             .filter(Boolean)
             .forEach(field => this._clearValidationError(field));
@@ -781,6 +803,11 @@ export class QuestionBuilder {
             newQuestion.nps_max = qf.npsMax.value;
         }
 
+        if (questionTypeName === CHECKBOX_TYPE_NAME) {
+            newQuestion.qp_others = document.getElementById('chk_qp_others')?.checked ? 1 : 0;
+            newQuestion.qp_none_above = document.getElementById('chk_qp_none_above')?.checked ? 1 : 0;
+        }
+
         this.questions.push(newQuestion);
         this.renderQuestions();
         this.resetAddQuestionForm();
@@ -808,7 +835,7 @@ export class QuestionBuilder {
         if (questionTypeName === LIKERT_TYPE_NAME) {
             this._setLikertOptions();
         } else if (OPTIONS_BASED_TYPES.includes(questionTypeName)) {
-            this._setEditableOptions();
+            this._setEditableOptions(questionTypeName);
         }
 
         if (qf.optionsSection) qf.optionsSection.classList.toggle('d-none', !OPTIONS_BASED_TYPES.includes(questionTypeName));
@@ -938,13 +965,40 @@ export class QuestionBuilder {
         if (addOption) addOption.classList.add('d-none');
     }
 
-    _setEditableOptions() {
-        const { optionsContainer } = this.ui.questionForm;
+    _setEditableOptions(questionTypeName) {
+        const { optionsContainer, optionsSection } = this.ui.questionForm;
         const { addOption } = this.ui.buttons;
         if (!optionsContainer) return;
 
         optionsContainer.innerHTML = `<div class="option-input-row"><span class="option-number">1</span><input type="text" class="form-control option-input" placeholder="Escribe tu opción aqui"><i class="fa fa-trash-o text-danger delete-option" style="cursor: pointer;"></i></div>`;
         this.updateOptionNumbers();
+
+        // Control dinámico de Checkbox Extra Options
+        let togglesContainer = document.getElementById('checkbox-extra-toggles');
+        if (!togglesContainer) {
+            togglesContainer = document.createElement('div');
+            togglesContainer.id = 'checkbox-extra-toggles';
+            optionsSection.appendChild(togglesContainer);
+        }
+
+        if (questionTypeName === CHECKBOX_TYPE_NAME) {
+            togglesContainer.innerHTML = `
+                <div class="checkbox-extra-options mt-3 p-3" style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;">
+                    <div class="form-check mb-2">
+                        <input type="checkbox" class="form-check-input" id="chk_qp_others">
+                        <label class="form-check-label" for="chk_qp_others" style="font-size:0.85rem; font-weight:500;">Habilitar opción "Otros"</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="chk_qp_none_above">
+                        <label class="form-check-label" for="chk_qp_none_above" style="font-size:0.85rem; font-weight:500;">Habilitar opción "Ninguna de las anteriores"</label>
+                    </div>
+                </div>
+            `;
+            togglesContainer.classList.remove('d-none');
+        } else {
+            togglesContainer.innerHTML = '';
+            togglesContainer.classList.add('d-none');
+        }
 
         if (addOption) addOption.classList.remove('d-none');
     }

@@ -107,7 +107,10 @@ doc_events = {
 		"on_update": "liseniq.utils.api_survey.generate_public_link_for_survey_hook"
 	},
 	"User": {
-		"on_update": "liseniq.utils.user_hooks.link_company_after_b2c"
+		"after_insert": "liseniq.utils.user_hooks.link_company_after_b2c"
+	},
+	"Contact": {
+		"after_insert": "liseniq.utils.user_hooks.link_contact_after_create"
 	}
 }
 

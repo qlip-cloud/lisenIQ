@@ -1398,6 +1398,24 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
     question_variables_map = get_question_variables_map()
     question_types_map = get_question_types_map()
     survey_template_map = get_survey_template_map()
+    
+    # Crear diccionario de preguntas abiertas por medición: {survey_id: {texto_pregunta: "open_question_N"}}
+    open_questions_dict = {}
+    for row in data:
+        survey_id = row.get('survey_id', '')
+        question_responses = row.get('_responses', {})
+        
+        if survey_id and survey_id not in open_questions_dict:
+            open_questions_dict[survey_id] = {}
+            counter = 1
+            
+            # Identificar todas las preguntas abiertas de esta medición
+            for qid in question_responses.keys():
+                if question_types_map.get(qid) == 'Abierta' and qid in all_questions_map:
+                    question_text = all_questions_map[qid]
+                    if question_text not in open_questions_dict[survey_id]:
+                        open_questions_dict[survey_id][question_text] = f"open_question_{counter}"
+                        counter += 1
 
     # conjunto total de claves demográficas (ids sin traducir)
     required_demographic_keys = set(core_demographic_keys) | set(demographic_ids)
@@ -1453,7 +1471,12 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
                 pass
 
             question_object['tema'] = tema
-
+            # Agregar un id númerico único para preguntas abiertas para agruparlas por ese número en el dashboard (ej: open_question_1, open_question_2, etc.)
+            if question_object['question_type'] == 'Abierta':
+                survey_id = demographic_data.get('survey_id', '')
+                question_object['question_group'] = open_questions_dict.get(survey_id, {}).get(question_text, '')
+            else:
+                question_object['question_group'] = ''
             transformed_data.append(question_object)
     
     return transformed_data

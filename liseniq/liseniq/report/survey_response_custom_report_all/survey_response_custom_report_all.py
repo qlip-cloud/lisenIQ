@@ -68,7 +68,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 shd.shd_document_number,
                 shd.shd_country,
                 shd.shd_entry_date,
-                shd.shd_academic_level,
+                al.al_title as academic_level,
                 shd.shd_dob,
                 shd.shd_gender,
                 shd.shd_company,
@@ -79,6 +79,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 ) as demographics_data
             FROM `tabqp_IQ_SurveyHistoricData` shd
             LEFT JOIN `tabqp_IQ_ContactDetailHistoric` cdh ON cdh.parent = shd.name
+            LEFT JOIN `tabqp_IQ_AcademicLevel` al ON al.name = shd.shd_academic_level
             WHERE shd.shd_survey_id = %s
             GROUP BY shd.name
         """
@@ -103,7 +104,7 @@ def process_historical_response_row(hist_record, survey_name, company_name, all_
         'gender': hist_record.get('shd_gender', ''),
         'custom_dob': hist_record.get('shd_dob', ''),
         'country': hist_record.get('shd_country', ''),
-        'custom_academic_level': hist_record.get('shd_academic_level', ''),
+        'custom_academic_level': hist_record.get('academic_level', ''),
         'entry_date': hist_record.get('shd_entry_date', ''),
     }
 

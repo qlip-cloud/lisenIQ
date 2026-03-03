@@ -27,13 +27,99 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initializeEventListeners();
+    
+    // Descargar resultados finales (sin modal)
     document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.download-results-btn');
-    if (!btn) return;
+        const btn = e.target.closest('.download-results-btn');
+        if (!btn) return;
 
-    const url = btn.getAttribute('data-url');
-    if (!url) return;
+        const url = btn.getAttribute('data-url');
+        if (!url) return;
 
-    window.location.href = url;
-});
+        window.location.href = url;
+    });
+    
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.download-follow-up-btn');
+        if (!btn) return;
+
+        const url = btn.getAttribute('data-url');
+        if (!url) return;
+
+        document.getElementById('downloadReportUrl').value = url;
+        
+        loadDemographics();
+        
+        document.getElementById('downloadReportModal').style.display = 'flex';
+    });
+    
+    function loadDemographics() {
+        frappe.call({
+            method: 'liseniq.utils.export.get_demographics',
+            callback: function(r) {
+                if (r.message) {
+                    const select1 = document.getElementById('demographic1');
+                    const select2 = document.getElementById('demographic2');
+                    
+                    // Limpiar opciones existentes excepto la primera
+                    select1.innerHTML = '<option value="">-- Selecciona un demográfico --</option>';
+                    select2.innerHTML = '<option value="">-- Selecciona un demográfico --</option>';
+                    
+                    // Agregar las opciones de demográficos
+                    r.message.forEach(function(demo) {
+                        const option1 = document.createElement('option');
+                        option1.value = demo.name;
+                        option1.textContent = demo.dt_title || demo.name;
+                        select1.appendChild(option1);
+                        
+                        const option2 = document.createElement('option');
+                        option2.value = demo.name;
+                        option2.textContent = demo.dt_title || demo.name;
+                        select2.appendChild(option2);
+                    });
+                }
+            }
+        });
+    }
+    
+    document.getElementById('closeDownloadReportModal').addEventListener('click', function() {
+        document.getElementById('downloadReportModal').style.display = 'none';
+    });
+    
+    document.getElementById('btnCancelDownload').addEventListener('click', function() {
+        document.getElementById('downloadReportModal').style.display = 'none';
+    });
+    
+    document.getElementById('downloadReportModal').addEventListener('click', function(e) {
+        if (e.target.id === 'downloadReportModal') {
+            document.getElementById('downloadReportModal').style.display = 'none';
+        }
+    });
+    
+    document.getElementById('btnDownloadReport').addEventListener('click', function() {
+        const demographic1 = document.getElementById('demographic1').value;
+        const demographic2 = document.getElementById('demographic2').value;
+        
+        if (!demographic1 && !demographic2) {
+            frappe.msgprint({
+                title: 'Atención',
+                indicator: 'orange',
+                message: 'Por favor selecciona al menos un demográfico para descargar el reporte.'
+            });
+            return;
+        }
+        
+        let baseUrl = document.getElementById('downloadReportUrl').value;
+        
+        if (demographic1) {
+            baseUrl += '&demographic1=' + encodeURIComponent(demographic1);
+        }
+        if (demographic2) {
+            baseUrl += '&demographic2=' + encodeURIComponent(demographic2);
+        }
+        
+        document.getElementById('downloadReportModal').style.display = 'none';
+        
+        window.location.href = baseUrl;
+    });
 });

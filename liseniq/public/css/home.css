@@ -476,7 +476,12 @@
 .btn-open-welcome-modal:hover {
     background-color: #6920d6;
 }
-
+.results-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
 @keyframes fadeIn {
     from {
         opacity: 0;

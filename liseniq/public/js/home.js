@@ -27,4 +27,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initializeEventListeners();
+    document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.download-results-btn');
+    if (!btn) return;
+
+    const url = btn.getAttribute('data-url');
+    if (!url) return;
+
+    window.location.href = url;
+});
 });

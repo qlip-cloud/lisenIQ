@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="review-question-details">
                         <span>Tipo: ${frappe.utils.escape_html(questionDisplayName)}</span>
                         <div>
-                            <span class="review-question-tag">Tag: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                            <span class="review-question-tag">Tema: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
                         </div>
                     </div>
                     ${optionsHtml}

@@ -367,7 +367,7 @@ export class QuestionBuilder {
                         ${this.isReadOnly ? '' : '<i class="fa fa-trash-o delete-question" title="Eliminar pregunta"></i>'}
                     </div>
                     <div class="question-item-tags">
-                        <span>Tag: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                        <span>Tema: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
 
                     </div>
                 </div>
@@ -532,7 +532,7 @@ export class QuestionBuilder {
                 </div>
                 ${optionsPreviewHtml}
                 <div class="question-details">
-                    <span class="category-tag">• Tag: ${frappe.utils.escape_html(q.demographic_name || 'General')}</span>
+                    <span class="category-tag">• Tema: ${frappe.utils.escape_html(q.demographic_name || 'General')}</span>
                     <span>Tipo: ${frappe.utils.escape_html(q.type_name)}</span>
                 </div>
             `;

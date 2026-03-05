@@ -31,17 +31,23 @@ document.addEventListener('DOMContentLoaded', () => {
         frappe.call({
             method: 'liseniq.utils.api_survey.get_survey_route_for_public_link',
             args: {
-                token: token
+                token: token,
+                dni: docId
             },
             callback: (r) => {
-                if (r.message && r.message.route) {
-                    const surveyUrl = `${window.location.origin}/${r.message.route}?new=1&token=${token}`;
-                    window.location.href = surveyUrl;
+                if (r.message) {
+                    if (r.message.is_leadership) {
+                        // Renderiza el dashboard en la misma vista
+                        showDashboard(r.message.evaluations, r.message.route);
+                    } else if (r.message.route) {
+                        // Redirección directa convencional
+                        const surveyUrl = `${window.location.origin}/${r.message.route}?new=1&token=${token}`;
+                        window.location.href = surveyUrl;
+                    } else {
+                        handleError('Ruta de encuesta no encontrada.');
+                    }
                 } else {
-                    showError(r.message || 'Ocurrió un error al procesar tu solicitud.');
-                    submitButton.disabled = false;
-                    submitButton.textContent = 'Iniciar';
-                    localStorage.removeItem('liseniq_doc_id'); // Limpiar en caso de error
+                    handleError(r.message || 'Ocurrió un error al procesar tu solicitud.');
                 }
             },
             error: (r) => {
@@ -54,13 +60,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Fallback for non-JSON error
                     }
                 }
-                showError(message);
-                submitButton.disabled = false;
-                submitButton.textContent = 'Iniciar';
-                localStorage.removeItem('liseniq_doc_id'); // Limpiar en caso de error
+                handleError(message);
             }
         });
     });
+
+    function handleError(msg) {
+        showError(msg);
+        submitButton.disabled = false;
+        submitButton.textContent = 'Iniciar';
+        localStorage.removeItem('liseniq_doc_id');
+    }
 
     function validateInput(docId) {
         if (!docId) {
@@ -84,5 +94,55 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideError() {
         errorElement.style.display = 'none';
         docIdInput.classList.remove('is-invalid');
+    }
+
+    function showDashboard(evaluations, route) {
+        const formGroup = document.querySelector('.iq-register-form-group');
+        const actionCenter = document.querySelector('.iq-register-form-action-center');
+        const dashboardContainer = document.getElementById('dashboard-container');
+        const listContainer = document.getElementById('evaluations-list');
+        const mainTitle = document.querySelector('.iq-register-main-title');
+
+        // Ocultar la sección del formulario inicial
+        if (formGroup) formGroup.style.display = 'none';
+        if (actionCenter) actionCenter.style.setProperty('display', 'none', 'important');
+        
+        // Restablecer el botón y ocultarlo por seguridad
+        if (submitButton) {
+            submitButton.style.display = 'none';
+            submitButton.disabled = false;
+            submitButton.textContent = 'Iniciar';
+        }
+        
+        hideError();
+
+        if (mainTitle) {
+            mainTitle.textContent = 'Tus Evaluaciones Pendientes';
+        }
+
+        // Poblar la lista de evaluaciones dinámicamente
+        listContainer.innerHTML = '';
+        evaluations.forEach(ev => {
+            const card = document.createElement('div');
+            card.className = 'evaluation-card';
+            card.innerHTML = `
+                <div class="evaluation-info">
+                    <span class="evaluation-role">${ev.is_auto ? 'Autoevaluación' : (ev.role || 'Evaluación')}</span>
+                    <span class="evaluation-name">${ev.is_auto ? `Tú mismo (${ev.evaluatee_name})` : ev.evaluatee_name}</span>
+                </div>
+                <div class="evaluation-action">
+                    Evaluar <span style="font-size: 18px; line-height: 1; padding-bottom: 2px;">&rarr;</span>
+                </div>
+            `;
+            card.addEventListener('click', () => {
+                // Navegar usando el token específico (rid) de esta evaluación
+                const surveyUrl = `${window.location.origin}/${route}?new=1&token=${ev.token}`;
+                window.location.href = surveyUrl;
+            });
+            listContainer.appendChild(card);
+        });
+
+        // Mostrar contenedor
+        dashboardContainer.style.display = 'block';
     }
 });

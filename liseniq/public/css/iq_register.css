@@ -188,3 +188,63 @@ body {
     background: #bcbcbc;
     cursor: not-allowed;
 }
+
+/* EVALUACIONES 360 */
+.evaluations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.evaluation-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.evaluation-card:hover {
+    background: #fff;
+    border-color: #6c2fff;
+    box-shadow: 0 4px 12px rgba(108, 47, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.evaluation-info {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.evaluation-role {
+    font-size: 11px;
+    color: #6c2fff;
+    font-weight: 700;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.evaluation-name {
+    font-size: 15px;
+    color: #222;
+    font-weight: 500;
+}
+
+.evaluation-action {
+    color: #6c2fff;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}

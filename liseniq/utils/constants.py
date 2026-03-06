@@ -53,6 +53,10 @@ frappe.web_form.after_load = () => {
   $(".frappe-control[data-fieldname='user']").hide();
   $(".frappe-control[data-fieldname='survey']").hide();
   
+  // Ocultar los campos de roles en el Web Form para encuestas ya existentes
+  $(".frappe-control[data-fieldname='custom_evaluatee']").hide();
+  $(".frappe-control[data-fieldname='custom_evaluator']").hide();
+  
   $('.web-form-actions button[type="submit"]').hide();
 
   // Validar si ya hay respuestas guardadas en localStorage

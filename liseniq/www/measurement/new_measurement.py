@@ -824,13 +824,18 @@ def save_measurement(data):
                 for field in survey_response_meta.fields:
                     if field.fieldtype not in ["Section Break", "Column Break", "Tab Break"]:
                         web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
+                        
+                        is_hidden = field.hidden
+                        if field.fieldname in ["custom_evaluatee", "custom_evaluator", "responses", "response_json", "user", "survey"]:
+                            is_hidden = 1
+
                         web_form.append("web_form_fields", {
                             "fieldname": field.fieldname,
                             "fieldtype": web_form_fieldtype,
                             "label": field.label,
                             "reqd": field.reqd,
                             "options": field.options,
-                            "hidden": field.hidden,
+                            "hidden": is_hidden,
                             "read_only": field.read_only,
                             "default": field.default,
                             "description": field.description,

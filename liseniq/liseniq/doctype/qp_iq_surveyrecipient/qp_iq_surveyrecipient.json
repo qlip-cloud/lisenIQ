@@ -88,6 +88,9 @@
   {
    "fieldname": "sr_evaluating_to",
    "fieldtype": "Link",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Evaluador Asignado",
    "options": "Contact"
   },
@@ -126,7 +129,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-26 18:39:46.775199",
+ "modified": "2026-03-05 20:22:51.611806",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

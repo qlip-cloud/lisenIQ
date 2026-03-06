@@ -1454,7 +1454,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
             
             # Identificar todas las preguntas abiertas de esta medición
             for qid in question_responses.keys():
-                if question_types_map.get(qid) == 'Abierta' and qid in all_questions_map:
+                if (question_types_map.get(qid) == 'Abierta' or question_types_map.get(qid) == 'Abierta texto corto')  and qid in all_questions_map:
                     question_text = all_questions_map[qid]
                     if question_text not in open_questions_dict[survey_id]:
                         open_questions_dict[survey_id][question_text] = f"open_question_{counter}"
@@ -1515,7 +1515,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
 
             question_object['tema'] = tema
             # Agregar un id númerico único para preguntas abiertas para agruparlas por ese número en el dashboard (ej: open_question_1, open_question_2, etc.)
-            if question_object['question_type'] == 'Abierta':
+            if question_object['question_type'] in ['Abierta', 'Abierta texto corto']:
                 survey_id = demographic_data.get('survey_id', '')
                 question_object['question_group'] = open_questions_dict.get(survey_id, {}).get(question_text, '')
             else:

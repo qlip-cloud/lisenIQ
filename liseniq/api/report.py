@@ -282,9 +282,20 @@ def get_user_demographics():
 
 
 @frappe.whitelist()
-def get_cultura_responses():
+def get_cultura_responses(filters=None):
     try:
-        valid_surveys = get_valid_surveys()
+        # Parse filters if they come as a string
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+        filters = filters or {}
+        
+        frappe.logger().debug(f"get_cultura_responses called with filters: {filters}")
+        
+        valid_surveys = get_valid_surveys(filters)
+        frappe.logger().debug(f"Found {len(valid_surveys)} valid surveys")
+        
         if not valid_surveys:
             return []
         all_questions_map = get_all_unique_questions(valid_surveys)
@@ -450,12 +461,23 @@ def get_user_demographics_cultura():
         return []
 
 @frappe.whitelist()
-def get_engagement_responses():
+def get_engagement_responses(filters=None):
     """
     Retorna las respuestas de las encuestas de engagement sin demográficos
     """
     try:
-        valid_surveys = get_valid_engagement_surveys()
+        # Parse filters if they come as a string
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+        filters = filters or {}
+        
+        frappe.logger().debug(f"get_engagement_responses called with filters: {filters}")
+        
+        valid_surveys = get_valid_engagement_surveys(filters)
+        frappe.logger().debug(f"Found {len(valid_surveys)} valid engagement surveys")
+        
         if not valid_surveys:
             return []
 
@@ -537,8 +559,9 @@ def get_demographics_from_historic():
         frappe.log_error(f"Error getting demographics from historic: {str(e)}")
         return []
 
-def get_valid_surveys():
+def get_valid_surveys(filters=None):
     try:
+        
         query = """
             SELECT 
                 s.name as survey_name,
@@ -556,16 +579,24 @@ def get_valid_surveys():
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
             LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
             WHERE LOWER(st.qnc_category) = 'cultura'
-            ORDER BY s.name
         """
-        results = frappe.db.sql(query, as_dict=True)
+        if filters:
+            if filters.get('company'):
+                query += " AND c.co_name = %(company)s"
+            if filters.get('start_date') and filters.get('end_date'):
+                query += " AND s.creation BETWEEN %(start_date)s AND %(end_date)s"
+        query += " ORDER BY s.name"
+        results = frappe.db.sql(query, filters or {}, as_dict=True)
+        
         return results
     except Exception as e:
         frappe.log_error(f"Error getting valid surveys: {str(e)}")
         return []
 
-def get_valid_engagement_surveys():
+def get_valid_engagement_surveys(filters=None):
     try:
+        frappe.logger().debug(f"get_valid_engagement_surveys called with filters: {filters}")
+        
         query = """
             SELECT 
                 s.name as survey_name,
@@ -583,9 +614,21 @@ def get_valid_engagement_surveys():
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
             LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
             WHERE LOWER(st.qnc_category) = 'engagement'
-            ORDER BY s.name
         """
-        results = frappe.db.sql(query, as_dict=True)
+        if filters:
+            if filters.get('company'):
+                query += " AND c.co_name = %(company)s"
+            if filters.get('start_date') and filters.get('end_date'):
+                query += " AND s.creation BETWEEN %(start_date)s AND %(end_date)s"
+        query += " ORDER BY s.name"
+        
+        frappe.logger().debug(f"Executing query: {query}")
+        frappe.logger().debug(f"Query parameters: {filters or {}}")
+        
+        results = frappe.db.sql(query, filters or {}, as_dict=True)
+        
+        frappe.logger().debug(f"Query returned {len(results)} results")
+        
         return results
     except Exception as e:
         frappe.log_error(f"Error getting valid engagement surveys: {str(e)}")

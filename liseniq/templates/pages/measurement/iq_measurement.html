@@ -100,7 +100,14 @@
                 <div class="row">
                     <div class="col-md-5">
                         <div class="form-group">
-                            <label for="survey-type-select">Público a participar</label>
+                            <span class="tooltip-wrapper">
+                                <label for="survey-type-select" data-tooltip-bottom="Define quiénes podrán responder la medición:
+                                
+• Contactos cargados previamente: Lista de contactos que ya has importado a la plataforma. Puedes elegirlos como participantes según lo requiera tu medición.
+
+• Medición abierta: Permite que cualquier persona responda mediante un enlace público, sin necesidad de estar registrada como contacto.">Público a participar</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
                                 <option value="selected" selected>Segmento de contactos</option>
                                 <option value="anonymous_link">Medición Anónima</option>
@@ -110,7 +117,11 @@
                     <div class="col-md-5">
                         <div class="form-group">
                             <span class="tooltip-wrapper">
-                                <label for="response-type-select" data-tooltip-bottom="Indica si deseas identificar quién respondió la medición.">¿Quiere saber los detalles de quien respondió?</label>
+                                <label for="response-type-select" data-tooltip-bottom="Indica si deseas identificar quién respondió la medición.
+
+• Anónima: Las respuestas no se asociarán a la identidad del participante. Útil para obtener retroalimentación más honesta y libre.
+
+• No anónima: Las respuestas quedarán vinculadas a cada participante, permitiendo análisis individuales o segmentados con mayor precisión.">¿Quiere saber los detalles de quien respondió?</label>
                                 <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
                             </span>
                             <select id="response-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>

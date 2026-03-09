@@ -313,7 +313,7 @@
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.4;
-  white-space: normal;
+  white-space: pre-line;
   width: 220px;
   max-width: calc(100vw - 40px);
   text-align: left;
@@ -350,7 +350,7 @@
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.4;
-  white-space: normal;
+  white-space: pre-line;
   width: 220px;
   max-width: calc(100vw - 40px);
   text-align: left;

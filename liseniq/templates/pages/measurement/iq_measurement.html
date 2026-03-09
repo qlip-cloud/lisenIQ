@@ -23,22 +23,34 @@
                 <p class="text-muted small mb-4">Asígnale un nombre a tu medición para identificarla.</p>
                 <div class="measurement-form-grid">
                     <div class="form-group">
-                        <label for="measurement-name">Nombre de la medición</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-name" data-tooltip-bottom="Es el título que identifica tu medición. Úsalo para describir claramente el propósito o el tipo de encuesta que estás creando.">Nombre de la medición</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <input type="text" id="measurement-name" class="form-control" data-required="true" maxlength="75" {{ "disabled" if is_edit_mode }}>
                         <small id="measurement-name-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-start-date">Fecha y Hora de Inicio</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-start-date" data-tooltip-bottom="Momento en el que la medición se habilita y se envían los correos para que los participantes puedan responder.">Fecha y Hora de Inicio</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <input type="datetime-local" id="measurement-start-date" class="form-control" data-required="true">
                         <small id="measurement-start-date-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-end-date">Fecha y Hora de Finalización</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-end-date" data-tooltip-bottom="Momento en el que la medición se cerrará automáticamente y dejará de recibir respuestas.">Fecha y Hora de Finalización</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <input type="datetime-local" id="measurement-end-date" class="form-control">
                         <small id="measurement-end-date-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-timezone">Zona Horaria</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-timezone" data-tooltip-bottom="Zona horaria que se aplicará a las fechas y horas de la medición.">Zona Horaria</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <select id="measurement-timezone" class="form-control form-select" data-required="true" {{ "disabled" if is_edit_mode }}>
                             {% for tz in timezones %}
                             <option value="{{ tz }}" {% if tz == 'America/Bogota' %}selected{% endif %}>{{ tz }}</option>
@@ -74,7 +86,10 @@
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
-                    <h3 class="page-main-title">Participantes</h3>
+                    <span class="tooltip-wrapper">
+                        <h3 class="page-main-title" data-tooltip-bottom="Personas que recibirán la medición. Puedes seleccionarlos desde tus contactos o usar una medición abierta sin lista predefinida.">Participantes</h3>
+                        <span class="tooltip-icon"></span>
+                    </span>
                     <div class="form-action-buttons">
                         <button id="btn-back-step-3" class="btn btn-outline-purple">Atrás</button>
                         <button id="btn-next-step-3" class="btn btn-purple-main">Siguiente</button>
@@ -94,7 +109,10 @@
                     </div>
                     <div class="col-md-5">
                         <div class="form-group">
-                            <label for="response-type-select">¿Quiere saber los detalles de quien respondió?</label>
+                            <span class="tooltip-wrapper">
+                                <label for="response-type-select" data-tooltip-bottom="Indica si deseas identificar quién respondió la medición.">¿Quiere saber los detalles de quien respondió?</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <select id="response-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
                                 <option value="identified">No Anónima</option>
                                 <option value="anonymous">Anónima</option>
@@ -106,16 +124,22 @@
                 <div id="selected-contacts-section" class="mt-4">
                     <div class="form-check mb-4">
                         <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check">
-                        <label class="form-check-label" for="send-all-contacts-check">
-                            Enviar a todos mis contactos
-                        </label>
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" for="send-all-contacts-check" data-tooltip-bottom="Opción para seleccionar automáticamente a todos los contactos disponibles en tu empresa y enviarlos como participantes de la medición.">
+                                Enviar a todos mis contactos
+                            </label>
+                            <span class="tooltip-icon"></span>
+                        </span>
                     </div>
                     
                     <div class="row align-items-start">
                         <div class="col-md-10">
                             <div class="contacts-filter-section">
                                 <div class="form-group">
-                                    <label for="field-type-select">Segmentación</label>
+                                    <span class="tooltip-wrapper">
+                                        <label for="field-type-select" data-tooltip-bottom="Función para dividir tus contactos por criterios como área, ciudad, cargo o cualquier corte demográfico configurado.​">Segmentación</label>
+                                        <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                    </span>
                                     <select id="field-type-select" class="form-control form-select">
                                         <option value="" selected>Seleccionar tipo de segmentación...</option>
                                         {% for demo in contact_demographics %}
@@ -126,7 +150,10 @@
                                 
                                 <div class="categories-selection-container">
                                     <div class="categories-box">
-                                        <label>Segmentos disponibles</label>
+                                        <span class="tooltip-wrapper">
+                                            <label data-tooltip-bottom="Lista de segmentos que has creado previamente. Puedes combinarlos para definir exactamente quién recibirá la medición.">Segmentos disponibles</label>
+                                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                        </span>
                                         <div id="available-categories" class="categories-list">
                                         </div>
                                     </div>
@@ -134,7 +161,10 @@
                                         <i class="fa fa-arrow-right"></i>
                                     </div>
                                     <div class="categories-box">
-                                        <label>Segmentos seleccionados</label>
+                                        <span class="tooltip-wrapper">
+                                            <label data-tooltip-bottom="Son los segmentos que has elegido para participar en la medición. Solo los contactos incluidos en ellos recibirán la encuesta.">Segmentos seleccionados</label>
+                                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                        </span>
                                         <div id="selected-categories" class="categories-list"></div>
                                     </div>
                                 </div>
@@ -142,7 +172,10 @@
                         </div>
                         <div class="col-md-2">
                             <div class="contact-count-card">
-                                <span class="count-label">Total de contactos a enviar</span>
+                                <span class="tooltip-wrapper">
+                                    <span class="count-label" data-tooltip-bottom="Cantidad de personas que recibirán la medición según la selección realizada. Se actualiza automáticamente cuando eliges segmentos o contactos individuales.">Total de contactos a enviar</span>
+                                    <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                </span>
                                 <div class="count-display">
                                     <span id="contact-count-number" class="count-number">0</span>
                                     <i id="view-contacts-btn" class="fa fa-eye view-contacts-icon" title="Ver contactos seleccionados"></i>
@@ -161,7 +194,10 @@
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
-                    <h3 class="page-main-title">Personalización</h3>
+                    <span class="tooltip-wrapper">
+                        <h3 class="page-main-title" data-tooltip-bottom="Modifica el contenido del mensaje que recibirán los participantes. Puedes ajustar el texto, el tono y los detalles de la invitación para adaptarlos a tu empresa o a la medición.">Personalización</h3>
+                        <span class="tooltip-icon"></span>
+                    </span>
                     <div class="form-action-buttons">
                         <button id="btn-back-step-4" class="btn btn-outline-purple">Atrás</button>
                         <button id="btn-next-step-4" class="btn btn-purple-main">Siguiente</button>
@@ -175,24 +211,44 @@
 
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="email-use-default-template">
-                        <label class="form-check-label" for="email-use-default-template">Usar plantilla por defecto</label>
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" data-tooltip-bottom="Utiliza el mensaje estándar recomendado por la plataforma para invitaciones o recordatorios. Es una opción rápida si no deseas personalizar el texto." for="email-use-default-template">Usar plantilla por defecto</label>
+                            <span class="tooltip-icon"></span>
+                        </span>
                     </div>
 
                     <div id="email-customization-fields">
                         <div class="email-type-toggle mb-3">
                             <div class="btn-group" role="group" aria-label="Tipo de correo">
-                                <button type="button" id="email-type-invitation-btn" class="btn btn-purple-main">Invitación a la encuesta</button>
-                                <button type="button" id="email-type-reminder-btn" class="btn btn-outline-purple">Correo de recordatorio</button>
+                                <button type="button" id="email-type-invitation-btn" class="btn btn-purple-main">
+                                    <span class="tooltip-wrapper">
+                                        <span data-tooltip-bottom="Mensaje que se enviará a los participantes al inicio de la medición para invitarlos a responder la encuesta.">Invitación a la encuesta</span>
+                                        <span class="tooltip-icon"></span>
+                                    </span>
+                                    
+                                </button>
+                                <button type="button" id="email-type-reminder-btn" class="btn btn-outline-purple">
+                                    <span class="tooltip-wrapper">
+                                        <span data-tooltip-bottom="Mensaje que se envía a los participantes que aún no han respondido la medición. Ayuda a aumentar la tasa de respuesta antes del cierre de la encuesta.">Correo de recordatorio</span>
+                                        <span class="tooltip-icon"></span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="email-subject">Asunto</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Título del correo que verán los participantes en su bandeja de entrada. Debe ser claro y motivador para aumentar la apertura del mensaje." for="email-subject">Asunto</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <input type="text" id="email-subject" class="form-control" maxlength="150" placeholder="Escribe el asunto del correo">
                         </div>
 
                         <div class="form-group mt-3">
-                            <label for="email-body">Cuerpo del mensaje</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Contenido del correo donde explicas el propósito de la medición, instrucciones y cualquier información relevante. Puedes personalizarlo según tu empresa o el tono deseado." for="email-body">Cuerpo del mensaje</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <textarea id="email-body" class="form-control email-body-textarea" rows="8" placeholder=""></textarea>
                         </div>
                     </div>
@@ -243,9 +299,12 @@
 
                     <div class="form-check mt-4 mb-3">
                         <input class="form-check-input" type="checkbox" value="" id="send-reminders-check">
-                        <label class="form-check-label" for="send-reminders-check">
-                            Enviar recordatorios
-                        </label>
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" for="send-reminders-check" data-tooltip-bottom="Activa o desactiva el envío automático de recordatorios a quienes no hayan respondido. Puedes programarlos para asegurar una mayor participación.​">
+                                Enviar recordatorios
+                            </label>
+                            <span class="tooltip-icon"></span>
+                        </span>
                     </div>
 
                     <div id="reminders-section" class="d-none">

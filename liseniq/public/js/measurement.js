@@ -28,8 +28,11 @@ class MeasurementCreator {
                 startDate: document.getElementById('measurement-start-date'),
                 endDate: document.getElementById('measurement-end-date'),
                 timezone: document.getElementById('measurement-timezone'),
+                isLeadership: document.getElementById('measurement-is-leadership'),
             },
             contactsStep: {
+                standardSection: document.getElementById('standard-contacts-section'),
+                leadershipSection: document.getElementById('leadership-contacts-section'),
                 surveyTypeSelect: document.getElementById('survey-type-select'),
                 responseTypeSelect: document.getElementById('response-type-select'),
                 selectedContactsSection: document.getElementById('selected-contacts-section'),
@@ -41,6 +44,12 @@ class MeasurementCreator {
                 arrow: document.querySelector('.categories-arrow'),
                 contactCountNumber: document.getElementById('contact-count-number'),
                 viewContactsBtn: document.getElementById('view-contacts-btn'),
+            },
+            leadershipStep: {
+                leaderSearch: document.getElementById('leadership-leader-search'),
+                leaderResults: document.getElementById('leadership-leader-results'),
+                btnAddLeader: document.getElementById('btn-add-leader'),
+                networksContainer: document.getElementById('leadership-networks-container')
             },
             personalizationStep: {
                 typeButtons: {
@@ -74,18 +83,27 @@ class MeasurementCreator {
             breadcrumbs: document.querySelectorAll('.measurement-name-breadcrumb'),
         };
 
+        this.leadershipRoles = [];
+        const rolesDataEl = document.getElementById('leadership-roles-data');
+        if (rolesDataEl) {
+            try { this.leadershipRoles = JSON.parse(rolesDataEl.dataset.roles); } catch(e){}
+        }
+
         this.state = {
             currentStep: 1,
             isEditMode: false,
             docName: null,
             contactCountDebounceTimer: null,
+            contactSearchTimer: null,
             currentEmailType: 'invitation',
             measurementData: {
                 name: '',
+                isLeadership: false,
                 startDate: '',
                 endDate: '',
                 timezone: 'America/Bogota',
                 questions: [],
+                leadershipNetwork: [], // Array { leader: {id, name_display}, evaluators: [{id, name, role, role_id, isAuto}] }
                 contacts: {
                     surveyType: 'selected',
                     responseType: 'anonymous',
@@ -142,6 +160,17 @@ class MeasurementCreator {
                 console.error("Error al parsear las preguntas precargadas:", e);
             }
         }
+
+        // Marcar automáticamente como Liderazgo si la plantilla proviene de esa categoría
+        const leadershipDataEl = document.getElementById('template-is-leadership-data');
+        if (leadershipDataEl && leadershipDataEl.dataset.isLeadership === '1') {
+            if (this.ui.step1Form.isLeadership) {
+                this.ui.step1Form.isLeadership.checked = true;
+                this.ui.step1Form.isLeadership.disabled = true;
+            }
+            this.state.measurementData.isLeadership = true;
+            this.questionBuilder.setCategory('Liderazgo');
+        }
     }
 
     loadMeasurementForEdit() {
@@ -158,12 +187,25 @@ class MeasurementCreator {
             if (data.startDate) this.ui.step1Form.startDate.value = String(data.startDate).slice(0, 16);
             if (data.endDate) this.ui.step1Form.endDate.value = String(data.endDate).slice(0, 16);
             if (data.timezone) this.ui.step1Form.timezone.value = data.timezone;
+            if (this.ui.step1Form.isLeadership) {
+                this.ui.step1Form.isLeadership.checked = !!data.isLeadership;
+            }
 
             this.state.measurementData.name = data.name || '';
+            this.state.measurementData.isLeadership = !!data.isLeadership;
             this.state.measurementData.startDate = this.ui.step1Form.startDate.value;
             this.state.measurementData.endDate = this.ui.step1Form.endDate.value;
             this.state.measurementData.timezone = this.ui.step1Form.timezone.value;
             this.updateBreadcrumbs();
+
+            if (this.state.measurementData.isLeadership) {
+                this.questionBuilder.setCategory('Liderazgo');
+                // Cargar estructura de liderazgo si existe
+                if (data.leadershipNetwork && Array.isArray(data.leadershipNetwork)) {
+                    this.state.measurementData.leadershipNetwork = data.leadershipNetwork;
+                    this.renderLeadershipNetworks();
+                }
+            }
 
             // Preguntas (visualización)
             if (data.questions) {
@@ -175,9 +217,9 @@ class MeasurementCreator {
                 this.questionBuilder.setReadOnly(true);
             }
 
-            // Participantes
-            if (data.contacts) {
-                const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber /*, viewContactsBtn*/ } = this.ui.contactsStep;
+            // Participantes Convencional
+            if (data.contacts && !this.state.measurementData.isLeadership) {
+                const { surveyTypeSelect, responseTypeSelect, selectedContactsSection, contactCountNumber } = this.ui.contactsStep;
                 if (surveyTypeSelect) surveyTypeSelect.value = data.contacts.surveyType || 'selected';
                 if (responseTypeSelect) responseTypeSelect.value = data.contacts.responseType || 'anonymous';
                 
@@ -191,11 +233,8 @@ class MeasurementCreator {
                 }
 
                 this.state.measurementData.contacts.headers = Array.isArray(data.contacts.headers) && data.contacts.headers.length > 0
-                    ? data.contacts.headers
-                    : ['Nombre'];
-                this.state.measurementData.contacts.list = Array.isArray(data.contacts.list)
-                    ? data.contacts.list
-                    : [];
+                    ? data.contacts.headers : ['Nombre'];
+                this.state.measurementData.contacts.list = Array.isArray(data.contacts.list) ? data.contacts.list : [];
 
                 if (contactCountNumber) {
                     const safeCount = this.state.measurementData.contacts.list.length;
@@ -214,7 +253,7 @@ class MeasurementCreator {
                 this.ui.reviewStep.remindersSection.classList.add('d-none');
             }
 
-            // Personalización de correo (asunto/cuerpo)
+            // Personalización de correo
             if (data.su_invitation_subject || data.su_invitation_body || data.su_reminder_subject || data.su_reminder_body) {
                 this.state.measurementData.emailCustomization = {
                     invitation_subject: data.su_invitation_subject || '',
@@ -253,8 +292,14 @@ class MeasurementCreator {
             });
         }
 
-        const { surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect, availableCategories, selectedCategories } = this.ui.contactsStep;
+        const { surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect, availableCategories, selectedCategories, leadershipSection } = this.ui.contactsStep;
         [surveyTypeSelect, responseTypeSelect].forEach(el => el && (el.disabled = true));
+        
+        if (this.state.isEditMode && leadershipSection) {
+            leadershipSection.querySelectorAll('input, select, button').forEach(el => {
+                el.disabled = true;
+            });
+        }
     }
 
     showStep(stepNumber) {
@@ -268,15 +313,24 @@ class MeasurementCreator {
         if (stepNumber === 2) {
             this.ui.navButtons.next2.disabled = this.state.measurementData.questions.length === 0;
         }
+        
         if (stepNumber === 3) {
-            const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
-            if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
-                selectedContactsSection?.classList.remove('d-none');
+            if (this.state.measurementData.isLeadership) {
+                this.ui.contactsStep.standardSection.classList.add('d-none');
+                this.ui.contactsStep.leadershipSection.classList.remove('d-none');
             } else {
-                // Ocultar sección de contactos si es anónimo o default
-                selectedContactsSection?.classList.add('d-none');
+                this.ui.contactsStep.leadershipSection.classList.add('d-none');
+                this.ui.contactsStep.standardSection.classList.remove('d-none');
+                
+                const { surveyTypeSelect, selectedContactsSection } = this.ui.contactsStep;
+                if (surveyTypeSelect && surveyTypeSelect.value === 'selected') {
+                    selectedContactsSection?.classList.remove('d-none');
+                } else {
+                    selectedContactsSection?.classList.add('d-none');
+                }
             }
         }
+        
         if (stepNumber === 4) {
             this.initWysiwygEditor(true, () => {
                 if (this.state.isEditMode) this.setEmailType('invitation');
@@ -288,11 +342,19 @@ class MeasurementCreator {
     }
 
     initializeEventListeners() {
-        const { navButtons, contactsStep, step1Form, contactsModal, reviewStep, personalizationStep } = this.ui;
+        const { navButtons, contactsStep, leadershipStep, step1Form, contactsModal, reviewStep, personalizationStep } = this.ui;
 
         navButtons.next1?.addEventListener('click', async () => {
             if (await this.validateStep1()) {
                 this.state.measurementData.name = step1Form.name.value.trim();
+                this.state.measurementData.isLeadership = step1Form.isLeadership ? step1Form.isLeadership.checked : false;
+                
+                if (this.state.measurementData.isLeadership) {
+                    this.questionBuilder.setCategory('Liderazgo');
+                } else {
+                    this.questionBuilder.setCategory('');
+                }
+
                 this.updateBreadcrumbs();
                 this.showStep(2);
             }
@@ -307,16 +369,15 @@ class MeasurementCreator {
         });
         navButtons.back4?.addEventListener('click', () => this.showStep(3));
         navButtons.next4?.addEventListener('click', () => {
-            // Guarda cambios de personalización y pasa a revisión
             this.syncEmailStateFromFields();
-            if (!this.validateEmailCustomization()) return; // Validar antes de continuar
+            if (!this.validateEmailCustomization()) return;
             this.renderReviewStep();
             this.showStep(5);
         });
         navButtons.back5?.addEventListener('click', () => this.showStep(4));
         navButtons.next5?.addEventListener('click', () => this.saveMeasurement());
 
-        // Personalización
+        // Eventos de Personalización
         personalizationStep.typeButtons.invitation?.addEventListener('click', () => {
             this.setEmailType('invitation');
             this.syncEmailFieldsFromState();
@@ -348,7 +409,7 @@ class MeasurementCreator {
             this.updateStep4NextButton();
         });
 
-        // Listeners que deben funcionar en ambos modos (creación y edición)
+        // Eventos Participantes (Convencional)
         contactsStep.sendAllContactsCheck?.addEventListener('change', () => this.handleSendAllCheckChange());
         contactsStep.fieldTypeSelect?.addEventListener('change', () => this.handleFieldTypeChange());
 
@@ -366,11 +427,46 @@ class MeasurementCreator {
             triggerUpdate();
         });
 
-        // Solo habilitar listeners de participantes en modo creación
         if (!this.state.isEditMode) {
             contactsStep.surveyTypeSelect?.addEventListener('change', () => this.handleSurveyTypeChange());
         }
-    
+
+        // Eventos Participantes (Liderazgo)
+        let selectedLeader = null;
+        leadershipStep.leaderSearch?.addEventListener('input', (e) => {
+            const term = e.target.value.trim();
+            selectedLeader = null;
+            leadershipStep.btnAddLeader.disabled = true;
+            if (term.length > 1) {
+                this.searchContacts(term, leadershipStep.leaderResults, (contact) => {
+                    selectedLeader = contact;
+                    leadershipStep.leaderSearch.value = contact.name_display;
+                    leadershipStep.btnAddLeader.disabled = false;
+                    leadershipStep.leaderResults.style.display = 'none';
+                });
+            } else {
+                leadershipStep.leaderResults.style.display = 'none';
+            }
+        });
+
+        leadershipStep.btnAddLeader?.addEventListener('click', () => {
+            if (selectedLeader) {
+                this.addLeaderToNetwork(selectedLeader);
+                selectedLeader = null;
+                leadershipStep.leaderSearch.value = '';
+                leadershipStep.btnAddLeader.disabled = true;
+            }
+        });
+
+        // Ocultar dropdowns al clickear fuera
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#leadership-contacts-section')) {
+                if (leadershipStep.leaderResults) leadershipStep.leaderResults.style.display = 'none';
+                document.querySelectorAll('.evaluator-results').forEach(el => el.style.display = 'none');
+            }
+        });
+
+        // Eventos Modales Convencional
         contactsStep.viewContactsBtn?.addEventListener('click', () => this.showContactsModal());
         reviewStep.viewContactsBtn?.addEventListener('click', () => this.showContactsModal());
         contactsModal.closeBtn?.addEventListener('click', () => this.hideContactsModal());
@@ -378,7 +474,6 @@ class MeasurementCreator {
             if (e.target === contactsModal.modal) this.hideContactsModal();
         });
 
-        // Delegación: eliminar contacto (solo modo edición)
         contactsModal.tableBody?.addEventListener('click', async (e) => {
             const btn = e.target.closest('.btn-delete-contact');
             if (!btn) return;
@@ -386,8 +481,7 @@ class MeasurementCreator {
 
             const contactName = btn.dataset.contactName;
             const displayName = btn.dataset.displayName || contactName;
-            const confirmed = window.confirm(`¿Desea eliminar el contacto "${displayName}" de esta medición?` +
-                `\nSi el contacto respondió, también se eliminará su respuesta asociada a esta medición.`);
+            const confirmed = window.confirm(`¿Desea eliminar el contacto "${displayName}" de esta medición?\nSi el contacto respondió, también se eliminará su respuesta.`);
             if (!confirmed) return;
 
             const originalHtml = btn.innerHTML;
@@ -396,10 +490,9 @@ class MeasurementCreator {
 
             try {
                 await this.deleteContactFromMeasurement(contactName);
-                // Actualizar estado y UI localmente
                 this.state.measurementData.contacts.list = this.state.measurementData.contacts.list.filter(c => c.name !== contactName);
                 this.updateContactsCountersUI();
-                this.showContactsModal(); // re-render modal
+                this.showContactsModal(); 
                 showGlobalNotification('Contacto eliminado correctamente.', 'success');
             } catch (err) {
                 console.error(err);
@@ -450,7 +543,6 @@ class MeasurementCreator {
         if (startDate && startDate.value) {
             const selectedDate = new Date(startDate.value);
             const now = new Date();
-            // Normalizamos las fechas al inicio del día (00:00:00) para permitir la fecha actual
             const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
             const currentDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -504,6 +596,15 @@ class MeasurementCreator {
     
     validateStep3() {
         if (this.state.isEditMode) return true;
+        
+        if (this.state.measurementData.isLeadership) {
+            if (this.state.measurementData.leadershipNetwork.length === 0) {
+                showGlobalNotification('Debe seleccionar y configurar al menos a un líder para continuar.', 'error');
+                return false;
+            }
+            return true;
+        }
+
         const { surveyTypeSelect } = this.ui.contactsStep;
         
         // Si es enlace anónimo no valido contactos
@@ -538,26 +639,218 @@ class MeasurementCreator {
         }
     }
 
+    // Funciones para manejo de contactos (Liderazgo)
+    searchContacts(term, resultsContainer, onSelect) {
+        clearTimeout(this.state.contactSearchTimer);
+        this.state.contactSearchTimer = setTimeout(async () => {
+            resultsContainer.innerHTML = '<div class="p-2 text-center text-muted small"><i class="fa fa-spinner fa-spin"></i></div>';
+            resultsContainer.style.display = 'block';
+            try {
+                const response = await frappe.call({
+                    method: 'liseniq.www.measurement.new_measurement.search_company_contacts',
+                    args: { search_term: term }
+                });
+                resultsContainer.innerHTML = '';
+                if (response.message && response.message.length > 0) {
+                    response.message.forEach(c => {
+                        const div = document.createElement('div');
+                        div.className = 'autocomplete-item';
+                        
+                        let subtext = [];
+                        if (c.email) subtext.push(c.email);
+                        if (c.dni) subtext.push(`DNI: ${c.dni}`);
+                        
+                        if (subtext.length > 0) {
+                            div.innerHTML = `
+                                <div>${frappe.utils.escape_html(c.full_name)}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">${frappe.utils.escape_html(subtext.join(' | '))}</div>
+                            `;
+                        } else {
+                            div.textContent = c.full_name;
+                        }
+                        
+                        div.addEventListener('click', () => onSelect({ id: c.name, name_display: c.full_name }));
+                        resultsContainer.appendChild(div);
+                    });
+                } else {
+                    resultsContainer.innerHTML = '<div class="p-2 text-muted small">No se encontraron contactos.</div>';
+                }
+            } catch (err) {
+                resultsContainer.innerHTML = '<div class="p-2 text-danger small">Error en la búsqueda.</div>';
+            }
+        }, 300);
+    }
+
+    addLeaderToNetwork(leader) {
+        if (this.state.measurementData.leadershipNetwork.some(n => n.leader.id === leader.id)) {
+            showGlobalNotification('Este colaborador ya ha sido añadido a la evaluación.', 'error');
+            return;
+        }
+        
+        const network = {
+            leader: leader,
+            evaluators: [
+                { id: leader.id, name: leader.name_display, role: 'Autoevaluación', isAuto: true }
+            ]
+        };
+        this.state.measurementData.leadershipNetwork.push(network);
+        this.renderLeadershipNetworks();
+    }
+
+    renderLeadershipNetworks() {
+        const container = this.ui.leadershipStep.networksContainer;
+        container.innerHTML = '';
+        
+        this.state.measurementData.leadershipNetwork.forEach((network) => {
+            const card = document.createElement('div');
+            card.className = 'leadership-network-card';
+            
+            let roleOptions = '<option value="">Seleccione rol...</option>';
+            this.leadershipRoles.forEach(r => {
+                roleOptions += `<option value="${r.co_label}">${frappe.utils.escape_html(r.co_label)}</option>`;
+            });
+
+            card.innerHTML = `
+                <div class="leadership-network-header">
+                    <h5>Evaluación 360°: ${frappe.utils.escape_html(network.leader.name_display)}</h5>
+                    ${this.state.isEditMode ? '' : `<button type="button" class="btn btn-sm btn-outline-danger btn-remove-leader" data-id="${network.leader.id}"><i class="fa fa-trash"></i> Quitar Colaborador</button>`}
+                </div>
+                <div class="leadership-network-body">
+                    ${this.state.isEditMode ? '' : `
+                    <div class="evaluator-add-row row align-items-end">
+                        <div class="col-md-5">
+                            <div class="form-group mb-0 position-relative">
+                                <label>Buscar Evaluador</label>
+                                <input type="text" class="form-control evaluator-search" data-leader-id="${network.leader.id}" placeholder="Nombre, Correo o Documento de Acceso">
+                                <div class="autocomplete-results evaluator-results" style="display:none;"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group mb-0">
+                                <label>Rol de Evaluador</label>
+                                <select class="form-control form-select evaluator-role" data-leader-id="${network.leader.id}">
+                                    ${roleOptions}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" class="btn btn-purple-main w-100 btn-add-evaluator" data-leader-id="${network.leader.id}" disabled>+ Añadir</button>
+                        </div>
+                    </div>`}
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Evaluador</th>
+                                    <th>Rol</th>
+                                    <th width="100">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${network.evaluators.map(ev => `
+                                    <tr>
+                                        <td>${frappe.utils.escape_html(ev.name)}</td>
+                                        <td>${frappe.utils.escape_html(ev.role)}</td>
+                                        <td>
+                                            ${ev.isAuto ? '<span class="text-muted small">Automático</span>' : (this.state.isEditMode ? '<span class="text-muted small">-</span>' : `<button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-evaluator" data-leader-id="${network.leader.id}" data-evaluator-id="${ev.id}"><i class="fa fa-trash"></i> Quitar</button>`)}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+            
+            if (!this.state.isEditMode) {
+                this.attachLeadershipCardEvents(card, network);
+            }
+        });
+    }
+
+    attachLeadershipCardEvents(card, network) {
+        card.querySelector('.btn-remove-leader')?.addEventListener('click', () => {
+            this.state.measurementData.leadershipNetwork = this.state.measurementData.leadershipNetwork.filter(n => n.leader.id !== network.leader.id);
+            this.renderLeadershipNetworks();
+        });
+        
+        const searchInput = card.querySelector('.evaluator-search');
+        const resultsBox = card.querySelector('.evaluator-results');
+        const roleSelect = card.querySelector('.evaluator-role');
+        const addBtn = card.querySelector('.btn-add-evaluator');
+        
+        let selectedEvaluator = null;
+        
+        searchInput?.addEventListener('input', (e) => {
+            const term = e.target.value.trim();
+            selectedEvaluator = null;
+            this.checkAddEvaluatorBtn(selectedEvaluator, roleSelect, addBtn);
+            if (term.length > 1) {
+                this.searchContacts(term, resultsBox, (contact) => {
+                    selectedEvaluator = contact;
+                    searchInput.value = contact.name_display;
+                    resultsBox.style.display = 'none';
+                    this.checkAddEvaluatorBtn(selectedEvaluator, roleSelect, addBtn);
+                });
+            } else {
+                resultsBox.style.display = 'none';
+            }
+        });
+        
+        roleSelect?.addEventListener('change', () => {
+            this.checkAddEvaluatorBtn(selectedEvaluator, roleSelect, addBtn);
+        });
+        
+        addBtn?.addEventListener('click', () => {
+            if (selectedEvaluator && roleSelect.value) {
+                if (network.evaluators.some(e => e.id === selectedEvaluator.id)) {
+                    showGlobalNotification('Este contacto ya evalúa a este líder.', 'error');
+                    return;
+                }
+                const roleValue = roleSelect.value;
+                network.evaluators.push({
+                    id: selectedEvaluator.id,
+                    name: selectedEvaluator.name_display,
+                    role: roleValue,
+                    role_id: roleValue,
+                    isAuto: false
+                });
+                this.renderLeadershipNetworks();
+            }
+        });
+        
+        card.querySelectorAll('.btn-remove-evaluator').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const evalId = e.currentTarget.dataset.evaluatorId;
+                network.evaluators = network.evaluators.filter(ev => ev.id !== evalId);
+                this.renderLeadershipNetworks();
+            });
+        });
+    }
+
+    checkAddEvaluatorBtn(evaluator, select, btn) {
+        if(btn) btn.disabled = !(evaluator && select.value);
+    }
+
+    // Resto de funciones (Convencionales) ----------------------------
+
     handleSurveyTypeChange() {
         const { surveyTypeSelect, selectedContactsSection, responseTypeSelect } = this.ui.contactsStep;
         const { useDefaultCheck } = this.ui.personalizationStep;
         const { sendRemindersCheck, remindersSection } = this.ui.reviewStep;
         
-        // Lógica de aislamiento para el flujo anónimo
         if (surveyTypeSelect.value === 'anonymous_link') {
             selectedContactsSection.classList.add('d-none');
-            
-            // Forzar respuesta anónima y deshabilitar selector
             responseTypeSelect.value = 'anonymous';
             responseTypeSelect.disabled = true;
             this.state.measurementData.contacts.list = [];
 
-            // Bloquear plantilla por defecto y recordatorios
-            // Usar plantilla por defecto: Checked y Disabled
             if (useDefaultCheck) {
                 useDefaultCheck.checked = true;
                 useDefaultCheck.disabled = true;
-                this.applyEmailCustomizationToggle(); // Ocultar campos de personalización
+                this.applyEmailCustomizationToggle();
                 this.state.wasUsingDefault = true;
             }
 
@@ -572,7 +865,6 @@ class MeasurementCreator {
             selectedContactsSection.classList.remove('d-none');
             responseTypeSelect.disabled = false;
             
-            // Restaurar controles si el usuario cambia de opción
             if (useDefaultCheck) useDefaultCheck.disabled = false;
             if (sendRemindersCheck) sendRemindersCheck.disabled = false;
 
@@ -580,7 +872,6 @@ class MeasurementCreator {
             selectedContactsSection.classList.add('d-none');
             responseTypeSelect.disabled = false;
 
-            // Restaurar controles si el usuario cambia de opción
             if (useDefaultCheck) useDefaultCheck.disabled = false;
             if (sendRemindersCheck) sendRemindersCheck.disabled = false;
         }
@@ -738,7 +1029,6 @@ class MeasurementCreator {
         const { invitation, reminder } = this.ui.personalizationStep.typeButtons;
         if (!invitation || !reminder) return;
 
-        // Limpiar clases anteriores
         invitation.classList.remove('email-type-active');
         reminder.classList.remove('email-type-active');
 
@@ -783,7 +1073,6 @@ class MeasurementCreator {
     }
 
     syncEmailStateFromFields() {
-        // Si se usa plantilla por defecto, no almacenar cambios
         if (this.ui.personalizationStep.useDefaultCheck?.checked) return;
         const { subject, body } = this.ui.personalizationStep;
         const ec = this.state.measurementData.emailCustomization;
@@ -799,7 +1088,6 @@ class MeasurementCreator {
         }
     }
 
-    // Control dinámico del botón, habilitar o deshabilitar según validez
     updateStep4NextButton() {
         const btn = this.ui.navButtons.next4;
         if (!btn) return;
@@ -842,6 +1130,7 @@ class MeasurementCreator {
 
         const basePayload = {
             name: this.state.measurementData.name,
+            is_leadership: this.state.measurementData.isLeadership,
             startDate: step1Form.startDate.value,
             endDate: step1Form.endDate.value,
             email_customization: emailCustomization,
@@ -854,6 +1143,7 @@ class MeasurementCreator {
                 ...basePayload, 
                 is_edit_mode: true, 
                 doc_name: this.state.docName,
+                leadershipNetwork: this.state.measurementData.leadershipNetwork,
                 contacts: {
                     surveyType: this.ui.contactsStep.surveyTypeSelect?.value || 'selected',
                     responseType: this.ui.contactsStep.responseTypeSelect?.value || 'identified',
@@ -864,6 +1154,7 @@ class MeasurementCreator {
                 ...basePayload,
                 timezone: step1Form.timezone.value,
                 questions: this.state.measurementData.questions,
+                leadershipNetwork: this.state.measurementData.leadershipNetwork,
                 contacts: {
                     surveyType: contactsStep.surveyTypeSelect.value,
                     responseType: contactsStep.responseTypeSelect.value,
@@ -897,37 +1188,49 @@ class MeasurementCreator {
 
         measurementName.textContent = this.state.measurementData.name;
 
-        if (this.state.isEditMode) {
-            const dataEl = document.getElementById('measurement-data');
-            const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
+        if (this.state.measurementData.isLeadership) {
+            surveyType.textContent = 'Liderazgo (360°)';
+            responseType.textContent = 'No Anónima';
             
-            // Texto para modo edición
-            if (data?.contacts?.surveyType === 'anonymous_link') {
-                surveyType.textContent = 'Medición Anónima';
-            } else if (data?.contacts?.surveyType === 'selected') {
-                surveyType.textContent = 'Contactos Cargados Previamente';
-            } else {
-                surveyType.textContent = 'Público Externo';
-            }
-
-            responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
-            questionsCount.textContent = (data?.questions || []).length;
-
-            const listLen = this.state.measurementData.contacts.list?.length || 0;
-            contactCount.textContent = listLen;
-            if (viewContactsBtn) viewContactsBtn.style.display = (listLen > 0 && data?.contacts?.surveyType !== 'anonymous_link') ? 'inline-block' : 'none';
-        } else {
-            surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
-            responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
+            let evaluatorsCount = 0;
+            this.state.measurementData.leadershipNetwork.forEach(n => evaluatorsCount += n.evaluators.length);
+            
+            contactCount.textContent = evaluatorsCount;
+            if (viewContactsBtn) viewContactsBtn.style.display = 'none';
+            
             questionsCount.textContent = this.state.measurementData.questions.length;
-            
-            // Revisión en modo anónimo
-            if (surveyTypeSelect.value === 'anonymous_link') {
-                contactCount.textContent = "N/A";
-                if (viewContactsBtn) viewContactsBtn.style.display = 'none';
+        } else {
+            if (this.state.isEditMode) {
+                const dataEl = document.getElementById('measurement-data');
+                const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
+                
+                if (data?.contacts?.surveyType === 'anonymous_link') {
+                    surveyType.textContent = 'Medición Anónima';
+                } else if (data?.contacts?.surveyType === 'selected') {
+                    surveyType.textContent = 'Contactos Cargados Previamente';
+                } else {
+                    surveyType.textContent = 'Público Externo';
+                }
+
+                responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
+                questionsCount.textContent = (data?.questions || []).length;
+
+                const listLen = this.state.measurementData.contacts.list?.length || 0;
+                contactCount.textContent = listLen;
+                if (viewContactsBtn) viewContactsBtn.style.display = (listLen > 0 && data?.contacts?.surveyType !== 'anonymous_link') ? 'inline-block' : 'none';
             } else {
-                contactCount.textContent = this.state.measurementData.contacts.list.length;
-                this.ui.reviewStep.viewContactsBtn.style.display = 'inline-block';
+                surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
+                responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
+                questionsCount.textContent = this.state.measurementData.questions.length;
+                
+            // Revisión en modo anónimo
+                if (surveyTypeSelect.value === 'anonymous_link') {
+                    contactCount.textContent = "N/A";
+                    if (viewContactsBtn) viewContactsBtn.style.display = 'none';
+                } else {
+                    contactCount.textContent = this.state.measurementData.contacts.list.length;
+                    this.ui.reviewStep.viewContactsBtn.style.display = 'inline-block';
+                }
             }
         }
 
@@ -991,7 +1294,6 @@ class MeasurementCreator {
                 th.textContent = frappe.utils.escape_html(h);
                 headerRow.appendChild(th);
             });
-            // Agregar columna de acciones en modo edición
             if (this.state.isEditMode) {
                 const th = document.createElement('th');
                 th.textContent = 'Acciones';
@@ -999,7 +1301,6 @@ class MeasurementCreator {
             }
         }
 
-        // Filas con datos
         if (contacts && contacts.length > 0) {
             contacts.forEach(c => {
                 const row = tableBody.insertRow();
@@ -1008,13 +1309,12 @@ class MeasurementCreator {
                     cell.textContent = frappe.utils.escape_html(c[h] || 'N/A');
                 });
 
-                // Celda de acciones (solo modo edición)
                 if (this.state.isEditMode) {
                     const cell = row.insertCell();
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'btn btn-link text-danger btn-delete-contact';
-                    btn.dataset.contactName = c.name; // name es el ID interno del Contact
+                    btn.dataset.contactName = c.name; 
                     btn.dataset.displayName = c['Nombre'] || '';
                     btn.innerHTML = `<i class="fa fa-trash"></i> Eliminar`;
                     cell.appendChild(btn);
@@ -1076,7 +1376,6 @@ class MeasurementCreator {
         const useDefault = !!this.ui.personalizationStep.useDefaultCheck?.checked;
         if (useDefault) return true;
 
-        // Validar que ambos tipos (invitación y recordatorio) tengan asunto y cuerpo
         const ec = this.state.measurementData.emailCustomization;
 
         const invSubject = (ec.invitation_subject || '').trim();
@@ -1084,7 +1383,6 @@ class MeasurementCreator {
         const remSubject = (ec.reminder_subject || '').trim();
         const remBody = (ec.reminder_body || '').trim();
 
-        // Utilidades para mostrar error de campo
         const showFieldError = (inputEl, msgIdSuffix, message) => {
             if (!inputEl) return;
             inputEl.classList.add('is-invalid');
@@ -1107,7 +1405,6 @@ class MeasurementCreator {
 
         // Limpiar errores previos
         clearFieldError(this.ui.personalizationStep.subject);
-        // cuerpo validado vía editor o textarea
         const editor = window.tinymce?.get('email-body');
         const bodyEl = this.ui.personalizationStep.body;
         if (bodyEl) {
@@ -1120,7 +1417,6 @@ class MeasurementCreator {
 
         // Validar invitación
         if (!invSubject) {
-            // activar UI invitación para que el usuario vea dónde corregir
             this.setEmailType('invitation');
             this.syncEmailFieldsFromState();
             showFieldError(this.ui.personalizationStep.subject, 'email-subject-error', 'El asunto de invitación es obligatorio.');
@@ -1130,7 +1426,6 @@ class MeasurementCreator {
             this.setEmailType('invitation');
             this.syncEmailFieldsFromState();
             if (editor) {
-                // marcar visualmente mediante borde del contenedor (textarea no visible)
                 const iframe = editor.getContainer();
                 iframe.style.boxShadow = '0 0 0 1px #dc3545';
             } else {
@@ -1141,7 +1436,6 @@ class MeasurementCreator {
 
         // Validar recordatorio
         if (!remSubject || !remBody) {
-            // activar UI recordatorio si falta alguno de sus campos
             this.setEmailType('reminder');
             this.syncEmailFieldsFromState();
         }
@@ -1159,7 +1453,6 @@ class MeasurementCreator {
             isValid = false;
         }
 
-        // Quitar resaltado del editor si todo está OK
         if (isValid && editor) {
             const iframe = editor.getContainer();
             iframe.style.boxShadow = '';

@@ -247,7 +247,7 @@
 #step-4-form .internal-scroll-section {
     max-height: 65vh;
     overflow-y: auto;
-    padding-right: 4px; /* homogeneidad con home.css */
+    padding-right: 4px; 
     overscroll-behavior: contain;
 }
 
@@ -326,7 +326,6 @@
 .email-type-toggle .btn-group {
     display: flex;
     gap: 1.5rem;
-    /* border-bottom: 1px solid #e2e6ea; */
     padding-bottom: .25rem;
 }
 
@@ -354,8 +353,7 @@
     border-bottom-color: var(--brand-primary) !important;
 }
 
-.email-type-toggle .btn-group .btn.btn-purple-main,
-.email-type-toggle .btn-group .btn.btn-outline-purple {
+.email-type-toggle .btn-group .btn.btn-purple-main,\n.email-type-toggle .btn-group .btn.btn-outline-purple {
     background: transparent !important;
     color: inherit;
 }
@@ -373,9 +371,121 @@
     margin-top: 2.5rem;
 }
 
-/* Fallback si TinyMCE no carga */
 #step-4-form .email-body-textarea {
     min-height: 360px;
+}
+
+
+/* ESTILOS ESPECÍFICOS RED LIDERAZGO */
+
+/* Scroll para el listado general de tarjetas de líderes */
+#leadership-networks-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 12px;
+    margin-bottom: 1.5rem;
+}
+
+#leadership-networks-container::-webkit-scrollbar {
+    width: 8px;
+}
+#leadership-networks-container::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 8px;
+}
+#leadership-networks-container::-webkit-scrollbar-thumb {
+    background: var(--brand-primary, #7B24FF);
+    border-radius: 8px;
+}
+#leadership-networks-container::-webkit-scrollbar-thumb:hover {
+    background: #6920d6;
+}
+
+.autocomplete-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.autocomplete-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-color-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.autocomplete-item:hover {
+    background-color: var(--brand-primary-light);
+    color: var(--brand-primary);
+}
+
+.leadership-network-card {
+    background-color: #fff;
+    border: 1px solid var(--brand-border-color, #dee2e6);
+    border-radius: 9px;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    overflow: hidden;
+}
+
+.leadership-network-header {
+    background-color: var(--brand-light-gray, #f8f9fa);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--brand-border-color, #dee2e6);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.leadership-network-header h5 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--brand-primary);
+    font-weight: 600;
+}
+
+.leadership-network-body {
+    padding: 1.5rem;
+}
+
+/* Scroll interno para la tabla de evaluadores de cada líder */
+.leadership-network-body .table-responsive {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.leadership-network-body .table-responsive::-webkit-scrollbar {
+    width: 6px;
+}
+.leadership-network-body .table-responsive::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 6px;
+}
+.leadership-network-body .table-responsive::-webkit-scrollbar-thumb {
+    background: #ced4da;
+    border-radius: 6px;
+}
+.leadership-network-body .table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd;
+}
+
+.evaluator-add-row {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    border: 1px dashed #ced4da;
 }
 
 @media (max-width: 991.98px) {

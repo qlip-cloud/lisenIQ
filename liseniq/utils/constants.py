@@ -6,6 +6,7 @@ let uqFlag = uqFromUrl || uqStored;
 
 // Variable global para almacenar el estado de anonimato
 window.liseniq_is_anonymous_survey = false;
+window.liseniq_is_leadership = false;
 
 if (uqFlag && !uqFromUrl) {
   const loc = new URL(window.location.href);
@@ -32,6 +33,22 @@ const buildRegisterUrl = function(token, msg) {
   return url;
 };
 
+// Utilidad para decodificar JWT en el cliente
+const parseJwt = function(token) {
+    try {
+        if (!token) return null;
+        const base64Url = token.split('.')[1];
+        if (!base64Url) return null;
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        return null;
+    }
+};
+
 // Ocultar navbars antes de que cargue el webform
 frappe.web_form.before_load = () => {
   $("nav").hide();
@@ -53,17 +70,24 @@ frappe.web_form.after_load = () => {
   $(".frappe-control[data-fieldname='user']").hide();
   $(".frappe-control[data-fieldname='survey']").hide();
   
+  // Ocultar los campos de roles en el Web Form para encuestas ya existentes
+  $(".frappe-control[data-fieldname='custom_evaluatee']").hide();
+  $(".frappe-control[data-fieldname='custom_evaluator']").hide();
+  
   $('.web-form-actions button[type="submit"]').hide();
 
   // Validar si ya hay respuestas guardadas en localStorage
   const surveyCacheKey = "liseniq_survey_cache_" + frappe.web_form.title;
   const cachedResponses = localStorage.getItem(surveyCacheKey);
 
-  // Validar si la encuesta ya fue respondida
+  // Extraer parámetros
   const urlParams = urlParamsGlobal;
   const token = urlParams.get("token");
   const dni = localStorage.getItem("liseniq_doc_id");
-  const register_url = buildRegisterUrl(token);
+  
+  // Verificamos si el token es personalizado (tiene rid) para saltar validación de DNI
+  const decodedToken = parseJwt(token);
+  const hasRid = decodedToken && !!decodedToken.rid;
 
   frappe.call({
       method: "liseniq.utils.api_survey.get_survey_is_anonymous",
@@ -82,7 +106,8 @@ frappe.web_form.after_load = () => {
           urlParamsGlobal = new URLSearchParams(window.location.search);
       }
 
-      if (uqFlag && (!dni || String(dni).trim() === "") && !is_anonymous) {
+      // Agregamos la excepción "!hasRid" para no pedir DNI en enlaces directos de 360
+      if (uqFlag && (!dni || String(dni).trim() === "") && !is_anonymous && !hasRid) {
           frappe.msgprint({
               title: __("Acceso denegado"),
               indicator: "red",
@@ -94,6 +119,7 @@ frappe.web_form.after_load = () => {
           return;
       }
 
+      // Bloqueo base
       if (!is_anonymous && !dni && !token) {
           frappe.msgprint({
               title: __("Acceso denegado"),
@@ -126,7 +152,7 @@ frappe.web_form.after_load = () => {
               window.location.href = register_url;
               return;
           }
-          if (res.require_dni && uqFlag && !is_anonymous) {
+          if (res.require_dni && uqFlag && !is_anonymous && !hasRid) {
               window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
               return;
           }
@@ -230,18 +256,33 @@ const show_completed_message = function (msg) {
 const load_survey = function (survey_name, cachedResponses) {
   $(".web-form-container").toggle(false);
   $('<div id="surveyElement"></div>').appendTo($(".page_content"));
+  
+  const urlParams = urlParamsGlobal;
+  const token = urlParams.get("token");
+  const doc_id = localStorage.getItem("liseniq_doc_id");
+
   frappe
     .call({
       method: "liseniq.utils.api_survey.get_public_survey",
       args: {
         survey_name: frappe.web_form.title,
+        token: token || null,
+        dni: doc_id || null
       },
     })
     .then((r) => {
       build_survey(r.message);
       const survey = new Survey.Model(frappe.survey_json);
       survey.locale = "es";
-      survey.completedHtml = "<h4>" + __("Gracias por completar la encuesta.") + "</h4>";
+      
+      // Control de comportamiento según el tipo de medición
+      if (r.message.is_leadership) {
+          window.liseniq_is_leadership = true;
+          survey.completedHtml = "<h4>" + __("Guardando respuesta y verificando evaluaciones pendientes...") + "</h4>";
+      } else {
+          survey.completedHtml = "<h4>" + __("Gracias por completar la encuesta.") + "</h4>";
+      }
+      
       survey.applyTheme(frappe.theme_json);
 
       // Precargar respuestas si existen en cache
@@ -317,13 +358,16 @@ const submit_response = function (data) {
     .then((r) => {
       const res = r.message || {};
       
-      // Bloqueos de seguridad
+      // Bloqueos de seguridad (También agregamos tolerancia al rid aquí)
+      const decodedToken = parseJwt(token);
+      const hasRid = decodedToken && !!decodedToken.rid;
+
       if (res.redirect_register) {
           const reg_token = res.register_token || token;
           window.location.href = buildRegisterUrl(reg_token, res.message);
           return;
       }
-      if (res.require_dni && uqFlag && !window.liseniq_is_anonymous_survey) {
+      if (res.require_dni && uqFlag && !window.liseniq_is_anonymous_survey && !hasRid) {
           window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
           return;
       }
@@ -355,7 +399,15 @@ const submit_response = function (data) {
         callback: (response) => {
           if (!response.exc) {
             localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
-            localStorage.removeItem("liseniq_doc_id");
+            
+            if (window.liseniq_is_leadership) {
+                // Si es liderazgo 360, redirigimos al dashboard para continuar evaluando
+                setTimeout(() => {
+                    window.location.href = buildRegisterUrl(token);
+                }, 2000);
+            } else {
+                localStorage.removeItem("liseniq_doc_id");
+            }
           }
         },
         always: function () {

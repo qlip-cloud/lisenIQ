@@ -17,12 +17,9 @@
                 <div class="iq-register-title-group">
                     <div class="iq-register-firstline">Medición</div>
                     <div class="iq-register-main-title">{{ survey_name }}</div>
-                    <!-- <div class="iq-register-description">
-                        Mide la cultura actual en la organización y apoya la definición de la cultura requerida para alinearla con la estrategia.<br>
-                        Reportes con análisis de brechas, subculturas y tendencias.
-                    </div> -->
                 </div>
                 <form id="identity-form" novalidate style="width:100%;">
+                    
                     <div class="iq-register-form-group" style="width:100%;">
                         <div class="iq-register-label-medium">Ingresa tu documento de acceso (cédula, número de identificación, DNI, número de carné o código interno asignado por tu empresa).</div>
                         <div class="iq-register-label-bold">Documento de Acceso</div>
@@ -38,10 +35,20 @@
                         <small id="doc-id-error" class="form-error-message" style="display:none;"></small>
                         <div class="iq-register-hint-medium">Sólo se permiten letras y números</div>
                     </div>
+                    
                     <div id="general-error" class="form-error-message" style="display:none; width:100%; text-align:center; margin-bottom: 15px;"></div>
+                    
                     <div class="iq-register-form-action-center" style="width:100%;">
                         <button type="submit" class="iq-register-btn" id="btn-submit">Iniciar</button>
                     </div>
+
+                    <div id="dashboard-container" style="display: none; width: 100%;">
+                        <div class="iq-register-label-medium" style="margin-bottom: 16px;">Selecciona la evaluación que deseas completar:</div>
+                        <div id="evaluations-list" class="evaluations-list">
+                            <!-- Evaluaciones se cargarán vía JS -->
+                        </div>
+                    </div>
+                    
                 </form>
             </div>
         </div>

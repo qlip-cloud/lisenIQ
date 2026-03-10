@@ -188,38 +188,57 @@ def process_survey_response(doc, method):
 
         recipient = None
         if rid:
+            # Agregamos 'sr_evaluating_to' a la consulta para traer al evaluador y evaluado
             recipient = frappe.db.get_value(
-                "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey", "sr_contact"], as_dict=True
+                "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey", "sr_contact", "sr_evaluating_to"], as_dict=True
             )
         if not recipient:
             recipient = frappe.db.get_value(
-                "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact"], as_dict=True
+                "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact", "sr_evaluating_to"], as_dict=True
             )
 
         if not recipient:
             frappe.throw("Enlace inválido o expirado.")
 
-        if recipient.sr_contact:
-            doc.user = recipient.sr_contact
-            dni = frappe.db.get_value("Contact", recipient.sr_contact, "custom_document_number")
+        # Obtenemos el evaluador y evaluado desde el recipient para usarlos en la lógica de asignación y validación
+        evaluator = recipient.get("sr_evaluating_to") # Contacto que evalúa
+        evaluatee = recipient.get("sr_contact")       # Contacto evaluado (Líder)
+
+        # Asignamos al Evaluador como el 'user' responsable de haber enviado la respuesta
+        if evaluator:
+            doc.user = evaluator
+        elif evaluatee:
+            doc.user = evaluatee
+
+        # Guardamos al Evaluado y Evaluador en campos customizados de Survey Response.
+        if hasattr(doc, 'custom_evaluatee'):
+            doc.custom_evaluatee = evaluatee
+        
+        if hasattr(doc, 'custom_evaluator'):
+            doc.custom_evaluator = evaluator
+
+        # Validar si este evaluador ya completó la encuesta para este líder en específico.
+        if doc.user:
+            dni = frappe.db.get_value("Contact", doc.user, "custom_document_number")
             if dni:
-                existing_response = frappe.db.exists(
-                    "Survey Response",
-                    {
-                        "survey": doc.survey,
-                        "user": dni,
-                        "name": ["!=", doc.name]
-                    }
-                )
+                existing_response_query = {
+                    "survey": doc.survey,
+                    "user": dni,
+                    "name": ["!=", doc.name]
+                }
+                
+                if evaluatee:
+                    existing_response_query["custom_evaluatee"] = evaluatee
+
+                existing_response = frappe.db.exists("Survey Response", existing_response_query)
                 if existing_response:
-                    frappe.throw("Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación.")
+                    frappe.throw("Esta encuesta ya fue completada para este colaborador evaluado. Gracias por tu participación.")
 
         su_name_of_recipient = frappe.db.get_value("qp_IQ_Survey", recipient.sr_survey, "su_name")
         if su_name_of_recipient != doc.survey:
             frappe.throw("Enlace inválido o expirado.")
 
         if recipient.sr_status == rs_responded:
-            # frappe.log_error(f"El destinatario {recipient.name} ya tiene estado 'Responded'. Abortando guardado.", "Survey Response Hook")
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
         frappe.db.set_value(

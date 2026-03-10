@@ -61,6 +61,7 @@ def global_website_context(context):
     context.has_portal_access = False
     context.access_error_message = ""
     context.liseniq_company_name = ""
+    context.first_login = False
 
     # Validación de Invitado
     if user == "Guest":
@@ -72,7 +73,7 @@ def global_website_context(context):
     contact = frappe.db.get_value(
         "Contact", 
         {"user": user}, 
-        ["name", "custom_company", "custom_is_liseniq_contact"], 
+        ["name", "custom_company", "custom_is_liseniq_contact", "custom_first_login"], 
         as_dict=True
     )
     
@@ -93,6 +94,16 @@ def global_website_context(context):
 
     context.has_portal_access = True
     context.liseniq_company_name = contact.custom_company
+		
+    context.first_login = contact.custom_first_login
+		
+    tours_list = frappe.get_all(
+        "qp_IQ_Tour",
+        filters={"parent": contact.name},
+        fields=["tour_name", "completed"]
+    )
+    
+    context.user_tours = {t.tour_name: t.completed for t in tours_list}
     
     return context
 
@@ -101,3 +112,18 @@ def check_access_and_redirect():
     global_website_context(context)
     if not context.has_portal_access:
         frappe.throw(context.access_error_message, frappe.PermissionError)
+
+@frappe.whitelist()
+def set_first_login_false():
+    user = frappe.session.user
+    if user and user != "Guest":
+        contact_name = frappe.db.get_value("Contact", {"user": user}, "name")
+        if contact_name:
+            try:
+                contact_doc = frappe.get_doc("Contact", contact_name)
+                contact_doc.custom_first_login = False
+                contact_doc.save(ignore_permissions=True)
+                frappe.db.commit()
+            except Exception as e:
+                frappe.log_error(frappe.get_traceback(), "liseniq: set_first_login_false")
+                frappe.throw(_("Error al actualizar el estado de primer inicio: {0}").format(str(e)))

@@ -150,6 +150,13 @@ document.addEventListener('DOMContentLoaded', function () {
         Object.values(ui.forms).forEach(form => form.classList.add('d-none'));
         ui.forms[`step${step}`].classList.remove('d-none');
         stepper.update(step);
+        
+        // Iniciar tour automáticamente al mostrar el step 3 (demográficos)
+        if (step === 3) {
+            setTimeout(() => {
+                startContactsDemographicsTour(true);
+            }, 300);
+        }
     };
 
     const updateFormUI = (mode) => {
@@ -726,4 +733,34 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     init();
+    // Tour de introducción
+    window.startContactsDemographicsTour = function(autoshow=false) {
+        const driver = window.driver.js.driver;
+        const demographicsTourObj = driver({
+            showProgress: false,
+            onDestroyed: function() {
+            frappe.call('liseniq.utils.tour_util.complete_tour', { tour_name: 'contacts_demographics_tour' });    
+            },
+            overlayColor: 'rgba(123, 36, 255, 0.20)',
+            nextBtnText: 'Siguiente',
+            prevBtnText: 'Anterior',
+            closeBtnText: 'Cerrar',
+            doneBtnText: 'Listo',
+            steps: [
+                { popover: { title: 'Datos Demográficos', description: 'Los datos demográficos son las variables con las que puedes segmentar la información de los resultados. Recomendamos configurarlos conforme a tus necesidades, para poder generar reportes con alto valor.', side: "left", align: 'start' }},
+                { element: '#thead-tag', popover: { title: 'Tag', description: 'Selecciona o crea los demográficos que vas a asignarle al contacto para posteriormente segmentar los resultados.', side: "bottom", align: 'start' }},
+                { element: '#thead-value', popover: { title: 'Valor', description: 'Crea el nombre o la variable dentro de cada demográfico.', side: "bottom", align: 'start' }}
+            ]
+        });
+       
+        const userTours = JSON.parse(document.getElementById("tours-data").textContent);
+        const tourName = 'contacts_demographics_tour';
+        const hasCompletedTour = userTours[tourName];
+        if (!hasCompletedTour && autoshow){
+            demographicsTourObj.drive();
+        }
+        if(!autoshow){
+            demographicsTourObj.drive();
+        }
+    }
 });

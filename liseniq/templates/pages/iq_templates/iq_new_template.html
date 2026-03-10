@@ -18,7 +18,13 @@
             <div class="template-form-container">
                 <div class="form-section">
                     <div class="form-group">
-                        <label for="template_is_private_input">Es plantilla privada</label>
+                        <label for="template_is_private_input">
+                            Es plantilla privada
+                            <span class="tooltip-wrapper" style="margin-left:4px;">
+                                <span class="tooltip-icon"></span>
+                                <span data-tooltip-bottom="Plantilla creada por tu empresa que solo pueden ver y usar los usuarios de tu organización. Ideal para modelos internos personalizados o confidenciales."></span>
+                            </span>
+                        </label>
                         <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" value="" id="template_is_private_input" checked>
                             <label class="form-check-label" for="template_is_private_input">
@@ -30,7 +36,13 @@
                         </small>
                     </div>
                     <div class="form-group">
-                        <label for="template_is_public_input">Es plantilla pública</label>
+                        <label for="template_is_public_input">
+                            Es plantilla pública
+                            <span class="tooltip-wrapper" style="margin-left:4px;">
+                                <span class="tooltip-icon"></span>
+                                <span data-tooltip-bottom="Plantilla visible y disponible para todas las empresas dentro de la plataforma. Está diseñada para ser reutilizada como un modelo estándar en cualquier organización."></span>
+                            </span>
+                        </label>
                         <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" value="" id="template_is_public_input">
                             <label class="form-check-label" for="template_is_public_input">
@@ -46,7 +58,13 @@
                         <small id="template_name_error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="template_category_input">Categoría</label>
+                        <label for="template_category_input">
+                            Categoría
+                            <span class="tooltip-wrapper" style="margin-left:4px;">
+                                <span class="tooltip-icon"></span>
+                                <span data-tooltip-bottom="Clasificación que agrupa las plantillas según su tema o propósito."></span>
+                            </span>
+                        </label>
                         <select class="form-control form-select" id="template_category_input" name="template_category" data-required="true">
                             <option value="" selected>Selecciona una categoría</option>
                             {% for cat in question_categories %}
@@ -56,7 +74,13 @@
                         <small id="template_category_error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="template_description_input">Descripción</label>
+                        <label for="template_description_input">
+                            Descripción
+                            <span class="tooltip-wrapper" style="margin-left:4px;">
+                                <span class="tooltip-icon"></span>
+                                <span data-tooltip-bottom="Breve resumen del contenido y propósito de la plantilla. Ayuda a identificar rápidamente cuándo debe usarse y qué tipo de medición permite realizar."></span>
+                            </span>
+                        </label>
                         <textarea class="form-control" id="template_description_input" name="template_description" rows="3" data-required="true"></textarea>
                         <small id="template_description_error" class="form-error-message d-none"></small>
                     </div>
@@ -98,7 +122,10 @@
                     <span id="template_name_breadcrumb_rev"></span>
                 </div>
                 <div class="title-with-action">
-                    <h3 class="page-main-title">Revisión</h3>
+                    <span class="tooltip-wrapper">
+                        <h3 class="page-main-title" data-tooltip-bottom="Vista previa de la plantilla antes de usarla en una medición. Permite verificar preguntas, escalas y estructura general para asegurarte de que todo esté correcto antes de continuar.">Revisión</h3>
+                        <span class="tooltip-icon"></span>
+                    </span>
                     <div class="form-action-buttons">
                         <button id="btn-back-step-3" class="btn btn-outline-purple">Atrás</button>
                         <button id="btn-save-template" class="btn btn-purple-main">Crear</button>

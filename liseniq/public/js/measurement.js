@@ -1469,4 +1469,34 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('measurement-stepper-container')) {
         new MeasurementCreator();
     }
+     // Tour de introducción
+    window.startMeasurementTour = function() {
+        const driver = window.driver.js.driver;
+        const measurementTourObj = driver({
+            showProgress: false,
+            onDestroyed: function() {
+            frappe.call('liseniq.utils.tour_util.complete_tour', { tour_name: 'measurement_creation_tour' });    
+            },
+            overlayColor: 'rgba(123, 36, 255, 0.20)',
+            nextBtnText: 'Siguiente',
+            prevBtnText: 'Anterior',
+            closeBtnText: 'Cerrar',
+            doneBtnText: 'Listo',
+            steps: [
+                { element: '[data-step="1"]', popover: { title: 'Nombre', description: 'Asigna nombre y fechas de lanzamiento y cierre de la medición.', side: "left", align: 'start' }},
+                { element: '[data-step="2"]', popover: { title: 'Preguntas', description: 'Crea las preguntas de la medición o escógelas del banco de preguntas.', side: "bottom", align: 'start' }},
+                { element: '[data-step="3"]', popover: { title: 'Participantes', description: 'Define quienes van a participar en la medición.', side: "bottom", align: 'start' }},
+                { element: '[data-step="4"]', popover: { title: 'Personalización', description: 'Personaliza los correos electrónicos de lanzamiento y recordatorio.', side: "bottom", align: 'start' }},
+                { element: '[data-step="5"]', popover: { title: 'Revisión', description: 'Realiza un revisión de todos los parámetros y confirma la creación de la medición.', side: "top", align: 'start' }}
+            ]
+        });
+        measurementTourObj.drive();
+    }
+
+    const userTours = JSON.parse(document.getElementById("tours-data").textContent);
+    const tourName = 'measurement_creation_tour';
+    const hasCompletedTour = userTours[tourName];
+    if (!hasCompletedTour){
+        startMeasurementTour();
+    }
 });

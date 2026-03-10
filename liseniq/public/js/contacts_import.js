@@ -1092,4 +1092,32 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateStepUI() {
         showStep(state.currentStep || 1);
     }
+
+    // Tour de introducción
+    window.startContactsImportTour = function() {
+        const driver = window.driver.js.driver;
+        const contactsTourObj = driver({
+            showProgress: false,
+            onDestroyed: function() {
+            frappe.call('liseniq.utils.tour_util.complete_tour', { tour_name: 'contacts_import' });    
+            },
+            overlayColor: 'rgba(123, 36, 255, 0.20)',
+            nextBtnText: 'Siguiente',
+            prevBtnText: 'Anterior',
+            closeBtnText: 'Cerrar',
+            doneBtnText: 'Listo',
+            steps: [
+                { element: '#download-template', popover: { title: 'Descargar Plantilla', description: 'Descarga el archivo donde vas a enlistar los contactos de la compañía.', side: "left", align: 'start' }},
+                { element: '#opt-upload', popover: { title: 'Cargar Archivo', description: 'Una vez listo el archivo, puedes cargarlo, puedes cargarlo directamente en la plataforma.', side: "bottom", align: 'start' }},
+                { element: '#opt-edit', popover: { title: 'Editar en Línea', description: 'Luego de hacer la carga, puedes validar la información y corregir errores directamente en la plataforma.', side: "bottom", align: 'start' }},
+            ]
+        });
+        contactsTourObj.drive();
+    }
+    const userTours = JSON.parse(document.getElementById("tours-data").textContent);
+    const tourName = 'contacts_import';
+    const hasCompletedTour = userTours[tourName];
+    if (!hasCompletedTour){
+        startContactsImportTour();
+    }
 });

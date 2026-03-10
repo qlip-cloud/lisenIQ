@@ -1,0 +1,31 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2025-09-23 17:00:54.084378",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "javascript": "",
+ "modified": "2026-03-03 11:48:26.873214",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "Survey Response Custom Report Front",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Survey Response",
+ "report_name": "Survey Response Custom Report Front",
+ "report_script": "",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "All"
+  }
+ ]
+}

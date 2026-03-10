@@ -7,13 +7,19 @@
 
 {% block page_main_content %}
 <div class="main-content-padding" id="contacts-import-app">
+    <script id="tours-data" type="application/json">
+        {{ user_tours | tojson }}
+    </script>
     <div id="import-stepper-container"></div>
 
     <!-- Paso 1: Cargar Plantilla -->
     <div id="step-1" class="import-step">
         <div class="page-title-section">
             <nav class="breadcrumb-nav">
-                <a href="/contacts">Contactos</a> / Carga Masiva de Contactos
+                <span class="tooltip-wrapper">
+                    <a data-tooltip-bottom="Función que te permite agregar múltiples contactos a la plataforma al mismo tiempo mediante un archivo en formato Excel o CSV. Ideal para cargar grandes bases de datos de forma rápida y organizada" href="/contacts">Contactos</a> / Carga Masiva de Contactos
+                    <span class="tooltip-icon" style="margin-left:4px;"></span>
+                </span>
             </nav>
             <h2 class="page-main-title">Importar contactos</h2>
         </div>
@@ -25,7 +31,12 @@
                     <div style="display:flex;align-items:center;gap:12px;padding:18px;">
                         <i class="fa fa-upload" style="font-size:18px;color:#7B24FF;"></i>
                         <div>
-                            <div style="font-weight:600;">Cargar archivo</div>
+                            <div style="font-weight:600;">
+                                <span class="tooltip-wrapper">
+                                    <span data-tooltip-bottom="Selecciona y sube el archivo con tus contactos desde tu dispositivo. Asegúrate de usar la plantilla recomendada para evitar errores de formato.">Cargar archivo</span>
+                                    <span class="tooltip-icon"></span>
+                                </span>
+                            </div>
                             <div style="color:#737373;font-size:0.85rem;">Sube tu plantilla (.xlsx o .csv)</div>
                         </div>
                     </div>
@@ -34,7 +45,12 @@
                     <div style="display:flex;align-items:center;gap:12px;padding:18px;">
                         <i class="fa fa-desktop" style="font-size:18px;color:#7B24FF;"></i>
                         <div>
-                            <div style="font-weight:600;">Editar en línea</div>
+                            <div style="font-weight:600;">
+                                <span class="tooltip-wrapper">
+                                    <span data-tooltip-bottom="Permite modificar los datos de tus contactos directamente desde la plataforma, sin necesidad de cargar un archivo. Útil para hacer ajustes rápidos o corregir información puntual.​">Editar en línea</span>
+                                    <span class="tooltip-icon"></span>
+                                </span>
+                            </div>
                             <div style="color:#737373;font-size:0.85rem;">Editar existentes o crear nuevos</div>
                         </div>
                     </div>
@@ -42,7 +58,12 @@
             </div>
 
             <div style="display:flex;align-items:center;gap:12px;">
-                <a id="download-template" class="btn btn-outline-purple">Descargar plantilla</a>
+                <a id="download-template" class="btn btn-outline-purple">
+                    <span class="tooltip-wrapper">
+                        <span data-tooltip-bottom="Descarga el archivo base con el formato correcto para cargar contactos. Incluye los campos requeridos y recomendaciones para evitar errores durante la importación.​">Descargar plantilla</span>
+                        <span class="tooltip-icon" style="margin-left:4px;"></span>
+                    </span>
+                </a>
             </div>
         </div>
 

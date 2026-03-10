@@ -5,6 +5,76 @@ import json
 import frappe
 from frappe import _
 
+"""
+TODO: 
+
+1. Implementar el reporte por tablas separadas para el reporte de medición de cultura organizacional
+2. Agregar todos los subdemográficos y cuando no exista el dato, colocar NA
+"""
+CATEGORIES = {
+    "Sentido de propósito": "MI INSPIRACIÓN",
+    "Trabajo trascendental": "MI INSPIRACIÓN",
+    "Me Conocen": "MI INSPIRACIÓN",
+    "Mi líder": "LOS LÍDERES",
+    "Apoyo": "LOS LÍDERES",
+    "Nuestros líderes": "LOS LÍDERES",
+    "Oportunidades de crecimiento en mi Rol": "MI DESARROLLO Y APRENDIZAJE",
+    "Oportunidades de desarrollo en la Organización": "MI DESARROLLO Y APRENDIZAJE",
+    "Cultura de Aprendizaje": "MI DESARROLLO Y APRENDIZAJE",
+    "Dinámicas de Equipo": "MI EQUIPO",
+    "Comunicación y Coordinación": "MI EQUIPO",
+    "Agilidad y Toma de Decisiones": "MI EQUIPO",
+    "Calidad de las relaciones": "AMBIENTE LABORAL POSITIVO",
+    "Trato de la Gente": "AMBIENTE LABORAL POSITIVO",
+    "Equidad y transparencia": "AMBIENTE LABORAL POSITIVO",
+    "Reputación de la Organización": "MI TRABAJO",
+    "Reputación de mi área": "MI TRABAJO",
+    "Entorno de trabajo": "MI TRABAJO",
+    "Principios": "RESPONSABLE",
+    "Sostenibilidad": "RESPONSABLE",
+    "Clientes": "RESPONSABLE",
+    "Talento": "HUMANISTA",
+    "Relaciones": "HUMANISTA",
+    "Comunicación": "HUMANISTA",
+    "Innovación": "COMPETITIVA",
+    "Logro": "COMPETITIVA",
+    "Liderazgo": "COMPETITIVA",
+}
+
+CARVAJAL_COMPANIES = {
+    "a570be58ba": "Carvajal Corporativo",
+    "a0567d22cc": "Carvajal Educación",
+    "5843de47eb": "Carvajal Soluciones de comunicación",
+    "9f2246bdd0": "Carvajal Pulpa y Papel",
+    "be89e11a86": "Carvajal Servicios Compartidos",
+    "510028895a": "Carvajal Empaques",
+    "5f58f986f1": "Carvajal Tecnología y Servicios",
+    "e34486d9ea": "Carvajal espacios"
+}
+
+VEDANTA_BIENESTAR = {
+    "Propósito y Valores": "PILAR EMPRESARIAL",
+    "Seguridad Organizacional": "PILAR EMPRESARIAL",
+    "Liderazgo": "PILAR EMPRESARIAL",
+    "Comunicación": "PILAR CULTURAL",
+    "Desarrollo Profesional": "PILAR CULTURAL",
+    "Entorno": "PILAR CULTURAL",
+    "Pertenencia y Valoración": "PILAR CULTURAL",
+    "Emocional": "PILAR PERSONAL",
+    "Mental": "PILAR PERSONAL",
+    "Física": "PILAR PERSONAL",
+    "Financiera": "PILAR PERSONAL",
+}
+
+TEMAS_INDICE_DE_ENGAGEMENT = {
+    "Si me ofrecieran un trabajo en condiciones similares en otra empresa, me quedaría donde estoy": "MI INSPIRACIÓN",
+    "Le recomendaría a un amigo o familiar que trabaje en esta organización": "AMBIENTE LABORAL POSITIVO",
+    "Siento compromiso y orgullo de trabajar en esta organización": "MI TRABAJO",
+    "Hago parte de un equipo de alto desempeño en la organización": "MI EQUIPO",
+    "Me veo aprendiendo y creciendo en esta organización en el futuro": "MI DESARROLLO Y APRENDIZAJE",
+    "Los líderes en esta organización me inspiran": "LOS LÍDERES"
+}
+
 def execute(filters=None):
     filters = filters or {}
     survey_name = filters.get('survey')
@@ -24,7 +94,7 @@ def execute(filters=None):
     # Obtener demographics_map basado en los usuarios específicos de esta encuesta
     demographics_map = get_demographics_labels_by_status(survey_status, survey_name)
 
-    columns = build_columns(question_map, demographics_map)
+    columns = build_columns(demographics_map)
     
     # Verificar si la encuesta está finalizada
     data = get_survey_data(survey_name, question_map, demographics_map, survey_status)
@@ -34,26 +104,36 @@ def execute(filters=None):
 
 def get_survey_status(survey_name):
     """
-    Obtiene el estado de la encuesta desde qp_IQ_Survey
+    Obtiene el estado de la encuesta desde qp_IQ_Survey, incluyendo compañía y plantilla
     """
     try:
         query = """
             SELECT 
                 iq.name as survey_id,
-                iq.su_in_history as in_history
+                iq.su_in_history as in_history,
+                iq.su_owner as company_id,
+                c.co_name as company_name,
+                iq.su_template as template_id,
+                tp.tp_name as template_name
             FROM `tabqp_IQ_Survey` iq
+            LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
+            LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
             WHERE iq.su_name = %s
         """
         result = frappe.db.sql(query, survey_name, as_dict=True)
         if result:
             return {
                 'survey_id': result[0].get('survey_id', ''),
-                'in_history': result[0].get('in_history', '')
+                'in_history': result[0].get('in_history', ''),
+                'company_id': result[0].get('company_id', ''),
+                'company_name': result[0].get('company_name', ''),
+                'template_id': result[0].get('template_id', ''),
+                'template_name': result[0].get('template_name', '')
             }
-        return {'survey_id': '', 'in_history': ''}
+        return {'survey_id': '', 'in_history': '', 'company_id': '', 'company_name': '', 'template_id': '', 'template_name': ''}
     except Exception as e:
         frappe.log_error(f"Error getting survey status: {str(e)}")
-        return {'survey_id': '', 'in_history': ''}
+        return {'survey_id': '', 'in_history': '', 'company_id': '', 'company_name': '', 'template_id': '', 'template_name': ''}
 
 
 def get_historical_survey_data(survey_id, question_map, demographics_map):
@@ -93,14 +173,12 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
         return []
 
 
-def process_historical_response_row(hist_record, question_map, demographics_map):
+def process_historical_response_row(hist_record, question_map, demographics_map, survey_status, question_variables_map):
     """
-    Procesa un registro histórico de respuesta
+    Procesa un registro histórico de respuesta y retorna múltiples filas (una por pregunta)
     """
-    row = {
-        'custom_document_number': hist_record.get('shd_document_number', ''),
-        'first_name': hist_record.get('shd_contact_name', '').split()[0] if hist_record.get('shd_contact_name') else '',
-        'last_name': ' '.join(hist_record.get('shd_contact_name', '').split()[1:]) if hist_record.get('shd_contact_name') else '',
+    # Datos base del registro histórico que se repiten en cada fila
+    base_row = {
         'name': hist_record.get('name', ''),
         'gender': hist_record.get('shd_gender', ''),
         'custom_dob': hist_record.get('shd_dob', ''),
@@ -109,17 +187,9 @@ def process_historical_response_row(hist_record, question_map, demographics_map)
         'entry_date': hist_record.get('shd_entry_date', ''),
     }
 
-    # Procesar respuestas de la encuesta
-    response_json = hist_record.get('shd_measurement_response', '{}')
-    parsed_responses = parse_response_json(response_json)
-    
-    # Inicializar todas las preguntas con valores vacíos y llenar las que tienen respuesta
-    for qid in question_map.keys():
-        row[qid] = parsed_responses.get(qid, '')
-
-    # Inicializar TODOS los campos demográficos con valores vacíos
+    # Inicializar campos demográficos
     for demographic_id in demographics_map.keys():
-        row[demographic_id] = ''
+        base_row[demographic_id] = ''
 
     # Sobrescribir con los valores del registro histórico
     demographics_data_str = hist_record.get('demographics_data', '')
@@ -127,34 +197,55 @@ def process_historical_response_row(hist_record, question_map, demographics_map)
         for demo_pair in demographics_data_str.split('||'):
             if ':' in demo_pair:
                 demo_type, demo_value = demo_pair.split(':', 1)
-                row[demo_type] = demo_value
+                base_row[demo_type] = demo_value
 
-    return row
+    # Procesar respuestas de la encuesta
+    response_json = hist_record.get('shd_measurement_response', '{}')
+    parsed_responses = parse_response_json(response_json)
+    
+    # Obtener información de la encuesta para lógica de tema
+    company_name = survey_status.get('company_name', '')
+    template_name = survey_status.get('template_name', '')
+    
+    # Crear una fila por cada pregunta
+    rows = []
+    for qid, question_label in question_map.items():
+        row = base_row.copy()
+        row['question'] = question_label
+        row['answer'] = parsed_responses.get(qid, '')
+        
+        # Agregar variable y tema
+        question_info = question_variables_map.get(question_label, {})
+        variable = question_info.get('variable', '')
+        row['variable'] = variable
+        
+        # Determinar el tema según el template y la compañía
+        tema = ''
+        if template_name == 'Plantilla Modelo Vedanta bienestar':
+            tema = VEDANTA_BIENESTAR.get(variable, '')
+        else:
+            tema = question_info.get('tema', '')
+        
+        # Lógica especial para empresas Carvajal
+        try:
+            company_name_val = (company_name or '').lower().strip()
+            carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
+            if company_name_val and company_name_val in carvajal_names:
+                tema = "CULTURA CARVAJAL"
+        except Exception:
+            pass
+        
+        row['theme'] = tema
+        rows.append(row)
+    
+    return rows
 
 
-def build_columns(question_map, demographics_map):
+def build_columns(demographics_map):
     """
     Construye las columnas del reporte de manera dinámica
     """
     columns = [
-        {
-            "label": _("Número de Identificación"),
-            "fieldname": "custom_document_number",
-            "fieldtype": "Data",
-            "width": 150   
-        },
-        {
-            "label": _("Nombre"),
-            "fieldname": "first_name",
-            "fieldtype": "Data",
-            "width": 150
-        },
-        {
-            "label": _("Apellidos"),
-            "fieldname": "last_name",
-            "fieldtype": "Data",
-            "width": 200
-        },
         {
             "label": _("ID Respuesta"),
             "fieldname": "name",
@@ -193,6 +284,7 @@ def build_columns(question_map, demographics_map):
         },
     ]
 
+    # Agregar columnas demográficas
     for did, dtitle in demographics_map.items():
         columns.append({
             "label": dtitle or did,
@@ -201,14 +293,31 @@ def build_columns(question_map, demographics_map):
             "width": 200
         })
 
-    for qid, title in question_map.items():
-        columns.append({
-            "label": title or qid,
-            "fieldname": qid,
-            "fieldtype": "Data",
-            "width": 300
-        })
-
+    # Agregar columnas de Pregunta y Respuesta al final
+    columns.append({
+        "label": _("Pregunta"),
+        "fieldname": "question",
+        "fieldtype": "Data",
+        "width": 300
+    })
+    columns.append({
+        "label": _("Variable"),
+        "fieldname": "variable",
+        "fieldtype": "Data",
+        "width": 200
+    })
+    columns.append({
+        "label": _("Tema"),
+        "fieldname": "theme",
+        "fieldtype": "Data",
+        "width": 200
+    })
+    columns.append({
+        "label": _("Respuesta"),
+        "fieldname": "answer",
+        "fieldtype": "Data",
+        "width": 300
+    })
 
     return columns
 
@@ -216,8 +325,12 @@ def build_columns(question_map, demographics_map):
 def get_survey_data(survey_name, question_map, demographics_map, survey_status):
     """
     Obtiene los datos de la encuesta de manera optimizada
+    Ahora cada pregunta genera una fila separada
     """
     data = []
+    
+    # Obtener mapeo de preguntas a variables y temas
+    question_variables_map = get_question_variables_map()
     
     # Si la encuesta está finalizada, usar datos históricos
     if survey_status.get('in_history') == 1:
@@ -225,8 +338,8 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
         if survey_id:
             historical_data = get_historical_survey_data(survey_id, question_map, demographics_map)
             for hist_record in historical_data:
-                row = process_historical_response_row(hist_record, question_map, demographics_map)
-                data.append(row)
+                rows = process_historical_response_row(hist_record, question_map, demographics_map, survey_status, question_variables_map)
+                data.extend(rows)  # Ahora devuelve múltiples filas
             return data
     
     # Si no está finalizada, usar datos en tiempo real
@@ -235,9 +348,6 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
             sr.name,
             sr.user,
             sr.response_json,
-            c.custom_document_number,
-            c.first_name,
-            c.last_name,
             c.custom_dob,
             c.custom_entry_date,
             c.custom_country,
@@ -255,27 +365,24 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
     if not responses:
         return []
 
-
     users_list = [r.user for r in responses if r.user]
     demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
 
     for response in responses:
-        row = process_response_row(response, question_map, demographics_map, demographics_data)
-        data.append(row)
+        rows = process_response_row(response, question_map, demographics_map, demographics_data, survey_status, question_variables_map)
+        data.extend(rows)  # Ahora devuelve múltiples filas
 
     return data
 
 
-def process_response_row(response, question_map, demographics_map, demographics_data):
+def process_response_row(response, question_map, demographics_map, demographics_data, survey_status, question_variables_map):
     """
-    Procesa una fila individual de respuesta
+    Procesa una respuesta individual y retorna múltiples filas (una por pregunta)
     """
     user = response.get('user', '')
     
-    row = {
-        'custom_document_number': response.get('custom_document_number', ''),
-        'first_name': response.get('first_name', ''),
-        'last_name': response.get('last_name', ''),
+    # Datos base de la respuesta que se repiten en cada fila
+    base_row = {
         'name': response.get('name', ''),
         'gender': response.get('gender', ''),
         'custom_dob': response.get('custom_dob', ''),
@@ -284,22 +391,54 @@ def process_response_row(response, question_map, demographics_map, demographics_
         'entry_date': response.get('custom_entry_date', ''),
     }
 
-    response_json = response.get('response_json', '{}')
-    parsed_responses = parse_response_json(response_json)
-    
-    for qid in question_map.keys():
-        row[qid] = parsed_responses.get(qid, '')
-
-    # Inicializar TODOS los campos demográficos con valores vacíos
+    # Agregar datos demográficos al base_row
     for demographic_id in demographics_map.keys():
-        row[demographic_id] = ''
-
-    # Sobrescribir con los valores que el usuario tiene
+        base_row[demographic_id] = ''
+    
     user_demographics = demographics_data.get(user, {})
     for demographic_id in user_demographics:
-        row[demographic_id] = user_demographics[demographic_id]
+        base_row[demographic_id] = user_demographics[demographic_id]
 
-    return row
+    # Parsear respuestas
+    response_json = response.get('response_json', '{}')
+    parsed_responses = parse_response_json(response_json)
+
+    # Obtener información de la encuesta para lógica de tema
+    company_name = survey_status.get('company_name', '')
+    template_name = survey_status.get('template_name', '')
+    
+    # Crear una fila por cada pregunta
+    rows = []
+    for qid, question_label in question_map.items():
+        row = base_row.copy()
+        row['question'] = question_label
+        row['answer'] = parsed_responses.get(qid, '')
+        
+        # Agregar variable y tema
+        question_info = question_variables_map.get(question_label, {})
+        variable = question_info.get('variable', '')
+        row['variable'] = variable
+        
+        # Determinar el tema según el template y la compañía
+        tema = ''
+        if template_name == 'Plantilla Modelo Vedanta bienestar':
+            tema = VEDANTA_BIENESTAR.get(variable, '')
+        else:
+            tema = question_info.get('tema', '')
+        
+        # Lógica especial para empresas Carvajal
+        try:
+            company_name_val = (company_name or '').lower().strip()
+            carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
+            if company_name_val and company_name_val in carvajal_names:
+                tema = "CULTURA CARVAJAL"
+        except Exception:
+            pass
+        
+        row['theme'] = tema
+        rows.append(row)
+    
+    return rows
 
 
 def parse_response_json(response_json):
@@ -477,3 +616,43 @@ def get_bulk_demographics(users_list, demographics_map):
             demographics_data[user][tag] = value
 
     return demographics_data
+
+def get_question_variables_map():
+    """
+    Obtiene el mapeo de preguntas a sus variables (tags) y temas
+    """
+    try:
+        query = """
+            SELECT 
+                a.name as question_id,
+                a.qn_statement as question_text,
+                b.dt_title as variable,
+                b.dt_title as tag
+            FROM `tabqp_IQ_Question` a
+            INNER JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            WHERE b.dt_object_type = 'Pregunta'
+        """
+        results = frappe.db.sql(query, as_dict=True)
+        
+        mapping = {}
+        for row in results:
+            question_text = row.get('question_text', '')
+            variable = row.get('variable', '')
+            
+            if question_text:
+                # Determinar el tema basado en CATEGORIES
+                tema = CATEGORIES.get(variable, '')
+                
+                # Si la variable es "Índice de Engagement", sobreescribir con tema específico
+                if variable == 'Índice de Engagement':
+                    tema = TEMAS_INDICE_DE_ENGAGEMENT.get(question_text, '')
+                
+                mapping[question_text] = {
+                    'variable': variable,
+                    'tema': tema
+                }
+                
+        return mapping
+    except Exception as e:
+        frappe.log_error(f"Error getting question variables map: {str(e)}")
+        return {}

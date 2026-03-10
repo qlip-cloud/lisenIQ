@@ -1,0 +1,35 @@
+
+<!--Modal Descargar Reporte de Seguimiento-->
+<div class="custom-modal-overlay" id="downloadReportModal" style="display: none;">
+  <div class="custom-modal">
+    <div class="custom-modal-header">
+      <h2 class="custom-modal-title" style="font-family: 'Rubik', sans-serif;">Descargar Reporte de Seguimiento</h2>
+      <button type="button" class="custom-modal-close" id="closeDownloadReportModal" aria-label="Cerrar">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <div class="custom-modal-body">
+      <p style="margin-bottom: 20px; color: #6c757d;">Selecciona al menos un demográfico para filtrar los resultados:</p>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="demographic1" style="display: block; margin-bottom: 5px; font-weight: 500;">Demográfico 1</label>
+        <select id="demographic1" name="demographic1" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <option value="">-- Selecciona un demográfico --</option>
+        </select>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="demographic2" style="display: block; margin-bottom: 5px; font-weight: 500;">Demográfico 2</label>
+        <select id="demographic2" name="demographic2" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <option value="">-- Selecciona un demográfico --</option>
+        </select>
+      </div>
+      
+      <input type="hidden" id="downloadReportUrl" value="">
+    </div>
+    <div class="custom-modal-footer">
+      <button type="button" class="btn-modal-secondary" id="btnCancelDownload">Cancelar</button>
+      <button type="button" class="btn-modal-primary" id="btnDownloadReport">Descargar</button>
+    </div>
+  </div>
+</div>

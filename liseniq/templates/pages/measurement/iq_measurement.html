@@ -2,8 +2,9 @@
 
     <div id="preloaded-questions-data" data-questions='{{ preloaded_questions_json | e if preloaded_questions_json else "[]" }}' style="display: none;"></div>
     <div id="measurement-data" data-measurement='{{ measurement_data_json | e if measurement_data_json else "null" }}' style="display: none;"></div>
-    <div id="template-is-leadership-data" data-is-leadership='{{ 1 if template_is_leadership else 0 }}' style="display: none;"></div>
-
+    <script id="tours-data" type="application/json">
+        {{ user_tours | tojson }}
+    </script>
     <div id="measurement-stepper-container" class="mb-5"></div>
 
     <div class="form-section-wrapper">
@@ -30,22 +31,34 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-name">Nombre de la medición</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-name" data-tooltip-bottom="Es el título que identifica tu medición. Úsalo para describir claramente el propósito o el tipo de encuesta que estás creando.">Nombre de la medición</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <input type="text" id="measurement-name" class="form-control" data-required="true" maxlength="75" {{ "disabled" if is_edit_mode }}>
                         <small id="measurement-name-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-start-date">Fecha y Hora de Inicio</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-start-date" data-tooltip-bottom="Momento en el que la medición se habilita y se envían los correos para que los participantes puedan responder.">Fecha y Hora de Inicio</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <input type="datetime-local" id="measurement-start-date" class="form-control" data-required="true">
                         <small id="measurement-start-date-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-end-date">Fecha y Hora de Finalización</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-end-date" data-tooltip-bottom="Momento en el que la medición se cerrará automáticamente y dejará de recibir respuestas.">Fecha y Hora de Finalización</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <input type="datetime-local" id="measurement-end-date" class="form-control">
                         <small id="measurement-end-date-error" class="form-error-message d-none"></small>
                     </div>
                     <div class="form-group">
-                        <label for="measurement-timezone">Zona Horaria</label>
+                        <span class="tooltip-wrapper">
+                            <label for="measurement-timezone" data-tooltip-bottom="Zona horaria que se aplicará a las fechas y horas de la medición.">Zona Horaria</label>
+                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                        </span>
                         <select id="measurement-timezone" class="form-control form-select" data-required="true" {{ "disabled" if is_edit_mode }}>
                             {% for tz in timezones %}
                             <option value="{{ tz }}" {% if tz == 'America/Bogota' %}selected{% endif %}>{{ tz }}</option>
@@ -82,7 +95,10 @@
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
-                    <h3 class="page-main-title">Participantes</h3>
+                    <span class="tooltip-wrapper">
+                        <h3 class="page-main-title" data-tooltip-bottom="Personas que recibirán la medición. Puedes seleccionarlos desde tus contactos o usar una medición abierta sin lista predefinida.">Participantes</h3>
+                        <span class="tooltip-icon"></span>
+                    </span>
                     <div class="form-action-buttons">
                         <button id="btn-back-step-3" class="btn btn-outline-purple">Atrás</button>
                         <button id="btn-next-step-3" class="btn btn-purple-main">Siguiente</button>
@@ -90,49 +106,75 @@
                 </div>
             </div>
             <div class="contacts-form-container">
-                
-                <!-- Bloque estándar (Públicos / Segmentos) -->
-                <div id="standard-contacts-section">
-                    <div class="row">
-                        <div class="col-md-5">
-                            <div class="form-group">
-                                <label for="survey-type-select">Público a participar</label>
-                                <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
-                                    <option value="selected" selected>Contactos Cargados Previamente</option>
-                                    <option value="anonymous_link">Medición Abierta</option>
-                                </select>
-                            </div>
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <span class="tooltip-wrapper">
+                                <label for="survey-type-select" data-tooltip-bottom="Define quiénes podrán responder la medición:
+                                
+• Contactos cargados previamente: Lista de contactos que ya has importado a la plataforma. Puedes elegirlos como participantes según lo requiera tu medición.
+
+• Medición abierta: Permite que cualquier persona responda mediante un enlace público, sin necesidad de estar registrada como contacto.">Público a participar</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
+                            <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
+                                <option value="selected" selected>Segmento de contactos</option>
+                                <option value="anonymous_link">Medición Anónima</option>
+                            </select>
                         </div>
-                        <div class="col-md-5">
-                            <div class="form-group">
-                                <label for="response-type-select">¿Quiere saber los detalles de quien respondió?</label>
-                                <select id="response-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
-                                    <option value="identified">No Anónima</option>
-                                    <option value="anonymous">Anónima</option>
-                                </select>
-                            </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <span class="tooltip-wrapper">
+                                <label for="response-type-select" data-tooltip-bottom="Indica si deseas identificar quién respondió la medición.
+
+• Anónima: Las respuestas no se asociarán a la identidad del participante. Útil para obtener retroalimentación más honesta y libre.
+
+• No anónima: Las respuestas quedarán vinculadas a cada participante, permitiendo análisis individuales o segmentados con mayor precisión.">¿Quiere saber los detalles de quien respondió?</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
+                            <select id="response-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
+                                <option value="identified">No Anónima</option>
+                                <option value="anonymous">Anónima</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div id="selected-contacts-section" class="mt-4">
-                        <div class="form-check mb-4">
-                            <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check">
-                            <label class="form-check-label" for="send-all-contacts-check">
+                <div id="selected-contacts-section" class="mt-4">
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" value="" id="send-all-contacts-check">
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" for="send-all-contacts-check" data-tooltip-bottom="Opción para seleccionar automáticamente a todos los contactos disponibles en tu empresa y enviarlos como participantes de la medición.">
                                 Enviar a todos mis contactos
                             </label>
-                        </div>
-                        
-                        <div class="row align-items-start">
-                            <div class="col-md-10">
-                                <div class="contacts-filter-section">
-                                    <div class="form-group">
-                                        <label for="field-type-select">Segmentación</label>
-                                        <select id="field-type-select" class="form-control form-select">
-                                            <option value="" selected>Seleccionar tipo de segmentación...</option>
-                                            {% for demo in contact_demographics %}
-                                            <option value="{{ demo.name }}">{{ demo.dt_title }}</option>
-                                            {% endfor %}
-                                        </select>
+                            <span class="tooltip-icon"></span>
+                        </span>
+                    </div>
+                    
+                    <div class="row align-items-start">
+                        <div class="col-md-10">
+                            <div class="contacts-filter-section">
+                                <div class="form-group">
+                                    <span class="tooltip-wrapper">
+                                        <label for="field-type-select" data-tooltip-bottom="Función para dividir tus contactos por criterios como área, ciudad, cargo o cualquier corte demográfico configurado.​">Segmentación</label>
+                                        <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                    </span>
+                                    <select id="field-type-select" class="form-control form-select">
+                                        <option value="" selected>Seleccionar tipo de segmentación...</option>
+                                        {% for demo in contact_demographics %}
+                                        <option value="{{ demo.name }}">{{ demo.dt_title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="categories-selection-container">
+                                    <div class="categories-box">
+                                        <span class="tooltip-wrapper">
+                                            <label data-tooltip-bottom="Lista de segmentos que has creado previamente. Puedes combinarlos para definir exactamente quién recibirá la medición.">Segmentos disponibles</label>
+                                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                        </span>
+                                        <div id="available-categories" class="categories-list">
+                                        </div>
                                     </div>
                                     
                                     <div class="categories-selection-container">
@@ -149,33 +191,25 @@
                                             <div id="selected-categories" class="categories-list"></div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="contact-count-card">
-                                    <span class="count-label">Total de contactos a enviar</span>
-                                    <div class="count-display">
-                                        <span id="contact-count-number" class="count-number">0</span>
-                                        <i id="view-contacts-btn" class="fa fa-eye view-contacts-icon" title="Ver contactos seleccionados"></i>
+                                    <div class="categories-box">
+                                        <span class="tooltip-wrapper">
+                                            <label data-tooltip-bottom="Son los segmentos que has elegido para participar en la medición. Solo los contactos incluidos en ellos recibirán la encuesta.">Segmentos seleccionados</label>
+                                            <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                        </span>
+                                        <div id="selected-categories" class="categories-list"></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Bloque de Liderazgo (Red 360) -->
-                <div id="leadership-contacts-section" class="d-none">
-                    <div id="leadership-roles-data" data-roles='{{ leadership_roles | tojson | e }}' style="display:none;"></div>
-                    
-                    <div class="leadership-add-leader-box mb-4 p-4 border rounded bg-light">
-                        <h5 class="mb-3" style="font-size: 1rem; color: var(--brand-primary);">Seleccionar Persona a Evaluar</h5>
-                        <div class="row align-items-end">
-                            <div class="col-md-8">
-                                <div class="form-group mb-0 position-relative">
-                                    <label for="leadership-leader-search">Buscar Colaborador</label>
-                                    <input type="text" id="leadership-leader-search" class="form-control" placeholder="Nombre, Correo o Documento de Acceso">
-                                    <div id="leadership-leader-results" class="autocomplete-results" style="display:none;"></div>
+                        <div class="col-md-2">
+                            <div class="contact-count-card">
+                                <span class="tooltip-wrapper">
+                                    <span class="count-label" data-tooltip-bottom="Cantidad de personas que recibirán la medición según la selección realizada. Se actualiza automáticamente cuando eliges segmentos o contactos individuales.">Total de contactos a enviar</span>
+                                    <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                </span>
+                                <div class="count-display">
+                                    <span id="contact-count-number" class="count-number">0</span>
+                                    <i id="view-contacts-btn" class="fa fa-eye view-contacts-icon" title="Ver contactos seleccionados"></i>
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -199,7 +233,10 @@
                     <span class="measurement-name-breadcrumb"></span>
                 </div>
                 <div class="title-with-action">
-                    <h3 class="page-main-title">Personalización</h3>
+                    <span class="tooltip-wrapper">
+                        <h3 class="page-main-title" data-tooltip-bottom="Modifica el contenido del mensaje que recibirán los participantes. Puedes ajustar el texto, el tono y los detalles de la invitación para adaptarlos a tu empresa o a la medición.">Personalización</h3>
+                        <span class="tooltip-icon"></span>
+                    </span>
                     <div class="form-action-buttons">
                         <button id="btn-back-step-4" class="btn btn-outline-purple">Atrás</button>
                         <button id="btn-next-step-4" class="btn btn-purple-main">Siguiente</button>
@@ -213,24 +250,44 @@
 
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="email-use-default-template">
-                        <label class="form-check-label" for="email-use-default-template">Usar plantilla por defecto</label>
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" data-tooltip-bottom="Utiliza el mensaje estándar recomendado por la plataforma para invitaciones o recordatorios. Es una opción rápida si no deseas personalizar el texto." for="email-use-default-template">Usar plantilla por defecto</label>
+                            <span class="tooltip-icon"></span>
+                        </span>
                     </div>
 
                     <div id="email-customization-fields">
                         <div class="email-type-toggle mb-3">
                             <div class="btn-group" role="group" aria-label="Tipo de correo">
-                                <button type="button" id="email-type-invitation-btn" class="btn btn-purple-main">Invitación a la encuesta</button>
-                                <button type="button" id="email-type-reminder-btn" class="btn btn-outline-purple">Correo de recordatorio</button>
+                                <button type="button" id="email-type-invitation-btn" class="btn btn-purple-main">
+                                    <span class="tooltip-wrapper">
+                                        <span data-tooltip-bottom="Mensaje que se enviará a los participantes al inicio de la medición para invitarlos a responder la encuesta.">Invitación a la encuesta</span>
+                                        <span class="tooltip-icon"></span>
+                                    </span>
+                                    
+                                </button>
+                                <button type="button" id="email-type-reminder-btn" class="btn btn-outline-purple">
+                                    <span class="tooltip-wrapper">
+                                        <span data-tooltip-bottom="Mensaje que se envía a los participantes que aún no han respondido la medición. Ayuda a aumentar la tasa de respuesta antes del cierre de la encuesta.">Correo de recordatorio</span>
+                                        <span class="tooltip-icon"></span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="email-subject">Asunto</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Título del correo que verán los participantes en su bandeja de entrada. Debe ser claro y motivador para aumentar la apertura del mensaje." for="email-subject">Asunto</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <input type="text" id="email-subject" class="form-control" maxlength="150" placeholder="Escribe el asunto del correo">
                         </div>
 
                         <div class="form-group mt-3">
-                            <label for="email-body">Cuerpo del mensaje</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Contenido del correo donde explicas el propósito de la medición, instrucciones y cualquier información relevante. Puedes personalizarlo según tu empresa o el tono deseado." for="email-body">Cuerpo del mensaje</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <textarea id="email-body" class="form-control email-body-textarea" rows="8" placeholder=""></textarea>
                         </div>
                     </div>
@@ -281,9 +338,12 @@
 
                     <div class="form-check mt-4 mb-3">
                         <input class="form-check-input" type="checkbox" value="" id="send-reminders-check">
-                        <label class="form-check-label" for="send-reminders-check">
-                            Enviar recordatorios
-                        </label>
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" for="send-reminders-check" data-tooltip-bottom="Activa o desactiva el envío automático de recordatorios a quienes no hayan respondido. Puedes programarlos para asegurar una mayor participación.​">
+                                Enviar recordatorios
+                            </label>
+                            <span class="tooltip-icon"></span>
+                        </span>
                     </div>
 
                     <div id="reminders-section" class="d-none">

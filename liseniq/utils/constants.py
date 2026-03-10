@@ -106,7 +106,7 @@ frappe.web_form.after_load = () => {
           urlParamsGlobal = new URLSearchParams(window.location.search);
       }
 
-      // IMPORTANTE: Agregamos la excepción "!hasRid" para no pedir DNI en enlaces directos de 360
+      // Agregamos la excepción "!hasRid" para no pedir DNI en enlaces directos de 360
       if (uqFlag && (!dni || String(dni).trim() === "") && !is_anonymous && !hasRid) {
           frappe.msgprint({
               title: __("Acceso denegado"),

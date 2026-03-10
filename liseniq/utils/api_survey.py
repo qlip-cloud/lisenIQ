@@ -20,6 +20,9 @@ def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
 
 @frappe.whitelist(allow_guest=True)
 def get_public_survey(survey_name, token=None, dni=None):
+  if dni and str(dni).strip().lower() in ["null", "none", "undefined", ""]:
+      dni = None
+      
   try:
     survey_data = frappe.db.get_value("Survey", survey_name, ["survey_json", "theme_json"], as_dict=True)
     if not survey_data:
@@ -27,6 +30,9 @@ def get_public_survey(survey_name, token=None, dni=None):
         
     # Verificar si es una medición de Liderazgo (360) para aplicar cambios dinámicos de preguntas
     survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_is_leadership", "su_owner"], as_dict=True)
+    
+    if survey_doc:
+        survey_data["is_leadership"] = survey_doc.su_is_leadership
     
     if survey_doc and survey_doc.su_is_leadership:
         recipient = None
@@ -126,6 +132,9 @@ def get_survey_is_anonymous(survey_name):
 
 @frappe.whitelist(allow_guest=True)
 def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
+  if dni and str(dni).strip().lower() in ["null", "none", "undefined", ""]:
+      dni = None
+      
   uq_flag = str(uq).lower() == "true"
   try:
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
@@ -312,69 +321,87 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
 
 @frappe.whitelist(allow_guest=True)
 def get_survey_route_for_public_link(token, dni=None):
+    if dni and str(dni).strip().lower() in ["null", "none", "undefined", ""]:
+        dni = None
+        
     if not token:
-        frappe.throw("Token no proporcionado.")
+        return {"error": "Token no proporcionado."}
 
     secret = _get_jwt_secret()
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-        frappe.throw("El enlace ha expirado o no es válido.")
+        return {"error": "El enlace ha expirado o no es válido."}
 
     survey_name = payload.get("sur")
+    rid = payload.get("rid")
+    
     if not survey_name:
-        frappe.throw("Token de encuesta inválido.")
+        return {"error": "Token de encuesta inválido."}
 
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
     su_doc = frappe.db.get_value(
         "qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_status", "su_end_date", "su_is_leadership", "su_owner"], as_dict=True
     )
     if not su_doc:
-        frappe.throw("Encuesta no encontrada.")
+        return {"error": "Encuesta no encontrada."}
         
     if status_finished and su_doc.su_status == status_finished:
-        frappe.throw("El enlace ha expirado.")
+        return {"error": "El enlace ha expirado o la medición ha finalizado."}
 
     if su_doc.su_end_date:
         now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
         if get_datetime(su_doc.su_end_date) <= now_local:
-            frappe.throw("El enlace ha expirado.")
+            return {"error": "El enlace ha expirado."}
 
     web_form_route = frappe.db.get_value("Web Form", {"title": survey_name}, "route")
     if not web_form_route:
-        frappe.throw("No se encontró el formulario para la encuesta.")
+        return {"error": "No se encontró el formulario para la encuesta."}
         
     if not su_doc.su_is_leadership:
-        return {"route": web_form_route, "is_leadership": False}
+        return {"route": web_form_route, "is_leadership": False, "has_rid": bool(rid)}
         
-    # Es medición de Liderazgo (360), requiere generar listado de evaluaciones
-    if not dni:
-        frappe.throw("El DNI es obligatorio para esta medición.")
-        
-    contact_name = frappe.db.get_value("Contact", {"custom_document_number": dni, "custom_company": su_doc.su_owner}, "name")
+    # Es medición de Liderazgo (360), buscamos al evaluador
+    contact_name = None
+    
+    # Si tenemos rid, es un enlace personalizado y obtenemos el evaluador directamente
+    if rid:
+        contact_name = frappe.db.get_value("qp_IQ_SurveyRecipient", rid, "sr_evaluating_to")
+        if not contact_name:
+            contact_name = frappe.db.get_value("qp_IQ_SurveyRecipient", rid, "sr_contact")
+            
+    # Si no es personalizado pero hay DNI, buscamos el contacto por su DNI
+    if not contact_name and dni:
+        contact_name = frappe.db.get_value("Contact", {"custom_document_number": dni, "custom_company": su_doc.su_owner}, "name")
+        if not contact_name:
+            # En lugar de frappe.throw(), devolvemos un JSON con el error para manejarlo limpiamente en JS
+            return {"error": "El DNI proporcionado no corresponde a un contacto registrado."}
+            
+    # Si no hay ni DNI ni RID, es un enlace genérico y se debe solicitar DNI obligatoriamente en el formulario
     if not contact_name:
-        frappe.throw("El DNI proporcionado no corresponde a un contacto registrado.")
+        return {"require_dni": True, "is_leadership": True}
         
     rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
     
+    # Buscamos todas las evaluaciones asignadas a este evaluador
     recipients = frappe.get_all(
         "qp_IQ_SurveyRecipient", 
-        filters={"sr_survey": su_doc.name, "sr_contact": contact_name, "sr_status": ["!=", rs_responded]}, 
-        fields=["name", "sr_evaluation_role", "sr_evaluating_to"]
+        filters={"sr_survey": su_doc.name, "sr_evaluating_to": contact_name, "sr_status": ["!=", rs_responded]}, 
+        fields=["name", "sr_evaluation_role", "sr_evaluating_to", "sr_contact"]
     )
     
     if not recipients:
-        frappe.throw("No tienes evaluaciones pendientes para esta medición.")
+        return {"is_completed": True, "message": "Has completado todas tus evaluaciones. ¡Gracias por tu participación!"}
         
     evaluations = []
     for r in recipients:
-        c_data = frappe.db.get_value("Contact", r.sr_evaluating_to, ["first_name", "last_name"], as_dict=True)
+        c_data = frappe.db.get_value("Contact", r.sr_contact, ["first_name", "last_name"], as_dict=True)
         if c_data:
             evaluatee_name = f"{(c_data.first_name or '').strip()} {(c_data.last_name or '').strip()}".strip()
         else:
-            evaluatee_name = r.sr_evaluating_to
+            evaluatee_name = r.sr_contact
             
-        # Generar un token con el Recipient ID embebido (comportamiento de enlace personal)
+        # Generar un token con el Recipient ID embebido para aperturar esa evaluación específica
         eval_payload = {
             "sur": survey_name,
             "rid": r.name,
@@ -384,7 +411,7 @@ def get_survey_route_for_public_link(token, dni=None):
         if isinstance(eval_token, bytes):
             eval_token = eval_token.decode("utf-8")
             
-        is_auto = (r.sr_evaluation_role == "Autoevaluación" and r.sr_evaluating_to == contact_name)
+        is_auto = (r.sr_evaluation_role == "Autoevaluación" and r.sr_evaluating_to == r.sr_contact)
         
         evaluations.append({
             "id": r.name,

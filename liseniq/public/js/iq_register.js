@@ -9,10 +9,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!token) {
         showError('No se encontró un token de encuesta válido en la URL.');
-        submitButton.disabled = true;
-        docIdInput.disabled = true;
+        if (submitButton) submitButton.disabled = true;
+        if (docIdInput) docIdInput.disabled = true;
         return;
     }
+
+    // Al cargar la página, verificamos si el token tiene información suficiente
+    // para saltarnos el paso del DNI (ej. enlace personalizado de Liderazgo)
+    frappe.call({
+        method: 'liseniq.utils.api_survey.get_survey_route_for_public_link',
+        args: {
+            token: token,
+            dni: ''
+        },
+        callback: (r) => {
+            if (r.message) {
+                if (r.message.error) {
+                    showError(r.message.error);
+                    if (submitButton) submitButton.disabled = true;
+                    if (docIdInput) docIdInput.disabled = true;
+                } else if (r.message.is_completed) {
+                    showDashboardMessage(r.message.message);
+                } else if (r.message.is_leadership && r.message.evaluations) {
+                    // Es un token que ya identifica al evaluador, mostramos dashboard
+                    showDashboard(r.message.evaluations, r.message.route);
+                } else if (r.message.require_dni) {
+                    // Requiere DNI, se mantiene el formulario visible para que el usuario proceda
+                } else if (r.message.route && r.message.has_rid) {
+                    // Es un enlace personalizado normal (no 360). Podemos saltarnos el formulario de DNI y redirigir
+                    const surveyUrl = `${window.location.origin}/${r.message.route}?new=1&token=${token}`;
+                    window.location.href = surveyUrl;
+                }
+            }
+        },
+        error: (r) => {
+            let message = 'Ocurrió un error inesperado.';
+            if (r.exc) {
+                try {
+                    const exc_obj = JSON.parse(r.exc);
+                    if (exc_obj._server_messages) {
+                        const msgs = JSON.parse(exc_obj._server_messages);
+                        message = msgs[0].message || message;
+                    }
+                } catch (e) { }
+            }
+            // Si ocurre un error de expiración o similar en la carga inicial, lo mostramos
+            showError(message);
+            if (submitButton) submitButton.disabled = true;
+            if (docIdInput) docIdInput.disabled = true;
+        }
+    });
 
     form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -36,7 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             callback: (r) => {
                 if (r.message) {
-                    if (r.message.is_leadership) {
+                    if (r.message.error) {
+                        handleError(r.message.error);
+                    } else if (r.message.is_completed) {
+                        showDashboardMessage(r.message.message);
+                    } else if (r.message.is_leadership && r.message.evaluations) {
                         // Renderiza el dashboard en la misma vista
                         showDashboard(r.message.evaluations, r.message.route);
                     } else if (r.message.route) {
@@ -55,10 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (r.exc) {
                     try {
                         const exc_obj = JSON.parse(r.exc);
-                        message = exc_obj[0] || message;
-                    } catch (e) {
-                        // Fallback for non-JSON error
-                    }
+                        if (exc_obj._server_messages) {
+                            const msgs = JSON.parse(exc_obj._server_messages);
+                            message = msgs[0].message || message;
+                        }
+                    } catch (e) {}
                 }
                 handleError(message);
             }
@@ -143,6 +194,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Mostrar contenedor
+        dashboardContainer.style.display = 'block';
+    }
+
+    function showDashboardMessage(msg) {
+        const formGroup = document.querySelector('.iq-register-form-group');
+        const actionCenter = document.querySelector('.iq-register-form-action-center');
+        const dashboardContainer = document.getElementById('dashboard-container');
+        const listContainer = document.getElementById('evaluations-list');
+        const mainTitle = document.querySelector('.iq-register-main-title');
+
+        if (formGroup) formGroup.style.display = 'none';
+        if (actionCenter) actionCenter.style.setProperty('display', 'none', 'important');
+        if (submitButton) {
+            submitButton.style.display = 'none';
+        }
+        hideError();
+
+        if (mainTitle) {
+            mainTitle.textContent = 'Medición Finalizada';
+        }
+
+        listContainer.innerHTML = `<div class="alert alert-success text-center" style="font-size: 15px; margin-top: 10px;">${msg}</div>`;
         dashboardContainer.style.display = 'block';
     }
 });

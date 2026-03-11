@@ -372,3 +372,40 @@
   border-bottom-color: rgba(148, 0, 255, 0.95);
   z-index: 999998;
 }
+
+/* Tooltip que aparece a la derecha */
+.tooltip-wrapper:hover [data-tooltip-right]::after {
+  content: attr(data-tooltip-right);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 999999;
+  background: rgba(148, 0, 255, 0.95);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-line;
+  width: 220px;
+  max-width: calc(100vw - 40px);
+  text-align: left;
+  word-wrap: break-word;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Flecha del tooltip derecho */
+.tooltip-wrapper:hover [data-tooltip-right]::before {
+  content: '';
+  position: absolute;
+  left: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: rgba(148, 0, 255, 0.95);
+  z-index: 999998;
+}

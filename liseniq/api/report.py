@@ -195,6 +195,7 @@ def get_user_demographics():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
+                        'company_id': hist_record.get('shd_company', ''),
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
                         'demographic_id': demo_tag,
                         'demographic_value': demo_value
@@ -207,6 +208,7 @@ def get_user_demographics():
                         user_demographics_array.append({
                             'user_id': user_id,
                             'survey_id': survey['id'],
+                            'company_id': hist_record.get('shd_company', ''),
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
                             'demographic_id': demographics_labels_map.get(core_demo, core_demo),
                             'demographic_value': core_value
@@ -236,6 +238,7 @@ def get_user_demographics():
                     c.gender,
                     c.custom_entry_date,
                     c.custom_country,
+                    c.custom_company as company_id,
                     a.al_title AS custom_academic_level,
                     cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
@@ -291,6 +294,7 @@ def get_user_demographics():
                         'user_id': user_id,
                         'survey_id': survey['id'],
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
+                        'company_id': survey.get('company_id', ''),
                         'demographic_id': demo_tag,
                         'demographic_value': demo_value
                     })
@@ -301,6 +305,7 @@ def get_user_demographics():
                         'user_id': user_id,
                         'survey_id': survey['id'],
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
+                        'company_id': survey.get('company_id', ''), 
                         'demographic_id': demo_label,
                         'demographic_value': demo_value
                     })
@@ -403,6 +408,7 @@ def get_user_demographics_cultura():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
+                        'company_id': hist_record.get('shd_company', ''),
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
                         'demographic_id': demo_tag,
                         'demographic_value': demo_value
@@ -415,6 +421,7 @@ def get_user_demographics_cultura():
                         user_demographics_array.append({
                             'user_id': user_id,
                             'survey_id': survey['id'],
+                            'company_id': hist_record.get('shd_company', ''),
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
                             'demographic_id': demographics_labels_map.get(core_demo, f'custom_{core_demo}' if core_demo in ['dob', 'entry_date', 'country'] else core_demo),
                             'demographic_value': core_value
@@ -444,6 +451,7 @@ def get_user_demographics_cultura():
                     c.gender,
                     c.custom_entry_date,
                     c.custom_country,
+                    c.custom_company as company_id,
                     a.al_title AS custom_academic_level,
                     cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
@@ -498,6 +506,7 @@ def get_user_demographics_cultura():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
+                        'company_id': survey.get('company_id', ''),
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
                         'demographic_id': demo_tag,
                         'demographic_value': demo_value
@@ -508,6 +517,7 @@ def get_user_demographics_cultura():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
+                        'company_id': survey.get('company_id', ''), 
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
                         'demographic_id': demo_label,
                         'demographic_value': demo_value

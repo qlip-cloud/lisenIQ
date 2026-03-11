@@ -734,7 +734,7 @@ def save_measurement(data):
                                         choices.append({
                                             "text": opt.qo_option_text,
                                             "value": opt.qo_option_value,
-                                            "imageLink": image_url
+                                            "imageLink": image_url if image_url else "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                         })
                         except Exception:
                             choices = []
@@ -752,15 +752,12 @@ def save_measurement(data):
                             if question_name:
                                 q_doc = frappe.get_doc("qp_IQ_Question", question_name)
                                 if q_doc and q_doc.qn_response_options:
-                                    choices = [
-                                        {
+                                    for opt in q_doc.qn_response_options:
+                                        choices.append({
                                             "text": opt.qo_option_text,
                                             "value": opt.qo_option_value,
-                                            "imageLink": opt.qo_url
-                                        }
-                                        for opt in q_doc.qn_response_options
-                                        if getattr(opt, "qo_url", None)
-                                    ]
+                                            "imageLink": opt.qo_url if opt.qo_url else "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                        })
                         except Exception:
                             choices = []
                         element["choices"] = choices

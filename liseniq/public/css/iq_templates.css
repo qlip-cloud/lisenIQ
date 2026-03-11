@@ -282,3 +282,21 @@
 .visual-option-input-row.is-uploading { opacity: 0.6; pointer-events: none; }
 #btn-close-modal { outline: none !important; box-shadow: none !important; border: none !important; }
 #btn-close-modal:focus, #btn-close-modal:active { outline: none !important; box-shadow: none !important; border: none !important; }
+
+/* Alineación de checkboxes en creación de plantillas */
+.custom-checkbox-align {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 0;
+}
+
+.custom-checkbox-align .form-check-input {
+    position: static;
+    margin: 0;
+}
+
+.custom-checkbox-align .form-check-label {
+    margin: 0;
+    padding-top: 1px;
+}

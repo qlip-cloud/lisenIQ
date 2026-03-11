@@ -435,43 +435,85 @@ nav, .navbar {
     padding-top: 15px !important;
 }
 
-/* --- Estilos para Likert Visual (SurveyJS imagepicker) --- */
+/* Estilos para Likert Visual (SurveyJS imagepicker) */
 .sd-imagepicker, .sv-imagepicker {
     --iq-img-size: 32px;
 }
-/* Imagen en versiones nuevas (sd-*) */
-.sd-imagepicker .sd-imagepicker__item img,
-.sd-imagepicker .sd-imagepicker__image,
-.sd-imagepicker .sd-imagepicker__image img {
-    width: var(--iq-img-size) !important;
-    height: var(--iq-img-size) !important;
-    max-width: var(--iq-img-size) !important;
-    max-height: var(--iq-img-size) !important;
-    object-fit: contain;
-    display: block;
-    margin: 0 auto;
+
+/* Ocultar la imagen transparente de respaldo para no generar espacio vacío */
+img[src*="R0lGODlhAQABAIAAAAAAAP"] {
+    display: none !important;
 }
-/* Imagen en versiones legacy (sv-*) */
-.sv-imagepicker .sv_q_imgsel img,
-.sv-imagepicker .sv_q_imgsel .sv_q_imgsel_image {
-    width: var(--iq-img-size) !important;
-    height: var(--iq-img-size) !important;
-    max-width: var(--iq-img-size) !important;
-    max-height: var(--iq-img-size) !important;
-    object-fit: contain;
-    display: block;
+
+/* Permitir que los contenedores de imagen se colapsen si no hay imagen (o si está oculta) */
+.sd-imagepicker .sd-imagepicker__image,
+.sv-imagepicker .sv_q_imgsel_image {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
     margin: 0 auto;
 }
 
-/* Centrado de ícono y texto */
+/* Imagen en versiones nuevas (sd-*) */
+.sd-imagepicker .sd-imagepicker__item img,
+.sd-imagepicker .sd-imagepicker__image img {
+    width: auto !important;
+    height: auto !important;
+    max-width: var(--iq-img-size) !important;
+    max-height: var(--iq-img-size) !important;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    pointer-events: none; /* Que el clic pase al input padre */
+}
+
+/* Imagen en versiones legacy (sv-*) */
+.sv-imagepicker .sv_q_imgsel img {
+    width: auto !important;
+    height: auto !important;
+    max-width: var(--iq-img-size) !important;
+    max-height: var(--iq-img-size) !important;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    pointer-events: none;
+}
+
+/* Asegurar que el contenedor sea siempre clickeable */
 .sd-imagepicker .sd-imagepicker__item,
 .sv-imagepicker .sv_q_imgsel_item {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 6px;
+    padding: 10px;
     text-align: center;
+    border-radius: 8px;
+    cursor: pointer !important;
+    position: relative;
+    transition: background-color 0.2s ease;
+    min-height: 60px; /* Asegura un área de click aceptable aunque no haya imagen */
+}
+
+.sd-imagepicker .sd-imagepicker__item:hover,
+.sv-imagepicker .sv_q_imgsel_item:hover {
+    background-color: #f4f5f7;
+}
+
+/* Forzar el z-index y expansión del input real para garantizar la captura del clic */
+.sd-imagepicker__item input[type="radio"],
+.sd-imagepicker__item input[type="checkbox"],
+.sv_q_imgsel_item input[type="radio"],
+.sv_q_imgsel_item input[type="checkbox"] {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0 !important;
+    z-index: 10 !important;
+    cursor: pointer !important;
+    margin: 0 !important;
 }
 
 /* Ajuste de tamaño y margen del texto */
@@ -480,14 +522,16 @@ nav, .navbar {
     font-size: 0.9rem;
     text-align: center;
     margin-top: 4px;
+    pointer-events: none; /* Que el clic pase al input padre */
 }
 
 /* Centrar la etiqueta */
 .sv-imagepicker .sv_q_imgsel_label {
     text-align: center !important;
+    width: 100%;
 }
 
-/* Eliminar bordes y sombras */
+/* Eliminar bordes y sombras nativas que interfieren con el diseño personalizado */
 .sv_qstn .sv_q_imgsel label>div {
     border: none !important;
     box-shadow: none !important;
@@ -520,16 +564,20 @@ nav, .navbar {
     display: inline-block;
 }
 
-/* Estilos para selección */
-.sv_qstn .sv_q_imgsel label > input:checked + div {
+/* Estilos para selección - visual indicator */
+.sv_qstn .sv_q_imgsel label > input:checked + div,
+.sv_qstn .sv_q_imgsel_item.checked {
     background-color: #d1f0ea !important;
+    border-radius: 8px;
 }
 
 /* Estilos para selección nueva (sd-*) */
 .sd-imagepicker .sd-imagepicker__item--selected,
 .sd-imagepicker .sd-imagepicker__item--checked {
     background-color: #d1f0ea !important;
+    border-radius: 8px;
 }
+
  /* Estilos para selección inline */
 .sv_main .sv_p_root .sv_q .sv_q_checkbox_inline label > input:checked + span,
 .sv_main .sv_p_root .sv_q .sv_q_radiogroup_inline label > input:checked + span {

@@ -503,3 +503,21 @@
         gap: 1.5rem;
     }
 }
+
+/* Alineación horizontal del checkbox de liderazgo */
+.leadership-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.leadership-checkbox .form-check-input {
+    position: static;
+    margin: 0;
+    cursor: pointer;
+}
+
+.leadership-checkbox .form-check-label {
+    margin: 0;
+    cursor: pointer;
+}

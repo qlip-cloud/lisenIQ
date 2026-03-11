@@ -464,7 +464,7 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
     object-fit: contain;
     display: block;
     margin: 0 auto;
-    pointer-events: none; /* Que el clic pase al input padre */
+    pointer-events: none;
 }
 
 /* Imagen en versiones legacy (sv-*) */
@@ -492,7 +492,7 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
     cursor: pointer !important;
     position: relative;
     transition: background-color 0.2s ease;
-    min-height: 60px; /* Asegura un área de click aceptable aunque no haya imagen */
+    min-height: 60px;
 }
 
 .sd-imagepicker .sd-imagepicker__item:hover,
@@ -522,7 +522,7 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
     font-size: 0.9rem;
     text-align: center;
     margin-top: 4px;
-    pointer-events: none; /* Que el clic pase al input padre */
+    pointer-events: none;
 }
 
 /* Centrar la etiqueta */

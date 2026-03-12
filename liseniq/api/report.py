@@ -148,7 +148,7 @@ def custom_report_by_question_engagement(filters=None):
     return translated_data
 
 @frappe.whitelist()
-def get_user_demographics():
+def get_user_demographics(filters=None):
     """
     Retorna un array de objetos con el id del usuario y sus demográficos asociados
     """
@@ -167,7 +167,13 @@ def get_user_demographics():
             'academic_level': 'Nivel Académico'
         }
         user_demographics_array = []
-        surveys = get_valid_engagement_surveys()
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+
+        survey_filters = filters or {}
+        surveys = get_valid_engagement_surveys(survey_filters)
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
         demographics_labels_from_historic = get_demographics_from_historic()
@@ -356,13 +362,19 @@ def get_cultura_responses(filters=None):
         return []
 
 @frappe.whitelist()
-def get_user_demographics_cultura():
+def get_user_demographics_cultura(filters=None):
     """
     Retorna un array de objetos con el id del usuario y sus demográficos asociados
     """
     try:
         user_demographics_array = []
-        surveys = get_valid_surveys()
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+        filters = filters or {}
+        survey_filters = filters or {}
+        surveys = get_valid_surveys(survey_filters)
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
         demographics_labels_from_historic = get_demographics_from_historic()
@@ -652,6 +664,8 @@ def get_valid_surveys(filters=None):
         if filters:
             if filters.get('company'):
                 query += " AND c.co_name = %(company)s"
+            if filters.get('company_id'):
+                query += " AND c.name = %(company_id)s"
             if filters.get('start_date') and filters.get('end_date'):
                 query += " AND s.creation BETWEEN %(start_date)s AND %(end_date)s"
         query += " ORDER BY s.name"

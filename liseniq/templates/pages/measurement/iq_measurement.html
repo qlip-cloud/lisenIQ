@@ -122,8 +122,8 @@
                                     <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
                                 </span>
                                 <select id="survey-type-select" class="form-control form-select" {{ "disabled" if is_edit_mode }}>
-                                    <option value="selected" selected>Segmento de contactos</option>
-                                    <option value="anonymous_link">Medición Anónima</option>
+                                    <option value="selected" selected>Contactos Cargados Previamente</option>
+                                    <option value="anonymous_link">Medición Abierta</option>
                                 </select>
                             </div>
                         </div>
@@ -289,7 +289,7 @@
 
                         <div class="form-group">
                             <span class="tooltip-wrapper">
-                                <label data-tooltip-bottom="Título del correo que verán los participantes en su bandeja de entrada. Debe ser claro y motivador para aumentar la apertura del mensaje." for="email-subject">Asunto</label>
+                                <label data-tooltip-right="Título del correo que verán los participantes en su bandeja de entrada. Debe ser claro y motivador para aumentar la apertura del mensaje." for="email-subject">Asunto</label>
                                 <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
                             </span>
                             <input type="text" id="email-subject" class="form-control" maxlength="150" placeholder="Escribe el asunto del correo">
@@ -297,7 +297,7 @@
 
                         <div class="form-group mt-3">
                             <span class="tooltip-wrapper">
-                                <label data-tooltip-bottom="Contenido del correo donde explicas el propósito de la medición, instrucciones y cualquier información relevante. Puedes personalizarlo según tu empresa o el tono deseado." for="email-body">Cuerpo del mensaje</label>
+                                <label data-tooltip-right="Contenido del correo donde explicas el propósito de la medición, instrucciones y cualquier información relevante. Puedes personalizarlo según tu empresa o el tono deseado." for="email-body">Cuerpo del mensaje</label>
                                 <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
                             </span>
                             <textarea id="email-body" class="form-control email-body-textarea" rows="8" placeholder=""></textarea>

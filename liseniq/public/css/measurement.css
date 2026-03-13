@@ -353,8 +353,7 @@
     border-bottom-color: var(--brand-primary) !important;
 }
 
-.email-type-toggle .btn-group .btn.btn-purple-main,
-.email-type-toggle .btn-group .btn.btn-outline-purple {
+.email-type-toggle .btn-group .btn.btn-purple-main,\n.email-type-toggle .btn-group .btn.btn-outline-purple {
     background: transparent !important;
     color: inherit;
 }

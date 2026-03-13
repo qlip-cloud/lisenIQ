@@ -9,7 +9,7 @@ from email.utils import formataddr
 from datetime import datetime, timezone
 import pytz
 
-DEFAULT_SENDER_NAME = "OCC Solutions "
+DEFAULT_SENDER_NAME = "Portal de Mediciones"
 
 def _now_utc_str() -> str:
 	return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")

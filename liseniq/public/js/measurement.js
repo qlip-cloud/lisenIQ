@@ -49,7 +49,11 @@ class MeasurementCreator {
                 leaderSearch: document.getElementById('leadership-leader-search'),
                 leaderResults: document.getElementById('leadership-leader-results'),
                 btnAddLeader: document.getElementById('btn-add-leader'),
-                networksContainer: document.getElementById('leadership-networks-container')
+                networksContainer: document.getElementById('leadership-networks-container'),
+                btnDownloadTemplate: document.getElementById('btn-download-leadership-template'),
+                btnUploadExcel: document.getElementById('btn-upload-leadership-excel'),
+                fileInputExcel: document.getElementById('leadership-excel-file'),
+                uploadErrors: document.getElementById('leadership-upload-errors'),
             },
             personalizationStep: {
                 typeButtons: {
@@ -458,6 +462,15 @@ class MeasurementCreator {
             }
         });
 
+        // Subida masiva 360°
+        if (leadershipStep.btnDownloadTemplate) {
+            leadershipStep.btnDownloadTemplate.addEventListener('click', () => this.downloadLeadershipTemplate());
+        }
+        if (leadershipStep.btnUploadExcel && leadershipStep.fileInputExcel) {
+            leadershipStep.btnUploadExcel.addEventListener('click', () => leadershipStep.fileInputExcel.click());
+            leadershipStep.fileInputExcel.addEventListener('change', (e) => this.handleLeadershipExcelUpload(e));
+        }
+
         // Ocultar dropdowns al clickear fuera
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#leadership-contacts-section')) {
@@ -510,6 +523,125 @@ class MeasurementCreator {
         Object.values(step1Form).forEach(field => {
             field?.addEventListener('input', () => this.clearValidationError(field));
         });
+    }
+
+    async downloadLeadershipTemplate() {
+        const btn = this.ui.leadershipStep.btnDownloadTemplate;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Generando...';
+
+        try {
+            const response = await frappe.call({
+                method: 'liseniq.www.measurement.new_measurement.generate_leadership_excel_template'
+            });
+            
+            if (response.message) {
+                const link = document.createElement('a');
+                link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + response.message;
+                link.download = 'Plantilla_Carga_Liderazgo.xlsx';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                showGlobalNotification('No se pudo generar la plantilla.', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showGlobalNotification('Error al generar la plantilla.', 'error');
+        } finally {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    }
+
+    async handleLeadershipExcelUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const errContainer = this.ui.leadershipStep.uploadErrors;
+        if (errContainer) errContainer.innerHTML = '';
+
+        const validExts = ['.xlsx', '.xls'];
+        const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+        if (!validExts.includes(fileExt)) {
+            if (errContainer) {
+                 errContainer.innerHTML = `<div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">Solo se permiten archivos Excel (.xlsx, .xls).</div>`;
+            } else {
+                 showGlobalNotification('Solo se permiten archivos Excel (.xlsx, .xls).', 'error');
+            }
+            event.target.value = '';
+            return;
+        }
+
+        const btnUpload = this.ui.leadershipStep.btnUploadExcel;
+        const originalText = btnUpload.innerHTML;
+        btnUpload.disabled = true;
+        btnUpload.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Procesando...';
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64Data = e.target.result;
+            try {
+                const response = await frappe.call({
+                    method: 'liseniq.www.measurement.new_measurement.process_leadership_excel',
+                    args: { file_base64: base64Data }
+                });
+
+                const res = response.message;
+                if (res.status === 'success') {
+                    if (res.networks && res.networks.length > 0) {
+                        
+                        // LIMPIAR LA RED ANTERIOR PARA CARGAR LOS NUEVOS DATOS EXCLUSIVAMENTE
+                        this.state.measurementData.leadershipNetwork = [];
+
+                        res.networks.forEach(newNet => {
+                            this.state.measurementData.leadershipNetwork.push(newNet);
+                        });
+                        this.renderLeadershipNetworks();
+                        showGlobalNotification('Carga masiva procesada exitosamente.', 'success');
+                    } else {
+                        showGlobalNotification('No se encontraron datos válidos en el archivo.', 'warning');
+                    }
+
+                    if (res.errors && res.errors.length > 0) {
+                        console.warn('Errores de carga:', res.errors);
+                        if (errContainer) {
+                            let errorHtml = `
+                                <div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                                    <strong>Se encontraron los siguientes problemas de validación (filas omitidas):</strong><br>
+                                    <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
+                            `;
+                            res.errors.forEach(err => {
+                                errorHtml += `<li style="margin-bottom: 6px;">${frappe.utils.escape_html(err)}</li>`;
+                            });
+                            errorHtml += `</ul></div>`;
+                            errContainer.innerHTML = errorHtml;
+                        } else {
+                            alert('Se encontraron los siguientes problemas de validación:\n\n' + res.errors.join('\n'));
+                        }
+                    }
+                } else {
+                    if (errContainer) {
+                         errContainer.innerHTML = `<div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;"><strong>Error:</strong> ${frappe.utils.escape_html(res.message || 'Error al procesar el archivo.')}</div>`;
+                    } else {
+                         showGlobalNotification(res.message || 'Error al procesar el archivo.', 'error');
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                if (errContainer) {
+                     errContainer.innerHTML = `<div class="alert alert-danger" style="background-color: #fff5f5; border: 1px solid #fc8181; color: #c53030; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">Ocurrió un error al procesar el Excel en el servidor.</div>`;
+                } else {
+                     showGlobalNotification('Ocurrió un error al procesar el Excel en el servidor.', 'error');
+                }
+            } finally {
+                btnUpload.disabled = false;
+                btnUpload.innerHTML = originalText;
+                event.target.value = ''; // Limpiar para permitir volver a subir el mismo archivo si es necesario
+            }
+        };
+        reader.readAsDataURL(file);
     }
 
     updateBreadcrumbs() {
@@ -690,7 +822,7 @@ class MeasurementCreator {
         const network = {
             leader: leader,
             evaluators: [
-                { id: leader.id, name: leader.name_display, role: 'Autoevaluación', isAuto: true }
+                { id: leader.id, name: leader.name_display, role: 'Autoevaluación', role_id: 'Autoevaluación', isAuto: true }
             ]
         };
         this.state.measurementData.leadershipNetwork.push(network);
@@ -750,9 +882,15 @@ class MeasurementCreator {
                             <tbody>
                                 ${network.evaluators.map(ev => `
                                     <tr>
-                                        <td>${frappe.utils.escape_html(ev.name)}</td>
-                                        <td>${frappe.utils.escape_html(ev.role)}</td>
-                                        <td>
+                                        <td class="align-middle">${frappe.utils.escape_html(ev.name)}</td>
+                                        <td class="align-middle">
+                                            ${(this.state.isEditMode || ev.isAuto) ? frappe.utils.escape_html(ev.role) : `
+                                            <select class="form-control form-select form-select-sm evaluator-role-change" data-evaluator-id="${ev.id}">
+                                                ${this.leadershipRoles.map(r => `<option value="${r.co_label}" ${ev.role === r.co_label ? 'selected' : ''}>${frappe.utils.escape_html(r.co_label)}</option>`).join('')}
+                                            </select>
+                                            `}
+                                        </td>
+                                        <td class="align-middle">
                                             ${ev.isAuto ? '<span class="text-muted small">Automático</span>' : (this.state.isEditMode ? '<span class="text-muted small">-</span>' : `<button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-evaluator" data-leader-id="${network.leader.id}" data-evaluator-id="${ev.id}"><i class="fa fa-trash"></i> Quitar</button>`)}
                                         </td>
                                     </tr>
@@ -774,6 +912,18 @@ class MeasurementCreator {
         card.querySelector('.btn-remove-leader')?.addEventListener('click', () => {
             this.state.measurementData.leadershipNetwork = this.state.measurementData.leadershipNetwork.filter(n => n.leader.id !== network.leader.id);
             this.renderLeadershipNetworks();
+        });
+
+        card.querySelectorAll('.evaluator-role-change').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const evalId = e.currentTarget.dataset.evaluatorId;
+                const newRole = e.currentTarget.value;
+                const evaluator = network.evaluators.find(ev => ev.id === evalId);
+                if (evaluator) {
+                    evaluator.role = newRole;
+                    evaluator.role_id = newRole;
+                }
+            });
         });
         
         const searchInput = card.querySelector('.evaluator-search');

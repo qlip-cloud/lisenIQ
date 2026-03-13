@@ -214,6 +214,20 @@
                 <div id="leadership-contacts-section" class="d-none">
                     <div id="leadership-roles-data" data-roles='{{ leadership_roles | tojson | e }}' style="display:none;"></div>
                     
+                    <!-- Acciones de carga masiva -->
+                    <div class="leadership-bulk-actions mb-3 d-flex justify-content-end align-items-center">
+                        <button id="btn-download-leadership-template" type="button" class="btn btn-outline-purple btn-sm mr-2" {{ "disabled" if is_edit_mode }}>
+                            <i class="fa fa-download"></i> Descargar Plantilla Excel
+                        </button>
+                        <button id="btn-upload-leadership-excel" type="button" class="btn btn-purple-main btn-sm" {{ "disabled" if is_edit_mode }}>
+                            <i class="fa fa-upload"></i> Subir Excel
+                        </button>
+                        <input type="file" id="leadership-excel-file" class="d-none" accept=".xlsx, .xls">
+                    </div>
+
+                    <!-- Contenedor para mostrar los errores del Excel -->
+                    <div id="leadership-upload-errors"></div>
+
                     <div class="leadership-add-leader-box mb-4 p-4 border rounded bg-light">
                         <h5 class="mb-3" style="font-size: 1rem; color: var(--brand-primary);">Seleccionar Persona a Evaluar</h5>
                         <div class="row align-items-end">

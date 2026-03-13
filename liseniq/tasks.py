@@ -9,7 +9,7 @@ from email.utils import formataddr
 from datetime import datetime, timezone
 import pytz
 
-DEFAULT_SENDER_NAME = "Mediciones Listen AIQ"
+DEFAULT_SENDER_NAME = "Portal de Mediciones"
 
 def _now_utc_str() -> str:
 	return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -37,15 +37,6 @@ def _now_in_survey_tz(survey_doc) -> datetime:
 
 def _get_notification_sender_name() -> str:
 	try:
-		cache_key = "liseniq_notification_sender_aiq"
-		cached = None
-		try:
-			cached = frappe.cache().get_value(cache_key)
-		except Exception:
-			pass
-		if cached:
-			return cached if isinstance(cached, str) else cached.decode("utf-8")
-
 		param = frappe.db.get_value(
 			"qp_IQ_Parameters",
 			{"pa_abbreviation": "notification_sender_aiq"},
@@ -56,10 +47,6 @@ def _get_notification_sender_name() -> str:
 			data_type = (param.get("pa_data_type") or "").strip().lower()
 			value = (param.get("pa_data_character") or "").strip()
 			if data_type.startswith("char") and value:
-				try:
-					frappe.cache().set_value(cache_key, value)
-				except Exception:
-					pass
 				return value
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "_get_notification_sender_name")

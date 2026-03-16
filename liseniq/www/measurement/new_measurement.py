@@ -1,5 +1,9 @@
 import frappe
 import json
+import base64
+import openpyxl
+from openpyxl.worksheet.datavalidation import DataValidation
+from io import BytesIO
 from frappe import _
 from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
 from liseniq.utils.api_survey import generate_public_link_for_survey
@@ -956,4 +960,182 @@ def save_measurement(data):
     except Exception as e:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Error en save_measurement")
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
+def generate_leadership_excel_template():
+    """ Genera la plantilla Excel para carga masiva de red 360° """
+    try:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Carga_Masiva_360"
+        
+        # Headers principales
+        ws.append(["email", "relacion"])
+        
+        # Datos de ejemplo
+        ws.append(["ejemplo_lider@empresa.com", "Autoevaluación"])
+        ws.append(["ejemplo_evaluador@empresa.com", "Evaluador"])
+        
+        # Recuperar Roles activos de Catalog Options
+        catalog = frappe.db.get_value("qp_IQ_Catalog", {"ca_mnemonico": "measurement_roles"}, "name")
+        roles = []
+        if catalog:
+            roles_data = frappe.get_all("qp_IQ_CatalogOptions", filters={"co_catalog": catalog, "co_is_active": 1}, fields=["co_label"])
+            roles = [r.co_label for r in roles_data]
+            
+        # Segunda hoja con instrucciones y roles válidos
+        ws_info = wb.create_sheet(title="Roles_Validos")
+        ws_info.append(["Información Importante:"])
+        ws_info.append(["- Inicie el bloque con el líder usando 'Autoevaluación' en la columna relacion."])
+        ws_info.append(["- Las siguientes filas serán los evaluadores asignados a ese líder."])
+        ws_info.append([])
+        ws_info.append(["ROLES PERMITIDOS (copiar exactamente):"])
+        ws_info.append(["Autoevaluación"])
+        
+        row_idx = 7
+        for r in roles:
+            ws_info.append([r])
+            row_idx += 1
+
+        # Añadir lista desplegable en la columna relacion (B) de la hoja principal
+        formula = f"='Roles_Validos'!$A$6:$A${row_idx - 1}"
+        dv = DataValidation(type="list", formula1=formula, allow_blank=True)
+        dv.error = 'Debe seleccionar un rol válido de la lista desplegable.'
+        dv.errorTitle = 'Rol Inválido'
+        dv.prompt = 'Seleccione un rol de la lista.'
+        dv.promptTitle = 'Relación'
+        
+        ws.add_data_validation(dv)
+        dv.add('B2:B1000')
+
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+        
+        return base64.b64encode(stream.read()).decode('utf-8')
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "generate_leadership_excel_template")
+        return None
+
+@frappe.whitelist()
+def process_leadership_excel(file_base64):
+    """ Procesa el Excel subido en base64 para construir la red 360 """
+    try:
+        # Decodificar el archivo Excel
+        file_data = base64.b64decode(file_base64.split(",")[1])
+        wb = openpyxl.load_workbook(BytesIO(file_data))
+        ws = wb.active
+
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows or len(rows) < 2:
+            return {"status": "error", "message": "El archivo está vacío o no contiene datos válidos."}
+
+        headers = [str(h).lower().strip() for h in rows[0] if h]
+        if "email" not in headers or "relacion" not in headers:
+            return {"status": "error", "message": "El archivo Excel debe contener exactamente las columnas 'email' y 'relacion'."}
+        
+        email_idx = headers.index("email")
+        relacion_idx = headers.index("relacion")
+
+        # Obtener todos los contactos de la empresa del usuario actual
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        contacts = frappe.db.sql("""
+            SELECT c.name, CONCAT(IFNULL(c.first_name, ''), ' ', IFNULL(c.last_name, '')) as full_name, ce.email_id
+            FROM `tabContact` c
+            LEFT JOIN `tabContact Email` ce ON ce.parent = c.name AND ce.parenttype = 'Contact'
+            WHERE c.status IN ('Enabled', 'Passive')
+            AND c.custom_is_liseniq_contact = 1
+            AND c.custom_is_deleted = 0
+            AND c.custom_company = %s
+        """, (user_company,), as_dict=True)
+
+        # Mapeo de emails (minúsculas) a la data de contacto
+        email_map = {c.email_id.lower().strip(): {"id": c.name, "name_display": c.full_name.strip()} for c in contacts if c.email_id}
+
+        # Roles válidos y activos
+        catalog = frappe.db.get_value("qp_IQ_Catalog", {"ca_mnemonico": "measurement_roles"}, "name")
+        valid_roles = []
+        if catalog:
+            roles_data = frappe.get_all("qp_IQ_CatalogOptions", filters={"co_catalog": catalog, "co_is_active": 1}, fields=["co_label"])
+            valid_roles = [r.co_label for r in roles_data]
+            
+        valid_roles_lower = {r.lower(): r for r in valid_roles}
+
+        networks = []
+        current_leader = None
+        evaluators = []
+        errors = []
+
+        # Recorrer las filas del Excel
+        for i, row in enumerate(rows[1:], start=2):
+            if len(row) <= max(email_idx, relacion_idx):
+                continue
+                
+            email = str(row[email_idx]).strip().lower() if row[email_idx] else None
+            relacion = str(row[relacion_idx]).strip() if row[relacion_idx] else None
+
+            if not email and not relacion:
+                continue
+                
+            if not email:
+                errors.append(f"Fila {i}: Falta el correo electrónico.")
+                continue
+                
+            if not relacion:
+                errors.append(f"Fila {i}: Falta la relación para {email}.")
+                continue
+
+            contact_info = email_map.get(email)
+            if not contact_info:
+                errors.append(f"Fila {i}: El correo '{email}' no corresponde a un contacto activo en su empresa.")
+                continue
+
+            relacion_lower = relacion.lower()
+
+            if relacion_lower in ["autoevaluación", "autoevaluacion"]:
+                # Guardar el bloque del líder anterior si existe
+                if current_leader:
+                    networks.append({"leader": current_leader, "evaluators": evaluators})
+                
+                # Iniciar un nuevo bloque de liderazgo
+                current_leader = contact_info
+                evaluators = [{
+                    "id": contact_info["id"],
+                    "name": contact_info["name_display"],
+                    "role": "Autoevaluación",
+                    "role_id": "Autoevaluación",
+                    "isAuto": True
+                }]
+            else:
+                if not current_leader:
+                    errors.append(f"Fila {i}: Evaluador '{email}' encontrado antes de definir un líder (Se requiere una fila de 'Autoevaluación' primero).")
+                    continue
+                    
+                if relacion_lower in valid_roles_lower:
+                    real_role = valid_roles_lower[relacion_lower]
+                    
+                    # Evitar duplicados del mismo evaluador para un mismo líder
+                    if not any(e["id"] == contact_info["id"] for e in evaluators):
+                        evaluators.append({
+                            "id": contact_info["id"],
+                            "name": contact_info["name_display"],
+                            "role": real_role,
+                            "role_id": real_role,
+                            "isAuto": False
+                        })
+                else:
+                    errors.append(f"Fila {i}: La relación '{relacion}' no es válida o está inactiva.")
+
+        # Guardar el último bloque leído
+        if current_leader:
+            networks.append({"leader": current_leader, "evaluators": evaluators})
+
+        return {
+            "status": "success", 
+            "networks": networks,
+            "errors": errors
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "process_leadership_excel")
         return {"status": "error", "message": str(e)}

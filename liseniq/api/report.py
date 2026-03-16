@@ -668,6 +668,8 @@ def get_valid_surveys(filters=None):
                 query += " AND c.name = %(company_id)s"
             if filters.get('start_date') and filters.get('end_date'):
                 query += " AND s.creation BETWEEN %(start_date)s AND %(end_date)s"
+            if filters.get('survey_id'):
+                query += " AND iq.name = %(survey_id)s"
         query += " ORDER BY s.name"
         results = frappe.db.sql(query, filters or {}, as_dict=True)
         
@@ -703,6 +705,8 @@ def get_valid_engagement_surveys(filters=None):
                 query += " AND c.co_name = %(company)s"
             if filters.get('start_date') and filters.get('end_date'):
                 query += " AND s.creation BETWEEN %(start_date)s AND %(end_date)s"
+            if filters.get('survey_id'):
+                query += " AND iq.name = %(survey_id)s"
         query += " ORDER BY s.name"
         
         frappe.logger().debug(f"Executing query: {query}")

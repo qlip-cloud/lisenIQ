@@ -353,7 +353,8 @@
     border-bottom-color: var(--brand-primary) !important;
 }
 
-.email-type-toggle .btn-group .btn.btn-purple-main,\n.email-type-toggle .btn-group .btn.btn-outline-purple {
+.email-type-toggle .btn-group .btn.btn-purple-main,
+.email-type-toggle .btn-group .btn.btn-outline-purple {
     background: transparent !important;
     color: inherit;
 }
@@ -376,7 +377,7 @@
 }
 
 
-/* ESTILOS ESPECÍFICOS RED LIDERAZGO */
+/* ESTILOS ESPECÍFICOS PARA 360° */
 
 /* Scroll para el listado general de tarjetas de líderes */
 #leadership-networks-container {
@@ -478,6 +479,29 @@
 }
 .leadership-network-body .table-responsive::-webkit-scrollbar-thumb:hover {
     background: #adb5bd;
+}
+
+/* Estilos para errores de carga masiva */
+#leadership-upload-errors ul {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 0;
+    padding-right: 8px;
+}
+
+#leadership-upload-errors ul::-webkit-scrollbar {
+    width: 6px;
+}
+#leadership-upload-errors ul::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+#leadership-upload-errors ul::-webkit-scrollbar-thumb {
+    background: #fc8181;
+    border-radius: 3px;
+}
+#leadership-upload-errors ul::-webkit-scrollbar-thumb:hover {
+    background: #f56565;
 }
 
 .evaluator-add-row {

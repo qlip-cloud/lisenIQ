@@ -1124,6 +1124,8 @@ def process_leadership_excel(file_base64):
                             "role_id": real_role,
                             "isAuto": False
                         })
+                    else:
+                        errors.append(f"El contacto {contact_info['name_display']} está repetido en la evaluación de {current_leader['name_display']} se tomó la primera relación y se omitieron el resto.")
                 else:
                     errors.append(f"Fila {i}: La relación '{relacion}' no es válida o está inactiva.")
 

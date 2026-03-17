@@ -11,7 +11,7 @@ def execute(filters=None):
 		frappe.throw(_("Survey {0} does not exist").format(survey))
 
 	survey_doc = frappe.get_doc("Survey", survey)
-	qp_iq_survey = frappe.get_doc("qp_IQ_Survey", {"survey": survey})
+	qp_iq_survey = frappe.get_doc("qp_IQ_Survey", {"su_name": survey})
 
 	columns = get_columns()
 	data = get_data(survey_doc, qp_iq_survey)
@@ -48,10 +48,10 @@ def get_columns():
 
 def get_data(survey_doc, qp_iq_survey):
 	data = []
-	survey_recipients = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": qp_iq_survey.name}, fields=["*"])
+	survey_recipients = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": qp_iq_survey.name}, fields=["*"], order_by="sr_contact asc")
 	for recipient in survey_recipients:
 		evaluated = recipient.sr_contact
-		evaluator_role = recipient.sr_evaluating_role
+		evaluator_role = recipient.sr_evaluation_role
 		evaluator = recipient.sr_evaluating_to if recipient.sr_evaluating_to != evaluated else ""	
 		status = get_response_status(survey_doc, recipient)
 

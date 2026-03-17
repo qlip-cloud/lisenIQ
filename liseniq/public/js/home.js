@@ -39,6 +39,17 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = url;
     });
     
+    // Descargar reporte de seguimiento mediciones 360
+     document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.download-follow-up-360-btn');
+        if (!btn) return;
+
+        const url = btn.getAttribute('data-url');
+        if (!url) return;
+
+        window.location.href = url;
+    });
+    
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.download-follow-up-btn');
         if (!btn) return;

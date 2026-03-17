@@ -117,7 +117,7 @@
                             </div>
                             <div class="results-row">
                                  <span class="tooltip-wrapper" style="margin-left:8px;">
-                                     <div class="percentage-display" data-tooltip-bottom="Porcentaje de respuestas">{{ m.percentage }}%</div>
+                                     <div class="percentage-display" data-tooltip-right="Porcentaje de respuestas">{{ m.percentage }}%</div>
                                     <span class="tooltip-icon"></span>
                                 </span>
                                 {% if m.status == "Finalizada" %}
@@ -135,11 +135,21 @@
                                         <i class="fa fa-bar-chart"></i>
                                     </a>
                                 </div>
-                                {% else %}
+                                {% elif m.status == "En Progreso" and not m.is_leadership %}
                                 <span 
                                         data-survey="{{ m.name }}" 
                                         data-url="/api/method/liseniq.utils.export.export_follow_up_report?survey_name={{ m.name }}" 
                                         class="results-link-icon download-follow-up-btn material-symbols-outlined" 
+                                        title="Descargar reporte de seguimiento" 
+                                        aria-label="Descargar reporte de seguimiento de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        visibility
+                                    </span>
+                                {% elif m.status == "En Progreso" and m.is_leadership %}
+                                <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_seguimiento_360?survey_name={{ m.title }}" 
+                                        class="results-link-icon download-follow-up-360-btn material-symbols-outlined" 
                                         title="Descargar reporte de seguimiento" 
                                         aria-label="Descargar reporte de seguimiento de {{ m.title }}"
                                         style="cursor: pointer;">

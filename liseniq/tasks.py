@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 import pytz
 
 DEFAULT_SENDER_NAME = "Portal de Mediciones"
+BATCH_SIZE = 500  # Tamaño del lote/bloque para envío de correos y generación de links
 
 def _now_utc_str() -> str:
 	return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
 
 def _get_survey_tz_name(survey_doc) -> str:
 	try:
@@ -327,28 +327,6 @@ def launch_pending_surveys():
 					frappe.log_error(f"Encuesta {survey.name} procesada a 'En Progreso' pero no tiene destinatarios pendientes.", "launch_pending_surveys - Sin Destinatarios")
 					continue
 				
-				# Agrupar si es 360 Liderazgo
-				if is_leadership:
-					groups = {}
-					for r in recipients_docs:
-						eval_id = r.sr_evaluating_to or r.sr_contact
-						groups.setdefault(eval_id, []).append(r)
-					contact_ids = list(groups.keys())
-					frappe.log_error(f"Encuesta {survey.name} es Liderazgo. {len(recipients_docs)} evaluaciones agrupadas en {len(groups)} evaluadores.", "launch_pending_surveys - Liderazgo")
-				else:
-					contact_ids = [r.sr_contact for r in recipients_docs]
-					frappe.log_error(f"Encuesta {survey.name} convencional. Destinatarios pendientes: {len(recipients_docs)}.", "launch_pending_surveys - Convencional")
-
-				if contact_ids:
-					contacts_data = frappe.get_all(
-						"Contact",
-						filters={"name": ["in", contact_ids]},
-						fields=["name", "email_id", "custom_document_number"]
-					)
-					contact_details_map = {c.name: c for c in contacts_data}
-				else:
-					contact_details_map = {}
-
 				is_custom_email = not getattr(survey_doc, "su_default_notif", True)
 				subject = survey_doc.su_invitation_subject if is_custom_email else f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
 
@@ -371,67 +349,103 @@ def launch_pending_surveys():
 				enviados = 0
 				errores = 0
 
-				# Lógica de Envíos según tipo
+				# Lógica de Envíos según tipo usando Chunking para eficiencia y manejo de memoria
 				if is_leadership:
 					base_url = frappe.utils.get_url('/iq-register')
-					
-					for eval_id, records in groups.items():
-						contact_info = contact_details_map.get(eval_id)
-						if not contact_info:
-							frappe.log_error(f"Evaluador '{eval_id}' no encontrado en Contactos. Omitiendo...", "launch_pending_surveys - Advertencia Liderazgo")
-							errores += len(records)
-							continue
+					groups = {}
+					for r in recipients_docs:
+						eval_id = r.sr_evaluating_to or r.sr_contact
+						groups.setdefault(eval_id, []).append(r)
+					evaluator_ids = list(groups.keys())
+					frappe.log_error(f"Encuesta {survey.name} es Liderazgo. {len(recipients_docs)} evaluaciones agrupadas en {len(groups)} evaluadores.", "launch_pending_surveys - Liderazgo")
 
-						contact_dni = contact_info.get("custom_document_number")
+					for i in range(0, len(evaluator_ids), BATCH_SIZE):
+						chunk_ids = evaluator_ids[i:i + BATCH_SIZE]
+						contacts_data = frappe.get_all(
+							"Contact",
+							filters={"name": ["in", chunk_ids]},
+							fields=["name", "email_id", "custom_document_number"]
+						)
+						contact_details_map = {c.name: c for c in contacts_data}
 
-						# Si eval no tiene DNI
-						if not contact_dni:
-							frappe.log_error(f"Evaluador '{eval_id}' no tiene DNI configurado. Es imposible generar el enlace.", "launch_pending_surveys - Sin DNI")
-							errores += len(records)
-							continue
+						for eval_id in chunk_ids:
+							records = groups[eval_id]
+							contact_info = contact_details_map.get(eval_id)
+							if not contact_info:
+								err_msg = f"Error: Evaluador '{eval_id}' no encontrado en el sistema."
+								frappe.log_error(err_msg, "launch_pending_surveys - Advertencia Liderazgo")
+								for r in records: frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, "sr_error_link", err_msg)
+								errores += len(records)
+								continue
 
-						first_rec = records[0]
-						payload = {
-							"rid": first_rec.name,
-							"sur": survey.su_name,
-							"iat": int(time()),
-							"custom_document_number": contact_dni
-						}
+							contact_dni = contact_info.get("custom_document_number")
 
-						try:
-							token = jwt.encode(payload, secret, algorithm="HS256")
-							if isinstance(token, bytes): token = token.decode("utf-8")
-						except Exception as e:
-							frappe.log_error(f"Error generando JWT para evaluador {eval_id}: {e}", "launch_pending_surveys - Error JWT")
-							errores += len(records)
-							continue
+							if not contact_dni:
+								err_msg = "Error: Evaluador no tiene DNI configurado. Es imposible generar el enlace."
+								frappe.log_error(f"Evaluador '{eval_id}' sin DNI.", "launch_pending_surveys - Sin DNI")
+								for r in records: frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, "sr_error_link", err_msg)
+								errores += len(records)
+								continue
 
-						unique_url = f"{base_url}?token={token}&uq=true"
-						
-						# Intentar enviar el correo solo si hay email
-						contact_email = contact_info.get("email_id")
-						if contact_email:
-							message = _get_invitation_html(survey.su_name, survey_doc.su_invitation_body, end_date_html, unique_url, is_custom_email)
+							first_rec = records[0]
+							payload = {
+								"rid": first_rec.name,
+								"sur": survey.su_name,
+								"iat": int(time()),
+								"custom_document_number": contact_dni
+							}
+
 							try:
-								frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=True)
+								token = jwt.encode(payload, secret, algorithm="HS256")
+								if isinstance(token, bytes): token = token.decode("utf-8")
 							except Exception as e:
-								frappe.log_error(f"Error enviando correo a {contact_email} (Liderazgo): {e}. El link SI se guardará en DB.", "launch_pending_surveys - Error Mail")
-						else:
-							frappe.log_error(f"Evaluador '{eval_id}' no tiene correo. Se generó el link en BD sin enviarlo.", "launch_pending_surveys - Sin Email")
+								err_msg = f"Error generando token JWT: {str(e)[:200]}"
+								frappe.log_error(err_msg, "launch_pending_surveys - Error JWT")
+								for r in records: frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, "sr_error_link", err_msg)
+								errores += len(records)
+								continue
 
-						# Guardar en Base de Datos de manera obligatoria (siempre que tenga DNI)
-						for r in records:
-							try:
-								frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {"sr_link": unique_url, "sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
-								enviados += 1
-							except Exception as e:
-								if "Data too long" in str(e):
-									frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {"sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
+							unique_url = f"{base_url}?token={token}&uq=true"
+							link_error_msg = ""
+							contact_email = contact_info.get("email_id")
+							
+							if contact_email:
+								message = _get_invitation_html(survey.su_name, survey_doc.su_invitation_body, end_date_html, unique_url, is_custom_email)
+								try:
+									frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=False)
+								except Exception as e:
+									link_error_msg = f"Enlace generado en BD, pero fallo al enviar correo: {str(e)[:200]}"
+									frappe.log_error(f"Error enviando correo a {contact_email} (Liderazgo): {e}", "launch_pending_surveys - Error Mail")
+							else:
+								link_error_msg = "Advertencia: Enlace generado en BD, pero usuario no tiene correo electrónico configurado."
+								frappe.log_error(f"Evaluador '{eval_id}' sin email.", "launch_pending_surveys - Sin Email")
+
+							for r in records:
+								try:
+									frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {
+										"sr_link": unique_url, 
+										"sr_token": token, 
+										"sr_status": rs_sent, 
+										"sr_sent_on": now(),
+										"sr_error_link": link_error_msg
+									})
 									enviados += 1
-								else:
-									frappe.log_error(f"Error guardando token en DB para registro {r.name}: {e}", "launch_pending_surveys - Error DB")
-									errores += 1
+								except Exception as e:
+									if "Data too long" in str(e):
+										frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {
+											"sr_token": token, 
+											"sr_status": rs_sent, 
+											"sr_sent_on": now(),
+											"sr_error_link": link_error_msg
+										})
+										enviados += 1
+									else:
+										frappe.log_error(f"Error guardando token en DB para registro {r.name}: {e}", "launch_pending_surveys - Error DB")
+										errores += 1
+						
+						frappe.db.commit()
 				else:
+					frappe.log_error(f"Encuesta {survey.name} convencional. Destinatarios pendientes: {len(recipients_docs)}.", "launch_pending_surveys - Convencional")
 					web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
 					if not web_form_route:
 						frappe.log_error(f"No se encontró ruta Web Form para encuesta {survey.su_name}.", "launch_pending_surveys - Error WebForm")
@@ -439,62 +453,91 @@ def launch_pending_surveys():
 					
 					base_url = frappe.utils.get_url(web_form_route)
 
-					for recipient_doc in recipients_docs:
-						contact_info = contact_details_map.get(recipient_doc.sr_contact)
-						if not contact_info:
-							frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no encontrado en el sistema. Omitiendo...", "launch_pending_surveys - Advertencia")
-							errores += 1
-							continue
-
-						contact_dni = contact_info.get("custom_document_number")
-
-						# Si contacto no tiene DNI
-						if not contact_dni:
-							frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no tiene DNI configurado. Es imposible generar el enlace.", "launch_pending_surveys - Sin DNI")
-							errores += 1
-							continue
-
-						payload = {
-							"rid": recipient_doc.name,
-							"sur": survey.su_name,
-							"iat": int(time()),
-							"custom_document_number": contact_dni
-						}
-
-						try:
-							token = jwt.encode(payload, secret, algorithm="HS256")
-							if isinstance(token, bytes): token = token.decode("utf-8")
-						except Exception as e:
-							frappe.log_error(f"Error generando JWT para {recipient_doc.name}: {e}", "launch_pending_surveys - Error JWT")
-							errores += 1
-							continue
-
-						unique_url = f"{base_url}?new=1&token={token}"
+					for i in range(0, len(recipients_docs), BATCH_SIZE):
+						batch = recipients_docs[i:i + BATCH_SIZE]
+						chunk_ids = [r.sr_contact for r in batch]
 						
-						# Intentar enviar el correo solo si hay email
-						contact_email = contact_info.get("email_id")
-						if contact_email:
-							message = _get_invitation_html(survey.su_name, survey_doc.su_invitation_body, end_date_html, unique_url, is_custom_email)
-							try:
-								frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=True)
-							except Exception as e:
-								frappe.log_error(f"Error enviando correo a {contact_email} (Convencional): {e}. El link SI se guardará en DB.", "launch_pending_surveys - Error Mail")
-						else:
-							frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no tiene correo. Se generó el link en BD sin enviarlo.", "launch_pending_surveys - Sin Email")
+						contacts_data = frappe.get_all(
+							"Contact",
+							filters={"name": ["in", chunk_ids]},
+							fields=["name", "email_id", "custom_document_number"]
+						)
+						contact_details_map = {c.name: c for c in contacts_data}
 
-						# Guardar en Base de Datos obligatoriamente
-						try:
-							frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {"sr_link": unique_url, "sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
-							enviados += 1
-						except Exception as e:
-							if "Data too long" in str(e):
-								frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {"sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
-								enviados += 1
-							else:
-								frappe.log_error(f"Error guardando token en DB para {recipient_doc.name}: {e}", "launch_pending_surveys - Error DB")
+						for recipient_doc in batch:
+							contact_info = contact_details_map.get(recipient_doc.sr_contact)
+							if not contact_info:
+								err_msg = "Error: Contacto no encontrado en el sistema."
+								frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no encontrado.", "launch_pending_surveys - Advertencia")
+								frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_error_link", err_msg)
 								errores += 1
+								continue
+
+							contact_dni = contact_info.get("custom_document_number")
+
+							if not contact_dni:
+								err_msg = "Error: Contacto no tiene DNI configurado. Es imposible generar el enlace."
+								frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' sin DNI.", "launch_pending_surveys - Sin DNI")
+								frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_error_link", err_msg)
+								errores += 1
+								continue
+
+							payload = {
+								"rid": recipient_doc.name,
+								"sur": survey.su_name,
+								"iat": int(time()),
+								"custom_document_number": contact_dni
+							}
+
+							try:
+								token = jwt.encode(payload, secret, algorithm="HS256")
+								if isinstance(token, bytes): token = token.decode("utf-8")
+							except Exception as e:
+								err_msg = f"Error generando token JWT: {str(e)[:200]}"
+								frappe.log_error(f"Error generando JWT para {recipient_doc.name}: {e}", "launch_pending_surveys - Error JWT")
+								frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_error_link", err_msg)
+								errores += 1
+								continue
+
+							unique_url = f"{base_url}?new=1&token={token}"
+							link_error_msg = ""
+							contact_email = contact_info.get("email_id")
+							
+							if contact_email:
+								message = _get_invitation_html(survey.su_name, survey_doc.su_invitation_body, end_date_html, unique_url, is_custom_email)
+								try:
+									frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=False)
+								except Exception as e:
+									link_error_msg = f"Enlace generado en BD, pero fallo al enviar correo: {str(e)[:200]}"
+									frappe.log_error(f"Error enviando correo a {contact_email} (Convencional): {e}", "launch_pending_surveys - Error Mail")
+							else:
+								link_error_msg = "Advertencia: Enlace generado en BD, pero usuario no tiene correo electrónico configurado."
+								frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' sin email.", "launch_pending_surveys - Sin Email")
+
+							try:
+								frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+									"sr_link": unique_url, 
+									"sr_token": token, 
+									"sr_status": rs_sent, 
+									"sr_sent_on": now(),
+									"sr_error_link": link_error_msg
+								})
+								enviados += 1
+							except Exception as e:
+								if "Data too long" in str(e):
+									frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+										"sr_token": token, 
+										"sr_status": rs_sent, 
+										"sr_sent_on": now(),
+										"sr_error_link": link_error_msg
+									})
+									enviados += 1
+								else:
+									frappe.log_error(f"Error guardando token en DB para {recipient_doc.name}: {e}", "launch_pending_surveys - Error DB")
+									errores += 1
+						
+						frappe.db.commit()
 				
-				frappe.db.commit()
 				frappe.log_error(f"Procesamiento finalizado para {survey.name}. Enviados/Generados: {enviados}, Omitidos sin DNI/Error: {errores}.", "launch_pending_surveys - Éxito")
 				
 			except Exception as e:
@@ -586,26 +629,6 @@ def send_survey_reminders():
 				frappe.log_error(f"Procesando recordatorios para {survey.name}. {len(recipients_to_remind)} registros candidatos.", "send_survey_reminders - Procesando")
 
 				is_leadership = getattr(survey_doc, "su_is_leadership", 0)
-
-				if is_leadership:
-					groups = {}
-					for r in recipients_to_remind:
-						eid = r.sr_evaluating_to or r.sr_contact
-						groups.setdefault(eid, []).append(r)
-					contact_ids = list(groups.keys())
-				else:
-					contact_ids = [r.sr_contact for r in recipients_to_remind]
-
-				if contact_ids:
-					contacts_data = frappe.get_all(
-						"Contact", 
-						filters={"name": ["in", contact_ids]}, 
-						fields=["name", "email_id"]
-					)
-					contact_info_map = {c.name: c for c in contacts_data}
-				else:
-					contact_info_map = {}
-
 				sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
 				if not sender_email:
 					frappe.log_error("Fallo crítico: No se encontró cuenta de correo saliente por defecto.", "send_survey_reminders - Error Crítico")
@@ -618,61 +641,77 @@ def send_survey_reminders():
 				enviados = 0
 				errores = 0
 
-				# Lógica de Reminders según tipo
+				# Lógica de Reminders usando Batching
 				if is_leadership:
 					base_url = frappe.utils.get_url('/iq-register')
-					
-					for eval_id, records in groups.items():
-						try:
-							first_rec = records[0]
-							current_sent = int(first_rec.sr_reminder_send or 0)
-							if current_sent >= expected_sends: continue
+					groups = {}
+					for r in recipients_to_remind:
+						eid = r.sr_evaluating_to or r.sr_contact
+						groups.setdefault(eid, []).append(r)
+					evaluator_ids = list(groups.keys())
 
-							cinfo = contact_info_map.get(eval_id)
-							if not cinfo: 
-								frappe.log_error(f"Evaluador '{eval_id}' no encontrado en Contactos. Omitiendo...", "send_survey_reminders - Advertencia Liderazgo")
-								errores += len(records)
-								continue
-							
-							# Intentar enviar correo si existe
-							contact_email = cinfo.get("email_id")
-							if contact_email:
-								link = first_rec.sr_link
-								if not link or "iq-register" not in link:
-									link = f"{base_url}?token={first_rec.sr_token}&uq=true"
+					for i in range(0, len(evaluator_ids), BATCH_SIZE):
+						chunk_ids = evaluator_ids[i:i + BATCH_SIZE]
+						contacts_data = frappe.get_all("Contact", filters={"name": ["in", chunk_ids]}, fields=["name", "email_id"])
+						contact_info_map = {c.name: c for c in contacts_data}
 
-								message = _get_reminder_html(survey.su_name, survey_doc.su_reminder_body, link, is_custom_email)
+						for eval_id in chunk_ids:
+							records = groups[eval_id]
+							try:
+								first_rec = records[0]
+								current_sent = int(first_rec.sr_reminder_send or 0)
+								if current_sent >= expected_sends: continue
 
-								try:
-									frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=True)
-								except Exception as e:
-									frappe.log_error(f"Error enviando recordatorio a {contact_email} (Liderazgo): {e}", "send_survey_reminders - Error Mail")
-							else:
-								frappe.log_error(f"Evaluador '{eval_id}' no tiene correo. Se actualiza contador sin enviar email.", "send_survey_reminders - Sin Email")
+								cinfo = contact_info_map.get(eval_id)
+								if not cinfo: 
+									err_msg = "Error: Evaluador no encontrado en el sistema al procesar recordatorio."
+									frappe.log_error(f"Evaluador '{eval_id}' no encontrado.", "send_survey_reminders - Advertencia Liderazgo")
+									for r in records: frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, "sr_error_link", err_msg)
+									errores += len(records)
+									continue
+								
+								link_error_msg = ""
+								contact_email = cinfo.get("email_id")
+								if contact_email:
+									link = first_rec.sr_link
+									if not link or "iq-register" not in link:
+										link = f"{base_url}?token={first_rec.sr_token}&uq=true"
 
-							# Siempre avanzar el contador para no quedar en bucle
-							next_count = current_sent + 1
-							next_reminder_date = None
-							if next_count < max_allowed:
-								if is_daily: next_reminder_date = add_to_date(base_date, days=(next_count)).date()
-								else: next_reminder_date = add_to_date(base_date, days=(7 * next_count)).date()
+									message = _get_reminder_html(survey.su_name, survey_doc.su_reminder_body, link, is_custom_email)
 
-							for r in records:
-								try:
-									frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {
-										"sr_reminder_send": next_count,
-										"sr_last_reminder_send": now_dt,
-										"sr_next_reminder": next_reminder_date
-									})
-									enviados += 1
-								except Exception as e:
-									frappe.log_error(f"Error guardando recordatorio DB {r.name}: {e}", "send_survey_reminders - Error DB")
-									errores += 1
-									
-							frappe.db.commit()
-						except Exception as e:
-							frappe.db.rollback()
-							frappe.log_error(f"Error general en grupo de recordatorio {eval_id}: {e}\n{frappe.get_traceback()}", "send_survey_reminders - Error Grupo Liderazgo")
+									try:
+										frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=False)
+									except Exception as e:
+										link_error_msg = f"Fallo al enviar correo recordatorio: {str(e)[:200]}"
+										frappe.log_error(f"Error enviando recordatorio a {contact_email} (Liderazgo): {e}", "send_survey_reminders - Error Mail")
+								else:
+									link_error_msg = "Advertencia: Recordatorio no enviado, el usuario no tiene correo electrónico."
+									frappe.log_error(f"Evaluador '{eval_id}' sin correo.", "send_survey_reminders - Sin Email")
+
+								next_count = current_sent + 1
+								next_reminder_date = None
+								if next_count < max_allowed:
+									if is_daily: next_reminder_date = add_to_date(base_date, days=(next_count)).date()
+									else: next_reminder_date = add_to_date(base_date, days=(7 * next_count)).date()
+
+								for r in records:
+									try:
+										update_dict = {
+											"sr_reminder_send": next_count,
+											"sr_last_reminder_send": now_dt,
+											"sr_next_reminder": next_reminder_date
+										}
+										if link_error_msg: update_dict["sr_error_link"] = link_error_msg
+										
+										frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, update_dict)
+										enviados += 1
+									except Exception as e:
+										frappe.log_error(f"Error guardando recordatorio DB {r.name}: {e}", "send_survey_reminders - Error DB")
+										errores += 1
+							except Exception as e:
+								frappe.log_error(f"Error procesando recordatorio para grupo {eval_id}: {e}", "send_survey_reminders - Error Grupo Liderazgo")
+						
+						frappe.db.commit()
 				else:
 					web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
 					base_url = frappe.utils.get_url(web_form_route) if web_form_route else None
@@ -680,53 +719,63 @@ def send_survey_reminders():
 						frappe.log_error(f"Ruta Web Form no encontrada para {survey.su_name}", "send_survey_reminders - Error WebForm")
 						continue
 
-					for recipient in recipients_to_remind:
-						try:
-							current_sent = int(recipient.sr_reminder_send or 0)
-							if current_sent >= expected_sends: continue
+					for i in range(0, len(recipients_to_remind), BATCH_SIZE):
+						batch = recipients_to_remind[i:i + BATCH_SIZE]
+						chunk_ids = [r.sr_contact for r in batch]
+						contacts_data = frappe.get_all("Contact", filters={"name": ["in", chunk_ids]}, fields=["name", "email_id"])
+						contact_info_map = {c.name: c for c in contacts_data}
 
-							cinfo = contact_info_map.get(recipient.sr_contact)
-							if not cinfo: 
-								frappe.log_error(f"Contacto '{recipient.sr_contact}' no encontrado. Omitiendo...", "send_survey_reminders - Advertencia")
-								errores += 1
-								continue
+						for recipient in batch:
+							try:
+								current_sent = int(recipient.sr_reminder_send or 0)
+								if current_sent >= expected_sends: continue
 
-							# Intentar enviar correo si existe
-							contact_email = cinfo.get("email_id")
-							if contact_email:
-								link = f"{base_url}?new=1&token={recipient.sr_token}"
-								message = _get_reminder_html(survey.su_name, survey_doc.su_reminder_body, link, is_custom_email)
+								cinfo = contact_info_map.get(recipient.sr_contact)
+								if not cinfo: 
+									err_msg = "Error: Contacto no encontrado en el sistema al enviar recordatorio."
+									frappe.log_error(f"Contacto '{recipient.sr_contact}' no encontrado.", "send_survey_reminders - Advertencia")
+									frappe.db.set_value("qp_IQ_SurveyRecipient", recipient.name, "sr_error_link", err_msg)
+									errores += 1
+									continue
+
+								link_error_msg = ""
+								contact_email = cinfo.get("email_id")
+								if contact_email:
+									link = f"{base_url}?new=1&token={recipient.sr_token}"
+									message = _get_reminder_html(survey.su_name, survey_doc.su_reminder_body, link, is_custom_email)
+
+									try:
+										frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=False)
+									except Exception as e:
+										link_error_msg = f"Fallo al enviar correo recordatorio: {str(e)[:200]}"
+										frappe.log_error(f"Error enviando recordatorio a {contact_email}: {e}", "send_survey_reminders - Error Mail")
+								else:
+									link_error_msg = "Advertencia: Recordatorio no enviado, el usuario no tiene correo electrónico."
+									frappe.log_error(f"Contacto '{recipient.sr_contact}' sin correo.", "send_survey_reminders - Sin Email")
+
+								next_count = current_sent + 1
+								next_reminder_date = None
+								if next_count < max_allowed:
+									if is_daily: next_reminder_date = add_to_date(base_date, days=(next_count)).date()
+									else: next_reminder_date = add_to_date(base_date, days=(7 * next_count)).date()
 
 								try:
-									frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=True)
+									update_dict = {
+										"sr_reminder_send": next_count,
+										"sr_last_reminder_send": now_dt,
+										"sr_next_reminder": next_reminder_date
+									}
+									if link_error_msg: update_dict["sr_error_link"] = link_error_msg
+									
+									frappe.db.set_value("qp_IQ_SurveyRecipient", recipient.name, update_dict)
+									enviados += 1
 								except Exception as e:
-									frappe.log_error(f"Error enviando recordatorio a {contact_email}: {e}", "send_survey_reminders - Error Mail")
-							else:
-								frappe.log_error(f"Contacto '{recipient.sr_contact}' no tiene correo. Se actualiza contador sin enviar email.", "send_survey_reminders - Sin Email")
-
-							# Siempre avanzar el contador para no quedar en bucle
-							next_count = current_sent + 1
-							next_reminder_date = None
-							if next_count < max_allowed:
-								if is_daily: next_reminder_date = add_to_date(base_date, days=(next_count)).date()
-								else: next_reminder_date = add_to_date(base_date, days=(7 * next_count)).date()
-
-							try:
-								frappe.db.set_value("qp_IQ_SurveyRecipient", recipient.name, {
-									"sr_reminder_send": next_count,
-									"sr_last_reminder_send": now_dt,
-									"sr_next_reminder": next_reminder_date
-								})
-								enviados += 1
+									frappe.log_error(f"Error actualizando recordatorio DB {recipient.name}: {e}", "send_survey_reminders - Error DB")
+									errores += 1
 							except Exception as e:
-								frappe.log_error(f"Error actualizando recordatorio DB {recipient.name}: {e}", "send_survey_reminders - Error DB")
-								errores += 1
-								
-							frappe.db.commit()
-
-						except Exception as e:
-							frappe.db.rollback()
-							frappe.log_error(f"Error general en recordatorio {recipient.name}: {e}\n{frappe.get_traceback()}", "send_survey_reminders - Error Bucle Convencional")
+								frappe.log_error(f"Error procesando recordatorio para registro {recipient.name}: {e}", "send_survey_reminders - Error Bucle Convencional")
+						
+						frappe.db.commit()
 							
 				frappe.log_error(f"Recordatorios para {survey.name} finalizados. Avances: {enviados}, Errores: {errores}", "send_survey_reminders - Éxito")
 
@@ -875,28 +924,6 @@ def send_pending_links_for_survey(survey_name: str):
 			return {"status": "success", "message": "No hay destinatarios pendientes por enviar."}
 
 		is_leadership = getattr(survey, "su_is_leadership", 0)
-
-		if is_leadership:
-			groups = {}
-			for r in recipients_docs:
-				eid = r.sr_evaluating_to or r.sr_contact
-				groups.setdefault(eid, []).append(r)
-			contact_ids = list(groups.keys())
-			frappe.log_error(f"Es medición de Liderazgo. {len(recipients_docs)} evaluaciones agrupadas para {len(groups)} evaluadores.", "send_pending_links_for_survey - Info")
-		else:
-			contact_ids = [r.sr_contact for r in recipients_docs]
-			frappe.log_error(f"Medición convencional. {len(recipients_docs)} destinatarios pendientes.", "send_pending_links_for_survey - Info")
-
-		if contact_ids:
-			contacts_data = frappe.get_all(
-				"Contact",
-				filters={"name": ["in", contact_ids]},
-				fields=["name", "email_id", "custom_document_number"]
-			)
-			contact_details_map = {c.name: c for c in contacts_data}
-		else:
-			contact_details_map = {}
-
 		is_custom_email = not getattr(survey, "su_default_notif", True)
 		subject = survey.su_invitation_subject if is_custom_email else f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
 
@@ -920,122 +947,190 @@ def send_pending_links_for_survey(survey_name: str):
 
 		if is_leadership:
 			base_url = frappe.utils.get_url('/iq-register')
-			for eval_id, records in groups.items():
-				contact_info = contact_details_map.get(eval_id)
-				if not contact_info:
-					frappe.log_error(f"Evaluador '{eval_id}' no encontrado en Contactos. Omitiendo...", "send_pending_links_for_survey - Advertencia")
-					omitidos += len(records)
-					continue
+			groups = {}
+			for r in recipients_docs:
+				eid = r.sr_evaluating_to or r.sr_contact
+				groups.setdefault(eid, []).append(r)
+			evaluator_ids = list(groups.keys())
+			frappe.log_error(f"Es medición de Liderazgo. {len(recipients_docs)} evaluaciones agrupadas para {len(groups)} evaluadores.", "send_pending_links_for_survey - Info")
 
-				contact_dni = contact_info.get("custom_document_number")
+			for i in range(0, len(evaluator_ids), BATCH_SIZE):
+				chunk_ids = evaluator_ids[i:i + BATCH_SIZE]
+				contacts_data = frappe.get_all(
+					"Contact",
+					filters={"name": ["in", chunk_ids]},
+					fields=["name", "email_id", "custom_document_number"]
+				)
+				contact_details_map = {c.name: c for c in contacts_data}
 
-				if not contact_dni:
-					frappe.log_error(f"Evaluador '{eval_id}' no tiene DNI configurado. Es imposible generar el enlace.", "send_pending_links_for_survey - Sin DNI")
-					omitidos += len(records)
-					continue
+				for eval_id in chunk_ids:
+					records = groups[eval_id]
+					contact_info = contact_details_map.get(eval_id)
+					if not contact_info:
+						err_msg = "Error: Evaluador no encontrado en el sistema."
+						frappe.log_error(f"Evaluador '{eval_id}' no encontrado.", "send_pending_links_for_survey - Advertencia")
+						for r in records: frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, "sr_error_link", err_msg)
+						omitidos += len(records)
+						continue
 
-				first_rec = records[0]
-				payload = {
-					"rid": first_rec.name,
-					"sur": survey.su_name,
-					"iat": int(time()),
-					"custom_document_number": contact_dni
-				}
+					contact_dni = contact_info.get("custom_document_number")
 
-				try:
-					token = jwt.encode(payload, secret, algorithm="HS256")
-					if isinstance(token, bytes): token = token.decode("utf-8")
-				except Exception as e:
-					frappe.log_error(f"Fallo codificando JWT para evaluador {eval_id}: {e}", "send_pending_links_for_survey - Error JWT")
-					omitidos += len(records)
-					continue
+					if not contact_dni:
+						err_msg = "Error: Evaluador no tiene DNI configurado. Es imposible generar el enlace."
+						frappe.log_error(f"Evaluador '{eval_id}' sin DNI.", "send_pending_links_for_survey - Sin DNI")
+						for r in records: frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, "sr_error_link", err_msg)
+						omitidos += len(records)
+						continue
 
-				unique_url = f"{base_url}?token={token}&uq=true"
-				
-				# Intentar enviar correo solo si hay email
-				contact_email = contact_info.get("email_id")
-				if contact_email:
-					message = _get_invitation_html(survey.su_name, survey.su_invitation_body, end_date_html, unique_url, is_custom_email)
+					first_rec = records[0]
+					payload = {
+						"rid": first_rec.name,
+						"sur": survey.su_name,
+						"iat": int(time()),
+						"custom_document_number": contact_dni
+					}
+
 					try:
-						frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=True)
+						token = jwt.encode(payload, secret, algorithm="HS256")
+						if isinstance(token, bytes): token = token.decode("utf-8")
 					except Exception as e:
-						frappe.log_error(f"Fallo enviando correo a {contact_email}: {e}. El link SI se guardará en BD.", "send_pending_links_for_survey - Error Mail")
-				else:
-					frappe.log_error(f"Evaluador '{eval_id}' no tiene correo. Se generó el link en BD sin enviarlo.", "send_pending_links_for_survey - Sin Email")
+						err_msg = f"Error generando token JWT: {str(e)[:200]}"
+						frappe.log_error(f"Fallo codificando JWT para evaluador {eval_id}: {e}", "send_pending_links_for_survey - Error JWT")
+						for r in records: frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, "sr_error_link", err_msg)
+						omitidos += len(records)
+						continue
 
-				# Guardar obligatoriamente en Base de Datos
-				for r in records:
-					try:
-						frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {"sr_link": unique_url, "sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
-						enviados += 1
-					except Exception as e:
-						if "Data too long" in str(e):
-							frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {"sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
+					unique_url = f"{base_url}?token={token}&uq=true"
+					link_error_msg = ""
+					contact_email = contact_info.get("email_id")
+					
+					if contact_email:
+						message = _get_invitation_html(survey.su_name, survey.su_invitation_body, end_date_html, unique_url, is_custom_email)
+						try:
+							frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=False)
+						except Exception as e:
+							link_error_msg = f"Enlace generado en BD, pero fallo al enviar correo: {str(e)[:200]}"
+							frappe.log_error(f"Fallo enviando correo a {contact_email}: {e}. El link SI se guardará en BD.", "send_pending_links_for_survey - Error Mail")
+					else:
+						link_error_msg = "Advertencia: Enlace generado en BD, pero usuario no tiene correo electrónico configurado."
+						frappe.log_error(f"Evaluador '{eval_id}' sin correo.", "send_pending_links_for_survey - Sin Email")
+
+					for r in records:
+						try:
+							frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {
+								"sr_link": unique_url, 
+								"sr_token": token, 
+								"sr_status": rs_sent, 
+								"sr_sent_on": now(),
+								"sr_error_link": link_error_msg
+							})
 							enviados += 1
-						else:
-							frappe.log_error(f"Error actualizando DB registro {r.name}: {e}", "send_pending_links_for_survey - Error DB")
-							omitidos += 1
+						except Exception as e:
+							if "Data too long" in str(e):
+								frappe.db.set_value("qp_IQ_SurveyRecipient", r.name, {
+									"sr_token": token, 
+									"sr_status": rs_sent, 
+									"sr_sent_on": now(),
+									"sr_error_link": link_error_msg
+								})
+								enviados += 1
+							else:
+								frappe.log_error(f"Error actualizando DB registro {r.name}: {e}", "send_pending_links_for_survey - Error DB")
+								omitidos += 1
+				
+				frappe.db.commit()
+
 		else:
+			frappe.log_error(f"Medición convencional. {len(recipients_docs)} destinatarios pendientes.", "send_pending_links_for_survey - Info")
 			web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
 			if not web_form_route:
 				frappe.log_error(f"No se encontró ruta Web Form para encuesta {survey.su_name}.", "send_pending_links_for_survey - Error WebForm")
 				return {"status": "error", "message": "No se encontró el Web Form de la encuesta."}
 			base_url = frappe.utils.get_url(web_form_route)
 
-			for recipient_doc in recipients_docs:
-				contact_info = contact_details_map.get(recipient_doc.sr_contact)
-				if not contact_info:
-					frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no encontrado. Omitiendo...", "send_pending_links_for_survey - Advertencia")
-					omitidos += 1
-					continue
+			for i in range(0, len(recipients_docs), BATCH_SIZE):
+				batch = recipients_docs[i:i + BATCH_SIZE]
+				chunk_ids = [r.sr_contact for r in batch]
+				contacts_data = frappe.get_all(
+					"Contact",
+					filters={"name": ["in", chunk_ids]},
+					fields=["name", "email_id", "custom_document_number"]
+				)
+				contact_details_map = {c.name: c for c in contacts_data}
 
-				contact_dni = contact_info.get("custom_document_number")
-
-				if not contact_dni:
-					frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no tiene DNI configurado. Es imposible generar el enlace.", "send_pending_links_for_survey - Sin DNI")
-					omitidos += 1
-					continue
-
-				payload = {
-					"rid": recipient_doc.name,
-					"sur": survey.su_name,
-					"iat": int(time()),
-					"custom_document_number": contact_dni
-				}
-				try:
-					token = jwt.encode(payload, secret, algorithm="HS256")
-					if isinstance(token, bytes): token = token.decode("utf-8")
-				except Exception as e:
-					frappe.log_error(f"Fallo codificando JWT para {recipient_doc.name}: {e}", "send_pending_links_for_survey - Error JWT")
-					omitidos += 1
-					continue
-
-				unique_url = f"{base_url}?new=1&token={token}"
-				
-				# Intentar enviar correo solo si hay email
-				contact_email = contact_info.get("email_id")
-				if contact_email:
-					message = _get_invitation_html(survey.su_name, survey.su_invitation_body, end_date_html, unique_url, is_custom_email)
-					try:
-						frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=True)
-					except Exception as e:
-						frappe.log_error(f"Fallo enviando correo a {contact_email}: {e}. El link SI se guardará en BD.", "send_pending_links_for_survey - Error Mail")
-				else:
-					frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no tiene correo. Se generó el link en BD sin enviarlo.", "send_pending_links_for_survey - Sin Email")
-
-				# Guardar obligatoriamente en Base de Datos
-				try:
-					frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {"sr_link": unique_url, "sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
-					enviados += 1
-				except Exception as e:
-					if "Data too long" in str(e):
-						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {"sr_token": token, "sr_status": rs_sent, "sr_sent_on": now()})
-						enviados += 1
-					else:
-						frappe.log_error(f"Error actualizando DB registro {recipient_doc.name}: {e}", "send_pending_links_for_survey - Error DB")
+				for recipient_doc in batch:
+					contact_info = contact_details_map.get(recipient_doc.sr_contact)
+					if not contact_info:
+						err_msg = "Error: Contacto no encontrado en el sistema."
+						frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' no encontrado.", "send_pending_links_for_survey - Advertencia")
+						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_error_link", err_msg)
 						omitidos += 1
+						continue
 
-		frappe.db.commit()
+					contact_dni = contact_info.get("custom_document_number")
+
+					if not contact_dni:
+						err_msg = "Error: Contacto no tiene DNI configurado. Es imposible generar el enlace."
+						frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' sin DNI.", "send_pending_links_for_survey - Sin DNI")
+						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_error_link", err_msg)
+						omitidos += 1
+						continue
+
+					payload = {
+						"rid": recipient_doc.name,
+						"sur": survey.su_name,
+						"iat": int(time()),
+						"custom_document_number": contact_dni
+					}
+					try:
+						token = jwt.encode(payload, secret, algorithm="HS256")
+						if isinstance(token, bytes): token = token.decode("utf-8")
+					except Exception as e:
+						err_msg = f"Error generando token JWT: {str(e)[:200]}"
+						frappe.log_error(f"Fallo codificando JWT para {recipient_doc.name}: {e}", "send_pending_links_for_survey - Error JWT")
+						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, "sr_error_link", err_msg)
+						omitidos += 1
+						continue
+
+					unique_url = f"{base_url}?new=1&token={token}"
+					link_error_msg = ""
+					contact_email = contact_info.get("email_id")
+					
+					if contact_email:
+						message = _get_invitation_html(survey.su_name, survey.su_invitation_body, end_date_html, unique_url, is_custom_email)
+						try:
+							frappe.sendmail(recipients=[contact_email], sender=sender_formatted, subject=subject, message=message, now=False)
+						except Exception as e:
+							link_error_msg = f"Enlace generado en BD, pero fallo al enviar correo: {str(e)[:200]}"
+							frappe.log_error(f"Fallo enviando correo a {contact_email}: {e}. El link SI se guardará en BD.", "send_pending_links_for_survey - Error Mail")
+					else:
+						link_error_msg = "Advertencia: Enlace generado en BD, pero usuario no tiene correo electrónico configurado."
+						frappe.log_error(f"Contacto '{recipient_doc.sr_contact}' sin correo.", "send_pending_links_for_survey - Sin Email")
+
+					try:
+						frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+							"sr_link": unique_url, 
+							"sr_token": token, 
+							"sr_status": rs_sent, 
+							"sr_sent_on": now(),
+							"sr_error_link": link_error_msg
+						})
+						enviados += 1
+					except Exception as e:
+						if "Data too long" in str(e):
+							frappe.db.set_value("qp_IQ_SurveyRecipient", recipient_doc.name, {
+								"sr_token": token, 
+								"sr_status": rs_sent, 
+								"sr_sent_on": now(),
+								"sr_error_link": link_error_msg
+							})
+							enviados += 1
+						else:
+							frappe.log_error(f"Error actualizando DB registro {recipient_doc.name}: {e}", "send_pending_links_for_survey - Error DB")
+							omitidos += 1
+
+				frappe.db.commit()
+
 		frappe.log_error(f"Proceso manual finalizado. Enviados/Generados: {enviados}, Omitidos sin DNI/Error: {omitidos}.", "send_pending_links_for_survey - Éxito")
 		return {"status": "success", "sent": enviados, "skipped": omitidos}
 

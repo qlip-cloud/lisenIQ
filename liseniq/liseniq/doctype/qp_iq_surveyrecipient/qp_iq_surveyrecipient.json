@@ -22,7 +22,9 @@
   "sr_dates_reminders_column",
   "sr_reminder_send",
   "sr_last_reminder_send",
-  "sr_next_reminder"
+  "sr_next_reminder",
+  "section_break_19",
+  "sr_error_link"
  ],
  "fields": [
   {
@@ -125,11 +127,21 @@
   {
    "fieldname": "sr_access_column",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_19",
+   "fieldtype": "Section Break",
+   "label": "Errores"
+  },
+  {
+   "fieldname": "sr_error_link",
+   "fieldtype": "Long Text",
+   "label": "Error"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-05 20:22:51.611806",
+ "modified": "2026-03-17 21:05:57.069194",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

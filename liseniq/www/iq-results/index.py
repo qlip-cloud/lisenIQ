@@ -130,6 +130,9 @@ def get_power_bi_embed_config(report_id: Optional[str] = None,
     try:
         company = _get_user_company()
         
+        # Log para verificar la compañía detectada para el usuario
+        frappe.log_error(f"Usuario PBI: {frappe.session.user} | Compañía detectada: '{company}'", "Power BI - Check Compañia")
+        
         # Determinar qué configuración PBI usar basado en el MNEMONICO
         pbi_mnemonico_target = "PBICU"
 

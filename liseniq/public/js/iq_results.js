@@ -178,10 +178,29 @@ function embedPowerBI() {
     if (state.embedConfig.filters && Array.isArray(state.embedConfig.filters)) {
       config.filters = state.embedConfig.filters;
     }
+
+    // Logs para validar la configuración que se está enviando a Power BI, especialmente los filtros
+    console.log("Configuración enviada a Power BI:", config);
+    if (config.filters && config.filters.length > 0) {
+        console.log("Filtros detectados en JS listos para aplicar:", config.filters);
+    } else {
+        console.warn("No llegaron filtros desde el backend a la configuración JS.");
+    }
+
     if (window.powerbi.find(ui.pbi)) {
       window.powerbi.reset(ui.pbi);
     }
     const report = window.powerbi.embed(ui.pbi, config);
+
+    // Validar si el filtro fue aceptado luego de que cargue el reporte
+    report.on('loaded', async () => {
+        try {
+            const appliedFilters = await report.getFilters();
+            console.log("🔍 Filtros aplicados en el reporte PBI ya cargado:", appliedFilters);
+        } catch (err) {
+            console.error("No se pudo obtener la lista de filtros aplicados", err);
+        }
+    });
 
     // Paso 2: Renovación del token cuando expire (sin recargar el iframe).
     report.off('tokenExpired');

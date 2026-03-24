@@ -53,14 +53,24 @@
                 <div class="measurement-card">
                     <div class="card-header">
                         <span class="status-badge status-{{ m.status.lower().replace(' ', '-') }}">{{ m.status }}</span>
-                        {% if m.public_link %}
-                        <div class="tooltip-wrapper">
-                            <a href="{{ m.public_link }}" target="_blank" class="btn-public-link" data-tooltip-bottom="Este enlace lo puedes copiar y enviar a los colaboradores que estén participando en la medición y no tengan correo electrónico o no les haya llegado el correo de invitación. Para poder responder la encuesta, los colaboradores deberán ingresar su documento de identidad con el cual se han cargado en la plataforma.">
-                                <i class="fa fa-link" style="color: #7B24FF;"></i>
-                            </a>
-                            <span class="tooltip-icon"></span>
+                        <div class="card-header-actions" style="display: flex; gap: 12px; align-items: center;">
+                            {% if m.status == "En Progreso" and not m.is_anonymous %}
+                            <div class="tooltip-wrapper">
+                                <button class="btn-reminders" data-survey="{{ m.name }}" data-tooltip-bottom="Enviar recordatorio a contactos que aún no llenan la encuesta">
+                                    <i class="fa fa-paper-plane" style="color: #7B24FF;"></i>
+                                </button>
+                                <span class="tooltip-icon"></span>
+                            </div>
+                            {% endif %}
+                            {% if m.public_link %}
+                            <div class="tooltip-wrapper">
+                                <a href="{{ m.public_link }}" target="_blank" class="btn-public-link" data-tooltip-bottom="Este enlace lo puedes copiar y enviar a los colaboradores que estén participando en la medición y no tengan correo electrónico o no les haya llegado el correo de invitación. Para poder responder la encuesta, los colaboradores deberán ingresar su documento de identidad con el cual se han cargado en la plataforma.">
+                                    <i class="fa fa-link" style="color: #7B24FF;"></i>
+                                </a>
+                                <span class="tooltip-icon"></span>
+                            </div>
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
                     <div class="card-body">
                         <h3 class="card-title">{{ m.title }}</h3>

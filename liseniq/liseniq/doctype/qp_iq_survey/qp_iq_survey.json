@@ -37,6 +37,7 @@
   "column_break_27",
   "su_public_token",
   "section_break_5",
+  "su_manual_reminders_btn",
   "su_send_reminders",
   "su_reminder_frequency",
   "su_reminder_max",
@@ -271,11 +272,16 @@
    "fieldname": "su_is_leadership",
    "fieldtype": "Check",
    "label": "\u00bfEs Liderazgo?"
+  },
+  {
+   "fieldname": "su_manual_reminders_btn",
+   "fieldtype": "Button",
+   "label": "Enviar Recordatorio Manual"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-24 07:47:10.533436",
+ "modified": "2026-03-23 21:15:37.162438",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

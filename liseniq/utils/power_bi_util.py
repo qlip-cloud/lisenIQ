@@ -247,6 +247,7 @@ def build_embed_url(report_id: Optional[str] = None, workspace_id: Optional[str]
     
     return f"https://app.powerbi.com/reportEmbed?reportId={report_id}&groupId={workspace_id}"
 
+@frappe.whitelist()
 def get_embed_config(report_id: Optional[str] = None,
                      workspace_id: Optional[str] = None,
                      access_level: str = "View",
@@ -308,4 +309,13 @@ def get_embed_config(report_id: Optional[str] = None,
             "values": [filter_company]
         }]
     
+    # Logs para debuggear el filtro de compañía y la configuración utilizada
+    debug_msg = (
+        f"1. Param 'filter_company' recibido: {filter_company}\n"
+        f"2. Param 'pbi_mnemonico' o 'pbi_id_name': {pbi_mnemonico} / {pbi_id_name}\n\n"
+        f"Estructura 'filters' que se devuelve al frontend:\n"
+        f"{json.dumps(result.get('filters'), indent=4) if result.get('filters') else 'NINGUNO (No se aplicó filtro)'}\n"
+    )
+    frappe.log_error(title="Power BI Debug - Filtro Compañía", message=debug_msg)
+
     return result

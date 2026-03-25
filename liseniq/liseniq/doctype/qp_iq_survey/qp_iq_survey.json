@@ -17,6 +17,7 @@
   "su_status",
   "su_type",
   "su_is_anonymous",
+  "su_is_leadership",
   "su_in_history",
   "column_break_2",
   "su_timezone",
@@ -36,6 +37,7 @@
   "column_break_27",
   "su_public_token",
   "section_break_5",
+  "su_manual_reminders_btn",
   "su_send_reminders",
   "su_reminder_frequency",
   "su_reminder_max",
@@ -84,7 +86,7 @@
    "default": "0",
    "fieldname": "su_is_anonymous",
    "fieldtype": "Check",
-   "label": "Es An\u00f3nima"
+   "label": "\u00bfEs An\u00f3nima?"
   },
   {
    "fieldname": "su_respondents_template",
@@ -263,12 +265,23 @@
    "default": "0",
    "fieldname": "su_in_history",
    "fieldtype": "Check",
-   "label": "En Historial"
+   "label": "\u00bfEn Historial?"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_is_leadership",
+   "fieldtype": "Check",
+   "label": "\u00bfEs Liderazgo?"
+  },
+  {
+   "fieldname": "su_manual_reminders_btn",
+   "fieldtype": "Button",
+   "label": "Enviar Recordatorio Manual"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-16 09:33:16.018042",
+ "modified": "2026-03-23 21:15:37.162438",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

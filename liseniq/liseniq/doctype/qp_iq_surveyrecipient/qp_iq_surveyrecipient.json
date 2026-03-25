@@ -5,16 +5,26 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "sr_general_section",
   "sr_survey",
   "sr_contact",
-  "sr_link",
+  "sr_leadership_column",
+  "sr_evaluation_role",
+  "sr_evaluating_to",
+  "sr_access_section",
   "sr_status",
+  "sr_link",
+  "sr_access_column",
   "sr_token",
+  "sr_dates_reminders_section",
   "sr_sent_on",
   "sr_survey_response",
+  "sr_dates_reminders_column",
   "sr_reminder_send",
   "sr_last_reminder_send",
-  "sr_next_reminder"
+  "sr_next_reminder",
+  "section_break_19",
+  "sr_error_link"
  ],
  "fields": [
   {
@@ -22,7 +32,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Medicion",
+   "label": "Encuesta / Medici\u00f3n",
    "options": "qp_IQ_Survey"
   },
   {
@@ -30,57 +40,108 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Contacto",
+   "label": "Contacto / Evaluado",
    "options": "Contact"
   },
   {
    "fieldname": "sr_link",
    "fieldtype": "Long Text",
-   "label": "Link"
+   "label": "URL de Acceso"
   },
   {
    "fieldname": "sr_status",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Estatus Link",
+   "label": "Estado del Enlace",
    "options": "qp_IQ_RecipientStatus"
   },
   {
    "fieldname": "sr_sent_on",
    "fieldtype": "Datetime",
-   "label": "Fecha De Envio"
+   "label": "Fecha de Env\u00edo"
   },
   {
    "fieldname": "sr_survey_response",
    "fieldtype": "Link",
-   "label": "Respuestas",
+   "label": "Respuesta Recibidas",
    "options": "Survey Response"
   },
   {
    "fieldname": "sr_reminder_send",
    "fieldtype": "Int",
-   "label": "Recordatorios Enviados"
+   "label": "Recordatorios Totales"
   },
   {
    "fieldname": "sr_last_reminder_send",
    "fieldtype": "Datetime",
-   "label": "Fecha De Ultimo Recordatorio"
+   "label": "\u00daltimo Recordatorio"
   },
   {
    "fieldname": "sr_next_reminder",
    "fieldtype": "Datetime",
-   "label": "Pr\u00f3ximo Recordatorio a Enviar"
+   "label": "Pr\u00f3ximo Recordatorio"
   },
   {
    "fieldname": "sr_token",
    "fieldtype": "Long Text",
-   "label": "Token"
+   "label": "Token de Seguridad"
+  },
+  {
+   "fieldname": "sr_evaluating_to",
+   "fieldtype": "Link",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Evaluador Asignado",
+   "options": "Contact"
+  },
+  {
+   "fieldname": "sr_evaluation_role",
+   "fieldtype": "Data",
+   "label": "Rol del Evaluador"
+  },
+  {
+   "fieldname": "sr_general_section",
+   "fieldtype": "Section Break",
+   "label": "Informaci\u00f3n General"
+  },
+  {
+   "fieldname": "sr_access_section",
+   "fieldtype": "Section Break",
+   "label": "Control de Acceso"
+  },
+  {
+   "fieldname": "sr_dates_reminders_section",
+   "fieldtype": "Section Break",
+   "label": "Seguimiento y Fechas"
+  },
+  {
+   "fieldname": "sr_leadership_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sr_dates_reminders_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sr_access_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_19",
+   "fieldtype": "Section Break",
+   "label": "Errores"
+  },
+  {
+   "fieldname": "sr_error_link",
+   "fieldtype": "Long Text",
+   "label": "Error"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-30 10:58:33.839603",
+ "modified": "2026-03-17 21:05:57.069194",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

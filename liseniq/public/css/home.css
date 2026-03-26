@@ -198,7 +198,46 @@
 .measurement-card .card-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     background-color: transparent;
+}
+
+.card-header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn-reminders, .btn-public-link {
+    background: none;
+    font-weight: bold;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: transform 0.2s ease;
+    outline: none;
+}
+
+.btn-reminders:focus, .btn-public-link:focus,
+.btn-reminders:active, .btn-public-link:active {
+    outline: none;
+}
+
+.btn-reminders:hover, .btn-public-link:hover {
+    transform: scale(1.1);
+}
+
+.btn-reminders i, .btn-public-link i {
+    font-size: 1.1rem;
+    transition: color 0.2s ease;
+}
+
+.btn-reminders:hover i, .btn-public-link:hover i {
+    color: #6920d6 !important;
 }
 
 .status-badge {
@@ -476,7 +515,12 @@
 .btn-open-welcome-modal:hover {
     background-color: #6920d6;
 }
-
+.results-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
 @keyframes fadeIn {
     from {
         opacity: 0;

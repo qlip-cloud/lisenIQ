@@ -67,10 +67,13 @@ def get_context(context):
 	context.is_navbar_custom = True
 	return context
 
-def get_all_demographic_types():
-	return [d.dt_title for d in frappe.get_all("qp_IQ_DemographicType", filters={"dt_object_type": "Contacto"}, fields=["dt_title"], order_by="dt_title asc")]
+def get_all_demographic_types(user_company=None):
+	filters = {"dt_object_type": "Contacto"}
+	if user_company:
+		filters["dt_creator_company"] = user_company
+	return [d.dt_title for d in frappe.get_all("qp_IQ_DemographicType", filters=filters, fields=["dt_title"], order_by="dt_title asc")]
 
-def get_mapping_dicts():
+def get_mapping_dicts(user_company=None):
 
 	# Tipo de Documento
 	doc_types = frappe.get_all("qp_IQ_DocumentType", fields=["name", "dt_name"])
@@ -93,7 +96,10 @@ def get_mapping_dicts():
 	academic_name_to_id = {d.al_title: d.name for d in academics}
 	
 	# Demográficos: dt_title (Visible) <-> name (ID)
-	demos = frappe.get_all("qp_IQ_DemographicType", fields=["name", "dt_title"])
+	demos_filters = {}
+	if user_company:
+		demos_filters["dt_creator_company"] = user_company
+	demos = frappe.get_all("qp_IQ_DemographicType", filters=demos_filters, fields=["name", "dt_title"])
 	demo_title_to_id = {d.dt_title: d.name for d in demos}
 
 	return {
@@ -110,6 +116,10 @@ def get_grid_options():
 	Retorna las opciones para selectores y la lista de columnas dinámicas de demográficos.
 	"""
 	try:
+		user = frappe.session.user
+		contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+		company = contact_info.custom_company if contact_info else None
+
 		return {
 			"document_types": [d.dt_name for d in frappe.get_all("qp_IQ_DocumentType", fields=["dt_name"], order_by="dt_name asc")],
 			"languages": [d.la_name for d in frappe.get_all("qp_IQ_Language", fields=["la_name"], order_by="la_name asc")],
@@ -117,13 +127,13 @@ def get_grid_options():
 			"genders": [d.gender for d in frappe.get_all("Gender", fields=["gender"], order_by="gender asc")],
 			"academic_levels": [d.al_title for d in frappe.get_all("qp_IQ_AcademicLevel", fields=["al_title"], order_by="al_title asc")],
 			"status": ["Activo", "Inactivo"],
-			"demographic_headers": get_all_demographic_types() # Lista de columnas dinámicas
+			"demographic_headers": get_all_demographic_types(company) # Lista de columnas dinámicas
 		}
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Error obteniendo opciones para Grid")
 		return {}
 
-def find_or_create_demographic_type(demographic_title):
+def find_or_create_demographic_type(demographic_title, user_company=None):
 	"""
 	Busca el ID de un tipo demográfico por su título. Si no existe, lo crea.
 	"""
@@ -134,9 +144,13 @@ def find_or_create_demographic_type(demographic_title):
 		return None
 
 	try:
+		filters = {"dt_title": normalized_title, "dt_object_type": object_type}
+		if user_company:
+			filters["dt_creator_company"] = user_company
+			
 		existing_doc_name = frappe.db.get_value(
 			"qp_IQ_DemographicType",
-			{"dt_title": normalized_title, "dt_object_type": object_type},
+			filters,
 			"name"
 		)
 
@@ -148,14 +162,19 @@ def find_or_create_demographic_type(demographic_title):
 			doc.dt_object_type = object_type
 			doc.dt_tag_color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
 			doc.dt_description = _("Demográfico '{0}' creado automáticamente desde Carga Masiva.").format(normalized_title)
+			if user_company:
+				doc.dt_creator_company = user_company
 			doc.insert(ignore_permissions=True)
 			return doc.name
 
 	except Exception:
 		# Recuperación en caso de concurrencia
+		filters = {"dt_title": normalized_title, "dt_object_type": object_type}
+		if user_company:
+			filters["dt_creator_company"] = user_company
 		return frappe.db.get_value(
 			"qp_IQ_DemographicType",
-			{"dt_title": normalized_title, "dt_object_type": object_type},
+			filters,
 			"name"
 		)
 
@@ -179,8 +198,8 @@ def _get_contacts_data_internal(company):
 		order_by="first_name asc"
 	)
 
-	maps = get_mapping_dicts()
-	demographic_headers = get_all_demographic_types()
+	maps = get_mapping_dicts(company)
+	demographic_headers = get_all_demographic_types(company)
 	grid_rows = []
 	
 	for c in contacts:
@@ -394,7 +413,7 @@ def check_if_modified(contact_doc, data, status):
 
 	return False
 
-def update_contact_fields(contact_doc, data, status, demo_map=None):
+def update_contact_fields(contact_doc, data, status, demo_map=None, user_company=None):
 	"""Actualiza los campos del documento en memoria y guarda."""
 	contact_doc.first_name = data['firstName']
 	contact_doc.last_name = data['lastName']
@@ -436,7 +455,7 @@ def update_contact_fields(contact_doc, data, status, demo_map=None):
 				demo_id = demo_map.get(d['type'])
 			
 			if not demo_id:
-				demo_id = find_or_create_demographic_type(d['type'])
+				demo_id = find_or_create_demographic_type(d['type'], user_company=user_company)
 			
 			child = contact_doc.append(CHILD_TABLE_FIELD, {})
 			child.cad_demographic_type = demo_id
@@ -501,7 +520,7 @@ def process_contacts_background(log_name, rows, user):
 		processed_dnis_in_file = set()
 
 		# Obtener mapas (incluyendo el nuevo mapa de demográficos)
-		maps = get_mapping_dicts()
+		maps = get_mapping_dicts(user_company)
 		dt_map = maps["dt_import"]
 		country_map = maps["country_import"]
 		lang_map = maps["lang_import"]
@@ -592,7 +611,7 @@ def process_contacts_background(log_name, rows, user):
 						contact_doc.save(ignore_permissions=True)
 						
 					if check_if_modified(contact_doc, data, estatus or contact_doc.custom_status):
-						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status, demo_map)
+						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status, demo_map, user_company)
 				else:
 					new_doc = frappe.new_doc("Contact")
 					new_doc.first_name = nombre
@@ -621,7 +640,7 @@ def process_contacts_background(log_name, rows, user):
 							for d in data['demographics']:
 								demo_id = demo_map.get(d['type'])
 								if not demo_id:
-									demo_id = find_or_create_demographic_type(d['type'])
+									demo_id = find_or_create_demographic_type(d['type'], user_company=user_company)
 								
 								child = new_doc.append(CHILD_TABLE_FIELD, {})
 								child.cad_demographic_type = demo_id

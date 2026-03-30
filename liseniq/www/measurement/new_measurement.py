@@ -27,6 +27,9 @@ def get_context(context):
     context.page_title = _("Editar Medición") if context.is_edit_mode else _("Crear Medición")
     context.measurement_data_json = "null"
 
+    # Obtener compañía del usuario para los filtros
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+
     # Preparar roles de liderazgo
     try:
         catalog = frappe.db.get_value("qp_IQ_Catalog", {"ca_mnemonico": "measurement_roles"}, "name")
@@ -163,9 +166,13 @@ def get_context(context):
             frappe.throw(_("Medición no encontrada."), frappe.DoesNotExistError)
 
     try:
+        demo_filters = {"dt_object_type": "Contacto"}
+        if user_company:
+            demo_filters["dt_creator_company"] = user_company
+            
         context.contact_demographics = frappe.get_all(
             "qp_IQ_DemographicType",
-            filters={"dt_object_type": "Contacto"},
+            filters=demo_filters,
             fields=["name", "dt_title"],
             order_by="dt_title"
         )
@@ -662,11 +669,17 @@ def save_measurement(data):
                             new_question.qn_owner = user_company
                             
                             if q.get("demographic"):
-                                demographic_name = frappe.db.exists("qp_IQ_DemographicType", {"dt_title": q["demographic"]})
+                                demo_filters = {"dt_title": q["demographic"], "dt_object_type": "Pregunta"}
+                                if user_company:
+                                    demo_filters["dt_creator_company"] = user_company
+                                
+                                demographic_name = frappe.db.exists("qp_IQ_DemographicType", demo_filters)
                                 if not demographic_name:
                                     demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
                                     demographic_doc.dt_title = q["demographic"]
                                     demographic_doc.dt_object_type = "Pregunta"
+                                    if user_company:
+                                        demographic_doc.dt_creator_company = user_company
                                     demographic_doc.insert(ignore_permissions=True)
                                     demographic_name = demographic_doc.name
                                 new_question.qn_demographic = demographic_name

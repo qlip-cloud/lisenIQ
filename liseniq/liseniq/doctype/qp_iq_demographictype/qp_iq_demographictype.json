@@ -6,8 +6,10 @@
  "engine": "InnoDB",
  "field_order": [
   "dt_title",
-  "dt_description",
   "dt_object_type",
+  "dt_description",
+  "column_break_5",
+  "dt_creator_company",
   "dt_tag_color"
  ],
  "fields": [
@@ -34,11 +36,21 @@
    "fieldname": "dt_tag_color",
    "fieldtype": "Color",
    "label": "Color de Etiqueta"
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dt_creator_company",
+   "fieldtype": "Link",
+   "label": "Compa\u00f1ia",
+   "options": "qp_IQ_Company"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 18:56:24.345014",
+ "modified": "2026-03-30 09:15:33.591778",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_DemographicType",

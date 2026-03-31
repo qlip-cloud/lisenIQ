@@ -583,4 +583,24 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
 .sv_main .sv_p_root .sv_q .sv_q_radiogroup_inline label > input:checked + span {
     background-color: #d1f0ea !important;
 }
+
+/* Ajustes para dispositivos móviles - Escala NPS */
+@media (max-width: 768px) {
+    .sd-rating, .sv_q_rating {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+    }
+
+    /* Asegura que los textos ocupen el 100 en su propia línea y estén centrados */
+    .sd-rating__min-text, 
+    .sd-rating__max-text,
+    .sv_q_rating_min_text, 
+    .sv_q_rating_max_text {
+        display: block !important;
+        width: 100% !important;
+        text-align: center !important;
+        margin: 10px 0 !important;
+    }
+}
 """

@@ -672,7 +672,7 @@ class MeasurementCreator {
         }
         
         // Validar que la fecha de inicio no sea anterior al día actual
-        if (startDate && startDate.value) {
+        if (!this.state.isEditMode && startDate && startDate.value) {
             const selectedDate = new Date(startDate.value);
             const now = new Date();
             const selectedDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());

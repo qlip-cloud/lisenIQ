@@ -500,20 +500,41 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
     background-color: #f4f5f7;
 }
 
-/* Forzar el z-index y expansión del input real para garantizar la captura del clic */
+/* Alinear el radio btn a las imágenes y caritas */
+.sd-imagepicker .sd-imagepicker__item label,
+.sv-imagepicker .sv_q_imgsel_item label {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100%;
+    cursor: pointer !important;
+}
+
+/* Mostrar y centrar el input nativo arriba de la imagen */
 .sd-imagepicker__item input[type="radio"],
 .sd-imagepicker__item input[type="checkbox"],
 .sv_q_imgsel_item input[type="radio"],
 .sv_q_imgsel_item input[type="checkbox"] {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    opacity: 0 !important;
+    position: static !important;
+    opacity: 1 !important;
+    margin: 0 auto !important;
+    display: block !important;
     z-index: 10 !important;
+    width: 18px !important;
+    height: 18px !important;
     cursor: pointer !important;
-    margin: 0 !important;
+}
+
+/* Corrección de fondo verde en opción NO seleccionada */
+.sd-imagepicker .sd-imagepicker__item:not(.sd-imagepicker__item--checked):not(.sd-imagepicker__item--selected),
+.sv-imagepicker .sv_q_imgsel_item:not(.checked) {
+    background-color: transparent !important;
+}
+
+.sd-imagepicker .sd-imagepicker__item:not(.sd-imagepicker__item--checked):not(.sd-imagepicker__item--selected) .sd-imagepicker__image,
+.sv-imagepicker .sv_q_imgsel_item:not(.checked) .sv_q_imgsel_image {
+    background-color: transparent !important;
 }
 
 /* Ajuste de tamaño y margen del texto */
@@ -549,9 +570,11 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
     text-align: center !important;
 }
 
-/* Hacer más ancha la visualización de números en la escala NPS */
-.sd-rating__item, .sv_q_rating_item {
-    min-width: 3.5rem !important;
+/* Hacer más ancha la visualización de números en la escala NPS (Desktop) */
+@media (min-width: 769px) {
+    .sd-rating__item, .sv_q_rating_item {
+        min-width: 3.5rem !important;
+    }
 }
 
 /* Ajustar el tamaño y margen de los textos MIN y MAX en la escala NPS */
@@ -584,23 +607,68 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
     background-color: #d1f0ea !important;
 }
 
-/* Ajustes para dispositivos móviles - Escala NPS */
+/* Ajustes para dispositivos móviles - Escala NPS y Likert */
 @media (max-width: 768px) {
+    
     .sd-rating, .sv_q_rating {
+        position: relative !important;
+        padding-top: 30px !important; /* Espacio para los textos min/max */
         display: flex !important;
-        flex-direction: column !important;
+        flex-wrap: nowrap !important; /* FORZAR UNA SOLA LÍNEA */
+        justify-content: space-between !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Asegurar que si hay un fieldset interno, comparta el comportamiento flex */
+    .sd-rating fieldset, .sv_q_rating fieldset {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Sacamos los textos laterales del flujo flex para que no ocupen espacio en la fila de números */
+    .sd-rating__min-text, .sv_q_rating_min_text {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 50% !important;
+        text-align: left !important;
+        font-size: 0.65rem !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    .sd-rating__max-text, .sv_q_rating_max_text {
+        position: absolute !important;
+        top: 0 !important;
+        right: 0 !important;
+        width: 50% !important;
+        text-align: right !important;
+        font-size: 0.65rem !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    .sd-rating__item, .sv_q_rating_item {
+        flex: 1 1 0% !important; 
+        min-width: 0 !important; /* Permite encogerse sin límite */
+        margin: 0 1px !important;
+        padding: 0 !important;
+    }
+
+    .sd-rating__item label, .sv_q_rating_item label {
+        width: 100% !important;
+        padding: 6px 0 !important;
+        display: flex !important;
+        justify-content: center !important;
         align-items: center !important;
     }
 
-    /* Asegura que los textos ocupen el 100 en su propia línea y estén centrados */
-    .sd-rating__min-text, 
-    .sd-rating__max-text,
-    .sv_q_rating_min_text, 
-    .sv_q_rating_max_text {
-        display: block !important;
-        width: 100% !important;
-        text-align: center !important;
-        margin: 10px 0 !important;
+    .sd-rating__item-text, .sv_q_rating_item-text {
+        font-size: 0.75rem !important;
     }
 }
 """

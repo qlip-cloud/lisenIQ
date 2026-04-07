@@ -1586,7 +1586,10 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
             
             # Determinar el tema según el template
             tema = ''
-            if template_name == 'Plantilla Modelo Vedanta bienestar':
+            template_name_normalized = (template_name or '').lower()
+            if 'bhd' in template_name_normalized:
+                tema = 'Cultura BHD'
+            elif template_name == 'Plantilla Modelo Vedanta bienestar':
                 tema = VEDANTA_BIENESTAR.get(variable, '')
             else:
                 tema = question_info.get('tema', '')

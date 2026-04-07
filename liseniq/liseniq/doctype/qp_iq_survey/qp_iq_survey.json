@@ -19,6 +19,7 @@
   "su_is_anonymous",
   "su_is_leadership",
   "su_in_history",
+  "su_report_generated",
   "column_break_2",
   "su_timezone",
   "su_start_date",
@@ -277,11 +278,17 @@
    "fieldname": "su_manual_reminders_btn",
    "fieldtype": "Button",
    "label": "Enviar Recordatorio Manual"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_report_generated",
+   "fieldtype": "Check",
+   "label": "\u00bfReporte de Liderazgo Generado?"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-23 21:15:37.162438",
+ "modified": "2026-04-07 12:38:11.711344",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

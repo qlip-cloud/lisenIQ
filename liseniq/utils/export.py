@@ -1,6 +1,7 @@
 import frappe
 from io import BytesIO
 from openpyxl import Workbook
+from openpyxl.styles import Alignment
 
 @frappe.whitelist()
 def export_survey_results(survey_name):
@@ -108,6 +109,64 @@ def export_follow_up_report(survey_name, demographic1=None, demographic2=None):
         excel_file.seek(0)
 
         filename = f"{survey_display_name}_seguimiento.xlsx"
+        
+        frappe.local.response.filename = filename
+        frappe.local.response.filecontent = excel_file.read()
+        frappe.local.response.type = "download"
+        frappe.local.response.display_content_as = "attachment"
+    finally:
+        frappe.flags.ignore_permissions = False
+        frappe.session.user = current_user
+
+
+@frappe.whitelist()
+def export_seguimiento_360(survey_name):
+    current_user = frappe.session.user
+    frappe.session.user = "Administrator"
+    try:
+        frappe.flags.ignore_permissions = True
+        survey = frappe.get_doc("qp_IQ_Survey", {"su_name": survey_name})
+        survey_id = survey.name
+        survey_display_name = survey.su_name
+        
+        REPORT_NAME = "Seguimiento Mediciones 360"
+        filters = {"survey": survey_name}
+
+        report = frappe.get_doc("Report", REPORT_NAME)
+        columns, data = report.get_data(filters)
+
+        col_labels = [col.get('label', col.get('fieldname', '')) for col in columns]
+        col_fields = [col.get('fieldname', '') for col in columns]
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Seguimiento 360"
+        sheet.append(col_labels)
+
+        for row in data:
+            sheet.append([row.get(field, '') for field in col_fields])
+
+        # Combinar celdas para cada evaluado
+        current_evaluated = None
+        start_row = 2  # Empezamos en la fila 2 porque la fila 1 tiene los encabezados
+        for idx, row in enumerate(data, start=2):
+            evaluated = row.get('evaluated')
+            if evaluated != current_evaluated:
+                if current_evaluated is not None:
+                    sheet.merge_cells(start_row=start_row, start_column=1, end_row=idx-1, end_column=1)
+                    sheet.cell(row=start_row, column=1).alignment = Alignment(horizontal='left', vertical='center')
+                current_evaluated = evaluated
+                start_row = idx
+        # Merge para el último evaluado
+        if current_evaluated is not None:
+            sheet.merge_cells(start_row=start_row, start_column=1, end_row=idx, end_column=1)
+            sheet.cell(row=start_row, column=1).alignment = Alignment(horizontal='left', vertical='center')
+
+        excel_file = BytesIO()
+        workbook.save(excel_file)
+        excel_file.seek(0)
+
+        filename = f"{survey_display_name}_seguimiento_360.xlsx"
         
         frappe.local.response.filename = filename
         frappe.local.response.filecontent = excel_file.read()

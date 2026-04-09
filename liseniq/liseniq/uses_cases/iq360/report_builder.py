@@ -11,6 +11,9 @@ Fields:
 - Nombre de la medición (survey_name): Data
 - Total de respuestas (total_responses): Int
 - Total de evaluadores (total_evaluators): Int 
+- Total de evaluadores pares
+- Total de evaluadores líderes
+- Total de evaluadores colaboradores
   Este campo se calcula usando qp_IQ_SurveyRecipient para contar el número de evaluadores únicos que evaluaron al líder.
 - Puntaje general (overall_score): Float
   Este campo se calcula promediando los puntajes de todas las respuestas del líder, incluyendo las respuestas de autoevaluación. El cálculo del puntaje general se realiza tomando en cuenta la escala de evaluación definida en la encuesta y promediando los puntajes asignados a cada respuesta.
@@ -203,7 +206,9 @@ def process_leader_data(survey_id, responses, questions_data):
     dimension_scores = defaultdict(lambda: defaultdict(list))
     question_scores = defaultdict(lambda: defaultdict(list))
     open_questions_answers = defaultdict(list)  
-
+    total_responses_peers = 0
+    total_responses_managers = 0
+    total_responses_team = 0
 
     for resp_list in normalized_responses.values():
         for resp in resp_list:
@@ -233,9 +238,22 @@ def process_leader_data(survey_id, responses, questions_data):
             # Comportamiento
             question_scores[resp['question']][score_key].append(value)
 
+            # Contadores de respuestas por rol
+            if score_key == SCORE_KEY_PEER:
+                total_responses_peers += 1
+            elif score_key == SCORE_KEY_MANAGER:
+                total_responses_managers += 1
+            elif score_key == SCORE_KEY_TEAM:
+                total_responses_team += 1
+
     # Resumen Global
     leader_data['overall_score'] = average(scores)
-
+    leader_data['total_responses_peers'] = total_responses_peers
+    leader_data['total_responses_managers'] = total_responses_managers
+    leader_data['total_responses_team'] = total_responses_team
+    leader_data['total_evaluators_peers'] = len([e for e in evaluators if e.sr_evaluation_role == ROLE_PEER])
+    leader_data['total_evaluators_managers'] = len([e for e in evaluators if e.sr_evaluation_role == ROLE_MANAGER])
+    leader_data['total_evaluators_team'] = len([e for e in evaluators if e.sr_evaluation_role == ROLE_TEAM])
     leader_data[SCORE_KEY_TEAM] = average(group_scores.get(SCORE_KEY_TEAM, []))
     leader_data[SCORE_KEY_SELF] = average(group_scores.get(SCORE_KEY_SELF, []))
     leader_data[SCORE_KEY_PEER] = average(group_scores.get(SCORE_KEY_PEER, []))
@@ -342,6 +360,12 @@ def build_leader_report(leader_data):
   report.survey_name = survey_name
   report.total_responses = leader_data.get('total_responses')
   report.total_evaluators = leader_data.get('total_evaluators')
+  report.total_evaluators_peers = leader_data.get('total_evaluators_peers')
+  report.total_evaluators_managers = leader_data.get('total_evaluators_managers')
+  report.total_evaluators_team = leader_data.get('total_evaluators_team')
+  report.total_responses_peers = leader_data.get('total_responses_peers')
+  report.total_responses_managers = leader_data.get('total_responses_managers')
+  report.total_responses_team = leader_data.get('total_responses_team')
   report.overall_score = leader_data.get('overall_score')
   report.team_score = leader_data.get(SCORE_KEY_TEAM)
   report.self_score = leader_data.get(SCORE_KEY_SELF)

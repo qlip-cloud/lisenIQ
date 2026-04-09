@@ -188,12 +188,36 @@ def process_leader_data(survey_id, responses, questions_data):
     leader_data['total_responses'] = len(responses)
 
     evaluators = get_leader_evaluators(leader_data['leader_name'], survey_id)
-    leader_data['total_evaluators'] = len(set(e.sr_evaluating_to for e in evaluators))
+    evaluator_ids = {
+      e.sr_evaluating_to
+      for e in evaluators
+      if e.sr_evaluating_to
+    }
+    leader_data['total_evaluators'] = len(evaluator_ids)
 
-    # Map de evaluadores
+    # Map de evaluadores (Contact.name -> rol)
     evaluator_map = {
-        e.sr_contact: e.sr_evaluation_role
-        for e in evaluators
+      e.sr_evaluating_to: e.sr_evaluation_role
+      for e in evaluators
+      if e.sr_evaluating_to
+    }
+
+    # También indexamos por DNI para compatibilidad con respuestas históricas.
+    if evaluator_ids:
+      contact_docs = frappe.get_all(
+        'Contact',
+        filters={'name': ['in', list(evaluator_ids)]},
+        fields=['name', 'custom_document_number'],
+      )
+      for contact in contact_docs:
+        role = evaluator_map.get(contact.name)
+        if role and contact.custom_document_number:
+          evaluator_map[contact.custom_document_number] = role
+
+    # Evaluador por respuesta (prioriza custom_evaluator si existe)
+    response_evaluator_map = {
+      r.name: (r.get('custom_evaluator') or r.get('user'))
+      for r in responses
     }
 
     # Normalizar respuestas
@@ -210,7 +234,23 @@ def process_leader_data(survey_id, responses, questions_data):
     total_responses_managers = 0
     total_responses_team = 0
 
-    for resp_list in normalized_responses.values():
+    # Count submitted evaluations by role (one per response document).
+    for response in responses:
+      evaluator_id = response.get('custom_evaluator') or response.get('user')
+      evaluator_role = evaluator_map.get(evaluator_id)
+      score_key = ROLE_TO_SCORE_KEY.get(evaluator_role)
+      if score_key == SCORE_KEY_PEER:
+        total_responses_peers += 1
+      elif score_key == SCORE_KEY_MANAGER:
+        total_responses_managers += 1
+      elif score_key == SCORE_KEY_TEAM:
+        total_responses_team += 1
+
+    for response_name, resp_list in normalized_responses.items():
+        mapped_evaluator_id = response_evaluator_map.get(response_name)
+        mapped_evaluator_role = evaluator_map.get(mapped_evaluator_id)
+        mapped_score_key = ROLE_TO_SCORE_KEY.get(mapped_evaluator_role)
+
         for resp in resp_list:
 
             if resp['answer_type'] == 'text':
@@ -221,8 +261,10 @@ def process_leader_data(survey_id, responses, questions_data):
             value = resp['answer']
             scores.append(value)
 
-            evaluator_role = evaluator_map.get(resp['evaluator'])
-            score_key = ROLE_TO_SCORE_KEY.get(evaluator_role)
+            score_key = mapped_score_key
+            if not score_key:
+              evaluator_role = evaluator_map.get(resp.get('evaluator'))
+              score_key = ROLE_TO_SCORE_KEY.get(evaluator_role)
             if not score_key:
                 continue
 
@@ -238,22 +280,23 @@ def process_leader_data(survey_id, responses, questions_data):
             # Comportamiento
             question_scores[resp['question']][score_key].append(value)
 
-            # Contadores de respuestas por rol
-            if score_key == SCORE_KEY_PEER:
-                total_responses_peers += 1
-            elif score_key == SCORE_KEY_MANAGER:
-                total_responses_managers += 1
-            elif score_key == SCORE_KEY_TEAM:
-                total_responses_team += 1
-
     # Resumen Global
     leader_data['overall_score'] = average(scores)
     leader_data['total_responses_peers'] = total_responses_peers
     leader_data['total_responses_managers'] = total_responses_managers
     leader_data['total_responses_team'] = total_responses_team
-    leader_data['total_evaluators_peers'] = len([e for e in evaluators if e.sr_evaluation_role == ROLE_PEER])
-    leader_data['total_evaluators_managers'] = len([e for e in evaluators if e.sr_evaluation_role == ROLE_MANAGER])
-    leader_data['total_evaluators_team'] = len([e for e in evaluators if e.sr_evaluation_role == ROLE_TEAM])
+    leader_data['total_evaluators_peers'] = len({
+      e.sr_evaluating_to for e in evaluators
+      if e.sr_evaluation_role == ROLE_PEER and e.sr_evaluating_to
+    })
+    leader_data['total_evaluators_managers'] = len({
+      e.sr_evaluating_to for e in evaluators
+      if e.sr_evaluation_role == ROLE_MANAGER and e.sr_evaluating_to
+    })
+    leader_data['total_evaluators_team'] = len({
+      e.sr_evaluating_to for e in evaluators
+      if e.sr_evaluation_role == ROLE_TEAM and e.sr_evaluating_to
+    })
     leader_data[SCORE_KEY_TEAM] = average(group_scores.get(SCORE_KEY_TEAM, []))
     leader_data[SCORE_KEY_SELF] = average(group_scores.get(SCORE_KEY_SELF, []))
     leader_data[SCORE_KEY_PEER] = average(group_scores.get(SCORE_KEY_PEER, []))

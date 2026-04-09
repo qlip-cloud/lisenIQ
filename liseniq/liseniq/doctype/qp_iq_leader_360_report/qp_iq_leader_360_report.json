@@ -8,9 +8,15 @@
   "sb_1",
   "leader_name",
   "total_evaluators",
+  "total_evaluators_peers",
+  "total_responses",
+  "total_responses_managers",
   "cb_1",
   "survey_name",
-  "total_responses",
+  "total_evaluators_managers",
+  "total_evaluators_team",
+  "total_responses_peers",
+  "total_responses_team",
   "sb_2",
   "overall_score",
   "self_score",
@@ -133,11 +139,41 @@
    "fieldtype": "Float",
    "hidden": 1,
    "label": "Promedio Otros"
+  },
+  {
+   "fieldname": "total_evaluators_peers",
+   "fieldtype": "Int",
+   "label": "Total de Evaluadores (Pares))"
+  },
+  {
+   "fieldname": "total_evaluators_team",
+   "fieldtype": "Int",
+   "label": "Total de Evaluadores (Colaboradores))"
+  },
+  {
+   "fieldname": "total_responses_managers",
+   "fieldtype": "Int",
+   "label": "Total de Respuestas (L\u00edderes)"
+  },
+  {
+   "fieldname": "total_evaluators_managers",
+   "fieldtype": "Int",
+   "label": "Total de Evaluadores (L\u00edderes)"
+  },
+  {
+   "fieldname": "total_responses_peers",
+   "fieldtype": "Int",
+   "label": "Total de Respuestas (Pares)"
+  },
+  {
+   "fieldname": "total_responses_team",
+   "fieldtype": "Int",
+   "label": "Total de Respuestas (Colaboradores)"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-30 10:05:42.161408",
+ "modified": "2026-04-09 08:51:34.842629",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Leader_360_Report",

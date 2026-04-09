@@ -3,7 +3,7 @@ import json
 import frappe
 from collections import defaultdict
 from liseniq.liseniq.uses_cases.iq360.selectors import  get_all_responses_for_survey, get_survey_questions, get_question_text_and_category, get_leader_evaluators
-from liseniq.liseniq.uses_cases.iq360.calculations import normalize_responses, average, std_dev
+from liseniq.liseniq.uses_cases.iq360.calculations import normalize_responses, average, std_dev, _round2
 """
 qp_IQ_LeaderReport- DocType to store the report for each leader based on the survey responses. 
 Fields:
@@ -53,6 +53,9 @@ ROLE_TO_SCORE_KEY = {
 
 def _get_logger():
   return frappe.logger('iq360_report_builder', allow_site=True)
+
+
+
 
 def build_leaders_report(survey_id):
   logger = _get_logger()
@@ -409,13 +412,13 @@ def build_leader_report(leader_data):
   report.total_responses_peers = leader_data.get('total_responses_peers')
   report.total_responses_managers = leader_data.get('total_responses_managers')
   report.total_responses_team = leader_data.get('total_responses_team')
-  report.overall_score = leader_data.get('overall_score')
-  report.team_score = leader_data.get(SCORE_KEY_TEAM)
-  report.self_score = leader_data.get(SCORE_KEY_SELF)
-  report.peers_score = leader_data.get(SCORE_KEY_PEER)
-  report.manager_score = leader_data.get(SCORE_KEY_MANAGER)
-  report.others_score = leader_data.get('others_score')
-  report.avg_leaders_score = leader_data.get('avg_leaders_score') or leader_data.get('average_leaders_score')
+  report.overall_score = _round2(leader_data.get('overall_score'))
+  report.team_score = _round2(leader_data.get(SCORE_KEY_TEAM))
+  report.self_score = _round2(leader_data.get(SCORE_KEY_SELF))
+  report.peers_score = _round2(leader_data.get(SCORE_KEY_PEER))
+  report.manager_score = _round2(leader_data.get(SCORE_KEY_MANAGER))
+  report.others_score = _round2(leader_data.get('others_score'))
+  report.avg_leaders_score = _round2(leader_data.get('avg_leaders_score') or leader_data.get('average_leaders_score'))
 
   # Respuestas abiertas
   open_answers = leader_data.get('open_questions_answers') or {}
@@ -426,12 +429,12 @@ def build_leader_report(leader_data):
   for dimension_name, values in (leader_data.get('dimension_summary') or {}).items():
     report.append('dimension_summary', {
       'dimension_name': dimension_name,
-      SCORE_KEY_SELF: values.get(SCORE_KEY_SELF),
-      SCORE_KEY_MANAGER: values.get(SCORE_KEY_MANAGER),
-      SCORE_KEY_PEER: values.get(SCORE_KEY_PEER),
-      SCORE_KEY_TEAM: values.get(SCORE_KEY_TEAM),
-      'others_score': values.get('others_score'),
-      'avg_score': values.get('avg_score'),
+      SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
+      SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
+      SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),
+      SCORE_KEY_TEAM: _round2(values.get(SCORE_KEY_TEAM)),
+      'others_score': _round2(values.get('others_score')),
+      'avg_score': _round2(values.get('avg_score')),
     })
 
   report.set('question_summary', [])
@@ -439,13 +442,13 @@ def build_leader_report(leader_data):
     report.append('question_summary', {
       'question_text': values.get('question_text'),
       'question_dimension': values.get('question_dimension'),
-      SCORE_KEY_SELF: values.get(SCORE_KEY_SELF),
-      SCORE_KEY_MANAGER: values.get(SCORE_KEY_MANAGER),
-      SCORE_KEY_PEER: values.get(SCORE_KEY_PEER),
-      SCORE_KEY_TEAM: values.get(SCORE_KEY_TEAM),
-      'others_score': values.get('others_score'),
-      'gap_self_vs_others': values.get('gap_self_vs_others'),
-      'std_deviation': values.get('std_dev'),
+      SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
+      SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
+      SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),
+      SCORE_KEY_TEAM: _round2(values.get(SCORE_KEY_TEAM)),
+      'others_score': _round2(values.get('others_score')),
+      'gap_self_vs_others': _round2(values.get('gap_self_vs_others')),
+      'std_deviation': _round2(values.get('std_dev')),
     })
 
   if report.is_new():

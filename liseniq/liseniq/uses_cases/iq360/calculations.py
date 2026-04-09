@@ -27,6 +27,13 @@ def parse_answer(value):
     except (ValueError, TypeError):
         return value, 'text'
 
+def _round2(value):
+  if value is None:
+    return None
+  try:
+    return round(float(value), 2)
+  except (TypeError, ValueError):
+    return value
 
 def normalize_responses(responses):
     parsed_data = defaultdict(list)

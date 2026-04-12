@@ -138,21 +138,39 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
   uq_flag = str(uq).lower() == "true"
   try:
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+    status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
     rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
     
-    survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_status", "su_end_date", "su_is_leadership", "su_owner"], as_dict=True)
+    survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_status", "su_start_date", "su_end_date", "su_is_leadership", "su_owner"], as_dict=True)
     if not survey_doc:
          return {"allow": False, "message": "Encuesta no encontrada."}
          
     su_status = survey_doc.su_status
+    su_start_date = survey_doc.su_start_date
     su_end_date = survey_doc.su_end_date
     survey_name_id = survey_doc.name
     is_leadership = survey_doc.su_is_leadership
 
     if status_finished and su_status == status_finished:
       return {"allow": False, "message": "La medición ha finalizado."}
+      
+    if status_in_progress and su_status != status_in_progress:
+      if su_start_date:
+        start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
+        return {"allow": False, "message": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
+      else:
+        return {"allow": False, "message": "Agradecemos tu interés. La medición aún no ha iniciado. Te invitamos a regresar más adelante para participar."}
+      
+    now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
+
+    # Validación de inicio de la medición
+    if su_start_date:
+      if get_datetime(su_start_date) > now_local:
+        start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
+        return {"allow": False, "message": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
+
+    # Validación de finalización de la medición
     if su_end_date:
-      now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
       if get_datetime(su_end_date) <= now_local:
         return {"allow": False, "message": "El enlace ha expirado."}
 
@@ -180,7 +198,6 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
 
       survey_end_date = survey_doc.su_end_date
       if survey_end_date:
-          now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
           if get_datetime(survey_end_date) < now_local:
               return {"allow": False, "message": "El enlace ha expirado."}
 
@@ -340,8 +357,9 @@ def get_survey_route_for_public_link(token, dni=None):
         return {"error": "Token de encuesta inválido."}
 
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+    status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
     su_doc = frappe.db.get_value(
-        "qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_status", "su_end_date", "su_is_leadership", "su_owner"], as_dict=True
+        "qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_status", "su_start_date", "su_end_date", "su_is_leadership", "su_owner"], as_dict=True
     )
     if not su_doc:
         return {"error": "Encuesta no encontrada."}
@@ -349,8 +367,21 @@ def get_survey_route_for_public_link(token, dni=None):
     if status_finished and su_doc.su_status == status_finished:
         return {"error": "El enlace ha expirado o la medición ha finalizado."}
 
+    if status_in_progress and su_doc.su_status != status_in_progress:
+        if su_doc.su_start_date:
+            start_date_str = get_datetime(su_doc.su_start_date).strftime("%d/%m/%Y a las %H:%M")
+            return {"error": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
+        else:
+            return {"error": "Agradecemos tu interés. La medición aún no ha iniciado. Te invitamos a regresar más adelante para participar."}
+
+    now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
+
+    if su_doc.su_start_date:
+        if get_datetime(su_doc.su_start_date) > now_local:
+            start_date_str = get_datetime(su_doc.su_start_date).strftime("%d/%m/%Y a las %H:%M")
+            return {"error": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
+
     if su_doc.su_end_date:
-        now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
         if get_datetime(su_doc.su_end_date) <= now_local:
             return {"error": "El enlace ha expirado."}
 

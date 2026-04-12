@@ -9,7 +9,6 @@ import pytz
 def _now_utc_str():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-
 def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
     try:
         tz_name = (frappe.db.get_value("qp_IQ_Survey", {"su_name": su_name}, "su_timezone") or "UTC").strip()
@@ -68,15 +67,31 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+        status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
         rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
-        su_status, su_end_date = frappe.db.get_value(
-            "qp_IQ_Survey", {"su_name": doc.survey}, ["su_status", "su_end_date"]
-        ) or (None, None)
+        
+        su_status, su_start_date, su_end_date = frappe.db.get_value(
+            "qp_IQ_Survey", {"su_name": doc.survey}, ["su_status", "su_start_date", "su_end_date"]
+        ) or (None, None, None)
+        
         if status_finished and su_status == status_finished:
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
+        if status_in_progress and su_status != status_in_progress:
+            if su_start_date:
+                start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
+                frappe.throw(f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar.")
+            else:
+                frappe.throw("Agradecemos tu interés. La medición aún no ha iniciado. Te invitamos a regresar más adelante para participar.")
+
+        now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
+
+        if su_start_date:
+            if get_datetime(su_start_date) > now_local:
+                start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
+                frappe.throw(f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar.")
+
         if su_end_date:
-            now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
             if get_datetime(su_end_date) <= now_local:
                 frappe.throw("El enlace ha expirado.")
 
@@ -111,12 +126,6 @@ def process_survey_response(doc, method):
 
         if token_sur and token_sur != doc.survey:
             frappe.throw("Enlace inválido o expirado.")
-
-        survey_end_date = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_end_date")
-        if survey_end_date:
-            now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
-            if get_datetime(survey_end_date) < now_local:
-                frappe.throw("El enlace ha expirado.")
 
         if not rid:
             # frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
@@ -261,30 +270,7 @@ def process_survey_response(doc, method):
                 frappe.db.set_value("qp_IQ_Survey", survey_name, "su_status", status_finished)
                 frappe.log_error(f"Encuesta {survey_name} finalizada por completitud (100%).", "Survey Response Hook")
 
-        # dni_from_token = payload.get("custom_document_number")
-        # contact_name = None
-        # if dni_from_token:
-        #     contact_name = frappe.db.get_value(
-        #         "Contact",
-        #         {"custom_document_number": dni_from_token},
-        #         "name"
-        #     )
-
-        # if not contact_name:
-        #     contact_name = recipient.sr_contact
-
-        # if contact_name and len(contact_name) > 140:
-        #     contact_name = contact_name[:140]
-        # doc.user = contact_name or "Anonimo"
-
-        # frappe.log_error(f"Actualizando destinatario {recipient.name} a 'Responded' y enlazando respuesta {doc.name}", "Survey Response Hook")
-        # frappe.db.set_value(
-        #     "qp_IQ_SurveyRecipient",
-        #     recipient.name,
-        #     {"sr_status": "Responded", "sr_survey_response": doc.name}
-        # )
         frappe.db.commit()
-        # frappe.log_error(f"Destinatario {recipient.name} actualizado correctamente.", "Survey Response Hook")
 
         try:
             resp = json.loads(doc.response_json or "{}")

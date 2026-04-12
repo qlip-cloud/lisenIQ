@@ -24,6 +24,7 @@ const getLikertIconUrl = (val) => LIKERT_ICON_MAP[Number(val)] || '';
 export class QuestionBuilder {
     constructor(onQuestionsUpdate) {
         this.questions = [];
+        this.editingIndex = null; // Para manejo de edición
         this.bankState = {
             questions: [],
             demographics: [],
@@ -99,9 +100,6 @@ export class QuestionBuilder {
 
         if (this.isReadOnly) {
             if (questionForm.demographicResults) questionForm.demographicResults.style.display = 'none';
-        }
-
-        if (questionForm.listContainer) {
         }
 
         if (this.isReadOnly && bankModal?.modal) {
@@ -245,9 +243,8 @@ export class QuestionBuilder {
                 if (nameSpan) nameSpan.textContent = file.name;
                 if (preview) preview.classList.toggle('d-none', !fileUrl);
             } catch (err) {
-                console.error('Error al subir la imagen de la opción:', err);
+                console.error('Error al subir la imagen:', err);
                 showGlobalNotification('No se pudo subir la imagen. Intenta nuevamente.', 'error', 4000);
-                // Limpia selección en caso de error
                 fileInput.value = '';
             } finally {
                 this._setVisualUploadingState(row, false);
@@ -364,11 +361,14 @@ export class QuestionBuilder {
                 </div>
                 <div class="question-item-actions">
                     <div class="action-icons">
-                        ${this.isReadOnly ? '' : '<i class="fa fa-trash-o delete-question" title="Eliminar pregunta"></i>'}
+                        ${this.isReadOnly ? '' : `
+                            <i class="fa fa-copy duplicate-question" title="Duplicar pregunta"></i>
+                            <i class="fa fa-edit edit-question" title="Editar pregunta" style="margin-left: 0.75rem;"></i>
+                            <i class="fa fa-trash-o delete-question" title="Eliminar pregunta" style="margin-left: 0.75rem;"></i>
+                        `}
                     </div>
                     <div class="question-item-tags">
                         <span>Tema: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
-
                     </div>
                 </div>
             </div>
@@ -386,7 +386,7 @@ export class QuestionBuilder {
                 args: {
                     keyword: this.bankState.searchKeyword,
                     demographic: this.bankState.activeDemographic,
-                    template_category: this.currentCategoryName // Pasar la categoría actual para filtro Liderazgo
+                    template_category: this.currentCategoryName
                 }
             });
             
@@ -456,7 +456,6 @@ export class QuestionBuilder {
             card.setAttribute('data-id', q.name);
 
             let optionsPreviewHtml = '';
-            // Preview para Selección Múltiple y Casilla de verificación (texto plano)
             if ((q.type_name === 'Selección Múltiple' || q.type_name === CHECKBOX_TYPE_NAME) && Array.isArray(q.options) && q.options.length > 0) {
                 let optionsListHtml = q.options.map(opt => `<div>- ${frappe.utils.escape_html(opt)}</div>`).join('');
                 if (q.type_name === CHECKBOX_TYPE_NAME) {
@@ -469,7 +468,6 @@ export class QuestionBuilder {
                         ${optionsListHtml}
                     </div>`;
             }
-            // Preview para Likert (preferir opciones con url del backend; fallback a íconos por defecto)
             else if (q.type_name === LIKERT_TYPE_NAME) {
                 const hasBackendOptions = Array.isArray(q.options) && q.options.length > 0;
                 const list = hasBackendOptions
@@ -488,7 +486,6 @@ export class QuestionBuilder {
                         }).join('')}
                     </div>`;
             }
-            // Preview para Likert Visual (usar url por opción)
             else if (q.type_name === LIKERT_VISUAL_TYPE_NAME && Array.isArray(q.options) && q.options.length > 0) {
                 optionsPreviewHtml = `
                     <div class="options-preview">
@@ -620,12 +617,17 @@ export class QuestionBuilder {
     }
 
     resetAddQuestionForm() {
+        this.editingIndex = null;
         const qf = this.ui.questionForm;
+
+        if (this.ui.buttons && this.ui.buttons.addQuestion) {
+            this.ui.buttons.addQuestion.textContent = "Añadir pregunta";
+        }
 
         if (!qf || !qf.text) return;
 
         qf.text.value = '';
-        if (qf.textOthers) qf.textOthers.value = ''; // Resetear campo otros
+        if (qf.textOthers) qf.textOthers.value = ''; 
         if (qf.type) qf.type.value = '';
         if (qf.demographic) qf.demographic.value = '';
         
@@ -808,9 +810,109 @@ export class QuestionBuilder {
             newQuestion.qp_none_above = document.getElementById('chk_qp_none_above')?.checked ? 1 : 0;
         }
 
-        this.questions.push(newQuestion);
+        // Manejo si es actualización vs creación
+        if (this.editingIndex !== null) {
+            const existingQ = this.questions[this.editingIndex];
+            Object.assign(existingQ, newQuestion, { id: existingQ.id }); // Mantiene el ID original
+
+            // Si es una pregunta real base de datos, actualizamos en backend de forma silenciosa
+            if (!existingQ.id.startsWith('manual-')) {
+                frappe.call({
+                    method: 'liseniq.www.iq-templates.new_template.update_template_question',
+                    args: {
+                        question_name: existingQ.id,
+                        question_data: JSON.stringify({
+                            qn_statement: existingQ.text,
+                            qn_statement_others: existingQ.text_others,
+                            qn_type: existingQ.type,
+                            qn_demographic: existingQ.demographic
+                        })
+                    },
+                    error: function(err) {
+                        console.error("Error al actualizar la pregunta:", err);
+                    }
+                });
+            }
+
+        } else {
+            this.questions.push(newQuestion);
+        }
+
         this.renderQuestions();
         this.resetAddQuestionForm();
+    }
+
+    populateFormForEdit(index) {
+        this.editingIndex = index;
+        const q = this.questions[index];
+        const qf = this.ui.questionForm;
+        
+        qf.text.value = q.text || '';
+        if (qf.textOthers) qf.textOthers.value = q.text_others || '';
+        qf.type.value = q.type || '';
+        
+        // Ejecutar los cambios de UI derivados del tipo seleccionado
+        this.handleQuestionTypeChange();
+
+        qf.demographic.value = q.demographic || '';
+        if (qf.negativeStatement) qf.negativeStatement.value = q.negative_statement || '';
+        if (qf.positiveStatement) qf.positiveStatement.value = q.positive_statement || '';
+        if (qf.npsMin) qf.npsMin.value = q.nps_min || q.npsMin || '';
+        if (qf.npsMax) qf.npsMax.value = q.nps_max || q.npsMax || '';
+
+        const selectedOption = qf.type.options[qf.type.selectedIndex];
+        const questionTypeName = selectedOption ? selectedOption.text.trim() : '';
+
+        // Poblar Opciones
+        if (OPTIONS_BASED_TYPES.includes(questionTypeName) && questionTypeName !== LIKERT_TYPE_NAME) {
+             if (qf.optionsContainer) qf.optionsContainer.innerHTML = '';
+             (q.options || []).forEach((opt, idx) => {
+                 const optText = (typeof opt === 'object') ? opt.text : opt;
+                 const row = document.createElement('div');
+                 row.className = 'option-input-row';
+                 row.innerHTML = `<span class="option-number">${idx+1}</span><input type="text" class="form-control option-input" value="${frappe.utils.escape_html(optText)}"><i class="fa fa-trash-o text-danger delete-option" style="cursor: pointer;"></i>`;
+                 qf.optionsContainer.appendChild(row);
+             });
+             if (!q.options || q.options.length === 0) this.addOptionRow();
+             
+             if (questionTypeName === CHECKBOX_TYPE_NAME) {
+                 const chkOthers = document.getElementById('chk_qp_others');
+                 const chkNone = document.getElementById('chk_qp_none_above');
+                 if (chkOthers) chkOthers.checked = !!q.qp_others;
+                 if (chkNone) chkNone.checked = !!q.qp_none_above;
+             }
+        } else if (questionTypeName === LIKERT_VISUAL_TYPE_NAME) {
+             if (qf.visualOptionsContainer) qf.visualOptionsContainer.innerHTML = '';
+             (q.options || []).forEach((opt, idx) => {
+                 const val = opt.value || '';
+                 const text = opt.text || '';
+                 const url = opt.url || '';
+                 const safeUrl = frappe.utils.escape_html(url);
+                 const row = document.createElement('div');
+                 row.className = 'visual-option-input-row';
+                 row.innerHTML = `
+                    <span class="option-number">${idx+1}</span>
+                    <input type="text" class="form-control visual-option-value" value="${frappe.utils.escape_html(val)}" placeholder="Valor">
+                    <input type="text" class="form-control visual-option-text" value="${frappe.utils.escape_html(text)}" placeholder="Texto">
+                    <div class="visual-file-cell">
+                        <input type="file" accept="image/*" class="visual-option-file">
+                        <input type="hidden" class="visual-option-url-input" value="${safeUrl}">
+                        <div class="visual-file-preview ${url ? '' : 'd-none'}">
+                            <img src="${safeUrl}" alt="previsualización">
+                            <span class="file-name small text-muted"></span>
+                        </div>
+                    </div>
+                    <i class="fa fa-trash-o text-danger delete-visual-option" style="cursor: pointer;"></i>`;
+                 qf.visualOptionsContainer.appendChild(row);
+             });
+             if (!q.options || q.options.length === 0) this.addVisualOptionRow();
+        }
+
+        if (this.ui.buttons.addQuestion) {
+            this.ui.buttons.addQuestion.textContent = "Actualizar Pregunta";
+        }
+        
+        qf.text.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     handleQuestionListActions(e) {
@@ -818,9 +920,27 @@ export class QuestionBuilder {
         const questionItem = e.target.closest('.question-item');
         if (!questionItem) return;
         const index = parseInt(questionItem.getAttribute('data-index'), 10);
+        
         if (e.target.classList.contains('delete-question')) {
             this.questions.splice(index, 1);
             this.renderQuestions();
+        } else if (e.target.classList.contains('duplicate-question')) {
+            const original = this.questions[index];
+            const duplicate = JSON.parse(JSON.stringify(original));
+            duplicate.id = `manual-dup-${Date.now()}`;
+            
+            // Incrementador de Copia
+            const match = duplicate.text.match(/ - Copia (\d+)$/);
+            if (match) {
+                duplicate.text = duplicate.text.replace(/ - Copia \d+$/, ` - Copia ${parseInt(match[1]) + 1}`);
+            } else {
+                duplicate.text += " - Copia 1";
+            }
+            
+            this.questions.splice(index + 1, 0, duplicate);
+            this.renderQuestions();
+        } else if (e.target.classList.contains('edit-question')) {
+            this.populateFormForEdit(index);
         }
     }
 

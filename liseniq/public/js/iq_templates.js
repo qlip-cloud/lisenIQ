@@ -7,6 +7,10 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const editTemplateName = urlParams.get('edit');
+    const isEditMode = !!editTemplateName;
+
     const step1 = document.getElementById('step-1');
     const step2 = document.getElementById('step-2');
     const step3 = document.getElementById('step-3');
@@ -90,6 +94,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         if (isValid && templateNameField.value.trim()) {
+            if (isEditMode) {
+                return true; // Saltar validación de nombre único en modo edición
+            }
+
             btnStep1.disabled = true;
             btnStep1.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Validando...`;
             try {
@@ -185,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function handleSaveTemplate() {
         btnSaveTemplate.disabled = true;
-        btnSaveTemplate.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Creando...`;
+        btnSaveTemplate.innerHTML = `<i class="fa fa-spinner fa-spin"></i> ${isEditMode ? 'Actualizando...' : 'Creando...'}`;
 
         try {
             const questions = questionBuilder.getQuestions();
@@ -208,13 +216,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     qp_none_above: q.qp_none_above ? 1 : 0
                 };
                 if (q.options) {
-                    if (q.typeName === 'Likert') {
-                        questionDoc.qn_response_options = q.options.map(opt => ({
-                            qo_option_text: opt.text,
-                            qo_option_value: opt.value,
-                            qo_url: opt.url
-                        }));
-                    } else if (q.typeName === 'Likert Visual') {
+                    if (q.typeName === 'Likert' || q.typeName === 'Likert Visual') {
                         questionDoc.qn_response_options = q.options.map(opt => ({
                             qo_option_text: opt.text,
                             qo_option_value: opt.value,
@@ -241,6 +243,22 @@ document.addEventListener('DOMContentLoaded', function () {
             const bankQuestionNames = questions.filter(q => !q.id.startsWith('manual-')).map(q => q.id);
             const allQuestionNames = [...newQuestionNames, ...bankQuestionNames];
 
+            if (isEditMode) {
+                // Flujo de Actualización
+                await frappe.call({
+                    method: 'liseniq.www.iq-templates.new_template.update_template_questions',
+                    args: { 
+                        template_name: editTemplateName, 
+                        new_questions: JSON.stringify(allQuestionNames) 
+                    }
+                });
+                
+                showGlobalNotification('Se ha actualizado la Plantilla', 'success');
+                setTimeout(() => { window.location.href = '/iq-templates'; }, 2000);
+                return;
+            }
+
+            // Flujo de Creación - Nueva plantilla
             const isPrivate = formStep1.isPrivate?.checked;
             const hiddenPublic = document.getElementById('tp_is_public_value');
             const isPublic = formStep1.isPublic?.checked ? 1 : (hiddenPublic && hiddenPublic.value === '1' ? 1 : 0);
@@ -293,9 +311,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } catch (err) {
             console.error("Error al guardar la plantilla:", err);
-            showGlobalNotification('Ocurrio un error al crear la Plantilla, intente nuevamente.', 'error');
+            showGlobalNotification(`Ocurrio un error al ${isEditMode ? 'actualizar' : 'crear'} la Plantilla, intente nuevamente.`, 'error');
             btnSaveTemplate.disabled = false;
-            btnSaveTemplate.textContent = 'Crear';
+            btnSaveTemplate.textContent = isEditMode ? 'Actualizar' : 'Crear';
         }
     }
 
@@ -366,10 +384,50 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         
         syncPublicFlag();
-        togglePrivateWarning(); // Inicializa el estado basado en el HTML por defecto
+        togglePrivateWarning(); 
     }
     
     function init() {
+        // Flujo de Edición - Cargar datos de la plantilla a editar
+        if (isEditMode) {
+            document.querySelector('.page-main-title').textContent = "Editar Plantilla";
+            document.querySelector('.breadcrumb-nav span').textContent = "Editar Plantilla";
+            if (btnSaveTemplate) btnSaveTemplate.textContent = "Actualizar";
+            
+            // Bloquear inputs para modo lectura en el primer paso
+            Object.values(formStep1).forEach(el => {
+                if (el) el.disabled = true;
+            });
+            if (imageInput) imageInput.disabled = true;
+
+            // Obtener los detalles y preguntas de la plantilla a editar
+            frappe.call({
+                method: 'liseniq.www.iq-templates.new_template.get_template_details',
+                args: { template_name: editTemplateName },
+                callback: function(r) {
+                    if (r.message) {
+                        formStep1.name.value = r.message.tp_name;
+                        formStep1.category.value = r.message.tp_category;
+                        formStep1.description.value = r.message.tp_description;
+                        if (formStep1.isPrivate) formStep1.isPrivate.checked = r.message.tp_is_private;
+                        if (formStep1.isPublic) formStep1.isPublic.checked = r.message.tp_is_public;
+                        
+                        questionBuilder.setCategory(formStep1.category.options[formStep1.category.selectedIndex]?.text);
+                    }
+                }
+            });
+
+            frappe.call({
+                method: 'liseniq.www.iq-templates.index.get_questions_from_template',
+                args: { template_name: editTemplateName },
+                callback: function(r) {
+                    if (r.message) {
+                        questionBuilder.setQuestions(r.message);
+                    }
+                }
+            });
+        }
+
         templateStepper.render();
         showStep(1);
         initializeEventListeners();

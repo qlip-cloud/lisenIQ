@@ -17,7 +17,6 @@ def get_context(context):
     context.no_cache = 1
 
     try:
-        # contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
         contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
         if not contact_info:
             frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
@@ -58,3 +57,63 @@ def get_context(context):
 def check_template_name(name):
     exists = frappe.db.exists("qp_IQ_Template", {"tp_name": name})
     return {"exists": bool(exists)}
+
+@frappe.whitelist()
+def get_template_details(template_name):
+    if not template_name:
+        return None
+    doc = frappe.get_doc("qp_IQ_Template", template_name)
+    return {
+        "tp_name": doc.tp_name,
+        "tp_category": doc.tp_category,
+        "tp_description": doc.tp_description,
+        "tp_is_private": doc.tp_is_private,
+        "tp_is_public": doc.tp_is_public
+    }
+
+@frappe.whitelist()
+def update_template_questions(template_name, new_questions):
+    questions = frappe.parse_json(new_questions)
+    doc = frappe.get_doc("qp_IQ_Template", template_name)
+    
+    # Limpiar tabla hija
+    doc.set("tp_questions", [])
+    
+    # Insertar nuevas preguntas preservando el orden
+    for q_name in questions:
+        doc.append("tp_questions", {"tq_question": q_name})
+        
+    doc.save(ignore_permissions=True)
+    return {"status": "success"}
+
+@frappe.whitelist()
+def update_template_question(question_name, question_data):
+    data = frappe.parse_json(question_data)
+    doc = frappe.get_doc("qp_IQ_Question", question_name)
+    
+    # Actualizar campos directos
+    if "qn_statement" in data:
+        doc.qn_statement = data.get("qn_statement")
+    if "qn_type" in data:
+        doc.qn_type = data.get("qn_type")
+    if "qn_statement_others" in data:
+        doc.qn_statement_others = data.get("qn_statement_others")
+        
+    # Validar o crear el demográfico dinámicamente
+    demographic_title = data.get("qn_demographic")
+    if demographic_title:
+        demographic_name = frappe.db.exists(
+            "qp_IQ_DemographicType",
+            {"dt_title": demographic_title, "dt_object_type": "Pregunta"}
+        )
+        if not demographic_name:
+            demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
+            demographic_doc.dt_title = demographic_title
+            demographic_doc.dt_object_type = "Pregunta"
+            demographic_doc.insert(ignore_permissions=True)
+            demographic_name = demographic_doc.name
+        
+        doc.qn_demographic = demographic_name
+        
+    doc.save(ignore_permissions=True)
+    return {"status": "success"}

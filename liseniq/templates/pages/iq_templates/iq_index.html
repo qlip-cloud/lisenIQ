@@ -51,9 +51,16 @@
                                             <span class="material-symbols-outlined">article</span>
                                         {% endif %}
                                     </div>
-                                    {% if template.tp_is_private %}
-                                    <i class="fa fa-lock text-muted" title="Plantilla Privada" style="color: #7B24FF !important;"></i>
-                                    {% endif %}
+                                    <div class="d-flex align-items-center">
+                                        {% if template.tp_owner == frappe.session.user %}
+                                        <a href="/iq-templates/new_template?edit={{ template.name }}" class="text-muted mr-2" style="font-size: 1.2rem; transition: color 0.2s;" title="Editar Plantilla">
+                                            <i class="fa fa-edit template-edit-icon" style="color: #7B24FF;"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if template.tp_is_private %}
+                                        <i class="fa fa-lock text-muted" title="Plantilla Privada" style="color: #7B24FF !important;"></i>
+                                        {% endif %}
+                                    </div>
                                 </div>
                                 <h5 class="card-title font-weight-bold mb-2">{{ template.tp_name }}</h5>
                                 <p class="card-text small text-muted">{{ template.tp_description }}</p>

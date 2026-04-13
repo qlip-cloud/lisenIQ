@@ -49,6 +49,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.location.href = url;
     });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.download-leadership-reports-zip-btn');
+        if (!btn) return;
+
+        const url = btn.getAttribute('data-url');
+        if (!url) return;
+
+        window.location.href = url;
+    });
     
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.download-follow-up-btn');

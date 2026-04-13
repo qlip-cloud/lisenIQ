@@ -144,6 +144,17 @@
                                     <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
                                         <i class="fa fa-bar-chart"></i>
                                     </a>
+                                    {% if m.status == "Finalizada" and m.is_leadership and m.has_generated_reports %}
+                                    <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_leadership_reports_zip?survey_name={{ m.name }}" 
+                                        class="results-link-icon download-leadership-reports-zip-btn material-symbols-outlined" 
+                                        title="Descargar informes PDF" 
+                                        aria-label="Descargar informes PDF de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        picture_as_pdf
+                                    </span>
+                                {% endif %}
                                 </div>
                                 {% elif m.status == "En Progreso" and not m.is_leadership %}
                                 <span 

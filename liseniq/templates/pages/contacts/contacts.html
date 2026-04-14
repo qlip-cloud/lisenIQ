@@ -1,5 +1,5 @@
 <div class="main-content-padding">
-    <<script id="tours-data" type="application/json">
+    <script id="tours-data" type="application/json">
         {{ user_tours | tojson }}
     </script>
     <div id="contacts-list-view">
@@ -80,24 +80,37 @@
                         <a href="#" id="breadcrumb-back-step1">Contactos</a> / <span class="form-mode-text">Nuevo Contacto</span>
                     </div>
                     <div class="title-with-action">
-                        <h3 class="page-main-title">Nuevo Contacto</h3>
+                        <span class="tooltip-wrapper">
+                            <h3 class="page-main-title" data-tooltip-bottom="Registra a una nueva persona en tu lista de contactos. Este usuario podrá recibir mediciones, segmentarse por criterios demográficos y participar en tus encuestas.">Nuevo Contacto</h3>
+                            <span class="tooltip-icon"></span>
+                        </span>
                         <button id="btn-next-step-1" type="button" class="btn btn-purple-main btn-form-nav">Siguiente</button>
                     </div>
                 </div>
                 <div class="contact-form-container">
                     <div class="contact-form-grid">
                         <div class="form-group">
-                            <label for="contact-firstname">Nombres</label>
+                            <span class="tooltip-wrapper">
+                                <label for="contact-firstname" data-tooltip-bottom="Primer y segundo nombre del contacto.">Nombres</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <input type="text" id="contact-firstname" class="form-control" required data-required="true">
                             <small id="contact-firstname-error" class="form-error-message d-none"></small>
                         </div>
                         <div class="form-group">
-                            <label for="contact-lastname">Apellidos</label>
+                            <span class="tooltip-wrapper">
+                                <label for="contact-lastname" data-tooltip-bottom="Primer y segundo apellido del contacto. ">Apellidos</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span> 
                             <input type="text" id="contact-lastname" class="form-control" required data-required="true">
                             <small id="contact-lastname-error" class="form-error-message d-none"></small>
                         </div>
                         <div class="form-group">
-                            <label for="contact-doc-type">Tipo de Documento</label>
+                            
+                            <span class="tooltip-wrapper">
+                                <label for="contact-doc-type" data-tooltip-bottom="Selecciona el tipo de documento  del contacto (por ejemplo: cédula, pasaporte, identificación interna). Útil para garantizar unicidad y evitar duplicados.​">Tipo de Documento</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <select id="contact-doc-type" class="form-control" data-default-doctype="{{ default_doctype or '' }}" required data-required="true">
                                 <option value="" selected>Seleccionar...</option>
                                 {% for doc_type in document_types %}
@@ -109,12 +122,18 @@
                             <small id="contact-doc-type-error" class="form-error-message d-none"></small>
                         </div>
                         <div class="form-group">
-                            <label for="contact-doc-number">Número de Documento</label>
+                            <span class="tooltip-wrapper">
+                                <label for="contact-doc-number" data-tooltip-bottom="Identificador único del contacto. Permite asegurar que no existan registros duplicados y facilita la trazabilidad. Utilizar solo números y letras. ">Número de Documento</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <input type="text" id="contact-doc-number" class="form-control" required data-required="true">
                             <small id="contact-doc-number-error" class="form-error-message d-none"></small>
                         </div>
                         <div class="form-group">
-                            <label for="contact-country">País</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Nación de residencia del contacto. Se utiliza para definir zona horaria, idioma sugerido y segmentación geográfica." for="contact-country">País</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <select id="contact-country" class="form-control" data-default-country="{{ default_country or '' }}" required data-required="true">
                                 <option value="">Seleccionar...</option>
                                 {% for country in latam_countries %}
@@ -126,7 +145,10 @@
                             <small id="contact-country-error" class="form-error-message d-none"></small>
                         </div>
                         <div class="form-group">
-                            <label for="contact-language">Idioma</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Idioma preferido del contacto para recibir correos, invitaciones y encuestas." for="contact-language">Idioma</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <select id="contact-language" class="form-control" data-default-language="{{ default_language or '' }}" required data-required="true">
                                 <option value="" selected>Seleccionar...</option>
                                 {% for lang in language %}
@@ -157,16 +179,25 @@
                 <div class="contact-form-container">
                     <div class="contact-form-grid">
                         <div class="form-group">
-                            <label for="contact-email">Correo Electrónico</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Correo donde el contacto recibirá las invitaciones y recordatorios de las mediciones. Debe ser un correo válido para garantizar la entrega." for="contact-email">Correo Electrónico</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <input type="email" id="contact-email" class="form-control">
                             <small id="contact-email-error" class="form-error-message d-none"></small>
                         </div>
                         <div class="form-group">
-                            <label for="contact-birthdate">Fecha de Nacimiento</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Información opcional que puede utilizarse para analizar variables de edad o generar segmentaciones demográficas más completas." for="contact-birthdate">Fecha de Nacimiento</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <input type="date" id="contact-birthdate" class="form-control">
                         </div>
                         <div class="form-group">
-                            <label for="contact-gender">Género</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Dato demográfico utilizado para análisis internos o segmentación. Su uso es opcional según las necesidades de la empresa.​" for="contact-gender">Género</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <select id="contact-gender" class="form-control">
                                 <option selected value="">Seleccionar...</option>
                                 {% for gener_types in gender %}
@@ -175,7 +206,10 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="contact-education">Nivel Académico</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Mayor nivel de estudios alcanzado por el contacto. Útil para análisis sociodemográficos y segmentaciones específicas." for="contact-education">Nivel Académico</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <select id="contact-education" class="form-control">
                                 <option value="" selected>Seleccionar...</option>
                                 {% for level in education_levels %}
@@ -184,7 +218,10 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="contact-entrydate">Fecha de Ingreso</label>
+                            <span class="tooltip-wrapper">
+                                <label data-tooltip-bottom="Fecha en la que el contacto ingresó a la empresa u organización. Permite analizar antigüedad y realizar cortes de segmentación." for="contact-entrydate">Fecha de Ingreso</label>
+                                <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                            </span>
                             <input type="date" id="contact-entrydate" class="form-control">
                         </div>
                     </div>
@@ -208,8 +245,18 @@
                     <table class="demographics-table">
                         <thead>
                             <tr>
-                                <th id="thead-tag">Tag</th>
-                                <th id="thead-value">Valor</th>
+                                <th id="thead-tag">
+                                    <span class="tooltip-wrapper">
+                                        <label data-tooltip-bottom="Categorías o variables que permiten segmentar a los contactos en grupos relevantes como sede, área, cargo o unidad de negocio." for="demographic-tag">Demográfico/Segmentación</label>
+                                        <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                    </span>
+                                </th>
+                                <th id="thead-value">
+                                    <span class="tooltip-wrapper">
+                                        <label data-tooltip-bottom="Valor del dato demográfico. Puede ser un texto, número o fecha." for="demographic-value">Etiqueta o Variable</label>
+                                        <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                                    </span>
+                                </th>
                                 <th></th>
                             </tr>
                         </thead>

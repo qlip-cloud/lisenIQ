@@ -1,5 +1,9 @@
 import frappe
 import json
+import base64
+import openpyxl
+from openpyxl.worksheet.datavalidation import DataValidation
+from io import BytesIO
 from frappe import _
 from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
 from liseniq.utils.api_survey import generate_public_link_for_survey
@@ -23,10 +27,29 @@ def get_context(context):
     context.page_title = _("Editar Medición") if context.is_edit_mode else _("Crear Medición")
     context.measurement_data_json = "null"
 
+    # Obtener compañía del usuario para los filtros
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+
+    # Preparar roles de liderazgo
+    try:
+        catalog = frappe.db.get_value("qp_IQ_Catalog", {"ca_mnemonico": "measurement_roles"}, "name")
+        if catalog:
+            context.leadership_roles = frappe.get_all(
+                "qp_IQ_CatalogOptions",
+                filters={"co_catalog": catalog, "co_is_active": 1},
+                fields=["name", "co_label"],
+                order_by="co_sort_order asc"
+            )
+        else:
+            context.leadership_roles = []
+    except Exception:
+        context.leadership_roles = []
+
     # Modo edición: cargar datos existentes
     if context.is_edit_mode:
         try:
             doc = frappe.get_doc("qp_IQ_Survey", measurement_name)
+            
             # Construir preguntas
             questions = []
             for q_link in (doc.su_questions or []):
@@ -53,7 +76,6 @@ def get_context(context):
             # Datos de participantes
             recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": doc.name})
             
-            # Detectar si es tipo anónimo puro basado en custom link y sin destinatarios obligatorios
             if doc.su_custom_generate_public_link and recipients_count == 0 and doc.su_is_anonymous:
                  survey_type = "anonymous_link"
             else:
@@ -61,22 +83,9 @@ def get_context(context):
                  
             response_type = "anonymous" if doc.su_is_anonymous else "identified"
 
-            # Construir lista de contactos para el modal en edición
-            contacts_headers = ["Nombre"]
-            contacts_list = []
-            if recipients_count > 0:
-                recipient_rows = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": doc.name}, fields=["sr_contact"])
-                contact_names = [r.sr_contact for r in recipient_rows if r.sr_contact]
-                if contact_names:
-                    contact_docs = frappe.get_all("Contact", filters={"name": ["in", contact_names]}, fields=["name", "first_name", "last_name"])
-                    for c in contact_docs:
-                        contacts_list.append({
-                            "name": c.name,
-                            "Nombre": f"{(c.first_name or '').strip()} {(c.last_name or '').strip()}".strip()
-                        })
-
             measurement_data = {
                 "name": doc.su_name,
+                "isLeadership": doc.get("su_is_leadership", 0),
                 "startDate": doc.su_start_date,
                 "endDate": doc.su_end_date,
                 "timezone": doc.su_timezone,
@@ -85,30 +94,85 @@ def get_context(context):
                     "frequency": doc.su_reminder_frequency,
                     "max": doc.su_reminder_max
                 },
-                # Personalización de correos
                 "su_invitation_subject": doc.su_invitation_subject,
                 "su_invitation_body": doc.su_invitation_body,
                 "su_reminder_subject": doc.su_reminder_subject,
                 "su_reminder_body": doc.su_reminder_body,
                 "su_default_notif": doc.su_default_notif,
                 "questions": questions,
-                "contacts": {
+            }
+
+            if doc.get("su_is_leadership"):
+                networks_dict = {}
+                if recipients_count > 0:
+                    recipients = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": doc.name}, fields=["name", "sr_contact", "sr_evaluating_to", "sr_evaluation_role"])
+                    
+                    contact_ids = list(set([r.sr_contact for r in recipients if r.sr_contact] + [r.sr_evaluating_to for r in recipients if r.sr_evaluating_to]))
+                    contact_map = {}
+                    if contact_ids:
+                        contacts_data = frappe.get_all("Contact", filters={"name": ["in", contact_ids]}, fields=["name", "first_name", "last_name"])
+                        for c in contacts_data:
+                            contact_map[c.name] = f"{(c.first_name or '').strip()} {(c.last_name or '').strip()}".strip()
+
+                    for r in recipients:
+                        leader_id = r.sr_contact
+                        evaluator_id = r.sr_evaluating_to
+                        
+                        # Fallback por seguridad
+                        if not evaluator_id:
+                            evaluator_id = leader_id
+
+                        if leader_id not in networks_dict:
+                            networks_dict[leader_id] = {
+                                "leader": {"id": leader_id, "name_display": contact_map.get(leader_id, leader_id)},
+                                "evaluators": []
+                            }
+                        
+                        is_auto = (leader_id == evaluator_id)
+                        role_label = r.sr_evaluation_role if r.sr_evaluation_role else ("Autoevaluación" if is_auto else "")
+                        
+                        networks_dict[leader_id]["evaluators"].append({
+                            "id": evaluator_id,
+                            "name": contact_map.get(evaluator_id, evaluator_id),
+                            "role": role_label,
+                            "role_id": r.sr_evaluation_role, 
+                            "isAuto": is_auto
+                        })
+                measurement_data["leadershipNetwork"] = list(networks_dict.values())
+            else:
+                contacts_headers = ["Nombre"]
+                contacts_list = []
+                if recipients_count > 0:
+                    recipient_rows = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": doc.name}, fields=["sr_contact"])
+                    contact_names = [r.sr_contact for r in recipient_rows if r.sr_contact]
+                    if contact_names:
+                        contact_docs = frappe.get_all("Contact", filters={"name": ["in", contact_names]}, fields=["name", "first_name", "last_name"])
+                        for c in contact_docs:
+                            contacts_list.append({
+                                "name": c.name,
+                                "Nombre": f"{(c.first_name or '').strip()} {(c.last_name or '').strip()}".strip()
+                            })
+                measurement_data["contacts"] = {
                     "surveyType": survey_type,
                     "responseType": response_type,
                     "contactCount": recipients_count,
                     "headers": contacts_headers,
                     "list": contacts_list
                 }
-            }
+
             context.measurement_data_json = frappe.as_json(measurement_data)
         except Exception as e:
             frappe.log_error(f"Error cargando medición para editar: {e}", "new_measurement.get_context")
             frappe.throw(_("Medición no encontrada."), frappe.DoesNotExistError)
 
     try:
+        demo_filters = {"dt_object_type": "Contacto"}
+        if user_company:
+            demo_filters["dt_creator_company"] = user_company
+            
         context.contact_demographics = frappe.get_all(
             "qp_IQ_DemographicType",
-            filters={"dt_object_type": "Contacto"},
+            filters=demo_filters,
             fields=["name", "dt_title"],
             order_by="dt_title"
         )
@@ -116,7 +180,6 @@ def get_context(context):
         context.contact_demographics = []
 
     try:
-        # Filtramos estrictamente por los mnemónicos
         context.question_types = frappe.get_all(
             "qp_IQ_QuestionType",
             filters={
@@ -139,8 +202,16 @@ def get_context(context):
         context.timezones = []
 
     template_name = frappe.request.args.get('template')
+    template_is_leadership = False
     if template_name:
         try:
+            # Identificar si la plantilla corresponde a Liderazgo
+            cat_id = frappe.db.get_value("qp_IQ_Template", template_name, "tp_category")
+            if cat_id:
+                cat_name = frappe.db.get_value("qp_IQ_QuestionCategory", cat_id, "qnc_category")
+                if cat_name == "Liderazgo":
+                    template_is_leadership = True
+
             questions = frappe.call(
                 'liseniq.www.iq-templates.index.get_questions_from_template',
                 template_name=template_name
@@ -149,10 +220,10 @@ def get_context(context):
         except Exception as e:
             frappe.log_error(f"No se pudieron cargar las preguntas de la plantilla {template_name}: {e}", "Error en new_measurement.py")
             context.preloaded_questions_json = "[]"
-    # Exponer el nombre de la plantilla
+    
+    context.template_is_leadership = template_is_leadership
     context.template_name = template_name or None
     if template_name:
-        # Persistimos en cache y en frappe.local para fallback
         frappe.cache().set_value(f"measurement_template:{frappe.session.user}", template_name)
         frappe.local.template_name = template_name
 
@@ -162,6 +233,61 @@ def get_context(context):
     })
 
     return context
+
+@frappe.whitelist()
+def search_company_contacts(search_term=""):
+    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    
+    params = {}
+    company_filter = ""
+    
+    if user_company:
+        company_filter = "AND c.custom_company = %(company)s"
+        params["company"] = user_company
+        
+    search_filter = ""
+    if search_term:
+        search_filter = """
+            AND (
+                c.first_name LIKE %(st)s OR 
+                c.last_name LIKE %(st)s OR 
+                CONCAT(IFNULL(c.first_name, ''), ' ', IFNULL(c.last_name, '')) LIKE %(st)s OR
+                c.custom_document_number LIKE %(st)s OR
+                ce.email_id LIKE %(st)s
+            )
+        """
+        params["st"] = f"%{search_term}%"
+        
+    query = f"""
+        SELECT DISTINCT
+            c.name, c.first_name, c.last_name, c.custom_document_number, ce.email_id
+        FROM
+            `tabContact` c
+        LEFT JOIN
+            `tabContact Email` ce ON ce.parent = c.name AND ce.parenttype = 'Contact' AND ce.is_primary = 1
+        WHERE
+            c.status IN ('Enabled', 'Passive')
+            AND c.custom_is_liseniq_contact = 1
+            AND c.custom_is_deleted = 0
+            AND c.custom_status != 'Inactivo'
+            {company_filter}
+            {search_filter}
+        LIMIT 50
+    """
+    
+    contacts = frappe.db.sql(query, params, as_dict=True)
+    
+    res = []
+    for c in contacts:
+        full_name = f"{c.first_name or ''} {c.last_name or ''}".strip()
+        res.append({
+            "name": c.name, 
+            "full_name": full_name, 
+            "email": c.email_id or "",
+            "dni": c.custom_document_number or ""
+        })
+        
+    return res
 
 @frappe.whitelist()
 def check_measurement_name(name, exclude_doc=None, only_open=False):
@@ -405,14 +531,11 @@ def save_measurement(data):
         email_data = data.get("email_customization") or {}
         email_use_default = bool(data.get("email_use_default"))
         
-        # Variable para almacenar la referencia al documento final
         final_survey_name = None
 
-        # Modo edición
         if data.get("is_edit_mode") and data.get("doc_name"):
             survey = frappe.get_doc("qp_IQ_Survey", data["doc_name"])
 
-            # Validación de nombre único por compañía
             new_name = data.get("name")
             if new_name:
                 exists = frappe.get_all(
@@ -444,7 +567,7 @@ def save_measurement(data):
                 survey.su_reminder_frequency = None
                 survey.su_reminder_max = None
 
-            # Personalización de correos en edición
+            survey.su_is_leadership = 1 if data.get("is_leadership") else 0
             survey.su_invitation_subject = email_data.get("invitation_subject")
             survey.su_invitation_body = email_data.get("invitation_body")
             survey.su_reminder_subject = email_data.get("reminder_subject")
@@ -453,29 +576,56 @@ def save_measurement(data):
 
             survey.save(ignore_permissions=True)
             frappe.db.commit()
-            
             final_survey_name = survey.name
 
-            # Solo actualizar contactos si NO es anónimo
-            if data.get("contacts", {}).get("surveyType") != "anonymous_link":
+            # Lógica de actualización de Contactos
+            rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
+            
+            if survey.su_is_leadership:
+                leadership_network = data.get("leadershipNetwork", [])
+                if leadership_network:
+                    existing_recipients = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": survey.name}, fields=["name", "sr_contact", "sr_evaluating_to", "sr_evaluation_role"])
+                    existing_pairs = {(r.sr_evaluating_to, r.sr_contact, r.sr_evaluation_role) for r in existing_recipients}
+                    
+                    for network in leadership_network:
+                        leader_id = network.get("leader", {}).get("id")
+                        for ev in network.get("evaluators", []):
+                            evaluator_id = ev.get("id")
+                            role_label = ev.get("role")
+                            
+                            if (evaluator_id, leader_id, role_label) not in existing_pairs:
+                                has_responded = frappe.db.exists("Survey Response", {"survey": survey.su_name, "user": evaluator_id, "custom_evaluatee": leader_id})
+                                if not has_responded:
+                                    doc_vals = {
+                                        "doctype": "qp_IQ_SurveyRecipient",
+                                        "sr_survey": survey.name,
+                                        "sr_contact": leader_id,
+                                        "sr_evaluating_to": evaluator_id,
+                                        "sr_status": rs_not_sent
+                                    }
+                                    if not ev.get("isAuto") and role_label:
+                                        doc_vals["sr_evaluation_role"] = role_label
+                                    elif ev.get("isAuto"):
+                                        doc_vals["sr_evaluation_role"] = "Autoevaluación"
+                                    
+                                    frappe.get_doc(doc_vals).insert(ignore_permissions=True)
+
+            elif data.get("contacts", {}).get("surveyType") != "anonymous_link":
                 contacts_data = data.get("contacts", {})
                 new_contacts = contacts_data.get("list", [])
                 if new_contacts:
-                    # Obtener contactos ya existentes en la medición
                     existing_recipients = frappe.get_all(
                         "qp_IQ_SurveyRecipient",
                         filters={"sr_survey": survey.name},
                         fields=["sr_contact"]
                     )
                     existing_contact_names = set(r["sr_contact"] for r in existing_recipients if r["sr_contact"])
-                    rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
 
                     for contact in new_contacts:
                         contact_name = contact.get("name")
                         if not contact_name or contact_name in existing_contact_names:
                             continue
 
-                        # Validar si ya respondió la encuesta
                         has_responded = frappe.db.exists(
                             "Survey Response",
                             {"survey": survey.su_name, "user": contact_name}
@@ -489,19 +639,16 @@ def save_measurement(data):
                             "sr_contact": contact_name,
                             "sr_status": rs_not_sent
                         }).insert(ignore_permissions=True)
+                        
             frappe.db.commit()
 
-            # Enviar de inmediato links a pendientes si la medición ya fue lanzada
             try:
                 frappe.call("liseniq.tasks.send_pending_links_for_survey", survey_name=survey.name)
             except Exception:
                 frappe.log_error(frappe.get_traceback(), "save_measurement.send_pending_links_on_edit")
 
-        # Modo nueva encuesta o creación
         else:
-            # Traemos un mapa completo de los tipos de preguntas para utilizar el Mnemónico
             question_types_map = {qt.name: qt for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name", "qnt_mnemonico"])}
-            
             user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
             user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
 
@@ -522,17 +669,22 @@ def save_measurement(data):
                             new_question.qn_owner = user_company
                             
                             if q.get("demographic"):
-                                demographic_name = frappe.db.exists("qp_IQ_DemographicType", {"dt_title": q["demographic"]})
+                                demo_filters = {"dt_title": q["demographic"], "dt_object_type": "Pregunta"}
+                                if user_company:
+                                    demo_filters["dt_creator_company"] = user_company
+                                
+                                demographic_name = frappe.db.exists("qp_IQ_DemographicType", demo_filters)
                                 if not demographic_name:
                                     demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
                                     demographic_doc.dt_title = q["demographic"]
                                     demographic_doc.dt_object_type = "Pregunta"
+                                    if user_company:
+                                        demographic_doc.dt_creator_company = user_company
                                     demographic_doc.insert(ignore_permissions=True)
                                     demographic_name = demographic_doc.name
                                 new_question.qn_demographic = demographic_name
 
                             if q.get("options"):
-                                # Verificamos si es Likert utilizando su lógica o si es diccionario con value
                                 if q.get("typeName") == "Likert" or (isinstance(q.get("options")[0], dict) and "value" in q["options"][0]):
                                     for opt in q["options"]:
                                         new_question.append("qn_response_options", {
@@ -549,7 +701,6 @@ def save_measurement(data):
                             if q.get("nps_min") is not None: new_question.qn_nps_min = q["nps_min"]
                             if q.get("nps_max") is not None: new_question.qn_nps_max = q["nps_max"]
 
-                            # Guardado de opciones personalizadas Checkbox
                             if q.get("qp_others"): new_question.qp_others = 1
                             if q.get("qp_none_above"): new_question.qp_none_above = 1
                                 
@@ -569,24 +720,16 @@ def save_measurement(data):
                 }
                 for q in data["questions"]:
                     question_name = manual_question_map.get(q["id"]) if q.get("id", "").startswith("manual-") else q["id"]
-                    
-                    # Extraer toda la información mapeada para validar mediante Mnemónico
                     qt_info = question_types_map.get(q["type"], {})
                     question_type_mnemonic = qt_info.get("qnt_mnemonico")
                     
                     surveyjs_type = "text"
-                    if question_type_mnemonic == "radio_group":
-                        surveyjs_type = "radiogroup"
-                    elif question_type_mnemonic == "text_area":
-                        surveyjs_type = "comment"
-                    elif question_type_mnemonic == "score_nps":
-                        surveyjs_type = "rating"
-                    elif question_type_mnemonic in ["scale_likert", "scale_emoji"]:
-                        surveyjs_type = "imagepicker"
-                    elif question_type_mnemonic == "check_group":
-                        surveyjs_type = "checkbox"
-                    elif question_type_mnemonic == "text_short":
-                        surveyjs_type = "text"
+                    if question_type_mnemonic == "radio_group": surveyjs_type = "radiogroup"
+                    elif question_type_mnemonic == "text_area": surveyjs_type = "comment"
+                    elif question_type_mnemonic == "score_nps": surveyjs_type = "rating"
+                    elif question_type_mnemonic in ["scale_likert", "scale_emoji"]: surveyjs_type = "imagepicker"
+                    elif question_type_mnemonic == "check_group": surveyjs_type = "checkbox"
+                    elif question_type_mnemonic == "text_short": surveyjs_type = "text"
 
                     element = {
                         "type": surveyjs_type,
@@ -595,7 +738,6 @@ def save_measurement(data):
                         "isRequired": "true"
                     }
 
-                    # Configuraciones especiales según el mnemónico
                     if question_type_mnemonic == "scale_likert":
                         choices = []
                         try:
@@ -603,16 +745,13 @@ def save_measurement(data):
                                 q_doc = frappe.get_doc("qp_IQ_Question", question_name)
                                 if q_doc and q_doc.qn_response_options:
                                     for opt in q_doc.qn_response_options:
-                                        try:
-                                            val_int = int(opt.qo_option_value)
-                                        except Exception:
-                                            val_int = None
-                                        # Asignar URL personalizada si existe, sino usar el mapa por defecto
+                                        try: val_int = int(opt.qo_option_value)
+                                        except Exception: val_int = None
                                         image_url = getattr(opt, "qo_url", None) or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
                                         choices.append({
                                             "text": opt.qo_option_text,
                                             "value": opt.qo_option_value,
-                                            "imageLink": image_url
+                                            "imageLink": image_url if image_url else "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                         })
                         except Exception:
                             choices = []
@@ -630,15 +769,12 @@ def save_measurement(data):
                             if question_name:
                                 q_doc = frappe.get_doc("qp_IQ_Question", question_name)
                                 if q_doc and q_doc.qn_response_options:
-                                    choices = [
-                                        {
+                                    for opt in q_doc.qn_response_options:
+                                        choices.append({
                                             "text": opt.qo_option_text,
                                             "value": opt.qo_option_value,
-                                            "imageLink": opt.qo_url
-                                        }
-                                        for opt in q_doc.qn_response_options
-                                        if getattr(opt, "qo_url", None)
-                                    ]
+                                            "imageLink": opt.qo_url if opt.qo_url else "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                        })
                         except Exception:
                             choices = []
                         element["choices"] = choices
@@ -677,12 +813,7 @@ def save_measurement(data):
                 survey_json_content = {
                     "title": data["name"],
                     "description": "",
-                    "pages": [
-                        {
-                            "name": "page1",
-                            "elements": elements
-                        }
-                    ]
+                    "pages": [{"name": "page1", "elements": elements}]
                 }
 
                 surveyjs_doc = frappe.new_doc("Survey")
@@ -703,24 +834,26 @@ def save_measurement(data):
                 web_form.published = 1
 
                 survey_response_meta = frappe.get_meta("Survey Response")
-                fieldtype_mapping = {
-                    "Long Text": "Text Editor"
-                }
+                fieldtype_mapping = {"Long Text": "Text Editor"}
                 for field in survey_response_meta.fields:
                     if field.fieldtype not in ["Section Break", "Column Break", "Tab Break"]:
                         web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
+                        
+                        is_hidden = field.hidden
+                        if field.fieldname in ["custom_evaluatee", "custom_evaluator", "responses", "response_json", "user", "survey"]:
+                            is_hidden = 1
+
                         web_form.append("web_form_fields", {
                             "fieldname": field.fieldname,
                             "fieldtype": web_form_fieldtype,
                             "label": field.label,
                             "reqd": field.reqd,
                             "options": field.options,
-                            "hidden": field.hidden,
+                            "hidden": is_hidden,
                             "read_only": field.read_only,
                             "default": field.default,
                             "description": field.description,
                         })
-
                 web_form.insert(ignore_permissions=True)
 
             user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
@@ -742,6 +875,7 @@ def save_measurement(data):
             survey = frappe.new_doc("qp_IQ_Survey")
             survey.su_name = data["name"]
             survey.su_owner = user_company
+            survey.su_is_leadership = 1 if data.get("is_leadership") else 0
             survey.su_start_date = data.get("startDate")
             survey.su_end_date = data.get("endDate")
             survey.su_timezone = data.get("timezone")
@@ -761,15 +895,11 @@ def save_measurement(data):
             survey_type = contacts_data.get("surveyType")
             response_type = contacts_data.get("responseType")
 
-            # Agrego logica para forzar anónimo y URL pública en caso de enlace anónimo
             if survey_type == 'anonymous_link':
                 survey.su_is_anonymous = 1
                 survey.su_custom_generate_public_link = 1
             else:
-                # Para encuestas de contactos ('selected' o 'all'), siempre su_is_anonymous = 0
-                # para forzar la generación de tokens y el seguimiento.
                 survey.su_is_anonymous = 0 
-                
                 if survey_type == 'all':
                     survey.su_custom_generate_public_link = 0
                 elif survey_type == 'selected':
@@ -783,7 +913,6 @@ def save_measurement(data):
             else:
                 survey.su_send_reminders = 0
 
-            # Personalización de correos en creación
             survey.su_invitation_subject = email_data.get("invitation_subject")
             survey.su_invitation_body = email_data.get("invitation_body")
             survey.su_reminder_subject = email_data.get("reminder_subject")
@@ -800,19 +929,43 @@ def save_measurement(data):
             frappe.db.commit()
 
             final_survey_name = survey.name
+            rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
 
-            if survey_type == 'selected' and contacts_data.get("list"):
-                contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]
-                if contact_names:
-                    rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
-                    for contact_name in contact_names:
-                        frappe.get_doc({
+            if survey.su_is_leadership:
+                leadership_network = data.get("leadershipNetwork", [])
+                for network in leadership_network:
+                    leader_id = network.get("leader", {}).get("id")
+                    for ev in network.get("evaluators", []):
+                        evaluator_id = ev.get("id")
+                        role_label = ev.get("role")
+                        
+                        doc_vals = {
                             "doctype": "qp_IQ_SurveyRecipient",
                             "sr_survey": survey.name,
-                            "sr_contact": contact_name,
+                            "sr_contact": leader_id,
+                            "sr_evaluating_to": evaluator_id,
                             "sr_status": rs_not_sent
-                        }).insert(ignore_permissions=True)
+                        }
+                        if not ev.get("isAuto") and role_label:
+                            doc_vals["sr_evaluation_role"] = role_label
+                        elif ev.get("isAuto"):
+                            doc_vals["sr_evaluation_role"] = "Autoevaluación"
+                            
+                        frappe.get_doc(doc_vals).insert(ignore_permissions=True)
                 frappe.db.commit()
+
+            else:
+                if survey_type == 'selected' and contacts_data.get("list"):
+                    contact_names = [c.get("name") for c in contacts_data.get("list") if c.get("name")]
+                    if contact_names:
+                        for contact_name in contact_names:
+                            frappe.get_doc({
+                                "doctype": "qp_IQ_SurveyRecipient",
+                                "sr_survey": survey.name,
+                                "sr_contact": contact_name,
+                                "sr_status": rs_not_sent
+                            }).insert(ignore_permissions=True)
+                    frappe.db.commit()
 
         frappe.db.commit()
         return {"status": "success", "message": f"Medición '{survey.su_name}' creada exitosamente.", "docname": survey.name}
@@ -820,4 +973,184 @@ def save_measurement(data):
     except Exception as e:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Error en save_measurement")
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
+def generate_leadership_excel_template():
+    """ Genera la plantilla Excel para carga masiva de red 360° """
+    try:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Carga_Masiva_360"
+        
+        # Headers principales
+        ws.append(["email", "relacion"])
+        
+        # Datos de ejemplo
+        ws.append(["ejemplo_lider@empresa.com", "Autoevaluación"])
+        ws.append(["ejemplo_evaluador@empresa.com", "Evaluador"])
+        
+        # Recuperar Roles activos de Catalog Options
+        catalog = frappe.db.get_value("qp_IQ_Catalog", {"ca_mnemonico": "measurement_roles"}, "name")
+        roles = []
+        if catalog:
+            roles_data = frappe.get_all("qp_IQ_CatalogOptions", filters={"co_catalog": catalog, "co_is_active": 1}, fields=["co_label"])
+            roles = [r.co_label for r in roles_data]
+            
+        # Segunda hoja con instrucciones y roles válidos
+        ws_info = wb.create_sheet(title="Roles_Validos")
+        ws_info.append(["Información Importante:"])
+        ws_info.append(["- Inicie el bloque con el líder usando 'Autoevaluación' en la columna relacion."])
+        ws_info.append(["- Las siguientes filas serán los evaluadores asignados a ese líder."])
+        ws_info.append([])
+        ws_info.append(["ROLES PERMITIDOS (copiar exactamente):"])
+        ws_info.append(["Autoevaluación"])
+        
+        row_idx = 7
+        for r in roles:
+            ws_info.append([r])
+            row_idx += 1
+
+        # Añadir lista desplegable en la columna relacion (B) de la hoja principal
+        formula = f"='Roles_Validos'!$A$6:$A${row_idx - 1}"
+        dv = DataValidation(type="list", formula1=formula, allow_blank=True)
+        dv.error = 'Debe seleccionar un rol válido de la lista desplegable.'
+        dv.errorTitle = 'Rol Inválido'
+        dv.prompt = 'Seleccione un rol de la lista.'
+        dv.promptTitle = 'Relación'
+        
+        ws.add_data_validation(dv)
+        dv.add('B2:B1000')
+
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+        
+        return base64.b64encode(stream.read()).decode('utf-8')
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "generate_leadership_excel_template")
+        return None
+
+@frappe.whitelist()
+def process_leadership_excel(file_base64):
+    """ Procesa el Excel subido en base64 para construir la red 360 """
+    try:
+        # Decodificar el archivo Excel
+        file_data = base64.b64decode(file_base64.split(",")[1])
+        wb = openpyxl.load_workbook(BytesIO(file_data))
+        ws = wb.active
+
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows or len(rows) < 2:
+            return {"status": "error", "message": "El archivo está vacío o no contiene datos válidos."}
+
+        headers = [str(h).lower().strip() for h in rows[0] if h]
+        if "email" not in headers or "relacion" not in headers:
+            return {"status": "error", "message": "El archivo Excel debe contener exactamente las columnas 'email' y 'relacion'."}
+        
+        email_idx = headers.index("email")
+        relacion_idx = headers.index("relacion")
+
+        # Obtener todos los contactos de la empresa del usuario actual
+        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        contacts = frappe.db.sql("""
+            SELECT c.name, CONCAT(IFNULL(c.first_name, ''), ' ', IFNULL(c.last_name, '')) as full_name, ce.email_id
+            FROM `tabContact` c
+            LEFT JOIN `tabContact Email` ce ON ce.parent = c.name AND ce.parenttype = 'Contact'
+            WHERE c.status IN ('Enabled', 'Passive')
+            AND c.custom_is_liseniq_contact = 1
+            AND c.custom_is_deleted = 0
+            AND c.custom_company = %s
+        """, (user_company,), as_dict=True)
+
+        # Mapeo de emails (minúsculas) a la data de contacto
+        email_map = {c.email_id.lower().strip(): {"id": c.name, "name_display": c.full_name.strip()} for c in contacts if c.email_id}
+
+        # Roles válidos y activos
+        catalog = frappe.db.get_value("qp_IQ_Catalog", {"ca_mnemonico": "measurement_roles"}, "name")
+        valid_roles = []
+        if catalog:
+            roles_data = frappe.get_all("qp_IQ_CatalogOptions", filters={"co_catalog": catalog, "co_is_active": 1}, fields=["co_label"])
+            valid_roles = [r.co_label for r in roles_data]
+            
+        valid_roles_lower = {r.lower(): r for r in valid_roles}
+
+        networks = []
+        current_leader = None
+        evaluators = []
+        errors = []
+
+        # Recorrer las filas del Excel
+        for i, row in enumerate(rows[1:], start=2):
+            if len(row) <= max(email_idx, relacion_idx):
+                continue
+                
+            email = str(row[email_idx]).strip().lower() if row[email_idx] else None
+            relacion = str(row[relacion_idx]).strip() if row[relacion_idx] else None
+
+            if not email and not relacion:
+                continue
+                
+            if not email:
+                errors.append(f"Fila {i}: Falta el correo electrónico.")
+                continue
+                
+            if not relacion:
+                errors.append(f"Fila {i}: Falta la relación para {email}.")
+                continue
+
+            contact_info = email_map.get(email)
+            if not contact_info:
+                errors.append(f"Fila {i}: El correo '{email}' no corresponde a un contacto activo en su empresa.")
+                continue
+
+            relacion_lower = relacion.lower()
+
+            if relacion_lower in ["autoevaluación", "autoevaluacion"]:
+                # Guardar el bloque del líder anterior si existe
+                if current_leader:
+                    networks.append({"leader": current_leader, "evaluators": evaluators})
+                
+                # Iniciar un nuevo bloque de liderazgo
+                current_leader = contact_info
+                evaluators = [{
+                    "id": contact_info["id"],
+                    "name": contact_info["name_display"],
+                    "role": "Autoevaluación",
+                    "role_id": "Autoevaluación",
+                    "isAuto": True
+                }]
+            else:
+                if not current_leader:
+                    errors.append(f"Fila {i}: Evaluador '{email}' encontrado antes de definir un líder (Se requiere una fila de 'Autoevaluación' primero).")
+                    continue
+                    
+                if relacion_lower in valid_roles_lower:
+                    real_role = valid_roles_lower[relacion_lower]
+                    
+                    # Evitar duplicados del mismo evaluador para un mismo líder
+                    if not any(e["id"] == contact_info["id"] for e in evaluators):
+                        evaluators.append({
+                            "id": contact_info["id"],
+                            "name": contact_info["name_display"],
+                            "role": real_role,
+                            "role_id": real_role,
+                            "isAuto": False
+                        })
+                    else:
+                        errors.append(f"El contacto {contact_info['name_display']} está repetido en la evaluación de {current_leader['name_display']} se tomó la primera relación y se omitieron el resto.")
+                else:
+                    errors.append(f"Fila {i}: La relación '{relacion}' no es válida o está inactiva.")
+
+        # Guardar el último bloque leído
+        if current_leader:
+            networks.append({"leader": current_leader, "evaluators": evaluators})
+
+        return {
+            "status": "success", 
+            "networks": networks,
+            "errors": errors
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "process_leadership_excel")
         return {"status": "error", "message": str(e)}

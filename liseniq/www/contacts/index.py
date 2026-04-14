@@ -63,7 +63,8 @@ def get_context(context):
         limit_page_length=30
     )
 
-    demographic_types_list = frappe.get_all('qp_IQ_DemographicType', filters={'dt_object_type': 'Contacto'}, fields=['name', 'dt_title'], order_by='dt_title asc')
+    # Filtrar tipos demográficos por la compañía del usuario
+    demographic_types_list = frappe.get_all('qp_IQ_DemographicType', filters={'dt_object_type': 'Contacto', 'dt_creator_company': user_company}, fields=['name', 'dt_title'], order_by='dt_title asc')
     context.demographic_types_json = frappe.as_json(demographic_types_list or [])
     context.default_country = "Colombia"
     context.default_doctype = "822f13806f"
@@ -161,7 +162,7 @@ def get_contact_details(contact_name):
         "demographics": processed_demographics
     }
 
-def find_or_create_demographic_type(demographic_title):
+def find_or_create_demographic_type(demographic_title, user_company=None):
     normalized_title = " ".join(demographic_title.strip().split()).title()
     object_type = "Contacto"
 
@@ -169,9 +170,13 @@ def find_or_create_demographic_type(demographic_title):
         return None
 
     try:
+        filters = {"dt_title": normalized_title, "dt_object_type": object_type}
+        if user_company:
+            filters["dt_creator_company"] = user_company
+
         existing_doc_name = frappe.db.get_value(
             "qp_IQ_DemographicType",
-            {"dt_title": normalized_title, "dt_object_type": object_type},
+            filters,
             "name"
         )
 
@@ -183,14 +188,19 @@ def find_or_create_demographic_type(demographic_title):
             doc.dt_object_type = object_type
             doc.dt_tag_color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
             doc.dt_description = _("Demográfico '{0}' creado automáticamente para {1}.").format(normalized_title, object_type)
+            if user_company:
+                doc.dt_creator_company = user_company
             doc.insert(ignore_permissions=True)
             return doc.name
 
     except frappe.exceptions.UniqueValidationError:
         frappe.db.rollback()
+        filters = {"dt_title": normalized_title, "dt_object_type": object_type}
+        if user_company:
+            filters["dt_creator_company"] = user_company
         return frappe.db.get_value(
             "qp_IQ_DemographicType",
-            {"dt_title": normalized_title, "dt_object_type": object_type},
+            filters,
             "name"
         )
 
@@ -239,7 +249,7 @@ def _map_contact_data(contact_doc, data):
         for item in demographics:
             demographic_type_title = item.get("type")
             if demographic_type_title:
-                demographic_doc_name = find_or_create_demographic_type(demographic_type_title)
+                demographic_doc_name = find_or_create_demographic_type(demographic_type_title, user_company=user_contact_info)
                 if demographic_doc_name:
                     contact_doc.append("custom_additional_details", {
                         "cad_demographic_type": demographic_doc_name,
@@ -347,12 +357,19 @@ def get_demographic_suggestions(search_term):
     if not search_term:
         return []
         
+    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    
+    filters = [
+        ["dt_object_type", "=", "Contacto"],
+        ["dt_title", "like", f"%{search_term}%"]
+    ]
+    
+    if user_contact_info:
+        filters.append(["dt_creator_company", "=", user_contact_info])
+
     return frappe.get_all(
         "qp_IQ_DemographicType",
-        filters=[
-            ["dt_object_type", "=", "Contacto"],
-            ["dt_title", "like", f"%{search_term}%"]
-        ],
+        filters=filters,
         fields=["dt_title"],
         limit=10
     )

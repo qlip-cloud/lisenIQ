@@ -1,0 +1,198 @@
+{
+ "actions": [],
+ "creation": "2026-03-26 12:22:51.309073",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sb_1",
+  "leader_name",
+  "total_evaluators",
+  "total_evaluators_peers",
+  "total_responses",
+  "total_responses_managers",
+  "cb_1",
+  "survey_name",
+  "total_evaluators_managers",
+  "total_evaluators_team",
+  "total_responses_peers",
+  "total_responses_team",
+  "sb_2",
+  "overall_score",
+  "self_score",
+  "manager_score",
+  "cb_2",
+  "team_score",
+  "peers_score",
+  "avg_leaders_score",
+  "others_score",
+  "sb_3",
+  "dimension_summary",
+  "sb_4",
+  "question_summary",
+  "sb_5",
+  "open_questions_answer"
+ ],
+ "fields": [
+  {
+   "fieldname": "sb_1",
+   "fieldtype": "Section Break",
+   "label": "Informaci\u00f3n General"
+  },
+  {
+   "fieldname": "leader_name",
+   "fieldtype": "Data",
+   "label": "L\u00edder Evaluado"
+  },
+  {
+   "fieldname": "total_evaluators",
+   "fieldtype": "Int",
+   "label": "Total de Evaluadores"
+  },
+  {
+   "fieldname": "cb_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_responses",
+   "fieldtype": "Int",
+   "label": "Total de Respuestas"
+  },
+  {
+   "fieldname": "sb_2",
+   "fieldtype": "Section Break",
+   "label": "Resumen Global"
+  },
+  {
+   "fieldname": "overall_score",
+   "fieldtype": "Float",
+   "label": "Puntaje General"
+  },
+  {
+   "fieldname": "self_score",
+   "fieldtype": "Float",
+   "label": "Puntaje Autoevaluaci\u00f3n"
+  },
+  {
+   "fieldname": "manager_score",
+   "fieldtype": "Float",
+   "label": "Puntaje L\u00edder"
+  },
+  {
+   "fieldname": "cb_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "team_score",
+   "fieldtype": "Float",
+   "label": "Puntaje Colaboradores"
+  },
+  {
+   "fieldname": "avg_leaders_score",
+   "fieldtype": "Float",
+   "label": "Promedio L\u00edderes"
+  },
+  {
+   "fieldname": "dimension_summary",
+   "fieldtype": "Table",
+   "label": "Dimensiones",
+   "options": "qp_IQ_Dimension_Summary"
+  },
+  {
+   "fieldname": "sb_3",
+   "fieldtype": "Section Break",
+   "label": "Resultados por Dimensi\u00f3n"
+  },
+  {
+   "fieldname": "sb_4",
+   "fieldtype": "Section Break",
+   "label": "Resultados por Comportamiento"
+  },
+  {
+   "fieldname": "question_summary",
+   "fieldtype": "Table",
+   "label": "Comportamientos",
+   "options": "qp_IQ_Question_Summary"
+  },
+  {
+   "fieldname": "sb_5",
+   "fieldtype": "Section Break",
+   "label": "Preguntas Abiertas"
+  },
+  {
+   "fieldname": "open_questions_answer",
+   "fieldtype": "Long Text",
+   "label": "Respuestas a Preguntas Abiertas"
+  },
+  {
+   "fieldname": "survey_name",
+   "fieldtype": "Data",
+   "label": "Nombre de la Medici\u00f3n"
+  },
+  {
+   "fieldname": "peers_score",
+   "fieldtype": "Float",
+   "label": "Puntaje Pares"
+  },
+  {
+   "fieldname": "others_score",
+   "fieldtype": "Float",
+   "hidden": 1,
+   "label": "Promedio Otros"
+  },
+  {
+   "fieldname": "total_evaluators_peers",
+   "fieldtype": "Int",
+   "label": "Total de Evaluadores (Pares))"
+  },
+  {
+   "fieldname": "total_evaluators_team",
+   "fieldtype": "Int",
+   "label": "Total de Evaluadores (Colaboradores))"
+  },
+  {
+   "fieldname": "total_responses_managers",
+   "fieldtype": "Int",
+   "label": "Total de Respuestas (L\u00edderes)"
+  },
+  {
+   "fieldname": "total_evaluators_managers",
+   "fieldtype": "Int",
+   "label": "Total de Evaluadores (L\u00edderes)"
+  },
+  {
+   "fieldname": "total_responses_peers",
+   "fieldtype": "Int",
+   "label": "Total de Respuestas (Pares)"
+  },
+  {
+   "fieldname": "total_responses_team",
+   "fieldtype": "Int",
+   "label": "Total de Respuestas (Colaboradores)"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-09 08:51:34.842629",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Leader_360_Report",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

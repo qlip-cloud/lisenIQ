@@ -148,7 +148,7 @@ def custom_report_by_question_engagement(filters=None):
     return translated_data
 
 @frappe.whitelist()
-def get_user_demographics():
+def get_user_demographics(filters=None):
     """
     Retorna un array de objetos con el id del usuario y sus demográficos asociados
     """
@@ -167,7 +167,13 @@ def get_user_demographics():
             'academic_level': 'Nivel Académico'
         }
         user_demographics_array = []
-        surveys = get_valid_engagement_surveys()
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+
+        survey_filters = filters or {}
+        surveys = get_valid_engagement_surveys(survey_filters)
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
         demographics_labels_from_historic = get_demographics_from_historic()
@@ -187,26 +193,31 @@ def get_user_demographics():
                     for demo_pair in demographics_data_str.split('||'):
                         if ':' in demo_pair:
                             demo_tag, demo_value = demo_pair.split(':', 1)
-                            user_demographics[demo_tag] = demo_value
+                            if demo_value:  # Solo agregar si tiene valor
+                                user_demographics[demo_tag] = demo_value
                 
-                # Agregar todos los demográficos (con valor o "NA")
-                for demo_tag in all_demographics_labels:
+                # Agregar solo los demográficos adicionales que el usuario tiene
+                for demo_tag, demo_value in user_demographics.items():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
+                        'company_id': hist_record.get('shd_company', ''),
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
                         'demographic_id': demo_tag,
-                        'demographic_value': user_demographics.get(demo_tag, 'NA')
+                        'demographic_value': demo_value
                     })
                 
+                # Agregar demográficos core solo si tienen valor
                 for core_demo in core_hist_demographics:
-                    if core_demo not in user_demographics:
+                    core_value = hist_record.get(f'shd_{core_demo}', '')
+                    if core_value:  # Solo agregar si tiene valor
                         user_demographics_array.append({
                             'user_id': user_id,
                             'survey_id': survey['id'],
+                            'company_id': hist_record.get('shd_company', ''),
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
                             'demographic_id': demographics_labels_map.get(core_demo, core_demo),
-                            'demographic_value': hist_record.get(f'shd_{core_demo}', 'NA')
+                            'demographic_value': core_value
                         })
 
         # Procesar encuestas activas
@@ -233,6 +244,7 @@ def get_user_demographics():
                     c.gender,
                     c.custom_entry_date,
                     c.custom_country,
+                    c.custom_company as company_id,
                     a.al_title AS custom_academic_level,
                     cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
@@ -247,31 +259,61 @@ def get_user_demographics():
             
             responses = frappe.db.sql(demographics_query, survey_names, as_dict=True)
             
-            # Organizar demográficos por usuario
+            # Organizar demográficos por usuario (adicionales y core)
             user_demographics_map = {}
+            user_core_demographics_map = {}
+            
             for response in responses:
                 user_id = response.get('custom_document_number', '')
+                if not user_id:
+                    continue
+                    
+                # Inicializar mapas si no existen
                 if user_id not in user_demographics_map:
                     user_demographics_map[user_id] = {}
-                user_demographics_map[user_id][response.get('demographic_tag', '')] = response.get('demographic_value', '')
-                user_demographics_map[user_id]['Fecha de Nacimiento'] = response.get('custom_dob', '')
-                user_demographics_map[user_id]['Género'] = response.get('gender', '')
-                user_demographics_map[user_id]['Fecha de Ingreso'] = response.get('custom_entry_date', '')
-                user_demographics_map[user_id]['País'] = response.get('custom_country', '')
-                user_demographics_map[user_id]['Nivel Académico'] = response.get('custom_academic_level', '')
-            
-            # Crear registros para todos los usuarios y todos los demográficos
-            for user_record in users:
-                user_id = user_record.get('custom_document_number', '')
-                user_demographics = user_demographics_map.get(user_id, {})
+                if user_id not in user_core_demographics_map:
+                    user_core_demographics_map[user_id] = {}
                 
-                for demo_tag in all_demographics_labels:
+                # Agregar demográficos adicionales
+                demo_tag = response.get('demographic_tag', '')
+                demo_value = response.get('demographic_value', '')
+                if demo_tag and demo_value:
+                    user_demographics_map[user_id][demo_tag] = demo_value
+                
+                # Agregar demográficos core
+                if response.get('custom_dob'):
+                    user_core_demographics_map[user_id]['Fecha de Nacimiento'] = response.get('custom_dob')
+                if response.get('gender'):
+                    user_core_demographics_map[user_id]['Género'] = response.get('gender')
+                if response.get('custom_entry_date'):
+                    user_core_demographics_map[user_id]['Fecha de Ingreso'] = response.get('custom_entry_date')
+                if response.get('custom_country'):
+                    user_core_demographics_map[user_id]['País'] = response.get('custom_country')
+                if response.get('custom_academic_level'):
+                    user_core_demographics_map[user_id]['Nivel Académico'] = response.get('custom_academic_level')
+            
+            # Crear registros solo para demográficos que el usuario tiene
+            for user_id in set(list(user_demographics_map.keys()) + list(user_core_demographics_map.keys())):
+                # Agregar demográficos adicionales
+                for demo_tag, demo_value in user_demographics_map.get(user_id, {}).items():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
+                        'company_id': survey.get('company_id', ''),
                         'demographic_id': demo_tag,
-                        'demographic_value': user_demographics.get(demo_tag, 'NA')
+                        'demographic_value': demo_value
+                    })
+                
+                # Agregar demográficos core
+                for demo_label, demo_value in user_core_demographics_map.get(user_id, {}).items():
+                    user_demographics_array.append({
+                        'user_id': user_id,
+                        'survey_id': survey['id'],
+                        'user_id-survey_id': f"{user_id}-{survey['id']}",
+                        'company_id': survey.get('company_id', ''), 
+                        'demographic_id': demo_label,
+                        'demographic_value': demo_value
                     })
 
         return user_demographics_array
@@ -282,9 +324,20 @@ def get_user_demographics():
 
 
 @frappe.whitelist()
-def get_cultura_responses():
+def get_cultura_responses(filters=None):
     try:
-        valid_surveys = get_valid_surveys()
+        # Parse filters if they come as a string
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+        filters = filters or {}
+        
+        frappe.logger().debug(f"get_cultura_responses called with filters: {filters}")
+        
+        valid_surveys = get_valid_surveys(filters)
+        frappe.logger().debug(f"Found {len(valid_surveys)} valid surveys")
+        
         if not valid_surveys:
             return []
         all_questions_map = get_all_unique_questions(valid_surveys)
@@ -309,13 +362,19 @@ def get_cultura_responses():
         return []
 
 @frappe.whitelist()
-def get_user_demographics_cultura():
+def get_user_demographics_cultura(filters=None):
     """
     Retorna un array de objetos con el id del usuario y sus demográficos asociados
     """
     try:
         user_demographics_array = []
-        surveys = get_valid_surveys()
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+        filters = filters or {}
+        survey_filters = filters or {}
+        surveys = get_valid_surveys(survey_filters)
         finished_surveys = [s for s in surveys if s.get('in_history') == 1]
         active_surveys = [s for s in surveys if s.get('in_history') != 1]
         demographics_labels_from_historic = get_demographics_from_historic()
@@ -353,26 +412,32 @@ def get_user_demographics_cultura():
                     for demo_pair in demographics_data_str.split('||'):
                         if ':' in demo_pair:
                             demo_tag, demo_value = demo_pair.split(':', 1)
-                            user_demographics[demo_tag] = demo_value
+                            if demo_value:  # Solo agregar si tiene valor
+                                user_demographics[demo_tag] = demo_value
                 
-                # Agregar todos los demográficos (con valor o "NA")
-                for demo_tag in all_demographics_labels:
+                # Agregar solo los demográficos adicionales que el usuario tiene
+                for demo_tag, demo_value in user_demographics.items():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
+                        'company_id': hist_record.get('shd_company', ''),
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
                         'demographic_id': demo_tag,
-                        'demographic_value': user_demographics.get(demo_tag, 'NA')
+                        'demographic_value': demo_value
                     })
+                
+                # Agregar demográficos core solo si tienen valor
                 for core_demo in core_hist_demographics:
-                    if core_demo not in user_demographics:
+                    core_value = hist_record.get(f'shd_{core_demo}', '')
+                    if core_value:  # Solo agregar si tiene valor
                         user_demographics_array.append({
                             'user_id': user_id,
                             'survey_id': survey['id'],
+                            'company_id': hist_record.get('shd_company', ''),
                             'user_id-survey_id': f"{user_id}-{survey['id']}",
                             'demographic_id': demographics_labels_map.get(core_demo, f'custom_{core_demo}' if core_demo in ['dob', 'entry_date', 'country'] else core_demo),
-                            'demographic_value': hist_record.get(f'shd_{core_demo}', 'NA')
-                         })
+                            'demographic_value': core_value
+                        })
 
         # Procesar encuestas activas
         for survey in active_surveys:
@@ -398,6 +463,7 @@ def get_user_demographics_cultura():
                     c.gender,
                     c.custom_entry_date,
                     c.custom_country,
+                    c.custom_company as company_id,
                     a.al_title AS custom_academic_level,
                     cad.cad_tag AS demographic_tag,
                     cad.cad_value AS demographic_value
@@ -412,36 +478,62 @@ def get_user_demographics_cultura():
             
             responses = frappe.db.sql(demographics_query, survey_names, as_dict=True)
             
-            # Organizar demográficos por usuario
+            # Organizar demográficos por usuario (adicionales y core)
             user_demographics_map = {}
+            user_core_demographics_map = {}
+            
             for response in responses:
                 user_id = response.get('custom_document_number', '')
+                if not user_id:
+                    continue
+                    
+                # Inicializar mapas si no existen
                 if user_id not in user_demographics_map:
                     user_demographics_map[user_id] = {}
-                user_demographics_map[user_id][response.get('demographic_tag', '')] = response.get('demographic_value', '')
-            
-            # Crear registros para todos los usuarios y todos los demográficos
-            for user_record in users:
-                user_id = user_record.get('custom_document_number', '')
-                user_demographics = user_demographics_map.get(user_id, {})
+                if user_id not in user_core_demographics_map:
+                    user_core_demographics_map[user_id] = {}
                 
-                for demo_tag in all_demographics_labels:
+                # Agregar demográficos adicionales
+                demo_tag = response.get('demographic_tag', '')
+                demo_value = response.get('demographic_value', '')
+                if demo_tag and demo_value:
+                    user_demographics_map[user_id][demo_tag] = demo_value
+                
+                # Agregar demográficos core
+                if response.get('custom_dob'):
+                    user_core_demographics_map[user_id]['Fecha de Nacimiento'] = response.get('custom_dob')
+                if response.get('gender'):
+                    user_core_demographics_map[user_id]['Género'] = response.get('gender')
+                if response.get('custom_entry_date'):
+                    user_core_demographics_map[user_id]['Fecha de Ingreso'] = response.get('custom_entry_date')
+                if response.get('custom_country'):
+                    user_core_demographics_map[user_id]['País'] = response.get('custom_country')
+                if response.get('custom_academic_level'):
+                    user_core_demographics_map[user_id]['Nivel Académico'] = response.get('custom_academic_level')
+            
+            # Crear registros solo para demográficos que el usuario tiene
+            for user_id in set(list(user_demographics_map.keys()) + list(user_core_demographics_map.keys())):
+                # Agregar demográficos adicionales
+                for demo_tag, demo_value in user_demographics_map.get(user_id, {}).items():
                     user_demographics_array.append({
                         'user_id': user_id,
                         'survey_id': survey['id'],
+                        'company_id': survey.get('company_id', ''),
                         'user_id-survey_id': f"{user_id}-{survey['id']}",
                         'demographic_id': demo_tag,
-                        'demographic_value': user_demographics.get(demo_tag, 'NA')
+                        'demographic_value': demo_value
                     })
-                for core_demo in core_demographics:
-                    if core_demo not in user_demographics:
-                        user_demographics_array.append({
-                            'user_id': user_id,
-                            'survey_id': survey['id'],
-                            'user_id-survey_id': f"{user_id}-{survey['id']}",
-                            'demographic_id': demographics_labels_map.get(core_demo, core_demo),
-                             'demographic_value': user_demographics.get(core_demo, 'NA')
-                         })
+                
+                # Agregar demográficos core
+                for demo_label, demo_value in user_core_demographics_map.get(user_id, {}).items():
+                    user_demographics_array.append({
+                        'user_id': user_id,
+                        'survey_id': survey['id'],
+                        'company_id': survey.get('company_id', ''), 
+                        'user_id-survey_id': f"{user_id}-{survey['id']}",
+                        'demographic_id': demo_label,
+                        'demographic_value': demo_value
+                    })
 
         return user_demographics_array
 
@@ -450,12 +542,23 @@ def get_user_demographics_cultura():
         return []
 
 @frappe.whitelist()
-def get_engagement_responses():
+def get_engagement_responses(filters=None):
     """
     Retorna las respuestas de las encuestas de engagement sin demográficos
     """
     try:
-        valid_surveys = get_valid_engagement_surveys()
+        # Parse filters if they come as a string
+        if isinstance(filters, str):
+            # Convert single quotes to double quotes for valid JSON
+            filters = filters.replace("'", '"')
+            filters = json.loads(filters)
+        filters = filters or {}
+        
+        frappe.logger().debug(f"get_engagement_responses called with filters: {filters}")
+        
+        valid_surveys = get_valid_engagement_surveys(filters)
+        frappe.logger().debug(f"Found {len(valid_surveys)} valid engagement surveys")
+        
         if not valid_surveys:
             return []
 
@@ -537,8 +640,9 @@ def get_demographics_from_historic():
         frappe.log_error(f"Error getting demographics from historic: {str(e)}")
         return []
 
-def get_valid_surveys():
+def get_valid_surveys(filters=None):
     try:
+        
         query = """
             SELECT 
                 s.name as survey_name,
@@ -556,16 +660,28 @@ def get_valid_surveys():
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
             LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
             WHERE LOWER(st.qnc_category) = 'cultura'
-            ORDER BY s.name
         """
-        results = frappe.db.sql(query, as_dict=True)
+        if filters:
+            if filters.get('company'):
+                query += " AND c.co_name = %(company)s"
+            if filters.get('company_id'):
+                query += " AND c.name = %(company_id)s"
+            if filters.get('start_date') and filters.get('end_date'):
+                query += " AND s.creation BETWEEN %(start_date)s AND %(end_date)s"
+            if filters.get('survey_id'):
+                query += " AND iq.name = %(survey_id)s"
+        query += " ORDER BY s.name"
+        results = frappe.db.sql(query, filters or {}, as_dict=True)
+        
         return results
     except Exception as e:
         frappe.log_error(f"Error getting valid surveys: {str(e)}")
         return []
 
-def get_valid_engagement_surveys():
+def get_valid_engagement_surveys(filters=None):
     try:
+        frappe.logger().debug(f"get_valid_engagement_surveys called with filters: {filters}")
+        
         query = """
             SELECT 
                 s.name as survey_name,
@@ -583,9 +699,23 @@ def get_valid_engagement_surveys():
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
             LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
             WHERE LOWER(st.qnc_category) = 'engagement'
-            ORDER BY s.name
         """
-        results = frappe.db.sql(query, as_dict=True)
+        if filters:
+            if filters.get('company'):
+                query += " AND c.co_name = %(company)s"
+            if filters.get('start_date') and filters.get('end_date'):
+                query += " AND s.creation BETWEEN %(start_date)s AND %(end_date)s"
+            if filters.get('survey_id'):
+                query += " AND iq.name = %(survey_id)s"
+        query += " ORDER BY s.name"
+        
+        frappe.logger().debug(f"Executing query: {query}")
+        frappe.logger().debug(f"Query parameters: {filters or {}}")
+        
+        results = frappe.db.sql(query, filters or {}, as_dict=True)
+        
+        frappe.logger().debug(f"Query returned {len(results)} results")
+        
         return results
     except Exception as e:
         frappe.log_error(f"Error getting valid engagement surveys: {str(e)}")
@@ -1411,7 +1541,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
             
             # Identificar todas las preguntas abiertas de esta medición
             for qid in question_responses.keys():
-                if question_types_map.get(qid) == 'Abierta' and qid in all_questions_map:
+                if (question_types_map.get(qid) == 'Abierta' or question_types_map.get(qid) == 'Abierta texto corto')  and qid in all_questions_map:
                     question_text = all_questions_map[qid]
                     if question_text not in open_questions_dict[survey_id]:
                         open_questions_dict[survey_id][question_text] = f"open_question_{counter}"
@@ -1456,7 +1586,10 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
             
             # Determinar el tema según el template
             tema = ''
-            if template_name == 'Plantilla Modelo Vedanta bienestar':
+            template_name_normalized = (template_name or '').lower()
+            if 'bhd' in template_name_normalized:
+                tema = 'Cultura BHD'
+            elif template_name == 'Plantilla Modelo Vedanta bienestar':
                 tema = VEDANTA_BIENESTAR.get(variable, '')
             else:
                 tema = question_info.get('tema', '')
@@ -1472,7 +1605,7 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
 
             question_object['tema'] = tema
             # Agregar un id númerico único para preguntas abiertas para agruparlas por ese número en el dashboard (ej: open_question_1, open_question_2, etc.)
-            if question_object['question_type'] == 'Abierta':
+            if question_object['question_type'] in ['Abierta', 'Abierta texto corto']:
                 survey_id = demographic_data.get('survey_id', '')
                 question_object['question_group'] = open_questions_dict.get(survey_id, {}).get(question_text, '')
             else:

@@ -53,11 +53,24 @@
                 <div class="measurement-card">
                     <div class="card-header">
                         <span class="status-badge status-{{ m.status.lower().replace(' ', '-') }}">{{ m.status }}</span>
-                        {% if m.public_link %}
-                        <a href="{{ m.public_link }}" target="_blank" class="btn-public-link" title="Ver enlace público">
-                            <i class="fa fa-link" style="color: #7B24FF;"></i>
-                        </a>
-                        {% endif %}
+                        <div class="card-header-actions" style="display: flex; gap: 12px; align-items: center;">
+                            {% if m.status == "En Progreso" and not m.is_anonymous %}
+                            <div class="tooltip-wrapper">
+                                <button class="btn-reminders" data-survey="{{ m.name }}" data-tooltip-bottom="Enviar recordatorio a contactos que aún no llenan la encuesta">
+                                    <i class="fa fa-paper-plane" style="color: #7B24FF;"></i>
+                                </button>
+                                <span class="tooltip-icon"></span>
+                            </div>
+                            {% endif %}
+                            {% if m.public_link %}
+                            <div class="tooltip-wrapper">
+                                <a href="{{ m.public_link }}" target="_blank" class="btn-public-link" data-tooltip-bottom="Este enlace lo puedes copiar y enviar a los colaboradores que estén participando en la medición y no tengan correo electrónico o no les haya llegado el correo de invitación. Para poder responder la encuesta, los colaboradores deberán ingresar su documento de identidad con el cual se han cargado en la plataforma.">
+                                    <i class="fa fa-link" style="color: #7B24FF;"></i>
+                                </a>
+                                <span class="tooltip-icon"></span>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                     <div class="card-body">
                         <h3 class="card-title">{{ m.title }}</h3>
@@ -69,9 +82,10 @@
                             {% else %}
                                 Libre
                             {% endif %}
-                            <a href="/measurement/new_measurement?name={{ m.name }}" class="btn-edit-link" title="Editar medición" style="margin-left:8px;">
+                            <a href="/measurement/new_measurement?name={{ m.name }}" class="btn-edit-link" title="Editar medición">
                                 <i class="fa fa-pencil" style="color: #7B24FF;"></i>
                             </a>
+                            
                         </p>
                     </div>
                     <div class="card-footer">
@@ -84,25 +98,84 @@
                                     </span>
                                 </div>
                                 {% if m.status == "Finalizada" %}
-                                <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
-                                    <i class="fa fa-bar-chart"></i>
-                                </a>
+                                <div class="results-container">
+                                    <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_survey_results?survey_name={{ m.name }}" 
+                                        class="results-link-icon download-results-btn" 
+                                        title="Descargar resultados" 
+                                        aria-label="Descargar resultados de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        <i class="fa fa-download"></i>
+                                    </span>
+                                    <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
+                                        <i class="fa fa-bar-chart"></i>
+                                    </a>
+                                </div>
                                 {% endif %}
                             </div>
                         {% else %}
                             <div class="progress-info">
                                 <i class="fa fa-user-o progress-icon"></i>
-                                <span class="progress-text">{{ m.completed }} / {{ m.total }}</span>
+                                <span class="tooltip-wrapper" style="margin-left:8px;">
+                                    <span class="tooltip-icon"></span>
+                                    <span class="progress-text" data-tooltip-bottom="Encuestas respondidas vs Encuestas enviadas">{{ m.completed }} / {{ m.total }}</span>
+                                </span>
                             </div>
                             <div class="progress-container">
                                 <div class="progress-bar" style="--progress-width: {{ m.percentage }}%;"></div>
                             </div>
                             <div class="results-row">
-                                <div class="percentage-display">{{ m.percentage }}%</div>
+                                 <span class="tooltip-wrapper" style="margin-left:8px;">
+                                     <div class="percentage-display" data-tooltip-right="Porcentaje de respuestas">{{ m.percentage }}%</div>
+                                    <span class="tooltip-icon"></span>
+                                </span>
                                 {% if m.status == "Finalizada" %}
-                                <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
-                                    <i class="fa fa-bar-chart"></i>
-                                </a>
+                                <div class="results-container">
+                                    <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_survey_results?survey_name={{ m.name }}" 
+                                        class="results-link-icon download-results-btn" 
+                                        title="Descargar resultados" 
+                                        aria-label="Descargar resultados de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        <i class="fa fa-download"></i>
+                                    </span>
+                                    <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
+                                        <i class="fa fa-bar-chart"></i>
+                                    </a>
+                                    {% if m.status == "Finalizada" and m.is_leadership and m.has_generated_reports %}
+                                    <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_leadership_reports_zip?survey_name={{ m.name }}" 
+                                        class="results-link-icon download-leadership-reports-zip-btn material-symbols-outlined" 
+                                        title="Descargar informes PDF" 
+                                        aria-label="Descargar informes PDF de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        picture_as_pdf
+                                    </span>
+                                {% endif %}
+                                </div>
+                                {% elif m.status == "En Progreso" and not m.is_leadership %}
+                                <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_follow_up_report?survey_name={{ m.name }}" 
+                                        class="results-link-icon download-follow-up-btn material-symbols-outlined" 
+                                        title="Descargar reporte de seguimiento" 
+                                        aria-label="Descargar reporte de seguimiento de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        visibility
+                                    </span>
+                                {% elif m.status == "En Progreso" and m.is_leadership %}
+                                <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_seguimiento_360?survey_name={{ m.title }}" 
+                                        class="results-link-icon download-follow-up-360-btn material-symbols-outlined" 
+                                        title="Descargar reporte de seguimiento" 
+                                        aria-label="Descargar reporte de seguimiento de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        visibility
+                                    </span>
                                 {% endif %}
                             </div>
                         {% endif %}
@@ -122,6 +195,7 @@
 <input type="hidden" name="first_login" id="firstLogin" value="{{ first_login }}">
 
 {% include "liseniq/templates/macros/iq_modal.html" %}
+{% include "liseniq/templates/macros/iq_follow_up_report_modal.html" %}
 
 {% endblock %}
 

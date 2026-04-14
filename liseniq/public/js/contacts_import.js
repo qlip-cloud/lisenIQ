@@ -90,6 +90,14 @@ document.addEventListener('DOMContentLoaded', function () {
         "Idioma"
     ];
 
+    // Campos estándares para validar columnas demográficos
+    const STANDARD_COLUMNS = [
+        "Nombre", "Apellido", "Tipo de Documento", "Número de Documento (DNI)",
+        "País", "Idioma", "Estatus", "Género", 
+        "Fecha de Nacimiento", "Nivel Académico", "Correo (Opcional)", 
+        "Fecha de Ingreso"
+    ];
+
     const ui = {
         stepperContainer: 'import-stepper-container',
         step1: document.getElementById('step-1'),
@@ -399,11 +407,18 @@ document.addEventListener('DOMContentLoaded', function () {
             "Nivel Académico": state.options.academic_levels
         };
 
-        // Validar Nombres de Columnas Nuevas
+        // Validar nombres de columnas nuevas de demográficos (no vacíos)
         const invalidColNames = state.newColumns.filter(c => !c.name || c.name.trim() === '');
         if (invalidColNames.length > 0) {
             hasErrors = true;
             validationErrors.push({ row: 'Cabecera', missing: ['Nombre de columna(s) nuevo demográfico vacío'] });
+        }
+        
+        // Validar longitud de nuevos demográficos (máx 140 caracteres)
+        const tooLongColNames = state.newColumns.filter(c => c.name && c.name.trim().length > 140);
+        if (tooLongColNames.length > 0) {
+            hasErrors = true;
+            validationErrors.push({ row: 'Cabecera', missing: ['El nombre del nuevo demográfico excede los 140 caracteres permitidos'] });
         }
 
         // Validar Densidad de Columnas Nuevas (Al menos 1 valor)
@@ -469,10 +484,29 @@ document.addEventListener('DOMContentLoaded', function () {
             node.data._isUnchanged = isUnchanged;
 
             // Validación de Correos Duplicados
-            const email = (row['Correo (Opcional)'] || '').toString().trim().toLowerCase();
-            if (email && duplicateEmailsInFile.has(email)) {
-                rowErrors.push(`Correo ${email} duplicado en el archivo`);
+            const emailOriginal = (row['Correo (Opcional)'] || '').toString().trim();
+            const emailLower = emailOriginal.toLowerCase();
+            if (emailOriginal) {
+                // Expresión regular robusta para validar emails
+                const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+                if (!emailRegex.test(emailOriginal)) {
+                    rowErrors.push(`Formato de correo inválido: ${emailOriginal}`);
+                } else if (duplicateEmailsInFile.has(emailLower)) {
+                    rowErrors.push(`Correo ${emailLower} duplicado en el archivo`);
+                }
             }
+
+            // Validación de longitud de valores Demográficos (máx 140 caracteres)
+            Object.keys(row).forEach(key => {
+                if (!STANDARD_COLUMNS.includes(key) && !key.startsWith('_') && key !== 'row_id') {
+                    const val = (row[key] || '').toString().trim();
+                    if (val.length > 140) {
+                        const newCol = state.newColumns.find(c => c.id === key);
+                        const colDisplayName = newCol && newCol.name ? newCol.name : key;
+                        rowErrors.push(`El valor en demográfico '${colDisplayName}' excede 140 caracteres`);
+                    }
+                }
+            });
 
             // Contar valores para columnas nuevas
             state.newColumns.forEach(c => {

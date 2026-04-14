@@ -458,6 +458,11 @@ document.addEventListener('DOMContentLoaded', function () {
             clearValidationError(field.id);
         });
         clearValidationError('contact-email');
+        
+        // Limpiar errores demográficos
+        ui.demographicsTbody.querySelectorAll('input').forEach(input => {
+            input.classList.remove('is-invalid');
+        });
     };
 
     const validateStep1 = () => {
@@ -492,7 +497,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const emailValue = emailField.value.trim();
         
         if (emailValue) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
             if (!emailRegex.test(emailValue)) {
                 isValid = false;
                 showValidationError('contact-email', 'Por favor, introduce un formato de correo electrónico válido.');
@@ -501,15 +506,70 @@ document.addEventListener('DOMContentLoaded', function () {
         return isValid;
     };
 
+    const validateStep3 = () => {
+        let isValid = true;
+        let errorMessage = '';
+
+        ui.demographicsTbody.querySelectorAll('tr').forEach(row => {
+            const typeInput = row.querySelector('.demographic-type-input');
+            const valueInput = row.querySelector('input[type="text"]:not(.demographic-type-input)');
+
+            if (typeInput) typeInput.classList.remove('is-invalid');
+            if (valueInput) valueInput.classList.remove('is-invalid');
+
+            if (typeInput && typeInput.value.trim().length > 140) {
+                isValid = false;
+                typeInput.classList.add('is-invalid');
+                errorMessage = 'El Tag del demográfico no puede exceder 140 caracteres.';
+            }
+
+            if (valueInput && valueInput.value.trim().length > 140) {
+                isValid = false;
+                valueInput.classList.add('is-invalid');
+                errorMessage = 'El Valor del demográfico no puede exceder 140 caracteres.';
+            }
+        });
+
+        if (!isValid && errorMessage) {
+            showGlobalNotification(errorMessage, 'error');
+        }
+
+        return isValid;
+    };
+
     const handleSave = () => {
+        // Ejecutar y verificar todas las validaciones antes de guardar
+        if (!validateStep1()) {
+            showFormStep(1);
+            showGlobalNotification('Por favor corrige los errores en los Datos Básicos.', 'error');
+            return;
+        }
+        if (!validateStep2()) {
+            showFormStep(2);
+            showGlobalNotification('Por favor corrige los errores en los Datos Opcionales.', 'error');
+            return;
+        }
+        if (!validateStep3()) {
+            showFormStep(3);
+            return;
+        }
+
         const contactData = getContactFormData();
         const method = appState.isEditMode ? 'update_contact' : 'create_contact';
         const args = appState.isEditMode ? { contact_name: appState.currentContactName, contact_data: JSON.stringify(contactData) } : { contact_data: JSON.stringify(contactData) };
+
+        // Bloquear botón para evitar doble envío
+        ui.buttons.save.disabled = true;
+        const originalText = ui.buttons.save.textContent;
+        ui.buttons.save.textContent = 'Guardando...';
 
         frappe.call({
             method: `liseniq.www.contacts.index.${method}`,
             args: args,
             callback: function(r) {
+                ui.buttons.save.disabled = false;
+                ui.buttons.save.textContent = originalText;
+
                 if (r.message && r.message.status === 'success') {
                     if (appState.isEditMode) {
                         updateContactInList(r.message.updated_contact);
@@ -523,6 +583,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             },
             error: (r) => {
+                ui.buttons.save.disabled = false;
+                ui.buttons.save.textContent = originalText;
                 console.error(`Error al ${appState.isEditMode ? 'actualizar' : 'crear'} el contacto:`, r);
                 showGlobalNotification('Ocurrió un error inesperado en el servidor.', 'error');
             }

@@ -570,6 +570,17 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
     text-align: center !important;
 }
 
+/* Sobreescribir el margen de survey.min.css */
+.sv_main .sv_p_root .sv_q input[type="radio"], 
+.sv_main .sv_p_root .sv_q input[type="checkbox"] {
+    margin: 0 !important;
+}
+
+/* Neutralizar los márgenes asimétricos de SurveyJS en los contenedores de opciones */
+.sv_main .sv_p_root .sv_q .sv_q_imgsel {
+    margin: 0 auto !important;
+}
+
 /* Hacer más ancha la visualización de números en la escala NPS (Desktop) */
 @media (min-width: 769px) {
     .sd-rating__item, .sv_q_rating_item {
@@ -669,6 +680,32 @@ img[src*="R0lGODlhAQABAIAAAAAAAP"] {
 
     .sd-rating__item-text, .sv_q_rating_item-text {
         font-size: 0.75rem !important;
+    }
+
+    /* Reglas específicas para alinear los elementos en dispositivos móviles */
+    .sv_main .sv_p_root .sv_q label,
+    .sv_main .sv_p_root .sv_q .sv-item,
+    .sv_main .sv_p_root .sv_q .sv-visual-item,
+    .sv_main .sv_p_root .sv_q .sv_q_imgsel {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        gap: 8px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Aseguramos que la imagen no rompa el flexbox */
+    .sv_main .sv_p_root .sv_q label img,
+    .sv_main .sv_p_root .sv_q .sv-item img {
+        margin: 0 auto !important;
+        display: block !important;
+        max-width: 100%;
+        height: auto;
     }
 }
 """

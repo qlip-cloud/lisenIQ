@@ -3,7 +3,7 @@ import json
 import frappe
 from collections import defaultdict
 from liseniq.liseniq.uses_cases.iq360.selectors import  get_all_responses_for_survey, get_survey_questions, get_question_text_and_category, get_leader_evaluators
-from liseniq.liseniq.uses_cases.iq360.calculations import normalize_responses, average, std_dev
+from liseniq.liseniq.uses_cases.iq360.calculations import normalize_responses, average, std_dev, _round2
 """
 qp_IQ_LeaderReport- DocType to store the report for each leader based on the survey responses. 
 Fields:
@@ -11,6 +11,9 @@ Fields:
 - Nombre de la medición (survey_name): Data
 - Total de respuestas (total_responses): Int
 - Total de evaluadores (total_evaluators): Int 
+- Total de evaluadores pares
+- Total de evaluadores líderes
+- Total de evaluadores colaboradores
   Este campo se calcula usando qp_IQ_SurveyRecipient para contar el número de evaluadores únicos que evaluaron al líder.
 - Puntaje general (overall_score): Float
   Este campo se calcula promediando los puntajes de todas las respuestas del líder, incluyendo las respuestas de autoevaluación. El cálculo del puntaje general se realiza tomando en cuenta la escala de evaluación definida en la encuesta y promediando los puntajes asignados a cada respuesta.
@@ -50,6 +53,9 @@ ROLE_TO_SCORE_KEY = {
 
 def _get_logger():
   return frappe.logger('iq360_report_builder', allow_site=True)
+
+
+
 
 def build_leaders_report(survey_id):
   logger = _get_logger()
@@ -185,12 +191,36 @@ def process_leader_data(survey_id, responses, questions_data):
     leader_data['total_responses'] = len(responses)
 
     evaluators = get_leader_evaluators(leader_data['leader_name'], survey_id)
-    leader_data['total_evaluators'] = len(set(e.sr_evaluating_to for e in evaluators))
+    evaluator_ids = {
+      e.sr_evaluating_to
+      for e in evaluators
+      if e.sr_evaluating_to
+    }
+    leader_data['total_evaluators'] = len(evaluator_ids)
 
-    # Map de evaluadores
+    # Map de evaluadores (Contact.name -> rol)
     evaluator_map = {
-        e.sr_contact: e.sr_evaluation_role
-        for e in evaluators
+      e.sr_evaluating_to: e.sr_evaluation_role
+      for e in evaluators
+      if e.sr_evaluating_to
+    }
+
+    # También indexamos por DNI para compatibilidad con respuestas históricas.
+    if evaluator_ids:
+      contact_docs = frappe.get_all(
+        'Contact',
+        filters={'name': ['in', list(evaluator_ids)]},
+        fields=['name', 'custom_document_number'],
+      )
+      for contact in contact_docs:
+        role = evaluator_map.get(contact.name)
+        if role and contact.custom_document_number:
+          evaluator_map[contact.custom_document_number] = role
+
+    # Evaluador por respuesta (prioriza custom_evaluator si existe)
+    response_evaluator_map = {
+      r.name: (r.get('custom_evaluator') or r.get('user'))
+      for r in responses
     }
 
     # Normalizar respuestas
@@ -203,9 +233,27 @@ def process_leader_data(survey_id, responses, questions_data):
     dimension_scores = defaultdict(lambda: defaultdict(list))
     question_scores = defaultdict(lambda: defaultdict(list))
     open_questions_answers = defaultdict(list)  
+    total_responses_peers = 0
+    total_responses_managers = 0
+    total_responses_team = 0
 
+    # Count submitted evaluations by role (one per response document).
+    for response in responses:
+      evaluator_id = response.get('custom_evaluator') or response.get('user')
+      evaluator_role = evaluator_map.get(evaluator_id)
+      score_key = ROLE_TO_SCORE_KEY.get(evaluator_role)
+      if score_key == SCORE_KEY_PEER:
+        total_responses_peers += 1
+      elif score_key == SCORE_KEY_MANAGER:
+        total_responses_managers += 1
+      elif score_key == SCORE_KEY_TEAM:
+        total_responses_team += 1
 
-    for resp_list in normalized_responses.values():
+    for response_name, resp_list in normalized_responses.items():
+        mapped_evaluator_id = response_evaluator_map.get(response_name)
+        mapped_evaluator_role = evaluator_map.get(mapped_evaluator_id)
+        mapped_score_key = ROLE_TO_SCORE_KEY.get(mapped_evaluator_role)
+
         for resp in resp_list:
 
             if resp['answer_type'] == 'text':
@@ -216,8 +264,10 @@ def process_leader_data(survey_id, responses, questions_data):
             value = resp['answer']
             scores.append(value)
 
-            evaluator_role = evaluator_map.get(resp['evaluator'])
-            score_key = ROLE_TO_SCORE_KEY.get(evaluator_role)
+            score_key = mapped_score_key
+            if not score_key:
+              evaluator_role = evaluator_map.get(resp.get('evaluator'))
+              score_key = ROLE_TO_SCORE_KEY.get(evaluator_role)
             if not score_key:
                 continue
 
@@ -235,7 +285,21 @@ def process_leader_data(survey_id, responses, questions_data):
 
     # Resumen Global
     leader_data['overall_score'] = average(scores)
-
+    leader_data['total_responses_peers'] = total_responses_peers
+    leader_data['total_responses_managers'] = total_responses_managers
+    leader_data['total_responses_team'] = total_responses_team
+    leader_data['total_evaluators_peers'] = len({
+      e.sr_evaluating_to for e in evaluators
+      if e.sr_evaluation_role == ROLE_PEER and e.sr_evaluating_to
+    })
+    leader_data['total_evaluators_managers'] = len({
+      e.sr_evaluating_to for e in evaluators
+      if e.sr_evaluation_role == ROLE_MANAGER and e.sr_evaluating_to
+    })
+    leader_data['total_evaluators_team'] = len({
+      e.sr_evaluating_to for e in evaluators
+      if e.sr_evaluation_role == ROLE_TEAM and e.sr_evaluating_to
+    })
     leader_data[SCORE_KEY_TEAM] = average(group_scores.get(SCORE_KEY_TEAM, []))
     leader_data[SCORE_KEY_SELF] = average(group_scores.get(SCORE_KEY_SELF, []))
     leader_data[SCORE_KEY_PEER] = average(group_scores.get(SCORE_KEY_PEER, []))
@@ -342,13 +406,19 @@ def build_leader_report(leader_data):
   report.survey_name = survey_name
   report.total_responses = leader_data.get('total_responses')
   report.total_evaluators = leader_data.get('total_evaluators')
-  report.overall_score = leader_data.get('overall_score')
-  report.team_score = leader_data.get(SCORE_KEY_TEAM)
-  report.self_score = leader_data.get(SCORE_KEY_SELF)
-  report.peers_score = leader_data.get(SCORE_KEY_PEER)
-  report.manager_score = leader_data.get(SCORE_KEY_MANAGER)
-  report.others_score = leader_data.get('others_score')
-  report.avg_leaders_score = leader_data.get('avg_leaders_score') or leader_data.get('average_leaders_score')
+  report.total_evaluators_peers = leader_data.get('total_evaluators_peers')
+  report.total_evaluators_managers = leader_data.get('total_evaluators_managers')
+  report.total_evaluators_team = leader_data.get('total_evaluators_team')
+  report.total_responses_peers = leader_data.get('total_responses_peers')
+  report.total_responses_managers = leader_data.get('total_responses_managers')
+  report.total_responses_team = leader_data.get('total_responses_team')
+  report.overall_score = _round2(leader_data.get('overall_score'))
+  report.team_score = _round2(leader_data.get(SCORE_KEY_TEAM))
+  report.self_score = _round2(leader_data.get(SCORE_KEY_SELF))
+  report.peers_score = _round2(leader_data.get(SCORE_KEY_PEER))
+  report.manager_score = _round2(leader_data.get(SCORE_KEY_MANAGER))
+  report.others_score = _round2(leader_data.get('others_score'))
+  report.avg_leaders_score = _round2(leader_data.get('avg_leaders_score') or leader_data.get('average_leaders_score'))
 
   # Respuestas abiertas
   open_answers = leader_data.get('open_questions_answers') or {}
@@ -359,12 +429,12 @@ def build_leader_report(leader_data):
   for dimension_name, values in (leader_data.get('dimension_summary') or {}).items():
     report.append('dimension_summary', {
       'dimension_name': dimension_name,
-      SCORE_KEY_SELF: values.get(SCORE_KEY_SELF),
-      SCORE_KEY_MANAGER: values.get(SCORE_KEY_MANAGER),
-      SCORE_KEY_PEER: values.get(SCORE_KEY_PEER),
-      SCORE_KEY_TEAM: values.get(SCORE_KEY_TEAM),
-      'others_score': values.get('others_score'),
-      'avg_score': values.get('avg_score'),
+      SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
+      SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
+      SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),
+      SCORE_KEY_TEAM: _round2(values.get(SCORE_KEY_TEAM)),
+      'others_score': _round2(values.get('others_score')),
+      'avg_score': _round2(values.get('avg_score')),
     })
 
   report.set('question_summary', [])
@@ -372,13 +442,13 @@ def build_leader_report(leader_data):
     report.append('question_summary', {
       'question_text': values.get('question_text'),
       'question_dimension': values.get('question_dimension'),
-      SCORE_KEY_SELF: values.get(SCORE_KEY_SELF),
-      SCORE_KEY_MANAGER: values.get(SCORE_KEY_MANAGER),
-      SCORE_KEY_PEER: values.get(SCORE_KEY_PEER),
-      SCORE_KEY_TEAM: values.get(SCORE_KEY_TEAM),
-      'others_score': values.get('others_score'),
-      'gap_self_vs_others': values.get('gap_self_vs_others'),
-      'std_deviation': values.get('std_dev'),
+      SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
+      SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
+      SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),
+      SCORE_KEY_TEAM: _round2(values.get(SCORE_KEY_TEAM)),
+      'others_score': _round2(values.get('others_score')),
+      'gap_self_vs_others': _round2(values.get('gap_self_vs_others')),
+      'std_deviation': _round2(values.get('std_dev')),
     })
 
   if report.is_new():

@@ -47,7 +47,7 @@ def get_context(context):
         surveys = frappe.get_all(
             "qp_IQ_Survey",
             filters=query_filters,
-            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link", "su_is_anonymous", "su_is_leadership","modified", "creation"],
+            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link", "su_is_anonymous", "su_is_leadership", "su_report_generated", "modified", "creation"],
             order_by="modified desc"
         )
     except frappe.DoesNotExistError:
@@ -88,7 +88,8 @@ def get_context(context):
             "percentage": percentage,
             "public_link": survey.su_public_link,
             "is_anonymous": is_anonymous,
-            "is_leadership": bool(survey.su_is_leadership)
+            "is_leadership": bool(survey.su_is_leadership),
+            "has_generated_reports": bool(getattr(survey, "su_report_generated", 0))
         })
 
     context.measurements = measurements_data

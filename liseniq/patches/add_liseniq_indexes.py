@@ -30,40 +30,35 @@ def execute():
     frappe.logger().info("Iniciando creación de índices de rendimiento para Liseniq...")
 
     try:
-        # 1. Base Frappe Survey
-        safe_add_index("Survey Response", ["survey"])
-        safe_add_index("Survey Response", ["creation"])
-        safe_add_index("Survey Response", ["survey", "user"])
-
-        # 2. qp_IQ_Survey (Encuestas)
+        # 1. qp_IQ_Survey (Encuestas)
         safe_add_index("qp_IQ_Survey", ["su_name"])
         safe_add_index("qp_IQ_Survey", ["su_owner"])
         safe_add_index("qp_IQ_Survey", ["su_template"])
         safe_add_index("qp_IQ_Survey", ["su_status"])
         safe_add_index("qp_IQ_Survey", ["su_in_history"]) # Muy usado en tus filtros booleanos
 
-        # 3. qp_IQ_SurveyHistoricData (Histórico masivo)
+        # 2. qp_IQ_SurveyHistoricData (Histórico masivo)
         safe_add_index("qp_IQ_SurveyHistoricData", ["shd_survey_id"])
         safe_add_index("qp_IQ_SurveyHistoricData", ["shd_document_number"])
         safe_add_index("qp_IQ_SurveyHistoricData", ["shd_company"])
 
-        # 4. Tablas Hijo de Demográficos
+        # 3. Tablas Hijo de Demográficos
         # Índice compuesto: Vital para buscar los demográficos de un contacto específico
         safe_add_index("qp_IQ_ContactAdditionalDetail", ["parent", "cad_demographic_type"])
         safe_add_index("qp_IQ_ContactDetailHistoric", ["parent"])
 
-        # 5. qp_IQ_DemographicType
+        # 4. qp_IQ_DemographicType
         safe_add_index("qp_IQ_DemographicType", ["dt_object_type"]) # Usado en report.py para filtrar 'Contacto' o 'Pregunta'
         safe_add_index("qp_IQ_DemographicType", ["dt_creator_company"])
 
-        # 6. qp_IQ_Question (Banco de preguntas)
+        # 5. qp_IQ_Question (Banco de preguntas)
         safe_add_index("qp_IQ_Question", ["qn_owner"])
         safe_add_index("qp_IQ_Question", ["qn_category"])
         safe_add_index("qp_IQ_Question", ["qn_type"])
         safe_add_index("qp_IQ_Question", ["qn_demographic"])
         safe_add_index("qp_IQ_Question", ["qn_status"])
 
-        # 7. qp_IQ_SurveyRecipient (Destinatarios y accesos)
+        # 6. qp_IQ_SurveyRecipient (Destinatarios y accesos)
         safe_add_index("qp_IQ_SurveyRecipient", ["sr_survey"])
         safe_add_index("qp_IQ_SurveyRecipient", ["sr_contact"])
         safe_add_index("qp_IQ_SurveyRecipient", ["sr_status"])
@@ -71,7 +66,7 @@ def execute():
         safe_add_index("qp_IQ_SurveyRecipient", ["sr_token"]) # Crítico para el acceso web rápido por URL
         safe_add_index("qp_IQ_SurveyRecipient", ["sr_survey", "sr_contact"]) # Índice compuesto para validar cruces
 
-        # 8. qp_IQ_Template (Plantillas)
+        # 7. qp_IQ_Template (Plantillas)
         safe_add_index("qp_IQ_Template", ["custom_company"])
         safe_add_index("qp_IQ_Template", ["tp_category"])
         safe_add_index("qp_IQ_Template", ["tp_status"])

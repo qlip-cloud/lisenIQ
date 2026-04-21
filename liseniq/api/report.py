@@ -341,19 +341,30 @@ def get_cultura_responses(filters=None):
         if not valid_surveys:
             return []
         all_questions_map = get_all_unique_questions(valid_surveys)
-        demographics_map = get_demographics_labels()
+        # Endpoint consumido por BI sin demograficos: evitar carga extra en memoria y BD.
+        demographics_map = {}
         core_demographics = [
             'custom_dob', 'gender', 'entry_date', 'country', 'custom_academic_level'
         ]
-        data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
-        transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+        data = get_all_survey_data_by_question(
+            valid_surveys,
+            all_questions_map,
+            demographics_map,
+            include_additional_demographics=False,
+        )
+        transformed_data = transform_data_by_question(
+            data,
+            all_questions_map,
+            demographics_map,
+            fill_missing_demographics=False,
+        )
 
-        demographics_to_exclude = set(demographics_map.keys()).union(set(core_demographics))
-        filtered_data = []
+        demographics_to_exclude = set(core_demographics)
         for row in transformed_data:
-            filtered_row = {k: v for k, v in row.items() if k not in demographics_to_exclude}
-            filtered_data.append(filtered_row)
-        translated_data = translate_keys(filtered_data, all_questions_map, demographics_map)
+            for key in demographics_to_exclude:
+                row.pop(key, None)
+
+        translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
 
         return translated_data
 
@@ -563,25 +574,32 @@ def get_engagement_responses(filters=None):
             return []
 
         all_questions_map = get_all_unique_questions(valid_surveys)
-        demographics_map = get_demographics_labels()
+        # Endpoint consumido por BI sin demograficos: evitar carga extra en memoria y BD.
+        demographics_map = {}
         core_demographics = [
             'custom_dob', 'gender', 'entry_date', 'country', 'custom_academic_level'
         ]
 
-        data = get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map)
-        transformed_data = transform_data_by_question(data, all_questions_map, demographics_map)
+        data = get_all_survey_data_by_question(
+            valid_surveys,
+            all_questions_map,
+            demographics_map,
+            include_additional_demographics=False,
+        )
+        transformed_data = transform_data_by_question(
+            data,
+            all_questions_map,
+            demographics_map,
+            fill_missing_demographics=False,
+        )
         
-        # Definir solo los demográficos adicionales a excluir (no los core)
-        demographic_keys_to_exclude = set(demographics_map.keys()).union(set(core_demographics))
+        demographic_keys_to_exclude = set(core_demographics)
         
-        # Filtrar solo los demográficos adicionales de los datos transformados
-        filtered_data = []
         for row in transformed_data:
-            filtered_row = {k: v for k, v in row.items() if k not in demographic_keys_to_exclude}
-            filtered_data.append(filtered_row)
+            for key in demographic_keys_to_exclude:
+                row.pop(key, None)
         
-        # Traducir las claves restantes
-        translated_data = translate_keys(filtered_data, all_questions_map, demographics_map)
+        translated_data = translate_keys(transformed_data, all_questions_map, demographics_map)
 
         return translated_data
 
@@ -887,7 +905,12 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
 
     return data
 
-def get_all_survey_data_by_question(valid_surveys, all_questions_map, demographics_map):
+def get_all_survey_data_by_question(
+    valid_surveys,
+    all_questions_map,
+    demographics_map,
+    include_additional_demographics=True,
+):
     """
     Obtiene los datos de todas las encuestas válidas
     """
@@ -962,9 +985,11 @@ def get_all_survey_data_by_question(valid_surveys, all_questions_map, demographi
         responses = frappe.db.sql(query, survey_names, as_dict=True)
         
         if responses:
-            # Obtener datos demográficos para todos los usuarios
-            users_list = [r.user for r in responses if r.user]
-            demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
+            demographics_data = {}
+            if include_additional_demographics and demographics_map:
+                # Reducir el tamano del IN en SQL y evitar datos repetidos.
+                users_list = list({r.user for r in responses if r.user})
+                demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
 
             for response in responses:
                 row = process_response_row_by_question(
@@ -1506,7 +1531,12 @@ def get_bulk_demographics(users_list, demographics_map):
     return demographics_data
 
 
-def transform_data_by_question(data, all_questions_map, demographics_map):
+def transform_data_by_question(
+    data,
+    all_questions_map,
+    demographics_map,
+    fill_missing_demographics=True,
+):
     """
     Transforma los datos para que cada pregunta esté en un objeto separado
     con los datos demográficos repetidos, usando claves 'question' y 'answer'
@@ -1557,10 +1587,11 @@ def transform_data_by_question(data, all_questions_map, demographics_map):
         # Preparar datos demográficos (sin _responses)
         demographic_data = {k: v for k, v in row.items() if k != '_responses'}
 
-        # Asegurar que todas las claves demográficas estén presentes (aunque sean None)
-        for dem_key in required_demographic_keys:
-            if dem_key not in demographic_data:
-                demographic_data[dem_key] = None
+        if fill_missing_demographics:
+            # Asegurar que todas las claves demográficas estén presentes (aunque sean None)
+            for dem_key in required_demographic_keys:
+                if dem_key not in demographic_data:
+                    demographic_data[dem_key] = None
 
         # Si no hay respuestas, saltar este registro
         if not question_responses:

@@ -11,7 +11,7 @@ import pytz
 from liseniq.liseniq.uses_cases.iq360.report_builder import build_leaders_report
 
 DEFAULT_SENDER_NAME = "Portal de Mediciones"
-BATCH_SIZE = 500  # Tamaño del lote/bloque para envío de correos y generación de links
+BATCH_SIZE = 200  # Tamaño del lote/bloque para envío de correos y generación de links
 
 def _now_utc_str() -> str:
 	return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")

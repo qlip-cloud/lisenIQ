@@ -341,7 +341,6 @@ def get_cultura_responses(filters=None):
         if not valid_surveys:
             return []
         all_questions_map = get_all_unique_questions(valid_surveys)
-        # Endpoint consumido por BI sin demograficos: evitar carga extra en memoria y BD.
         demographics_map = {}
         core_demographics = [
             'custom_dob', 'gender', 'entry_date', 'country', 'custom_academic_level'
@@ -574,7 +573,6 @@ def get_engagement_responses(filters=None):
             return []
 
         all_questions_map = get_all_unique_questions(valid_surveys)
-        # Endpoint consumido por BI sin demograficos: evitar carga extra en memoria y BD.
         demographics_map = {}
         core_demographics = [
             'custom_dob', 'gender', 'entry_date', 'country', 'custom_academic_level'
@@ -987,7 +985,6 @@ def get_all_survey_data_by_question(
         if responses:
             demographics_data = {}
             if include_additional_demographics and demographics_map:
-                # Reducir el tamano del IN en SQL y evitar datos repetidos.
                 users_list = list({r.user for r in responses if r.user})
                 demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
 
@@ -1588,7 +1585,6 @@ def transform_data_by_question(
         demographic_data = {k: v for k, v in row.items() if k != '_responses'}
 
         if fill_missing_demographics:
-            # Asegurar que todas las claves demográficas estén presentes (aunque sean None)
             for dem_key in required_demographic_keys:
                 if dem_key not in demographic_data:
                     demographic_data[dem_key] = None

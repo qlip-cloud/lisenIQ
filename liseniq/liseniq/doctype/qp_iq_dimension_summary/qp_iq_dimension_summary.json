@@ -11,6 +11,7 @@
   "manager_score",
   "peers_score",
   "team_score",
+  "average_leaders_score",
   "avg_score"
  ],
  "fields": [
@@ -54,12 +55,17 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Pares"
+  },
+  {
+   "fieldname": "average_leaders_score",
+   "fieldtype": "Data",
+   "label": "Promedio L\u00edderes"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-30 14:39:08.693101",
+ "modified": "2026-04-16 16:58:01.542450",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Dimension_Summary",

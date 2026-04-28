@@ -32,8 +32,10 @@
   {
    "fieldname": "co_name",
    "fieldtype": "Data",
+   "in_global_search": 1,
    "in_list_view": 1,
    "in_preview": 1,
+   "in_standard_filter": 1,
    "label": "Nombre de la Compa\u00f1ia"
   },
   {
@@ -149,7 +151,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-17 09:58:23.897979",
+ "modified": "2026-04-27 18:56:51.956424",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Company",

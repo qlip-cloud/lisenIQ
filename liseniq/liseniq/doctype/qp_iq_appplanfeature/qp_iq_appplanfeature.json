@@ -1,0 +1,44 @@
+{
+ "actions": [],
+ "creation": "2026-04-27 18:18:42.697417",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pf_feature",
+  "pf_limit"
+ ],
+ "fields": [
+  {
+   "fieldname": "pf_feature",
+   "fieldtype": "Link",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Funcionalidad",
+   "options": "qp_IQ_AppFeature"
+  },
+  {
+   "fieldname": "pf_limit",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "L\u00edmite(Usuarios)",
+   "search_index": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-27 18:37:30.537917",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_AppPlanFeature",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

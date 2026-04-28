@@ -73,6 +73,27 @@ TEMAS_INDICE_DE_ENGAGEMENT = {
     "Los líderes en esta organización me inspiran": "LOS LÍDERES"
 }
 
+
+def get_response_day(filters=None):
+    """
+    Devuelve una fecha única para filtrar respuestas por el día exacto.
+    Prioriza response_date/date/day y, como compatibilidad, start_date/end_date cuando representan el mismo día.
+    """
+    filters = filters or {}
+
+    for key in ("response_date", "date", "day"):
+        value = filters.get(key)
+        if value:
+            return value
+
+    start_date = filters.get("start_date")
+    end_date = filters.get("end_date")
+
+    if start_date and end_date:
+        return start_date if start_date == end_date else None
+
+    return start_date or end_date
+
 @frappe.whitelist()
 def custom_report(filters=None):
     """
@@ -335,7 +356,12 @@ def get_cultura_responses(filters=None):
         
         frappe.logger().debug(f"get_cultura_responses called with filters: {filters}")
         
-        valid_surveys = get_valid_surveys(filters)
+        survey_filters = {
+            key: value
+            for key, value in filters.items()
+            if key not in {"response_date", "date", "day", "start_date", "end_date"}
+        }
+        valid_surveys = get_valid_surveys(survey_filters)
         frappe.logger().debug(f"Found {len(valid_surveys)} valid surveys")
         
         if not valid_surveys:
@@ -350,6 +376,7 @@ def get_cultura_responses(filters=None):
             all_questions_map,
             demographics_map,
             include_additional_demographics=False,
+            filters=filters,
         )
         transformed_data = transform_data_by_question(
             data,
@@ -566,7 +593,12 @@ def get_engagement_responses(filters=None):
         
         frappe.logger().debug(f"get_engagement_responses called with filters: {filters}")
         
-        valid_surveys = get_valid_engagement_surveys(filters)
+        survey_filters = {
+            key: value
+            for key, value in filters.items()
+            if key not in {"response_date", "date", "day", "start_date", "end_date"}
+        }
+        valid_surveys = get_valid_engagement_surveys(survey_filters)
         frappe.logger().debug(f"Found {len(valid_surveys)} valid engagement surveys")
         
         if not valid_surveys:
@@ -583,6 +615,7 @@ def get_engagement_responses(filters=None):
             all_questions_map,
             demographics_map,
             include_additional_demographics=False,
+            filters=filters,
         )
         transformed_data = transform_data_by_question(
             data,
@@ -773,7 +806,7 @@ def get_surveys_expected_responses():
     return frappe.db.sql(query_survey, as_dict=True)
 
 
-def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
+def get_historical_survey_data(survey_id, all_questions_map, demographics_map, filters=None):
     """
     Obtiene los datos históricos de una encuesta finalizada desde qp_IQ_SurveyHistoricData
     """
@@ -793,6 +826,7 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
                 shd.shd_gender,
                 shd.shd_company,
                 shd.shd_measurement_response,
+                shd.creation,
                 GROUP_CONCAT(
                     CONCAT(cdh.cdh_tag, ':', cdh.cdh_value)
                     SEPARATOR '||'
@@ -801,21 +835,31 @@ def get_historical_survey_data(survey_id, all_questions_map, demographics_map):
             LEFT JOIN `tabqp_IQ_ContactDetailHistoric` cdh ON cdh.parent = shd.name
             LEFT JOIN `tabqp_IQ_AcademicLevel` al ON al.name = shd.shd_academic_level
             WHERE shd.shd_survey_id = %s
-            GROUP BY shd.name
         """
-        results = frappe.db.sql(query, survey_id, as_dict=True)
+        params = [survey_id]
+        response_day = get_response_day(filters)
+
+        if response_day:
+            query += " AND DATE(shd.creation) = %s"
+            params.append(response_day)
+        
+        query += " GROUP BY shd.name"
+        
+        results = frappe.db.sql(query, params, as_dict=True)
         return results
     except Exception as e:
         frappe.log_error(f"Error getting historical survey data: {str(e)}")
         return []
 
 
-def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
+def get_all_survey_data(valid_surveys, all_questions_map, demographics_map, filters=None):
     """
     Obtiene los datos de todas las encuestas válidas
     """
     if not valid_surveys:
         return []
+    
+    filters = filters or {}
     
     # Crear mapeo de survey_name a company_name e id
     survey_company_map = {
@@ -844,7 +888,7 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
     
     # Procesar encuestas finalizadas con datos históricos
     for survey in finished_surveys:
-        historical_data = get_historical_survey_data(survey['id'], all_questions_map, demographics_map)
+        historical_data = get_historical_survey_data(survey['id'], all_questions_map, demographics_map, filters)
         for hist_record in historical_data:
             row = process_historical_response_row(
                 hist_record,
@@ -883,8 +927,13 @@ def get_all_survey_data(valid_surveys, all_questions_map, demographics_map):
             ORDER BY sr.survey, sr.creation DESC
         """
         
-        responses = frappe.db.sql(query, survey_names, as_dict=True)
-        
+        response_day = get_response_day(filters)
+        query_params = list(survey_names)
+        if response_day:
+            query = query.replace("ORDER BY sr.survey, sr.creation DESC", "AND DATE(sr.creation) = %s\nORDER BY sr.survey, sr.creation DESC")
+            query_params.append(response_day)
+
+        responses = frappe.db.sql(query, query_params, as_dict=True)
         if responses:
             # Obtener datos demográficos para todos los usuarios
             users_list = [r.user for r in responses if r.user]
@@ -908,12 +957,15 @@ def get_all_survey_data_by_question(
     all_questions_map,
     demographics_map,
     include_additional_demographics=True,
+    filters=None,
 ):
     """
     Obtiene los datos de todas las encuestas válidas
     """
     if not valid_surveys:
         return []
+    
+    filters = filters or {}
     
     # Crear mapeo de survey_name a company_name, company_id y survey_id
     survey_company_map = {
@@ -941,7 +993,7 @@ def get_all_survey_data_by_question(
     
     # Procesar encuestas finalizadas con datos históricos
     for survey in finished_surveys:
-        historical_data = get_historical_survey_data(survey['id'], all_questions_map, demographics_map)
+        historical_data = get_historical_survey_data(survey['id'], all_questions_map, demographics_map, filters)
         for hist_record in historical_data:
             row = process_historical_response_row_by_question(
                 hist_record,
@@ -977,10 +1029,17 @@ def get_all_survey_data_by_question(
             LEFT JOIN `tabContact` c ON c.name = sr.user
             LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
             WHERE sr.survey IN ({survey_names_placeholder})
-            ORDER BY sr.survey, sr.creation DESC
         """
         
-        responses = frappe.db.sql(query, survey_names, as_dict=True)
+        response_day = get_response_day(filters)
+        query_params = list(survey_names)
+        if response_day:
+            query += " AND DATE(sr.creation) = %s"
+            query_params.append(response_day)
+
+        query += " ORDER BY sr.survey, sr.creation DESC"
+
+        responses = frappe.db.sql(query, query_params, as_dict=True)
         
         if responses:
             demographics_data = {}

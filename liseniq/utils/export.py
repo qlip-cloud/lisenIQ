@@ -55,8 +55,11 @@ def export_survey_results(survey_name):
         frappe.flags.ignore_permissions = True
         survey = frappe.get_doc("qp_IQ_Survey", survey_name)
         survey_name = survey.su_name
-        
-        REPORT_NAME = "Survey Response Custom Report Front"
+        is_leadership = survey.su_is_leadership
+        if is_leadership:
+            REPORT_NAME = "Engagement Responses"
+        else:
+            REPORT_NAME = "Survey Response Custom Report Front"
         filters = {"survey": survey_name}
 
         report = frappe.get_doc("Report", REPORT_NAME)

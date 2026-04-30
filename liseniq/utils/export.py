@@ -109,11 +109,12 @@ def export_survey_results(survey_name):
         frappe.session.user = current_user
 
 @frappe.whitelist()
-def get_demographics():
+def get_demographics(survey):
     """Obtiene la lista de demográficos de tipo Contacto"""
+    survey_owner = frappe.get_value("qp_IQ_Survey", {"name": survey}, "su_owner")
     demographics = frappe.get_all(
         'qp_IQ_DemographicType',
-        filters={'dt_object_type': 'Contacto'},
+        filters={'dt_object_type': 'Contacto', 'dt_creator_company': survey_owner},
         fields=['name', 'dt_title'],
         order_by='dt_title'
     )

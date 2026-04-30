@@ -69,14 +69,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.getElementById('downloadReportUrl').value = url;
         
-        loadDemographics();
+        var survey = btn.getAttribute('data-survey');
+        loadDemographics(survey);
         
         document.getElementById('downloadReportModal').style.display = 'flex';
     });
     
-    function loadDemographics() {
+    function loadDemographics(survey) {
         frappe.call({
             method: 'liseniq.utils.export.get_demographics',
+            args: {
+                survey: survey
+            },
             callback: function(r) {
                 if (r.message) {
                     const select1 = document.getElementById('demographic1');

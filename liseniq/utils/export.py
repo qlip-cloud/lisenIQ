@@ -32,7 +32,6 @@ def _leadership_pdf_options():
         "margin-bottom": "0mm",
         "margin-left": "0mm",
         "margin-right": "0mm",
-        "zoom": "1.5",
         "header-spacing": "0",
         "disable-smart-shrinking": "",
     }

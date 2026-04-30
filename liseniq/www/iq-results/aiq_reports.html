@@ -1,0 +1,71 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Reportes Avanzados") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="aiq-reports-wrapper">
+    
+    <!-- Encabezado del reporte -->
+    <div class="aiq-reports-header">
+        <div>
+            <h2 id="report-survey-title">{{ survey_title }}</h2>
+            <p class="text-muted small mt-1">
+                Visualizando reporte interactivo
+            </p>
+        </div>
+        <a href="/iq-results" class="btn btn-outline-purple btn-sm">
+            Volver a Resultados
+        </a>
+    </div>
+
+    <!-- Cards de Métricas Globales -->
+    <div class="metrics-container">
+        <div class="metric-card">
+            <h3 class="metric-title">Puntaje Global</h3>
+            <div class="metric-value">{{ global_score | default('0') }}</div>
+            <div class="metric-subtitle">Escala (1 - 5)</div>
+        </div>
+        <div class="metric-card">
+            <h3 class="metric-title">Participantes</h3>
+            <div class="metric-value">{{ total_recipients | default('0') }}</div>
+            <div class="metric-subtitle">Colaboradores únicos</div>
+        </div>
+        <div class="metric-card">
+            <h3 class="metric-title">Tasa de Respuesta</h3>
+            <div class="metric-value">{{ response_percentage | default('0') }}%</div>
+            <div class="metric-subtitle">Encuestados que contestaron</div>
+        </div>
+    </div>
+
+    <!-- Título de Sección para Gráficos de Cultura -->
+    <h3 class="chart-section-title">Tipos de cultura & dimensiones</h3>
+
+    <!-- Contenedor del Gráfico de Cultura -->
+    <div class="chart-card">
+        <div id="culture-chart-container" class="chart-wrapper"></div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/aiq_reports.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <!-- Inyectamos la data de backend al frontend de forma segura -->
+    <script>
+        window.liseniqSubscriptionPlan = "{{ subscription_plan | default('') }}";
+        window.liseniqAppFeatures = '{{ app_features_json | default("[]") | safe }}';
+        
+        // Data del gráfico inyectada desde Python
+        window.cultureChartData = {{ culture_chart_data | default('[]') | safe }};
+    </script>
+    <script type="module" src="/assets/liseniq/js/aiq_reports.js"></script>
+{% endblock %}

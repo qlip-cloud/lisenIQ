@@ -114,6 +114,25 @@ def update_template_question(question_name, question_data):
             demographic_name = demographic_doc.name
         
         doc.qn_demographic = demographic_name
+
+    # Validar o crear Cultura dinámicamente
+    culture_title = data.get("qp_topic")
+    if culture_title:
+        culture_name = frappe.db.exists(
+            "qp_IQ_DemographicType",
+            {"dt_title": culture_title, "dt_object_type": "Tema"}
+        )
+        if not culture_name:
+            culture_doc = frappe.new_doc("qp_IQ_DemographicType")
+            culture_doc.dt_title = culture_title
+            culture_doc.dt_object_type = "Tema"
+            user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+            if user_company:
+                culture_doc.dt_creator_company = user_company
+            culture_doc.insert(ignore_permissions=True)
+            culture_name = culture_doc.name
+        
+        doc.qp_topic = culture_name
         
     doc.save(ignore_permissions=True)
     return {"status": "success"}

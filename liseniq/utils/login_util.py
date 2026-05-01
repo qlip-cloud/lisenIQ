@@ -1,6 +1,6 @@
 import frappe
+import json
 from frappe import _
-
 
 # Función para obtener el nombre de la compañía del usuario y cachearlo en sesión
 @frappe.whitelist()
@@ -49,7 +49,6 @@ def set_company_name_on_session_creation(login_manager):
 		frappe.log_error(frappe.get_traceback(), "liseniq: set_company_name_on_session_creation")
 
 # Función para inyectar contexto global en páginas del portal
-# Valida que el usuario no sea Guest, que tenga una compañía asignada y que sea un contacto administrativo (custom_is_liseniq_contact=0).
 def global_website_context(context):
 
     if context is None:
@@ -62,11 +61,15 @@ def global_website_context(context):
     context.access_error_message = ""
     context.liseniq_company_name = ""
     context.first_login = False
+    
+    # Valores por defecto para Suscripciones
+    context.subscription_plan = ""
+    context.app_features = []
+    context.app_features_json = "[]"
 
     # Validación de Invitado
     if user == "Guest":
         context.access_error_message = _("Debe iniciar sesión para acceder.")
-        # frappe.log_error(title="Acceso al portal fallido", message="Usuario Guest intentó acceder al portal.")
         return context
 
     # Obtener datos del Contacto
@@ -105,6 +108,41 @@ def global_website_context(context):
     
     context.user_tours = {t.tour_name: t.completed for t in tours_list}
     
+    # Logica de suscripciones y funcionalidades
+    try:
+        # Buscamos la suscripción activa de la compañía
+        active_sub = frappe.get_all(
+            "qp_IQ_CompanySubscription",
+            filters={
+                "sub_company": contact.custom_company,
+                "sub_is_active": 1
+            },
+            fields=["sub_plan"],
+            limit=1
+        )
+
+        if active_sub and active_sub[0].sub_plan:
+            context.subscription_plan = active_sub[0].sub_plan
+            
+            # Obtenemos el listado de funcionalidades (Child Table) asociadas al plan
+            plan_doc = frappe.get_doc("qp_IQ_AppPlan", active_sub[0].sub_plan)
+            feature_names = [f.pf_feature for f in plan_doc.pl_features if f.pf_feature]
+            
+            if feature_names:
+                # Obtenemos el código de las funcionalidades (fe_code)
+                features = frappe.get_all(
+                    "qp_IQ_AppFeature",
+                    filters={"name": ("in", feature_names)},
+                    fields=["fe_code"]
+                )
+                context.app_features = [f.fe_code for f in features if f.fe_code]
+        
+        # Guardamos en formato JSON estricto para poder renderizarlo en Javascript
+        context.app_features_json = json.dumps(context.app_features)
+
+    except Exception as e:
+        frappe.log_error(title="Error al cargar funcionalidades del plan", message=str(e))
+
     return context
 
 def check_access_and_redirect():

@@ -121,6 +121,7 @@ def get_questions_from_template(template_name):
         mnemonic = t_data.qnt_mnemonico if t_data else None
 
         demographic_name = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else None
+        culture_name = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qp_topic, "dt_title") if q_doc.qp_topic else None
 
         question_data = {
             "id": q_doc.name,
@@ -129,6 +130,7 @@ def get_questions_from_template(template_name):
             "type": q_doc.qn_type,
             "typeName": type_name,
             "demographic": demographic_name,
+            "culture": culture_name,
             "negative_statement": q_doc.qn_negative_statement,
             "positive_statement": q_doc.qn_positive_statement,
             "nps_min": q_doc.qn_nps_min,
@@ -163,7 +165,7 @@ def get_questions_from_template(template_name):
 
 
 @frappe.whitelist()
-def get_demographic_suggestions_for_questions(search_term):
+def get_demographic_suggestions_for_questions(search_term, object_type="Pregunta"):
     if not search_term:
         return []
 
@@ -171,7 +173,7 @@ def get_demographic_suggestions_for_questions(search_term):
         "qp_IQ_DemographicType",
         filters={
             'dt_title': ['like', f'%{search_term}%'],
-            'dt_object_type': 'Pregunta'
+            'dt_object_type': object_type
         },
         fields=['dt_title'],
         limit=10,
@@ -221,6 +223,22 @@ def create_question_from_template_wizard(question_data):
                 demographic_name = demographic_doc.name
             
             question_doc.qn_demographic = demographic_name
+
+        culture_title = data.get("qp_topic")
+        if culture_title:
+            culture_name = frappe.db.exists(
+                "qp_IQ_DemographicType",
+                {"dt_title": culture_title, "dt_object_type": "Tema"}
+            )
+            if not culture_name:
+                culture_doc = frappe.new_doc("qp_IQ_DemographicType")
+                culture_doc.dt_title = culture_title
+                culture_doc.dt_object_type = "Tema"
+                culture_doc.dt_creator_company = user_company
+                culture_doc.insert(ignore_permissions=True)
+                culture_name = culture_doc.name
+            
+            question_doc.qp_topic = culture_name
 
         nps_min = data.get("qn_nps_min")
         if nps_min is not None and nps_min != '':
@@ -309,6 +327,7 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
             "qn_statement_others as text_others",
             "qn_category", "qn_type", "qn_nps_min",
             "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic",
+            "qp_topic",
             "qp_others", "qp_none_above"
         ],
         ignore_permissions=True
@@ -336,6 +355,11 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
             q["demographic_name"] = frappe.db.get_value("qp_IQ_DemographicType", q["qn_demographic"], "dt_title")
         else:
             q["demographic_name"] = None
+
+        if q.get("qp_topic"):
+            q["culture_name"] = frappe.db.get_value("qp_IQ_DemographicType", q["qp_topic"], "dt_title")
+        else:
+            q["culture_name"] = None
 
         if mnemonic in OPTIONS_BASED_MNEMONICS or q.get("type_name") in OPTIONS_BASED_TYPES:
             if mnemonic in ("scale_emoji", "scale_likert") or q.get("type_name") in ("Likert Visual", "Likert"):

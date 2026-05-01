@@ -30,7 +30,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Tipo de Objeto",
-   "options": "Contacto\nPregunta\nPlantilla\nRespuesta"
+   "options": "Contacto\nPregunta\nPlantilla\nRespuesta\nTema"
   },
   {
    "fieldname": "dt_tag_color",
@@ -50,7 +50,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-30 09:15:33.591778",
+ "modified": "2026-04-30 18:35:31.723435",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_DemographicType",

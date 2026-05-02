@@ -64,16 +64,56 @@
     color: #6b7280;
 }
 
-/* Títulos de Sección de Gráficos */
+/* Encabezados flexibles para botones de acciones */
+.chart-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-left: 0.5rem;
+}
+
 .chart-section-title {
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #6b7280;
     font-weight: 700;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    padding-left: 0.5rem;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 0;
+}
+
+/* Grupo de botones para no separarlos */
+.chart-actions-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Estilos unificados para todos los botones del gráfico (Exportar y Toggle) */
+.chart-actions-group .btn {
+    color: #7c3aed;
+    background-color: #ffffff;
+    border: 1px solid #7c3aed;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+}
+
+.chart-actions-group .btn:hover {
+    background-color: #7c3aed;
+    color: #ffffff;
+    border-color: #7c3aed;
+}
+
+.btn-toggle-chart {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 /* Tarjeta contenedora de los gráficos */
@@ -91,12 +131,13 @@
     height: 450px;
 }
 
-/* Contenedor para las secciones de preguntas frecuentes y comentarios */
+/* Estilos para la sección de top 10 y bottom 10 */
 .top-bottom-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
     margin-bottom: 2rem;
+    margin-top: 2rem;
 }
 
 .tb-card {
@@ -184,6 +225,15 @@
         height: 350px;
     }
     .top-bottom-container {
-        grid-template-columns: 1fr; /* Apilar en móviles */
+        grid-template-columns: 1fr;
+    }
+    .chart-header-flex {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .chart-actions-group {
+        width: 100%;
+        flex-wrap: wrap;
     }
 }

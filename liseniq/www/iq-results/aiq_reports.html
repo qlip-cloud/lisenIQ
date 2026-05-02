@@ -45,7 +45,6 @@
 
     <!-- Contenedor Top / Bottom -->
     <div class="top-bottom-container">
-        <!-- Tarjeta Top 10 -->
         <div class="tb-card">
             <h4 class="tb-header-title">Top 10 — mayor puntaje</h4>
             <div class="tb-table-header">
@@ -56,8 +55,6 @@
                 <!-- Llenado dinámicamente con JS -->
             </div>
         </div>
-
-        <!-- Tarjeta Bottom 10 -->
         <div class="tb-card">
             <h4 class="tb-header-title">Bottom 10 — menor puntaje</h4>
             <div class="tb-table-header">
@@ -70,19 +67,45 @@
         </div>
     </div>
 
-    <!-- Título de Sección para Gráfico de Tipo de Cultura -->
-    <h3 class="chart-section-title">Tipos de cultura</h3>
+    <!-- Título y botones de Sección para Gráfico de Tipo de Cultura -->
+    <div class="chart-header-flex" id="culture-header-container">
+        <h3 class="chart-section-title">Tipos de cultura</h3>
+        <div class="chart-actions-group">
+            <button id="btn-export-culture-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+                <i class="fa fa-image" aria-hidden="true"></i>
+            </button>
+            <button id="btn-export-culture-pdf" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+                <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+            </button>
+            <button id="btn-toggle-culture" class="btn btn-outline-purple btn-sm" title="Ver Gráfico de Torta">
+                <i class="fa fa-pie-chart" aria-hidden="true"></i>
+            </button>
+        </div>
+    </div>
 
     <!-- Contenedor del Gráfico de Tipo de Cultura -->
-    <div class="chart-card">
+    <div class="chart-card" id="culture-card-container">
         <div id="culture-chart-container" class="chart-wrapper"></div>
     </div>
 
-    <!-- Título de Sección para Gráfico de Dimensiones -->
-    <h3 class="chart-section-title">Dimensiones</h3>
+    <!-- Título y botones de Sección para Gráfico de Dimensiones -->
+    <div class="chart-header-flex" id="dimension-header-container">
+        <h3 class="chart-section-title">Dimensiones</h3>
+        <div class="chart-actions-group">
+            <button id="btn-export-dimension-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+                <i class="fa fa-image" aria-hidden="true"></i>
+            </button>
+            <button id="btn-export-dimension-pdf" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+                <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+            </button>
+            <button id="btn-toggle-dimension" class="btn btn-outline-purple btn-sm" title="Ver Gráfico de Torta">
+                <i class="fa fa-pie-chart" aria-hidden="true"></i>
+            </button>
+        </div>
+    </div>
 
     <!-- Contenedor del Gráfico de Dimensiones -->
-    <div class="chart-card">
+    <div class="chart-card" id="dimension-card-container">
         <div id="dimension-chart-container" class="chart-wrapper"></div>
     </div>
 
@@ -97,7 +120,6 @@
 
 {% block script %}
     {{ super() }}
-    <!-- Inyectamos la data de backend al frontend de forma segura -->
     <script>
         window.liseniqSubscriptionPlan = "{{ subscription_plan | default('') }}";
         window.liseniqAppFeatures = '{{ app_features_json | default("[]") | safe }}';

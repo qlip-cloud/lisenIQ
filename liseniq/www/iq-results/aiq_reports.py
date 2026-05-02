@@ -27,7 +27,7 @@ def get_context(context):
 
     # Calculo de metricas globales y datos para gráficos solo si hay una encuesta seleccionada
     if survey_name:
-        # 1 & 2. Total de Participantes (Contactos enviados) y % de Respuesta
+        # Total de Participantes (Contactos enviados) y % de Respuesta
         total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name})
         
         # Obtener el estado 'Responded' de manera optimizada
@@ -41,35 +41,48 @@ def get_context(context):
         context.total_recipients = total_recipients
         context.response_percentage = response_percentage
 
-        # Puntaje Global y Datos para Gráfico de Cultura
+        # Puntaje Global y Datos para Gráficos
         likert_types = frappe.get_all("qp_IQ_QuestionType", 
                                       filters={"qnt_type_name": ["like", "%Likert%"]}, 
                                       pluck="name")
         
         global_score = 0.0
         culture_chart_data = []
+        dimension_chart_data = []
 
         if likert_types:
-            # Traemos las preguntas Likert incluyendo el enunciado (qn_statement)
+            # Traemos las preguntas Likert incluyendo el enunciado y el topic
             likert_questions_data = frappe.get_all("qp_IQ_Question", 
                                               filters={"qn_type": ["in", likert_types]}, 
-                                              fields=["name", "qn_demographic", "qn_statement"])
+                                              fields=["name", "qn_demographic", "qn_statement", "qp_topic"])
             
             likert_questions = [q.name for q in likert_questions_data]
             
             # Mapeos
             q_to_culture = {q.name: q.qn_demographic for q in likert_questions_data if q.qn_demographic}
             q_to_statement = {q.name: q.qn_statement for q in likert_questions_data}
+            q_to_topic = {q.name: q.qp_topic for q in likert_questions_data if q.qp_topic}
             
             if likert_questions:
-                # Validamos que el Demográfico sea aplicable a Preguntas y obtenemos su Título
+                # Mapeo de demograficos
                 demo_types = frappe.get_all("qp_IQ_DemographicType", 
                                             filters={"dt_object_type": "Pregunta"}, 
                                             fields=["name", "dt_title"])
-                
                 valid_demographics = [d.name for d in demo_types]
-                # Mapeo: Demográfico ID -> Título del Demográfico
                 demo_title_map = {d.name: (d.dt_title or d.name) for d in demo_types}
+
+                # Mapeo de Topics/Temas
+                topic_title_map = {}
+                try:
+                    topic_field = frappe.get_meta("qp_IQ_Question").get_field("qp_topic")
+                    if topic_field and topic_field.fieldtype == "Link" and topic_field.options:
+                        t_doctype = topic_field.options
+                        t_title_field = frappe.get_meta(t_doctype).title_field or "name"
+                        td_list = frappe.get_all(t_doctype, fields=["name", t_title_field])
+                        # Asignamos el texto (title/nombre) para mostrar en el Eje X en lugar del ID
+                        topic_title_map = {d["name"]: (d.get(t_title_field) or d["name"]) for d in td_list}
+                except Exception as e:
+                    frappe.log_error(f"Error extrayendo metadata de qp_topic: {e}", "AIQ Reports")
 
                 su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
                 
@@ -80,8 +93,11 @@ def get_context(context):
                 total_score = 0.0
                 total_answers = 0
                 
-                culture_totals = {}
-                culture_counts = {}
+                dimension_totals = {}
+                dimension_counts = {}
+
+                topic_totals = {}
+                topic_counts = {}
 
                 for resp_json in survey_responses:
                     if not resp_json:
@@ -97,15 +113,18 @@ def get_context(context):
                                     total_score += val
                                     total_answers += 1
                                     
-                                    # Acumular para el Gráfico de Cultura
+                                    # Acumular para el Gráfico de Dimensiones (por pregunta)
                                     if q_name in q_to_culture:
                                         demo_id = q_to_culture[q_name]
-                                        
-                                        # Solo agregamos si su tipo coincide con 'Pregunta'
                                         if not valid_demographics or demo_id in valid_demographics:
-                                            # Agrupamos por el ID de la pregunta
-                                            culture_totals[q_name] = culture_totals.get(q_name, 0.0) + val
-                                            culture_counts[q_name] = culture_counts.get(q_name, 0) + 1
+                                            dimension_totals[q_name] = dimension_totals.get(q_name, 0.0) + val
+                                            dimension_counts[q_name] = dimension_counts.get(q_name, 0) + 1
+
+                                    # Acumular para el Gráfico de Tipo Cultura (por qp_topic)
+                                    if q_name in q_to_topic:
+                                        t_id = q_to_topic[q_name]
+                                        topic_totals[t_id] = topic_totals.get(t_id, 0.0) + val
+                                        topic_counts[t_id] = topic_counts.get(t_id, 0) + 1
                                         
                                 except (ValueError, TypeError):
                                     pass
@@ -115,32 +134,40 @@ def get_context(context):
                 if total_answers > 0:
                     global_score = round(total_score / total_answers, 2)
                     
-                # Calcular promedios por pregunta
-                for q_name, t_score in culture_totals.items():
-                    avg = round(t_score / culture_counts[q_name], 2)
-                    
+                # Construir Data: Gráfico de Dimensiones
+                for q_name, t_score in dimension_totals.items():
+                    avg = round(t_score / dimension_counts[q_name], 2)
                     statement_text = q_to_statement.get(q_name, q_name)
                     demo_id = q_to_culture.get(q_name, "N/A")
-                    
-                    # Obtenemos el Título legible del Demográfico
                     demo_title = demo_title_map.get(demo_id, demo_id)
                     
-                    culture_chart_data.append({
+                    dimension_chart_data.append({
                         "culture": demo_title, 
                         "question": statement_text,
                         "score": avg
                     })
-                
-                # Ordenar de menor a mayor según el puntaje
+                dimension_chart_data.sort(key=lambda x: x["score"])
+
+                # Construir Data: Gráfico de Tipo de Cultura
+                for t_id, t_score in topic_totals.items():
+                    avg = round(t_score / topic_counts[t_id], 2)
+                    t_title = topic_title_map.get(t_id, t_id)
+                    
+                    culture_chart_data.append({
+                        "topic": t_title,
+                        "score": avg
+                    })
                 culture_chart_data.sort(key=lambda x: x["score"])
         
         context.global_score = global_score
         context.culture_chart_data = json.dumps(culture_chart_data)
+        context.dimension_chart_data = json.dumps(dimension_chart_data)
     else:
         # Valores por defecto de seguridad si no hay medición seleccionada
         context.total_recipients = 0
         context.response_percentage = 0
         context.global_score = 0.0
         context.culture_chart_data = "[]"
+        context.dimension_chart_data = "[]"
 
     return context

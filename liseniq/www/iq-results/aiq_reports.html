@@ -40,12 +40,20 @@
         </div>
     </div>
 
-    <!-- Título de Sección para Gráficos de Cultura -->
-    <h3 class="chart-section-title">Tipos de cultura & dimensiones</h3>
+    <!-- Título de Sección para Gráfico de Tipo de Cultura -->
+    <h3 class="chart-section-title">Tipos de cultura</h3>
 
-    <!-- Contenedor del Gráfico de Cultura -->
+    <!-- Contenedor del Gráfico de Tipo de Cultura -->
     <div class="chart-card">
         <div id="culture-chart-container" class="chart-wrapper"></div>
+    </div>
+
+    <!-- Título de Sección para Gráfico de Dimensiones -->
+    <h3 class="chart-section-title">Dimensiones</h3>
+
+    <!-- Contenedor del Gráfico de Dimensiones -->
+    <div class="chart-card">
+        <div id="dimension-chart-container" class="chart-wrapper"></div>
     </div>
 
 </div>
@@ -64,8 +72,9 @@
         window.liseniqSubscriptionPlan = "{{ subscription_plan | default('') }}";
         window.liseniqAppFeatures = '{{ app_features_json | default("[]") | safe }}';
         
-        // Data del gráfico inyectada desde Python
+        // Data de los gráficos inyectada desde Python
         window.cultureChartData = {{ culture_chart_data | default('[]') | safe }};
+        window.dimensionChartData = {{ dimension_chart_data | default('[]') | safe }};
     </script>
     <script type="module" src="/assets/liseniq/js/aiq_reports.js"></script>
 {% endblock %}

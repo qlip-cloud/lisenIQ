@@ -91,8 +91,99 @@
     height: 450px;
 }
 
+/* Contenedor para las secciones de preguntas frecuentes y comentarios */
+.top-bottom-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.tb-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.tb-header-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+}
+
+.tb-table-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4b5563;
+    border-bottom: 1px solid #d1d5db;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tb-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    gap: 1rem;
+}
+
+.tb-row:last-child {
+    border-bottom: none;
+}
+
+.tb-question {
+    flex: 1;
+    font-size: 0.85rem;
+    color: #4b5563;
+    line-height: 1.4;
+}
+
+.tb-score-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 90px;
+    justify-content: flex-end;
+}
+
+.tb-score-bar-bg {
+    width: 30px;
+    height: 6px;
+    background-color: #f3f4f6;
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+}
+
+.tb-score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+}
+
+.fill-green { background-color: #10b981; }
+.fill-orange { background-color: #f97316; }
+
+.tb-score-value {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #1f2937;
+    width: 35px;
+    text-align: right;
+}
+
 @media (max-width: 768px) {
     .chart-wrapper {
         height: 350px;
+    }
+    .top-bottom-container {
+        grid-template-columns: 1fr; /* Apilar en móviles */
     }
 }

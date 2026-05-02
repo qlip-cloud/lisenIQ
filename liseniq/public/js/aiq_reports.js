@@ -26,9 +26,45 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // Inicializamos ambos gráficos
-    initCultureChart(); 
-    initDimensionChart();
+    // Parseamos los features del plan
+    let appFeatures = [];
+    try {
+        appFeatures = typeof window.liseniqAppFeatures === 'string' ? JSON.parse(window.liseniqAppFeatures) : (window.liseniqAppFeatures || []);
+    } catch(e) {
+        console.error("Error parseando features de la app", e);
+    }
+
+    // Función auxiliar para ocultar secciones sin acceso en el DOM
+    const hideSection = (containerId) => {
+        const container = document.getElementById(containerId);
+        if (container) {
+            const card = container.closest('.chart-card');
+            if (card) {
+                card.style.display = 'none';
+                const title = card.previousElementSibling;
+                if (title && title.classList.contains('chart-section-title')) {
+                    title.style.display = 'none'; // Oculta el título "Tipos de cultura" o "Dimensiones"
+                }
+            }
+        }
+    };
+
+    // Inicializamos las secciones
+    initTopBottomCards();
+
+    // Gráfico de Tipo de Cultura: Requiere feature 'aiq_rep_cultura'
+    if (appFeatures.includes('aiq_rep_cultura')) {
+        initCultureChart(); 
+    } else {
+        hideSection('culture-chart-container');
+    }
+
+    // Gráfico de Dimensiones: Requiere feature 'aiq_rep_dimension'
+    if (appFeatures.includes('aiq_rep_dimension')) {
+        initDimensionChart();
+    } else {
+        hideSection('dimension-chart-container');
+    }
 });
 
 function loadApexCharts() {
@@ -65,6 +101,48 @@ function parseBackendData(rawData) {
         console.error("Error al parsear los datos del gráfico:", e, rawData);
     }
     return data;
+}
+
+// Logica de las tarjetas Top 10 y Bottom 10
+function initTopBottomCards() {
+    const topContainer = document.getElementById('top-10-list');
+    const bottomContainer = document.getElementById('bottom-10-list');
+    
+    if (!topContainer || !bottomContainer) return;
+
+    let data = parseBackendData(window.dimensionChartData);
+    if (!data || data.length === 0) return;
+
+    // Clonamos la data para no afectar los gráficos
+    // Ordenamos de menor a mayor para Bottom 10
+    let ascendingData = [...data].sort((a, b) => a.score - b.score);
+    let bottom10 = ascendingData.slice(0, 10);
+
+    // Ordenamos de mayor a menor para Top 10
+    let descendingData = [...data].sort((a, b) => b.score - a.score);
+    let top10 = descendingData.slice(0, 10);
+
+    // Función auxiliar para renderizar cada lista
+    const renderRows = (items, container, colorClass) => {
+        container.innerHTML = items.map(item => {
+            // El score va de 1 a 5, calculamos el porcentaje para rellenar la barra
+            const percentage = Math.min(100, Math.max(0, (item.score / 5) * 100));
+            return `
+                <div class="tb-row">
+                    <div class="tb-question">${item.question}</div>
+                    <div class="tb-score-wrapper">
+                        <div class="tb-score-bar-bg">
+                            <div class="tb-score-bar-fill ${colorClass}" style="width: ${percentage}%"></div>
+                        </div>
+                        <div class="tb-score-value">${item.score.toFixed(2)}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    };
+
+    renderRows(top10, topContainer, 'fill-green');
+    renderRows(bottom10, bottomContainer, 'fill-orange');
 }
 
 // Logica de grafico tipo de cultura/tema (nivel 3)

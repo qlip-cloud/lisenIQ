@@ -40,12 +40,51 @@
         </div>
     </div>
 
-    <!-- Título de Sección para Gráficos de Cultura -->
-    <h3 class="chart-section-title">Tipos de cultura & dimensiones</h3>
+    <!-- Título de Sección para Top y Bottom 10 -->
+    <h3 class="chart-section-title">Atributos más y menos valorados</h3>
 
-    <!-- Contenedor del Gráfico de Cultura -->
-    <div class="chart-card">
+    <!-- Contenedor Top / Bottom -->
+    <div class="top-bottom-container">
+        <div class="tb-card">
+            <h4 class="tb-header-title">Top 10 — mayor puntaje</h4>
+            <div class="tb-table-header">
+                <span>Atributo</span>
+                <span>Score</span>
+            </div>
+            <div id="top-10-list">
+                <!-- Llenado dinámicamente con JS -->
+            </div>
+        </div>
+        <div class="tb-card">
+            <h4 class="tb-header-title">Bottom 10 — menor puntaje</h4>
+            <div class="tb-table-header">
+                <span>Atributo</span>
+                <span>Score</span>
+            </div>
+            <div id="bottom-10-list">
+                <!-- Llenado dinámicamente con JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Título y botones de Sección para Gráfico de Tipo de Cultura -->
+    <div class="chart-header-flex" id="culture-header-container">
+        <h3 class="chart-section-title">Tipos de cultura</h3>
+    </div>
+
+    <!-- Contenedor del Gráfico de Tipo de Cultura -->
+    <div class="chart-card" id="culture-card-container">
         <div id="culture-chart-container" class="chart-wrapper"></div>
+    </div>
+
+    <!-- Título y botones de Sección para Gráfico de Dimensiones -->
+    <div class="chart-header-flex" id="dimension-header-container">
+        <h3 class="chart-section-title">Dimensiones</h3>
+    </div>
+
+    <!-- Contenedor del Gráfico de Dimensiones -->
+    <div class="chart-card" id="dimension-card-container">
+        <div id="dimension-chart-container" class="chart-wrapper"></div>
     </div>
 
 </div>
@@ -59,13 +98,13 @@
 
 {% block script %}
     {{ super() }}
-    <!-- Inyectamos la data de backend al frontend de forma segura -->
     <script>
         window.liseniqSubscriptionPlan = "{{ subscription_plan | default('') }}";
         window.liseniqAppFeatures = '{{ app_features_json | default("[]") | safe }}';
         
-        // Data del gráfico inyectada desde Python
+        // Data de los gráficos inyectada desde Python
         window.cultureChartData = {{ culture_chart_data | default('[]') | safe }};
+        window.dimensionChartData = {{ dimension_chart_data | default('[]') | safe }};
     </script>
     <script type="module" src="/assets/liseniq/js/aiq_reports.js"></script>
 {% endblock %}

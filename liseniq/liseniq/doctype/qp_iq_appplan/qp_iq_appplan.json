@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2026-04-27 18:11:02.349862",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pl_name",
+  "pl_price",
+  "pl_billing_cycle",
+  "pl_status",
+  "pl_section_features",
+  "pl_features"
+ ],
+ "fields": [
+  {
+   "fieldname": "pl_name",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Nombre del Plan"
+  },
+  {
+   "fieldname": "pl_price",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Precio"
+  },
+  {
+   "fieldname": "pl_billing_cycle",
+   "fieldtype": "Select",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Ciclo de Facturaci\u00f3n",
+   "options": "Mensual\nAnual"
+  },
+  {
+   "default": "1",
+   "fieldname": "pl_status",
+   "fieldtype": "Check",
+   "label": "Estado"
+  },
+  {
+   "fieldname": "pl_section_features",
+   "fieldtype": "Section Break",
+   "label": "Detalle de Funcionalidades"
+  },
+  {
+   "fieldname": "pl_features",
+   "fieldtype": "Table",
+   "label": "Funcionalidades",
+   "options": "qp_IQ_AppPlanFeature"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-27 18:55:01.108883",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_AppPlan",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "pl_name",
+ "track_changes": 1
+}

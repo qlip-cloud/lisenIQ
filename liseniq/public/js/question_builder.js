@@ -34,6 +34,7 @@ export class QuestionBuilder {
         };
         this.searchDebounceTimer = null;
         this.demographicDebounceTimer = null;
+        this.cultureDebounceTimer = null;
         this.onQuestionsUpdate = onQuestionsUpdate;
         this.isReadOnly = false;
         
@@ -100,6 +101,7 @@ export class QuestionBuilder {
 
         if (this.isReadOnly) {
             if (questionForm.demographicResults) questionForm.demographicResults.style.display = 'none';
+            if (questionForm.cultureResults) questionForm.cultureResults.style.display = 'none';
         }
 
         if (this.isReadOnly && bankModal?.modal) {
@@ -123,6 +125,8 @@ export class QuestionBuilder {
                 type: document.getElementById('new_question_type'),
                 demographic: document.getElementById('new_question_demographic'),
                 demographicResults: document.querySelector('#new_question_demographic + .autocomplete-results'),
+                culture: document.getElementById('new_question_culture'),
+                cultureResults: document.querySelector('#new_question_culture + .autocomplete-results'),
                 optionsSection: document.getElementById('options-based-section'),
                 optionsContainer: document.getElementById('options-container'),
                 visualOptionsSection: document.getElementById('visual-options-section'),
@@ -259,9 +263,20 @@ export class QuestionBuilder {
             if (this.isReadOnly) return;
             this.onDemographicSelect(e);
         });
+
+        questionForm.culture?.addEventListener('input', () => {
+            if (this.isReadOnly) return;
+            this.onCultureInput();
+        });
+        questionForm.cultureResults?.addEventListener('click', (e) => {
+            if (this.isReadOnly) return;
+            this.onCultureSelect(e);
+        });
+
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.form-group')) {
                 if(this.ui.questionForm.demographicResults) this.ui.questionForm.demographicResults.style.display = 'none';
+                if(this.ui.questionForm.cultureResults) this.ui.questionForm.cultureResults.style.display = 'none';
             }
         });
     }
@@ -369,6 +384,7 @@ export class QuestionBuilder {
                     </div>
                     <div class="question-item-tags">
                         <span>Tema: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                        ${question.culture ? `<span style="margin-top:2px;">Cultura: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
                     </div>
                 </div>
             </div>
@@ -605,6 +621,7 @@ export class QuestionBuilder {
                         typeName: questionToAdd.type_name,
                         category_name: questionToAdd.category_name,
                         demographic: questionToAdd.demographic_name,
+                        culture: questionToAdd.culture_name,
                         options: options,
                         qp_others: questionToAdd.qp_others || 0,
                         qp_none_above: questionToAdd.qp_none_above || 0
@@ -630,6 +647,7 @@ export class QuestionBuilder {
         if (qf.textOthers) qf.textOthers.value = ''; 
         if (qf.type) qf.type.value = '';
         if (qf.demographic) qf.demographic.value = '';
+        if (qf.culture) qf.culture.value = '';
         
         this._setEditableOptions();
         
@@ -667,7 +685,7 @@ export class QuestionBuilder {
             togglesContainer.classList.add('d-none');
         }
 
-        [qf.text, qf.textOthers, qf.type, qf.demographic, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax]
+        [qf.text, qf.textOthers, qf.type, qf.demographic, qf.culture, qf.negativeStatement, qf.positiveStatement, qf.npsMin, qf.npsMax]
             .filter(Boolean)
             .forEach(field => this._clearValidationError(field));
     }
@@ -781,6 +799,7 @@ export class QuestionBuilder {
             type: qf.type.value, 
             typeName: questionTypeName, 
             demographic: qf.demographic.value.trim(),
+            culture: qf.culture ? qf.culture.value.trim() : null,
             category_name: this.isLeadershipMode ? 'Liderazgo' : 'Manual' 
         };
 
@@ -825,7 +844,8 @@ export class QuestionBuilder {
                             qn_statement: existingQ.text,
                             qn_statement_others: existingQ.text_others,
                             qn_type: existingQ.type,
-                            qn_demographic: existingQ.demographic
+                            qn_demographic: existingQ.demographic,
+                            qp_topic: existingQ.culture
                         })
                     },
                     error: function(err) {
@@ -855,6 +875,8 @@ export class QuestionBuilder {
         this.handleQuestionTypeChange();
 
         qf.demographic.value = q.demographic || '';
+        if (qf.culture) qf.culture.value = q.culture || '';
+        
         if (qf.negativeStatement) qf.negativeStatement.value = q.negative_statement || '';
         if (qf.positiveStatement) qf.positiveStatement.value = q.positive_statement || '';
         if (qf.npsMin) qf.npsMin.value = q.nps_min || q.npsMin || '';
@@ -1033,7 +1055,7 @@ export class QuestionBuilder {
             if (searchTerm.length > 1) {
                 frappe.call({
                     method: 'liseniq.www.iq-templates.index.get_demographic_suggestions_for_questions',
-                    args: { search_term: searchTerm },
+                    args: { search_term: searchTerm, object_type: 'Pregunta' },
                     callback: (r) => {
                         demographicResults.innerHTML = '';
                         if (r.message && r.message.length > 0) {
@@ -1060,6 +1082,46 @@ export class QuestionBuilder {
         if (e.target.classList.contains('autocomplete-item')) {
             demographic.value = e.target.textContent;
             demographicResults.style.display = 'none';
+        }
+    }
+    
+    onCultureInput() {
+        const { culture, cultureResults } = this.ui.questionForm;
+        if (!culture || !cultureResults) return;
+        const searchTerm = culture.value.trim();
+
+        clearTimeout(this.cultureDebounceTimer);
+        this.cultureDebounceTimer = setTimeout(() => {
+            if (searchTerm.length > 1) {
+                frappe.call({
+                    method: 'liseniq.www.iq-templates.index.get_demographic_suggestions_for_questions',
+                    args: { search_term: searchTerm, object_type: 'Tema' },
+                    callback: (r) => {
+                        cultureResults.innerHTML = '';
+                        if (r.message && r.message.length > 0) {
+                            r.message.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'autocomplete-item';
+                                div.textContent = item.dt_title;
+                                cultureResults.appendChild(div);
+                            });
+                            cultureResults.style.display = 'block';
+                        } else {
+                            cultureResults.style.display = 'none';
+                        }
+                    }
+                });
+            } else {
+                cultureResults.style.display = 'none';
+            }
+        }, 300);
+    }
+
+    onCultureSelect(e) {
+        const { culture, cultureResults } = this.ui.questionForm;
+        if (e.target.classList.contains('autocomplete-item')) {
+            culture.value = e.target.textContent;
+            cultureResults.style.display = 'none';
         }
     }
     

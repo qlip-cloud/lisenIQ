@@ -207,5 +207,9 @@
 
 {% block script %}
     {{ super() }}
+    <script>
+        window.liseniqSubscriptionPlan = "{{ subscription_plan | default('') }}";
+        window.liseniqAppFeatures = '{{ app_features_json | default("[]") | safe }}';
+    </script>
     <script type="module" src="/assets/liseniq/js/home.js"></script>
 {% endblock %}

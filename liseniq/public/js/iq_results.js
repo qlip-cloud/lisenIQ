@@ -22,6 +22,23 @@ const state = {
   selectedName: null
 };
 
+// Validación de funcionalidades (features) para mostrar/ocultar elementos o activar flujos alternativos
+function hasFeature(featureCode) {
+  try {
+      let featuresArray = [];
+      // Validamos si llega como String (JSON) o si ya es un Array
+      if (typeof window.liseniqAppFeatures === 'string') {
+          featuresArray = JSON.parse(window.liseniqAppFeatures || '[]');
+      } else if (Array.isArray(window.liseniqAppFeatures)) {
+          featuresArray = window.liseniqAppFeatures;
+      }
+      return featuresArray.includes(featureCode);
+  } catch (e) {
+      console.error("Error al procesar las funcionalidades de la suscripción:", e);
+      return false;
+  }
+}
+
 function initPreloaded() {
   if (!ui.preload) return;
   try {
@@ -179,7 +196,6 @@ function embedPowerBI() {
       config.filters = state.embedConfig.filters;
     }
 
-    // Logs para validar la configuración que se está enviando a Power BI, especialmente los filtros
     console.log("Configuración enviada a Power BI:", config);
     if (config.filters && config.filters.length > 0) {
         console.log("Filtros detectados en JS listos para aplicar:", config.filters);
@@ -192,7 +208,6 @@ function embedPowerBI() {
     }
     const report = window.powerbi.embed(ui.pbi, config);
 
-    // Validar si el filtro fue aceptado luego de que cargue el reporte
     report.on('loaded', async () => {
         try {
             const appliedFilters = await report.getFilters();
@@ -202,7 +217,6 @@ function embedPowerBI() {
         }
     });
 
-    // Paso 2: Renovación del token cuando expire (sin recargar el iframe).
     report.off('tokenExpired');
     report.on('tokenExpired', async () => {
       try {
@@ -224,6 +238,14 @@ function embedPowerBI() {
 }
 
 async function viewResults(doc, name) {
+
+  // Flujo reportes AIQ
+  if (hasFeature('aiq_reports')) {
+    window.location.href = `/iq-results/aiq_reports?survey_name=${encodeURIComponent(doc)}&survey_title=${encodeURIComponent(name)}`;
+    return; // Evitamos que cargue PowerBI
+  }
+
+  // Flujo PowerBI
   const step1Card = ui.grid?.closest('.card');
   if (step1Card) step1Card.classList.add('d-none');
   state.selectedDoc = doc;
@@ -240,6 +262,7 @@ async function viewResults(doc, name) {
 
 (function boot() {
   if (!ui.grid) return;
+
   initPreloaded();
   const params = new URLSearchParams(window.location.search);
   const preName = params.get('name');

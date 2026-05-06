@@ -59,9 +59,9 @@ def _compile_css_for_pdf(html):
     - Reemplaza pseudoclases ::before y ::after
     - Optimiza z-index
     """
-    # Variables CSS definidas en el documento
+
     css_variables = {
-        "--brand-primary": "#4d1a9be7",
+        "--brand-primary": "#502394",
         "--brand-secondary": "#14B8A6",
         "--brand-primary-light": "#f3e8ff",
         "--brand-light-gray": "#FAF9F8",
@@ -70,12 +70,9 @@ def _compile_css_for_pdf(html):
         "--text-color-secondary": "#6c757d",
     }
     
-    # 1. Reemplazar variables CSS en los estilos
     for var_name, var_value in css_variables.items():
         html = html.replace(f"var({var_name})", var_value)
     
-    # 2. Procesar pseudoclases ::before y ::after
-    # Buscar reglas con ::before o ::after y convertirlas a estilos inline
     style_pattern = r'<style[^>]*>(.*?)</style>'
     
     def process_style_tag(match):

@@ -34,6 +34,9 @@ def _leadership_pdf_options():
         "margin-right": "0mm",
         "header-spacing": "0",
         "disable-smart-shrinking": "",
+        "enable-local-file-access": "",  
+        "dpi": "300",  
+        "print-media-type": "", 
     }
 
 

@@ -14,7 +14,8 @@ def get_question_text_and_category(survey_name):
     question_doc = frappe.get_doc('qp_IQ_Question', {'name': question})
     question_details[question] = {
       'text': question_doc.qn_statement_others or question_doc.qn_statement,
-      'category': frappe.db.get_value('qp_IQ_DemographicType', question_doc.qn_demographic, 'dt_title') if question_doc.qn_demographic else None
+      'category': frappe.db.get_value('qp_IQ_DemographicType', question_doc.qn_demographic, 'dt_title') if question_doc.qn_demographic else None,
+      'theme': frappe.db.get_value('qp_IQ_DemographicType', question_doc.qp_topic, 'dt_title') if question_doc.qp_topic else None
     }
   return question_details
 

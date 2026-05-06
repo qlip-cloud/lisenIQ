@@ -39,8 +39,6 @@ def _leadership_pdf_options():
         "enable-local-file-access": "",  
         "dpi": "300",  
         "print-media-type": "",
-        "no-javascript": "",  # Deshabilita JavaScript que puede causar problemas
-        "quiet": "",  # Reduce mensajes de error
     }
 
 

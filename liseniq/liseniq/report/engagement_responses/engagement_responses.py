@@ -94,10 +94,13 @@ def execute(filters=None):
     # Obtener demographics_map basado en los usuarios específicos de esta encuesta
     demographics_map = get_demographics_labels_by_status(survey_status, survey_name)
 
+    # Obtener mapeo de temas de preguntas
+    question_themes_map = get_question_themes(survey_name)
+
     columns = build_columns(demographics_map)
 
     # Verificar si la encuesta está finalizada
-    data = get_survey_data(survey_name, question_map, demographics_map, survey_status)
+    data = get_survey_data(survey_name, question_map, demographics_map, survey_status, question_themes_map)
 
     return columns, data
 
@@ -150,6 +153,38 @@ def get_survey_status(survey_name):
         }
 
 
+def get_question_themes(survey_name):
+    """
+    Obtiene el mapeo de question_id a theme (qp_topic -> dt_title)
+    Similar a get_question_text_and_category en selectors.py
+    """
+    try:
+        query = """
+            SELECT 
+                sq.sq_question as question_id,
+                q.qp_topic as topic_id,
+                dt.dt_title as theme
+            FROM `tabqp_IQ_SurveyQuestion` sq
+            INNER JOIN `tabqp_IQ_Survey` s ON s.name = sq.parent
+            INNER JOIN `tabqp_IQ_Question` q ON q.name = sq.sq_question
+            LEFT JOIN `tabqp_IQ_DemographicType` dt ON dt.name = q.qp_topic
+            WHERE s.su_name = %s
+        """
+        results = frappe.db.sql(query, survey_name, as_dict=True)
+        
+        theme_map = {}
+        for row in results:
+            question_id = row.get("question_id")
+            theme = row.get("theme") or ""
+            if question_id:
+                theme_map[question_id] = theme
+        
+        return theme_map
+    except Exception as e:
+        frappe.log_error(f"Error getting question themes: {str(e)}")
+        return {}
+
+
 def get_historical_survey_data(survey_id, question_map, demographics_map):
     """
     Obtiene los datos históricos de una encuesta finalizada desde qp_IQ_SurveyHistoricData
@@ -188,7 +223,7 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
 
 
 def process_historical_response_row(
-    hist_record, question_map, demographics_map, survey_status, question_variables_map
+    hist_record, question_map, demographics_map, survey_status, question_variables_map, question_themes_map
 ):
     """
     Procesa un registro histórico de respuesta y retorna múltiples filas (una por pregunta)
@@ -219,10 +254,6 @@ def process_historical_response_row(
     response_json = hist_record.get("shd_measurement_response", "{}")
     parsed_responses = parse_response_json(response_json)
 
-    # Obtener información de la encuesta para lógica de tema
-    company_name = survey_status.get("company_name", "")
-    template_name = survey_status.get("template_name", "")
-
     # Crear una fila por cada pregunta
     rows = []
     for qid, question_label in question_map.items():
@@ -230,27 +261,14 @@ def process_historical_response_row(
         row["question"] = question_label
         row["answer"] = parsed_responses.get(qid, "")
 
-        # Agregar variable y tema
+        # Agregar variable y tema usando question_themes_map
         question_info = question_variables_map.get(question_label, {})
         variable = question_info.get("variable", "")
         row["variable"] = variable
 
-        # Determinar el tema según el template y la compañía
-        tema = ""
-        if template_name == "Plantilla Modelo Vedanta bienestar":
-            tema = VEDANTA_BIENESTAR.get(variable, "")
-        else:
-            tema = question_info.get("tema", "")
-
-        # Lógica especial para empresas Carvajal
-        try:
-            company_name_val = (company_name or "").lower().strip()
-            carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
-            if company_name_val and company_name_val in carvajal_names:
-                tema = "CULTURA CARVAJAL"
-        except Exception:
-            pass
-
+        # Obtener el tema del mapeo directo de preguntas
+        tema = question_themes_map.get(qid, "")
+        
         row["theme"] = tema
         rows.append(row)
 
@@ -303,6 +321,12 @@ def build_columns(demographics_map):
         {
             "fieldname": "relation",
             "label": "Relación",
+            "fieldtype": "Data",
+            "width": 200,
+        },
+        {
+            "fieldname": "tema",
+            "label": "Tema",
             "fieldtype": "Data",
             "width": 200,
         },
@@ -369,7 +393,7 @@ def build_columns(demographics_map):
     return columns
 
 
-def get_survey_data(survey_name, question_map, demographics_map, survey_status):
+def get_survey_data(survey_name, question_map, demographics_map, survey_status, question_themes_map):
     """
     Obtiene los datos de la encuesta de manera optimizada
     Ahora cada pregunta genera una fila separada
@@ -393,6 +417,7 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
     #                 demographics_map,
     #                 survey_status,
     #                 question_variables_map,
+    #                 question_themes_map,
     #             )
     #             data.extend(rows)  # Ahora devuelve múltiples filas
     #         return data
@@ -447,6 +472,7 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
             users_data_map,
             survey_status,
             question_variables_map,
+            question_themes_map,
         )
         data.extend(rows) 
 
@@ -462,6 +488,7 @@ def process_response_row(
     users_data_map,
     survey_status,
     question_variables_map,
+    question_themes_map,
 ):
     """
     Procesa una respuesta individual y retorna múltiples filas (una por pregunta)
@@ -497,10 +524,6 @@ def process_response_row(
     response_json = response.get("response_json", "{}")
     parsed_responses = parse_response_json(response_json)
 
-    # Obtener información de la encuesta para lógica de tema
-    company_name = survey_status.get("company_name", "")
-    template_name = survey_status.get("template_name", "")
-
     # Crear una fila por cada pregunta
     rows = []
     for qid, question_label in question_map.items():
@@ -508,28 +531,15 @@ def process_response_row(
         row["question"] = question_label
         row["answer"] = parsed_responses.get(qid, "")
 
-        # Agregar variable y tema
+        # Agregar variable y tema usando question_themes_map
         question_info = question_variables_map.get(question_label, {})
         variable = question_info.get("variable", "")
         row["variable"] = variable
 
-        # Determinar el tema según el template y la compañía
-        tema = ""
-        if template_name == "Plantilla Modelo Vedanta bienestar":
-            tema = VEDANTA_BIENESTAR.get(variable, "")
-        else:
-            tema = question_info.get("tema", "")
-
-        # Lógica especial para empresas Carvajal
-        try:
-            company_name_val = (company_name or "").lower().strip()
-            carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
-            if company_name_val and company_name_val in carvajal_names:
-                tema = "CULTURA CARVAJAL"
-        except Exception:
-            pass
-
-        row["theme"] = tema
+        # Obtener el tema del mapeo directo de preguntas
+        tema = question_themes_map.get(qid, "")
+        
+        row["tema"] = tema
         rows.append(row)
 
     return rows
@@ -748,6 +758,7 @@ def get_question_variables_map():
     except Exception as e:
         frappe.log_error(f"Error getting question variables map: {str(e)}")
         return {}
+
 
 
 def get_user_email(user):

@@ -589,7 +589,7 @@ def process_leader_data(survey_id, responses, questions_data, previous_survey_na
 
         q_data['question_text'] = q_info.get('text', question)
         q_data['question_dimension'] = q_info.get('category', 'Sin Categoría')
-        q_data['question_theme'] = q_info.get('theme', 'Sin Tema')
+        q_data['theme_name'] = q_info.get('theme', 'Sin Tema')
         q_data['others_score'] = average(others)
         previous_others_score = previous_question_others_map.get(q_data['question_text'])
         q_data['trend_delta'] = None
@@ -700,7 +700,7 @@ def build_leader_report(leader_data):
     report.append('question_summary', {
       'question_text': values.get('question_text'),
       'question_dimension': values.get('question_dimension'),
-      'question_theme': values.get('question_theme'),
+      'theme_name': values.get('theme_name'),
       SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
       SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
       SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),

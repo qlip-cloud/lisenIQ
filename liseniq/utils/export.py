@@ -53,12 +53,8 @@ def _ensure_pdf_header_footer_placeholders(html):
 
 
 def _compile_css_for_pdf(html):
-    """
-    Procesa el HTML para que sea compatible con generadores de PDF.
-    - Reemplaza variables CSS con valores concretos
-    - Reemplaza pseudoclases ::before y ::after
-    - Optimiza z-index
-    """
+
+
 
     css_variables = {
         "--brand-primary": "#502394",
@@ -78,25 +74,21 @@ def _compile_css_for_pdf(html):
     def process_style_tag(match):
         style_content = match.group(1)
         
-        # Procesar ::before
+
         before_pattern = r'([\w\s\-\.,#:>]+)::before\s*\{([^}]*)\}'
         style_content = re.sub(before_pattern, lambda m: _handle_pseudo_element(m, "before"), style_content)
-        
-        # Procesar ::after
+
         after_pattern = r'([\w\s\-\.,#:>]+)::after\s*\{([^}]*)\}'
         style_content = re.sub(after_pattern, lambda m: _handle_pseudo_element(m, "after"), style_content)
         
         return f'<style>{style_content}</style>'
     
     html = re.sub(style_pattern, process_style_tag, html, flags=re.DOTALL)
-    
-    # 3. Simplificar z-index (los generadores PDF tienen limitaciones)
-    # Convertir z-index a valores más bajos (máximo 999)
+
     z_pattern = r'z-index:\s*(\d+)'
     
     def limit_z_index(match):
         z_value = int(match.group(1))
-        # Limitar a 999 y mantener jerarquía
         limited_z = min(z_value, 999)
         return f'z-index: {limited_z}'
     
@@ -110,11 +102,6 @@ def _handle_pseudo_element(match, pseudo_type):
     selector = match.group(1).strip()
     properties = match.group(2).strip()
     
-    # Para elementos simples, agregamos estilos directamente
-    # Para ::before y ::after, los omitimos en PDF ya que no son bien soportados
-    # Una alternativa es usar borders o backgrounds
-    
-    # Reconstruir sin la pseudoclase para que el selector principal tenga los estilos base
     return f'{selector} {{ {properties} }}'
 
 @frappe.whitelist()

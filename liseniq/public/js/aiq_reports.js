@@ -238,6 +238,7 @@ function initTopBottomCards() {
             const percentage = Math.min(100, Math.max(0, (item.score / 5) * 100));
             return `
                 <div class="tb-row">
+                    <div class="tb-topic">${item.topic || 'N/A'}</div>
                     <div class="tb-question">${item.question}</div>
                     <div class="tb-score-wrapper">
                         <div class="tb-score-bar-bg">

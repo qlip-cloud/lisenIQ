@@ -39,6 +39,7 @@ def get_context(context):
             response_percentage = round((total_responses / total_recipients) * 100)
 
         context.total_recipients = total_recipients
+        context.total_responses = total_responses
         context.response_percentage = response_percentage
 
         # Puntaje Global y Datos para Gráficos
@@ -141,9 +142,14 @@ def get_context(context):
                     demo_id = q_to_culture.get(q_name, "N/A")
                     demo_title = demo_title_map.get(demo_id, demo_id)
                     
+                    # Añadir el tema para mostrar en Top 10 y Bottom 10
+                    t_id = q_to_topic.get(q_name)
+                    t_title = topic_title_map.get(t_id, "N/A") if t_id else "N/A"
+                    
                     dimension_chart_data.append({
                         "culture": demo_title, 
                         "question": statement_text,
+                        "topic": t_title,
                         "score": avg
                     })
                 dimension_chart_data.sort(key=lambda x: x["score"])
@@ -165,6 +171,7 @@ def get_context(context):
     else:
         # Valores por defecto de seguridad si no hay medición seleccionada
         context.total_recipients = 0
+        context.total_responses = 0
         context.response_percentage = 0
         context.global_score = 0.0
         context.culture_chart_data = "[]"

@@ -4,6 +4,7 @@
     height: calc(100vh - 80px);
     overflow-y: auto;
     overscroll-behavior: contain;
+    background-color: #ffffff;
 }
 
 .aiq-reports-wrapper::-webkit-scrollbar { width: 8px; }

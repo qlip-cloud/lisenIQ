@@ -16,9 +16,14 @@
                 Visualizando reporte interactivo
             </p>
         </div>
-        <a href="/iq-results" class="btn btn-outline-purple btn-sm">
-            Volver a Resultados
-        </a>
+        <div style="display: flex; gap: 10px;">
+            <!-- <button id="btn-export-full-pdf" class="btn btn-outline-purple btn-sm" title="Exportar Reporte Completo a PDF">
+                <i class="fa fa-file-pdf-o" aria-hidden="true"></i> Exportar Todo a PDF
+            </button> -->
+            <a href="/iq-results" class="btn btn-outline-purple btn-sm">
+                Volver a Resultados
+            </a>
+        </div>
     </div>
 
     <!-- Cards de Métricas Globales -->
@@ -83,7 +88,7 @@
     <!-- Contenedor Top / Bottom -->
     <div class="top-bottom-container">
         <div class="tb-card">
-            <h4 class="tb-header-title">Top 10 — mayor puntaje</h4>
+            <h4 class="tb-header-title">10 más altos — mayor puntaje</h4>
             <div class="tb-table-header">
                 <span>Tema</span>
                 <span>Atributo</span>
@@ -94,7 +99,7 @@
             </div>
         </div>
         <div class="tb-card">
-            <h4 class="tb-header-title">Bottom 10 — menor puntaje</h4>
+            <h4 class="tb-header-title">10 más bajos — menor puntaje</h4>
             <div class="tb-table-header">
                 <span>Tema</span>
                 <span>Atributo</span>

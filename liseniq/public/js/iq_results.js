@@ -8,7 +8,13 @@ const ui = {
   step2: document.getElementById('step2-pbi'),
   selectedName: document.getElementById('selected-name'),
   backBtn: document.getElementById('btn-back-step-2'),
-  clearName: document.getElementById('filter-name-clear')
+  clearName: document.getElementById('filter-name-clear'),
+  
+  // Elementos del Modal
+  reportModal: document.getElementById('report-choice-modal'),
+  closeReportModal: document.getElementById('btn-close-report-modal'),
+  btnAiqReport: document.getElementById('btn-aiq-report'),
+  btnPbiReport: document.getElementById('btn-pbi-report')
 };
 
 const state = {
@@ -26,7 +32,6 @@ const state = {
 function hasFeature(featureCode) {
   try {
       let featuresArray = [];
-      // Validamos si llega como String (JSON) o si ya es un Array
       if (typeof window.liseniqAppFeatures === 'string') {
           featuresArray = JSON.parse(window.liseniqAppFeatures || '[]');
       } else if (Array.isArray(window.liseniqAppFeatures)) {
@@ -136,19 +141,40 @@ function initEvents() {
     clearTimeout(state.debounce);
     state.debounce = setTimeout(fetchFiltered, 350);
   });
+  
   ui.template?.addEventListener('change', fetchFiltered);
+  
   ui.grid?.addEventListener('click', e => {
     const btn = e.target.closest('.btn-view-results');
     if (!btn) return;
-    viewResults(btn.dataset.doc, btn.dataset.name);
+    openReportModal(btn.dataset.doc, btn.dataset.name);
   });
+  
   ui.backBtn?.addEventListener('click', backToResults);
+  
   ui.clearName?.addEventListener('click', () => {
     if (!ui.name) return;
     if (ui.name.value === '') return;
     ui.name.value = '';
     fetchFiltered();
     ui.name.focus();
+  });
+
+  // Eventos del Modal
+  ui.closeReportModal?.addEventListener('click', closeReportModal);
+  
+  ui.reportModal?.addEventListener('click', e => {
+    if(e.target === ui.reportModal) closeReportModal();
+  });
+
+  ui.btnAiqReport?.addEventListener('click', () => {
+    if(ui.btnAiqReport.classList.contains('disabled')) return;
+    goToAiqReport();
+  });
+
+  ui.btnPbiReport?.addEventListener('click', () => {
+    if(ui.btnPbiReport.classList.contains('disabled')) return;
+    goToPbiReport();
   });
 }
 
@@ -158,6 +184,71 @@ function backToResults() {
   ui.step2?.classList.add('d-none');
 }
 
+// Modal de selección de reporte (AIQ vs PowerBI)
+function openReportModal(doc, name) {
+  state.selectedDoc = doc;
+  state.selectedName = name;
+
+  const hasAiq = hasFeature('aiq_reports');
+  const hasPbi = hasFeature('bi_reports');
+
+  // Configuración de la tarjeta AIQ
+  const aiqLabel = ui.btnAiqReport.querySelector('.upgrade-label');
+  if (hasAiq) {
+      ui.btnAiqReport.classList.remove('disabled');
+      aiqLabel.classList.add('d-none');
+  } else {
+      ui.btnAiqReport.classList.add('disabled');
+      aiqLabel.classList.remove('d-none');
+  }
+
+  // Configuración de la tarjeta PBI
+  const pbiLabel = ui.btnPbiReport.querySelector('.upgrade-label');
+  if (hasPbi) {
+      ui.btnPbiReport.classList.remove('disabled');
+      pbiLabel.classList.add('d-none');
+  } else {
+      ui.btnPbiReport.classList.add('disabled');
+      pbiLabel.classList.remove('d-none');
+  }
+
+  ui.reportModal?.classList.remove('d-none');
+}
+
+function closeReportModal() {
+  ui.reportModal?.classList.add('d-none');
+  state.selectedDoc = null;
+  state.selectedName = null;
+}
+
+// Navegación a Listen AIQ
+function goToAiqReport() {
+  if(!state.selectedDoc) return;
+  window.location.href = `/iq-results/aiq_reports?survey_name=${encodeURIComponent(state.selectedDoc)}&survey_title=${encodeURIComponent(state.selectedName)}`;
+}
+
+// Renderizado y Navegación a PowerBI
+async function goToPbiReport() {
+  if(!state.selectedDoc) return;
+  const doc = state.selectedDoc;
+  
+  closeReportModal();
+
+  const step1Card = ui.grid?.closest('.card');
+  if (step1Card) step1Card.classList.add('d-none');
+  
+  if (ui.step2?.classList.contains('d-none')) ui.step2.classList.remove('d-none');
+  
+  try {
+    await ensurePowerBISDK();
+    await fetchEmbedConfig({ survey_docname: doc });
+    embedPowerBI();
+  } catch (e) {
+    console.error('Error al mostrar resultados / embebido PBI', e);
+  }
+}
+
+// Configuración y funciones de embebido de Power BI
 function ensurePowerBISDK() {
   if (window.powerbi && window['powerbi-client']) {
     return Promise.resolve();
@@ -197,11 +288,6 @@ function embedPowerBI() {
     }
 
     console.log("Configuración enviada a Power BI:", config);
-    if (config.filters && config.filters.length > 0) {
-        console.log("Filtros detectados en JS listos para aplicar:", config.filters);
-    } else {
-        console.warn("No llegaron filtros desde el backend a la configuración JS.");
-    }
 
     if (window.powerbi.find(ui.pbi)) {
       window.powerbi.reset(ui.pbi);
@@ -234,29 +320,6 @@ function embedPowerBI() {
     });
   } catch (e) {
     console.error('Power BI embed error', e);
-  }
-}
-
-async function viewResults(doc, name) {
-
-  // Flujo reportes AIQ
-  if (hasFeature('aiq_reports')) {
-    window.location.href = `/iq-results/aiq_reports?survey_name=${encodeURIComponent(doc)}&survey_title=${encodeURIComponent(name)}`;
-    return; // Evitamos que cargue PowerBI
-  }
-
-  // Flujo PowerBI
-  const step1Card = ui.grid?.closest('.card');
-  if (step1Card) step1Card.classList.add('d-none');
-  state.selectedDoc = doc;
-  state.selectedName = name;
-  if (ui.step2?.classList.contains('d-none')) ui.step2.classList.remove('d-none');
-  try {
-    await ensurePowerBISDK();
-    await fetchEmbedConfig({ survey_docname: doc });
-    embedPowerBI();
-  } catch (e) {
-    console.error('Error al mostrar resultados / embebido', e);
   }
 }
 

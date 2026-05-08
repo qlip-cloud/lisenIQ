@@ -48,6 +48,31 @@
             </div>
         </div>
     </div>
+    
+    <!-- Modal para seleccionar tipo de reporte -->
+    <div id="report-choice-modal" class="choice-modal-overlay d-none">
+        <div class="choice-modal-content">
+            <div class="choice-modal-header">
+                <h5 class="choice-modal-title">Seleccionar Reporte</h5>
+                <button id="btn-close-report-modal" type="button" class="close" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="choice-modal-body">
+                <div class="modal-choice-card" id="btn-aiq-report">
+                    <i class="fa fa-bar-chart fa-2x mb-3"></i>
+                    <span>Reportes Listen AIQ</span>
+                    <div class="upgrade-label d-none">Mejora tu plan para habilitar</div>
+                </div>
+                <div class="modal-choice-card" id="btn-pbi-report">
+                    <i class="fa fa-pie-chart fa-2x mb-3"></i>
+                    <span>Reportes Power BI</span>
+                    <div class="upgrade-label d-none">Mejora tu plan para habilitar</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
 </div>
 {% endblock %}
 

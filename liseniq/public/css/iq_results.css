@@ -109,3 +109,49 @@
     box-shadow: none;
     color: #1f2937;
 }
+
+/* Estilos para la tarjeta de elección en el modal de upgrade */
+
+.modal-choice-card {
+    height: auto;
+    min-height: 180px;
+}
+
+.modal-choice-card:hover:not(.disabled) i {
+    transform: scale(1.1);
+}
+
+/* Estado bloqueado cuando no tiene el feature */
+.modal-choice-card.disabled {
+    cursor: not-allowed;
+    background: #f8f9fa;
+    border-color: #e5e7eb;
+}
+
+/* Prevenir el hover global de main.css en tarjetas deshabilitadas */
+.modal-choice-card.disabled:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: #e5e7eb;
+}
+
+.modal-choice-card.disabled i {
+    color: #9ca3af;
+}
+
+.modal-choice-card.disabled span {
+    color: #6b7280;
+}
+
+.upgrade-label {
+    margin-top: 1rem;
+    font-size: 0.7rem;
+    color: #b91c1c;
+    background-color: #fee2e2;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+}

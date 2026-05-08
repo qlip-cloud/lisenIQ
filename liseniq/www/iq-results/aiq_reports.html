@@ -16,9 +16,14 @@
                 Visualizando reporte interactivo
             </p>
         </div>
-        <a href="/iq-results" class="btn btn-outline-purple btn-sm">
-            Volver a Resultados
-        </a>
+        <div style="display: flex; gap: 10px;">
+            <!-- <button id="btn-export-full-pdf" class="btn btn-outline-purple btn-sm" title="Exportar Reporte Completo a PDF">
+                <i class="fa fa-file-pdf-o" aria-hidden="true"></i> Exportar Todo a PDF
+            </button> -->
+            <a href="/iq-results" class="btn btn-outline-purple btn-sm">
+                Volver a Resultados
+            </a>
+        </div>
     </div>
 
     <!-- Cards de Métricas Globales -->
@@ -29,9 +34,9 @@
             <div class="metric-subtitle">Escala (1 - 5)</div>
         </div>
         <div class="metric-card">
-            <h3 class="metric-title">Participantes</h3>
-            <div class="metric-value">{{ total_recipients | default('0') }}</div>
-            <div class="metric-subtitle">Colaboradores únicos</div>
+            <h3 class="metric-title">Participantes / Esperado</h3>
+            <div class="metric-value">{{ total_responses | default('0') }} / {{ total_recipients | default('0') }}</div>
+            <div class="metric-subtitle">Respuestas sobre el total enviado</div>
         </div>
         <div class="metric-card">
             <h3 class="metric-title">Tasa de Respuesta</h3>
@@ -40,36 +45,18 @@
         </div>
     </div>
 
-    <!-- Título de Sección para Top y Bottom 10 -->
-    <h3 class="chart-section-title">Atributos más y menos valorados</h3>
-
-    <!-- Contenedor Top / Bottom -->
-    <div class="top-bottom-container">
-        <div class="tb-card">
-            <h4 class="tb-header-title">Top 10 — mayor puntaje</h4>
-            <div class="tb-table-header">
-                <span>Atributo</span>
-                <span>Score</span>
-            </div>
-            <div id="top-10-list">
-                <!-- Llenado dinámicamente con JS -->
-            </div>
-        </div>
-        <div class="tb-card">
-            <h4 class="tb-header-title">Bottom 10 — menor puntaje</h4>
-            <div class="tb-table-header">
-                <span>Atributo</span>
-                <span>Score</span>
-            </div>
-            <div id="bottom-10-list">
-                <!-- Llenado dinámicamente con JS -->
-            </div>
-        </div>
-    </div>
 
     <!-- Título y botones de Sección para Gráfico de Tipo de Cultura -->
     <div class="chart-header-flex" id="culture-header-container">
         <h3 class="chart-section-title">Tipos de cultura</h3>
+        <div class="chart-actions-group">
+            <button id="btn-export-culture-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+                <i class="fa fa-image" aria-hidden="true"></i>
+            </button>
+            <button id="btn-export-culture-pdf" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+                <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Contenedor del Gráfico de Tipo de Cultura -->
@@ -80,11 +67,48 @@
     <!-- Título y botones de Sección para Gráfico de Dimensiones -->
     <div class="chart-header-flex" id="dimension-header-container">
         <h3 class="chart-section-title">Dimensiones</h3>
+        <div class="chart-actions-group">
+            <button id="btn-export-dimension-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+                <i class="fa fa-image" aria-hidden="true"></i>
+            </button>
+            <button id="btn-export-dimension-pdf" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+                <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Contenedor del Gráfico de Dimensiones -->
     <div class="chart-card" id="dimension-card-container">
         <div id="dimension-chart-container" class="chart-wrapper"></div>
+    </div>
+
+    <!-- Título de Sección para Top y Bottom 10 -->
+    <h3 class="chart-section-title">Atributos más altos y más bajos</h3>
+
+    <!-- Contenedor Top / Bottom -->
+    <div class="top-bottom-container">
+        <div class="tb-card">
+            <h4 class="tb-header-title">10 más altos — mayor puntaje</h4>
+            <div class="tb-table-header">
+                <span>Tema</span>
+                <span>Atributo</span>
+                <span style="text-align: right;">Puntaje</span>
+            </div>
+            <div id="top-10-list">
+                <!-- Llenado dinámicamente con JS -->
+            </div>
+        </div>
+        <div class="tb-card">
+            <h4 class="tb-header-title">10 más bajos — menor puntaje</h4>
+            <div class="tb-table-header">
+                <span>Tema</span>
+                <span>Atributo</span>
+                <span style="text-align: right;">Puntaje</span>
+            </div>
+            <div id="bottom-10-list">
+                <!-- Llenado dinámicamente con JS -->
+            </div>
+        </div>
     </div>
 
 </div>

@@ -50,6 +50,7 @@ def get_context(context):
         global_score = 0.0
         culture_chart_data = []
         dimension_chart_data = []
+        top_bottom_data = []
 
         if likert_types:
             # Traemos las preguntas Likert incluyendo el enunciado y el topic
@@ -80,7 +81,6 @@ def get_context(context):
                         t_doctype = topic_field.options
                         t_title_field = frappe.get_meta(t_doctype).title_field or "name"
                         td_list = frappe.get_all(t_doctype, fields=["name", t_title_field])
-                        # Asignamos el texto (title/nombre) para mostrar en el Eje X en lugar del ID
                         topic_title_map = {d["name"]: (d.get(t_title_field) or d["name"]) for d in td_list}
                 except Exception as e:
                     frappe.log_error(f"Error extrayendo metadata de qp_topic: {e}", "AIQ Reports")
@@ -94,8 +94,11 @@ def get_context(context):
                 total_score = 0.0
                 total_answers = 0
                 
-                dimension_totals = {}
-                dimension_counts = {}
+                dimension_group_totals = {}
+                dimension_group_counts = {}
+
+                question_totals = {}
+                question_counts = {}
 
                 topic_totals = {}
                 topic_counts = {}
@@ -114,12 +117,16 @@ def get_context(context):
                                     total_score += val
                                     total_answers += 1
                                     
-                                    # Acumular para el Gráfico de Dimensiones (por pregunta)
+                                    # Acumular para Top 10 y Bottom 10 (por pregunta individual)
+                                    question_totals[q_name] = question_totals.get(q_name, 0.0) + val
+                                    question_counts[q_name] = question_counts.get(q_name, 0) + 1
+
+                                    # Acumular para el Gráfico de Dimensiones (agrupado por demográfico)
                                     if q_name in q_to_culture:
                                         demo_id = q_to_culture[q_name]
                                         if not valid_demographics or demo_id in valid_demographics:
-                                            dimension_totals[q_name] = dimension_totals.get(q_name, 0.0) + val
-                                            dimension_counts[q_name] = dimension_counts.get(q_name, 0) + 1
+                                            dimension_group_totals[demo_id] = dimension_group_totals.get(demo_id, 0.0) + val
+                                            dimension_group_counts[demo_id] = dimension_group_counts.get(demo_id, 0) + 1
 
                                     # Acumular para el Gráfico de Tipo Cultura (por qp_topic)
                                     if q_name in q_to_topic:
@@ -135,24 +142,31 @@ def get_context(context):
                 if total_answers > 0:
                     global_score = round(total_score / total_answers, 2)
                     
-                # Construir Data: Gráfico de Dimensiones
-                for q_name, t_score in dimension_totals.items():
-                    avg = round(t_score / dimension_counts[q_name], 2)
-                    statement_text = q_to_statement.get(q_name, q_name)
-                    demo_id = q_to_culture.get(q_name, "N/A")
+                # Construir Data: Gráfico de Dimensiones (Agrupado por Demográfico)
+                for demo_id, t_score in dimension_group_totals.items():
+                    avg = round(t_score / dimension_group_counts[demo_id], 2)
                     demo_title = demo_title_map.get(demo_id, demo_id)
-                    
-                    # Añadir el tema para mostrar en Top 10 y Bottom 10
-                    t_id = q_to_topic.get(q_name)
-                    t_title = topic_title_map.get(t_id, "N/A") if t_id else "N/A"
                     
                     dimension_chart_data.append({
                         "culture": demo_title, 
+                        "score": avg
+                    })
+                dimension_chart_data.sort(key=lambda x: x["score"])
+
+                # Construir Data: Top y Bottom 10 (Por pregunta individual)
+                for q_name, t_score in question_totals.items():
+                    avg = round(t_score / question_counts[q_name], 2)
+                    statement_text = q_to_statement.get(q_name, q_name)
+                    
+                    t_id = q_to_topic.get(q_name)
+                    t_title = topic_title_map.get(t_id, "N/A") if t_id else "N/A"
+                    
+                    top_bottom_data.append({
                         "question": statement_text,
                         "topic": t_title,
                         "score": avg
                     })
-                dimension_chart_data.sort(key=lambda x: x["score"])
+                top_bottom_data.sort(key=lambda x: x["score"])
 
                 # Construir Data: Gráfico de Tipo de Cultura
                 for t_id, t_score in topic_totals.items():
@@ -168,6 +182,7 @@ def get_context(context):
         context.global_score = global_score
         context.culture_chart_data = json.dumps(culture_chart_data)
         context.dimension_chart_data = json.dumps(dimension_chart_data)
+        context.top_bottom_data = json.dumps(top_bottom_data)
     else:
         # Valores por defecto de seguridad si no hay medición seleccionada
         context.total_recipients = 0
@@ -176,5 +191,6 @@ def get_context(context):
         context.global_score = 0.0
         context.culture_chart_data = "[]"
         context.dimension_chart_data = "[]"
+        context.top_bottom_data = "[]"
 
     return context

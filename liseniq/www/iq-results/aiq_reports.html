@@ -129,6 +129,7 @@
         // Data de los gráficos inyectada desde Python
         window.cultureChartData = {{ culture_chart_data | default('[]') | safe }};
         window.dimensionChartData = {{ dimension_chart_data | default('[]') | safe }};
+        window.topBottomData = {{ top_bottom_data | default('[]') | safe }};
     </script>
     <script type="module" src="/assets/liseniq/js/aiq_reports.js"></script>
 {% endblock %}

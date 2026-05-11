@@ -294,7 +294,8 @@ function initTopBottomCards() {
     const bottomContainer = document.getElementById('bottom-10-list');
     if (!topContainer || !bottomContainer) return;
 
-    let data = parseBackendData(window.dimensionChartData);
+    // Utilizamos la nueva data 'topBottomData'
+    let data = parseBackendData(window.topBottomData || window.dimensionChartData);
     if (!data || data.length === 0) return;
 
     let ascendingData = [...data].sort((a, b) => a.score - b.score);
@@ -308,7 +309,7 @@ function initTopBottomCards() {
             return `
                 <div class="tb-row">
                     <div class="tb-topic">${item.topic || 'N/A'}</div>
-                    <div class="tb-question">${item.question}</div>
+                    <div class="tb-question">${item.question || 'N/A'}</div>
                     <div class="tb-score-wrapper">
                         <div class="tb-score-bar-bg">
                             <div class="tb-score-bar-fill ${colorClass}" style="width: ${percentage}%"></div>
@@ -452,7 +453,6 @@ function renderDimensionChart(type) {
 
     let data = parseBackendData(window.dimensionChartData);
     const categories = data.map(item => item.culture || 'N/A');
-    const questions = data.map(item => item.question || 'Sin pregunta');
     const scores = data.map(item => item.score || 0);
     const colorsArr = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
 
@@ -552,10 +552,9 @@ function renderDimensionChart(type) {
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
                     const score = series[seriesIndex][dataPointIndex];
-                    const questionText = questions[dataPointIndex]; 
                     const category = categories[dataPointIndex]; 
                     const color = w.config.colors[dataPointIndex % w.config.colors.length];
-                    return buildCustomTooltip(category, questionText, score, color);
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };
@@ -578,10 +577,9 @@ function renderDimensionChart(type) {
             tooltip: {
                 custom: function({series, seriesIndex, w}) {
                     const score = series[seriesIndex];
-                    const questionText = questions[seriesIndex]; 
                     const category = w.config.labels[seriesIndex]; 
                     const color = w.config.colors[seriesIndex % w.config.colors.length];
-                    return buildCustomTooltip(category, questionText, score, color);
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };

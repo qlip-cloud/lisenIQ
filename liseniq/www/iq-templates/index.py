@@ -60,7 +60,7 @@ def get_context(context):
             questions_count = len(doc.get("tp_questions", []))
             
             category_name = frappe.db.get_value(
-                "qp_IQ_QuestionCategory",
+                "qp_IQ_TemplateCategory",
                 template_data.tp_category,
                 "qnc_category"
             ) if template_data.tp_category else "Sin categoría"
@@ -92,7 +92,7 @@ def get_context(context):
 
     try:
         categories_from_db = frappe.get_all(
-            "qp_IQ_QuestionCategory",
+            "qp_IQ_TemplateCategory",
             fields=["name", "qnc_category", "qnc_is_popular"],
             order_by="qnc_category",
             ignore_permissions=True
@@ -251,11 +251,27 @@ def create_question_from_template_wizard(question_data):
         if data.get("qn_response_options"):
             for option in data.get("qn_response_options"):
                 if isinstance(option, dict):
-                    text = option.get("qo_option_text") or option.get("text") or ""
-                    value = option.get("qo_option_value")
-                    if value is None:
-                        value = option.get("value", text)
-                    url = option.get("qo_url") or option.get("url")
+                    # Extracción segura de valores, previniendo diccionarios anidados que rompen el SQL
+                    opt_text = option.get("qo_option_text") or option.get("text")
+                    opt_val = option.get("qo_option_value") or option.get("value")
+                    opt_url = option.get("qo_url") or option.get("url")
+
+                    if isinstance(opt_text, dict):
+                        if not opt_url:
+                            opt_url = opt_text.get("url") or opt_text.get("qo_url")
+                        if opt_val is None:
+                            opt_val = opt_text.get("value") or opt_text.get("qo_option_value")
+                        opt_text = opt_text.get("text") or opt_text.get("qo_option_text") or str(opt_text)
+
+                    if isinstance(opt_val, dict):
+                        opt_val = opt_val.get("value") or opt_val.get("qo_option_value") or str(opt_val)
+
+                    if isinstance(opt_url, dict):
+                        opt_url = opt_url.get("url") or opt_url.get("qo_url") or ""
+
+                    text = str(opt_text) if opt_text is not None else ""
+                    value = str(opt_val) if opt_val is not None else text
+                    url = str(opt_url) if opt_url else None
                 else:
                     text = str(option)
                     value = text
@@ -305,7 +321,7 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
         question_filters['qn_demographic'] = demographic
 
     # Obtener el ID de la categoría "Liderazgo" si existe
-    leadership_cat_name = frappe.db.get_value("qp_IQ_QuestionCategory", {"qnc_category": "Liderazgo"}, "name")
+    leadership_cat_name = frappe.db.get_value("qp_IQ_TemplateCategory", {"qnc_category": "Liderazgo"}, "name")
 
     if leadership_cat_name:
         # Si se seleccionó la categoría "Liderazgo", filtrar solo por esa categoría. De lo contrario, excluir esa categoría.
@@ -335,7 +351,7 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
 
     for q in questions:
         if q.get("qn_category"):
-            q["category_name"] = frappe.db.get_value("qp_IQ_QuestionCategory", q["qn_category"], "qnc_category")
+            q["category_name"] = frappe.db.get_value("qp_IQ_TemplateCategory", q["qn_category"], "qnc_category")
         else:
             q["category_name"] = "General"
 

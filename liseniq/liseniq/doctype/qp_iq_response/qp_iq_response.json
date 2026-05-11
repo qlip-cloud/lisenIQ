@@ -91,12 +91,12 @@
    "fieldname": "rs_question_category",
    "fieldtype": "Link",
    "label": "Categor\u00eda de Pregunta",
-   "options": "qp_IQ_QuestionCategory"
+   "options": "qp_IQ_TemplateCategory"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 18:58:24.763622",
+ "modified": "2026-05-08 19:18:29.370001",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Response",

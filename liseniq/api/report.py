@@ -658,7 +658,7 @@ def get_valid_surveys(filters=None):
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
-            LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
+            LEFT JOIN `tabqp_IQ_TemplateCategory` st ON st.name = tp.tp_category
             WHERE LOWER(st.qnc_category) = 'cultura'
         """
         if filters:
@@ -697,7 +697,7 @@ def get_valid_engagement_surveys(filters=None):
             INNER JOIN `tabqp_IQ_Survey` iq ON iq.su_name = s.name
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
-            LEFT JOIN `tabqp_IQ_QuestionCategory` st ON st.name = tp.tp_category
+            LEFT JOIN `tabqp_IQ_TemplateCategory` st ON st.name = tp.tp_category
             WHERE LOWER(st.qnc_category) = 'engagement'
         """
         if filters:

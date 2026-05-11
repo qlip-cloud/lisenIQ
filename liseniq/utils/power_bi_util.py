@@ -298,16 +298,35 @@ def get_embed_config(report_id: Optional[str] = None,
         "datasetId": dataset_id
     }
 
+    # Múltiples filtros para diferentes tablas, pero solo si se recibió filter_company
+    filtros_pbi = []
+
     if filter_company: 
-        result["filters"] = [{
+        # Filtro para la tabla original 'report'
+        filtros_pbi.append({
             "$schema": "http://powerbi.com/product/schema#basicFilter",
             "target": {
-                "table": "report",          # Nombre de la tabla en Power BI
-                "column": "company_name"    # Nombre de la columna en Power BI
+                "table": "report",          
+                "column": "company_name"    
             },
             "operator": "In",
             "values": [filter_company]
-        }]
+        })
+        
+        # Filtro para la nueva tabla 'evaluations_compare'
+        filtros_pbi.append({
+            "$schema": "http://powerbi.com/product/schema#basicFilter",
+            "target": {
+                "table": "evaluations_compare", 
+                "column": "company_name"    
+            },
+            "operator": "In",
+            "values": [filter_company]
+        })
+
+    # Si se construyeron filtros, asignarlos al diccionario resultante
+    if filtros_pbi:
+        result["filters"] = filtros_pbi
     
     # Logs para debuggear el filtro de compañía y la configuración utilizada
     debug_msg = (

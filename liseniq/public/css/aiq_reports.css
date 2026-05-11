@@ -1,0 +1,248 @@
+/* Contenedor principal de la página de reportes */
+.aiq-reports-wrapper {
+    padding: 1.5rem;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background-color: #ffffff;
+}
+
+.aiq-reports-wrapper::-webkit-scrollbar { width: 8px; }
+.aiq-reports-wrapper::-webkit-scrollbar-track { background: transparent; border-radius: 8px; }
+.aiq-reports-wrapper::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 8px; }
+.aiq-reports-wrapper::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+.aiq-reports-header {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.aiq-reports-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+/* Cards de Métricas */
+.metrics-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: #f9f9f8;
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.metric-title {
+    font-size: 0.9rem;
+    color: #4b5563;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+    line-height: 1;
+}
+
+.metric-subtitle {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+/* Encabezados flexibles para botones de acciones */
+.chart-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-left: 0.5rem;
+}
+
+.chart-section-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 0;
+}
+
+/* Grupo de botones para no separarlos */
+.chart-actions-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Estilos unificados para todos los botones del gráfico (Exportar y Toggle) */
+.chart-actions-group .btn {
+    color: #7c3aed;
+    background-color: #ffffff;
+    border: 1px solid #7c3aed;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+}
+
+.chart-actions-group .btn:hover {
+    background-color: #7c3aed;
+    color: #ffffff;
+    border-color: #7c3aed;
+}
+
+.btn-toggle-chart {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Tarjeta contenedora de los gráficos */
+.chart-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    margin-bottom: 2rem;
+}
+
+.chart-wrapper {
+    width: 100%;
+    height: 450px;
+}
+
+/* Estilos para la sección de top 10 y bottom 10 */
+.top-bottom-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    margin-top: 2rem;
+}
+
+.tb-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.tb-header-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+}
+
+/* Table top and bottom */
+.tb-table-header {
+    display: grid;
+    grid-template-columns: 25% 1fr 100px;
+    gap: 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4b5563;
+    border-bottom: 1px solid #d1d5db;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tb-row {
+    display: grid;
+    grid-template-columns: 25% 1fr 100px;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.tb-row:last-child {
+    border-bottom: none;
+}
+
+.tb-topic {
+    font-size: 0.8rem;
+    color: #6b7280;
+    font-weight: 600;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.tb-question {
+    font-size: 0.85rem;
+    color: #4b5563;
+    line-height: 1.4;
+}
+
+.tb-score-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.tb-score-bar-bg {
+    width: 30px;
+    height: 6px;
+    background-color: #f3f4f6;
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+}
+
+.tb-score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+}
+
+.fill-green { background-color: #10b981; }
+.fill-orange { background-color: #f97316; }
+
+.tb-score-value {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #1f2937;
+    width: 35px;
+    text-align: right;
+}
+
+@media (max-width: 768px) {
+    .chart-wrapper {
+        height: 350px;
+    }
+    .top-bottom-container {
+        grid-template-columns: 1fr;
+    }
+    .chart-header-flex {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .chart-actions-group {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+}

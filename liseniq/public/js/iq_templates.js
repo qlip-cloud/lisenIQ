@@ -182,6 +182,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span>Tipo: ${frappe.utils.escape_html(questionDisplayName)}</span>
                         <div>
                             <span class="review-question-tag">Tema: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                            ${question.culture ? `<span class="review-question-tag" style="margin-left:10px;">Cultura: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
                         </div>
                     </div>
                     ${optionsHtml}
@@ -212,6 +213,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     qn_nps_min: q.nps_min,
                     qn_nps_max: q.nps_max,
                     qn_demographic: q.demographic,
+                    qp_topic: q.culture,
                     qp_others: q.qp_others ? 1 : 0,
                     qp_none_above: q.qp_none_above ? 1 : 0
                 };

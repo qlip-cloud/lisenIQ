@@ -34,7 +34,7 @@
     </div>
 
     <div class="row mt-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <span class="tooltip-wrapper" style="margin-left:4px;">
                 <label data-tooltip-bottom="Define la forma en la que el participante podrá responder la pregunta: opción múltiple, likert, abiertas, texto corto, selección múltiple, entre otros. Selecciona el tipo que mejor se ajuste al dato que deseas recoger." for="new_question_type" class="small text-muted">Tipo de respuesta</label>
                 <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
@@ -47,7 +47,7 @@
             </select>
              <small id="new_question_type_error" class="form-error-message d-none">Este campo es requerido.</small>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="form-group" style="position: relative;">
                 <span class="tooltip-wrapper" style="margin-left:4px;">
                     <label data-tooltip-bottom="Etiqueta que clasifica la pregunta según su contenido (por ejemplo: liderazgo, comunicación, clima, servicio al cliente, etc.). Facilita la organización y análisis de los datos." for="new_question_demographic" class="small text-muted">Tema</label>
@@ -56,6 +56,17 @@
                 <input type="text" class="form-control" id="new_question_demographic" placeholder="Buscar o crear tema..." autocomplete="off">
                 <div class="autocomplete-results"></div>
                 <small id="new_question_demographic_error" class="form-error-message d-none"></small>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group" style="position: relative;">
+                <span class="tooltip-wrapper" style="margin-left:4px;">
+                    <label data-tooltip-bottom="Etiqueta que asocia la pregunta a una cultura organizacional específica." for="new_question_culture" class="small text-muted">Cultura</label>
+                    <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
+                </span>
+                <input type="text" class="form-control" id="new_question_culture" placeholder="Buscar o crear cultura..." autocomplete="off">
+                <div class="autocomplete-results" id="culture-autocomplete-results"></div>
+                <small id="new_question_culture_error" class="form-error-message d-none"></small>
             </div>
         </div>
     </div>

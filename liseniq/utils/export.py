@@ -4,6 +4,8 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from frappe.utils.pdf import get_pdf
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
+import re
+from bs4 import BeautifulSoup
 
 
 def _sanitize_filename(value):
@@ -32,9 +34,11 @@ def _leadership_pdf_options():
         "margin-bottom": "0mm",
         "margin-left": "0mm",
         "margin-right": "0mm",
-        "zoom": "1.5",
         "header-spacing": "0",
         "disable-smart-shrinking": "",
+        "enable-local-file-access": "",  
+        "dpi": "300",  
+        "print-media-type": "",
     }
 
 
@@ -47,6 +51,59 @@ def _ensure_pdf_header_footer_placeholders(html):
         return html.replace("</body>", placeholders + "</body>", 1)
     return html + placeholders
 
+
+def _compile_css_for_pdf(html):
+
+
+
+    css_variables = {
+        "--brand-primary": "#502394",
+        "--brand-secondary": "#14B8A6",
+        "--brand-primary-light": "#f3e8ff",
+        "--brand-light-gray": "#FAF9F8",
+        "--brand-border-color": "#dee2e6",
+        "--text-color-primary": "#212529",
+        "--text-color-secondary": "#6c757d",
+    }
+    
+    for var_name, var_value in css_variables.items():
+        html = html.replace(f"var({var_name})", var_value)
+    
+    style_pattern = r'<style[^>]*>(.*?)</style>'
+    
+    def process_style_tag(match):
+        style_content = match.group(1)
+        
+
+        before_pattern = r'([\w\s\-\.,#:>]+)::before\s*\{([^}]*)\}'
+        style_content = re.sub(before_pattern, lambda m: _handle_pseudo_element(m, "before"), style_content)
+
+        after_pattern = r'([\w\s\-\.,#:>]+)::after\s*\{([^}]*)\}'
+        style_content = re.sub(after_pattern, lambda m: _handle_pseudo_element(m, "after"), style_content)
+        
+        return f'<style>{style_content}</style>'
+    
+    html = re.sub(style_pattern, process_style_tag, html, flags=re.DOTALL)
+
+    z_pattern = r'z-index:\s*(\d+)'
+    
+    def limit_z_index(match):
+        z_value = int(match.group(1))
+        limited_z = min(z_value, 999)
+        return f'z-index: {limited_z}'
+    
+    html = re.sub(z_pattern, limit_z_index, html)
+    
+    return html
+
+
+def _handle_pseudo_element(match, pseudo_type):
+    """Convierte pseudoelementos a estilos inline """
+    selector = match.group(1).strip()
+    properties = match.group(2).strip()
+    
+    return f'{selector} {{ {properties} }}'
+
 @frappe.whitelist()
 def export_survey_results(survey_name):
     current_user = frappe.session.user
@@ -55,8 +112,11 @@ def export_survey_results(survey_name):
         frappe.flags.ignore_permissions = True
         survey = frappe.get_doc("qp_IQ_Survey", survey_name)
         survey_name = survey.su_name
-        
-        REPORT_NAME = "Survey Response Custom Report Front"
+        is_leadership = survey.su_is_leadership
+        if is_leadership:
+            REPORT_NAME = "Engagement Responses"
+        else:
+            REPORT_NAME = "Survey Response Custom Report Front"
         filters = {"survey": survey_name}
 
         report = frappe.get_doc("Report", REPORT_NAME)
@@ -106,11 +166,12 @@ def export_survey_results(survey_name):
         frappe.session.user = current_user
 
 @frappe.whitelist()
-def get_demographics():
+def get_demographics(survey):
     """Obtiene la lista de demográficos de tipo Contacto"""
+    survey_owner = frappe.get_value("qp_IQ_Survey", {"name": survey}, "su_owner")
     demographics = frappe.get_all(
         'qp_IQ_DemographicType',
-        filters={'dt_object_type': 'Contacto'},
+        filters={'dt_object_type': 'Contacto', 'dt_creator_company': survey_owner},
         fields=['name', 'dt_title'],
         order_by='dt_title'
     )
@@ -252,6 +313,7 @@ def export_leadership_reports_zip(survey_name):
                     no_letterhead=1,
                 )
                 html = _ensure_pdf_header_footer_placeholders(html)
+                html = _compile_css_for_pdf(html)
                 pdf_bytes = get_pdf(html, options=_leadership_pdf_options())
                 leader_name = _sanitize_filename(report_row.leader_name or report_doc.leader_name or report_doc.name)
                 zip_file.writestr(f"{leader_name}_{report_doc.name}.pdf", pdf_bytes)

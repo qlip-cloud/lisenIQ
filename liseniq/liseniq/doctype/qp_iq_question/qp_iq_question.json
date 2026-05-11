@@ -19,6 +19,7 @@
   "qn_optional",
   "qp_sec_od",
   "qn_demographic",
+  "qp_topic",
   "qn_is_demographic",
   "qn_statement_positive",
   "qn_statement_negative",
@@ -182,11 +183,17 @@
    "fieldname": "qp_none_above",
    "fieldtype": "Check",
    "label": "Permitir \"Ninguna\""
+  },
+  {
+   "fieldname": "qp_topic",
+   "fieldtype": "Link",
+   "label": "Tema de la pregunta",
+   "options": "qp_IQ_DemographicType"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-19 11:43:42.964867",
+ "modified": "2026-04-30 18:36:20.335726",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

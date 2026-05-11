@@ -1,4 +1,26 @@
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // Validacion de funcionalidades (features) para mostrar/ocultar elementos o activar flujos alternativos
+    function hasFeature(featureCode) {
+        try {
+            // Convertimos el string de la variable global a un Arreglo real
+            const featuresArray = JSON.parse(window.liseniqAppFeatures || '[]');
+            return featuresArray.includes(featureCode);
+        } catch (e) {
+            console.error("Error al procesar las funcionalidades de la suscripción:", e);
+            return false;
+        }
+    }
+
+    // (Opcional) Ocultar visualmente botones bloqueados al cargar la página
+    document.querySelectorAll('[data-feature]').forEach(el => {
+        const requiredFeature = el.getAttribute('data-feature');
+        if (requiredFeature && !hasFeature(requiredFeature)) {
+            el.style.opacity = '0.5';
+            el.setAttribute('title', `Requiere un plan superior. Tu plan actual: ${window.liseniqSubscriptionPlan || 'Básico'}`);
+        }
+    });
+
     const filterButton = document.querySelector('.filter-button');
     const filterDropdown = document.getElementById('filter-dropdown');
     const filterArrow = document.querySelector('.filter-arrow');
@@ -69,14 +91,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.getElementById('downloadReportUrl').value = url;
         
-        loadDemographics();
+        var survey = btn.getAttribute('data-survey');
+        loadDemographics(survey);
         
         document.getElementById('downloadReportModal').style.display = 'flex';
     });
     
-    function loadDemographics() {
+    function loadDemographics(survey) {
         frappe.call({
             method: 'liseniq.utils.export.get_demographics',
+            args: {
+                survey: survey
+            },
             callback: function(r) {
                 if (r.message) {
                     const select1 = document.getElementById('demographic1');

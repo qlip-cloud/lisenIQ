@@ -31,7 +31,9 @@
   "sb_4",
   "question_summary",
   "sb_5",
-  "open_questions_answer"
+  "open_questions_answer",
+  "sb_6",
+  "theme_summary"
  ],
  "fields": [
   {
@@ -169,11 +171,22 @@
    "fieldname": "total_responses_team",
    "fieldtype": "Int",
    "label": "Total de Respuestas (Colaboradores)"
+  },
+  {
+   "fieldname": "sb_6",
+   "fieldtype": "Section Break",
+   "label": "Resultados por Tema"
+  },
+  {
+   "fieldname": "theme_summary",
+   "fieldtype": "Table",
+   "label": "Temas",
+   "options": "qp_IQ_Theme_Summary"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-09 08:51:34.842629",
+ "modified": "2026-05-05 14:31:57.458818",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Leader_360_Report",

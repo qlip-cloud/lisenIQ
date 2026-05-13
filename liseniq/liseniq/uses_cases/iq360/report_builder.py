@@ -55,6 +55,66 @@ def _get_logger():
   return frappe.logger('iq360_report_builder', allow_site=True)
 
 
+def _resolve_previous_comparable_survey_name(current_survey):
+  """Find previous leadership measurement for same company and template."""
+  if not current_survey:
+    return None
+
+  owner = getattr(current_survey, 'su_owner', None)
+  template = getattr(current_survey, 'su_template', None)
+  if not owner or not template:
+    return None
+
+  current_ts = frappe.utils.get_datetime(getattr(current_survey, 'su_end_date', None) or getattr(current_survey, 'creation', None))
+  candidates = frappe.get_all(
+    'qp_IQ_Survey',
+    filters={
+      'su_owner': owner,
+      'su_template': template,
+      'su_is_leadership': 1,
+      'name': ['!=', current_survey.name],
+    },
+    fields=['name', 'su_name', 'su_end_date', 'creation'],
+  )
+
+  previous = None
+  for row in candidates:
+    row_ts = frappe.utils.get_datetime(row.get('su_end_date') or row.get('creation'))
+    if current_ts and row_ts and row_ts >= current_ts:
+      continue
+    if not previous:
+      previous = row
+      continue
+
+    prev_ts = frappe.utils.get_datetime(previous.get('su_end_date') or previous.get('creation'))
+    if row_ts and prev_ts and row_ts > prev_ts:
+      previous = row
+
+  return previous.get('su_name') if previous else None
+
+
+def _get_previous_leader_question_others_map(leader_name, previous_survey_name):
+  """Return question_text -> others_score map from previous generated leader report."""
+  if not leader_name or not previous_survey_name:
+    return {}
+
+  report_name = frappe.db.get_value(
+    'qp_IQ_Leader_360_Report',
+    {'leader_name': leader_name, 'survey_name': previous_survey_name},
+    'name',
+  )
+  if not report_name:
+    return {}
+
+  report = frappe.get_doc('qp_IQ_Leader_360_Report', report_name)
+  question_map = {}
+  for row in (report.question_summary or []):
+    question_text = row.get('question_text')
+    if question_text:
+      question_map[question_text] = row.get('others_score')
+  return question_map
+
+
 
 
 def build_leaders_report(survey_id):
@@ -74,6 +134,13 @@ def build_leaders_report(survey_id):
   survey_name = survey.su_name
   logger.info('survey loaded | survey_name=%s', survey_name)
 
+  previous_survey_name = _resolve_previous_comparable_survey_name(survey)
+  logger.info(
+    'previous comparable survey resolved | current_survey=%s previous_survey=%s',
+    survey_name,
+    previous_survey_name,
+  )
+
   # Get responses for the survey
   responses = get_all_responses_for_survey(survey_name)
   logger.info('responses fetched | count=%s', len(responses or []))
@@ -89,7 +156,12 @@ def build_leaders_report(survey_id):
   # Process responses for each leader and collect results
   for leader, leader_responses in leaders_responses.items():
     logger.info('processing leader | leader=%s responses=%s', leader, len(leader_responses or []))
-    leader_data = process_leader_data(survey_id, leader_responses, questions_data)
+    leader_data = process_leader_data(
+      survey_id,
+      leader_responses,
+      questions_data,
+      previous_survey_name=previous_survey_name,
+    )
     if not leader_data:
       logger.info('leader skipped | leader=%s reason=empty_data', leader)
       continue
@@ -98,22 +170,111 @@ def build_leaders_report(survey_id):
     leader_data['survey_name'] = survey_name
     leaders_data.append(leader_data)
 
-  # Average of overall scores across all evaluated leaders
-  overall_scores = [
-    data.get('overall_score')
-    for data in leaders_data
-    if data.get('overall_score') is not None
-  ]
-  avg_leaders_score = average(overall_scores)
-  logger.info(
-    'leaders average computed | leaders_with_score=%s avg_leaders_score=%s',
-    len(overall_scores),
-    avg_leaders_score,
-  )
+  # Average of all responses across all evaluated leaders (not average of averages)
+  all_scores = []
+  for data in leaders_data:
+    scores = data.get('_all_scores', [])
+    if scores:
+      all_scores.extend(scores)
+  avg_leaders_score = average(all_scores)
+
+  # Average leaders score by dimension (same measurement), including evaluator groups.
+  dimension_avg_leaders_scores = {}
+  dimension_group_avg_leaders_scores = {}
+  dimension_values = defaultdict(list)
+  dimension_group_values = defaultdict(lambda: defaultdict(list))
+  for data in leaders_data:
+    # Usar los valores crudos si están disponibles, sino usar los promedios (compatibilidad)
+    raw_scores = data.get('_raw_dimension_scores', {})
+    if raw_scores:
+      # Usar valores crudos - más correcto
+      for dimension_name, raw_data in raw_scores.items():
+        dimension_values[dimension_name].extend(raw_data.get('all_values', []))
+        dimension_group_values[dimension_name]['others_score'].extend(raw_data.get('others_values', []))
+        dimension_group_values[dimension_name][SCORE_KEY_SELF].extend(raw_data.get(f'{SCORE_KEY_SELF}_values', []))
+        dimension_group_values[dimension_name][SCORE_KEY_MANAGER].extend(raw_data.get(f'{SCORE_KEY_MANAGER}_values', []))
+        dimension_group_values[dimension_name][SCORE_KEY_PEER].extend(raw_data.get(f'{SCORE_KEY_PEER}_values', []))
+        dimension_group_values[dimension_name][SCORE_KEY_TEAM].extend(raw_data.get(f'{SCORE_KEY_TEAM}_values', []))
+    else:
+      # Fallback si no hay valores crudos (para compatibilidad con datos antiguos)
+      for dimension_name, dimension_data in (data.get('dimension_summary') or {}).items():
+        dimension_avg = dimension_data.get('avg_score')
+        if dimension_avg is not None:
+          dimension_values[dimension_name].append(dimension_avg)
+
+        for score_key in ('others_score', SCORE_KEY_SELF, SCORE_KEY_MANAGER, SCORE_KEY_PEER, SCORE_KEY_TEAM):
+          score_value = dimension_data.get(score_key)
+          if score_value is not None:
+            dimension_group_values[dimension_name][score_key].append(score_value)
+
+  for dimension_name, values in dimension_values.items():
+    dimension_avg_leaders_scores[dimension_name] = average(values)
+
+  for dimension_name, score_groups in dimension_group_values.items():
+    dimension_group_avg_leaders_scores[dimension_name] = {
+      score_key: average(values)
+      for score_key, values in score_groups.items()
+      if values
+    }
+
+  # Average leaders score by theme (same measurement), including evaluator groups.
+  theme_avg_leaders_scores = {}
+  theme_group_avg_leaders_scores = {}
+  theme_values = defaultdict(list)
+  theme_group_values = defaultdict(lambda: defaultdict(list))
+  for data in leaders_data:
+    # Usar los valores crudos si están disponibles, sino usar los promedios (compatibilidad)
+    raw_scores = data.get('_raw_theme_scores', {})
+    if raw_scores:
+      # Usar valores crudos - más correcto
+      for theme_name, raw_data in raw_scores.items():
+        theme_values[theme_name].extend(raw_data.get('all_values', []))
+        theme_group_values[theme_name]['others_score'].extend(raw_data.get('others_values', []))
+        theme_group_values[theme_name][SCORE_KEY_SELF].extend(raw_data.get(f'{SCORE_KEY_SELF}_values', []))
+        theme_group_values[theme_name][SCORE_KEY_MANAGER].extend(raw_data.get(f'{SCORE_KEY_MANAGER}_values', []))
+        theme_group_values[theme_name][SCORE_KEY_PEER].extend(raw_data.get(f'{SCORE_KEY_PEER}_values', []))
+        theme_group_values[theme_name][SCORE_KEY_TEAM].extend(raw_data.get(f'{SCORE_KEY_TEAM}_values', []))
+    else:
+      # Fallback si no hay valores crudos (para compatibilidad con datos antiguos)
+      for theme_name, theme_data in (data.get('theme_summary') or {}).items():
+        theme_avg = theme_data.get('avg_score')
+        if theme_avg is not None:
+          theme_values[theme_name].append(theme_avg)
+
+        for score_key in ('others_score', SCORE_KEY_SELF, SCORE_KEY_MANAGER, SCORE_KEY_PEER, SCORE_KEY_TEAM):
+          score_value = theme_data.get(score_key)
+          if score_value is not None:
+            theme_group_values[theme_name][score_key].append(score_value)
+
+  for theme_name, values in theme_values.items():
+    theme_avg_leaders_scores[theme_name] = average(values)
+
+  for theme_name, score_groups in theme_group_values.items():
+    theme_group_avg_leaders_scores[theme_name] = {
+      score_key: average(values)
+      for score_key, values in score_groups.items()
+      if values
+    }
 
   # Build or update the report for each leader
   for leader_data in leaders_data:
     leader_data['avg_leaders_score'] = avg_leaders_score
+    for dimension_name, dimension_data in (leader_data.get('dimension_summary') or {}).items():
+      dimension_data['average_leaders_score'] = dimension_avg_leaders_scores.get(dimension_name)
+      dimension_group_avg = dimension_group_avg_leaders_scores.get(dimension_name, {})
+      dimension_data['average_leaders_others_score'] = dimension_group_avg.get('others_score')
+      dimension_data['average_leaders_self_score'] = dimension_group_avg.get(SCORE_KEY_SELF)
+      dimension_data['average_leaders_manager_score'] = dimension_group_avg.get(SCORE_KEY_MANAGER)
+      dimension_data['average_leaders_peers_score'] = dimension_group_avg.get(SCORE_KEY_PEER)
+      dimension_data['average_leaders_team_score'] = dimension_group_avg.get(SCORE_KEY_TEAM)
+    for theme_name, theme_data in (leader_data.get('theme_summary') or {}).items():
+      theme_data['average_leaders_score'] = theme_avg_leaders_scores.get(theme_name)
+      theme_group_avg = theme_group_avg_leaders_scores.get(theme_name, {})
+      theme_data['average_leaders_others_score'] = theme_group_avg.get('others_score')
+      theme_data['average_leaders_self_score'] = theme_group_avg.get(SCORE_KEY_SELF)
+      theme_data['average_leaders_manager_score'] = theme_group_avg.get(SCORE_KEY_MANAGER)
+      theme_data['average_leaders_peers_score'] = theme_group_avg.get(SCORE_KEY_PEER)
+      theme_data['average_leaders_team_score'] = theme_group_avg.get(SCORE_KEY_TEAM)
     # Build or update the report for the leader
     report = build_leader_report(leader_data)
     logger.info(
@@ -167,15 +328,20 @@ def group_responses_by_leader(responses):
     return leaders_responses
 
 
-def process_leader_responses(survey_id, leaders_responses, questions_data):
+def process_leader_responses(survey_id, leaders_responses, questions_data, previous_survey_name=None):
     # Process responses for each leader
     leaders_report = {}
     for leader, responses in leaders_responses.items():
-        leaders_report[leader] = process_leader_data(survey_id, responses, questions_data)
+        leaders_report[leader] = process_leader_data(
+          survey_id,
+          responses,
+          questions_data,
+          previous_survey_name=previous_survey_name,
+        )
     return leaders_report
 
 
-def process_leader_data(survey_id, responses, questions_data):
+def process_leader_data(survey_id, responses, questions_data, previous_survey_name=None):
     logger = _get_logger()
 
     if not responses:
@@ -189,6 +355,12 @@ def process_leader_data(survey_id, responses, questions_data):
     leader_data['leader_name'] = first.get('custom_evaluatee')
     leader_data['survey_name'] = first.get('survey')
     leader_data['total_responses'] = len(responses)
+    previous_question_others_map = {}
+    if previous_survey_name:
+      previous_question_others_map = _get_previous_leader_question_others_map(
+        leader_data['leader_name'],
+        previous_survey_name,
+      )
 
     evaluators = get_leader_evaluators(leader_data['leader_name'], survey_id)
     evaluator_ids = {
@@ -231,6 +403,8 @@ def process_leader_data(survey_id, responses, questions_data):
     scores = []
     group_scores = defaultdict(list)
     dimension_scores = defaultdict(lambda: defaultdict(list))
+    dimension_themes = defaultdict(set)  # Rastrear temas por dimensión
+    theme_scores = defaultdict(lambda: defaultdict(list))
     question_scores = defaultdict(lambda: defaultdict(list))
     open_questions_answers = defaultdict(list)  
     total_responses_peers = 0
@@ -279,12 +453,18 @@ def process_leader_data(survey_id, responses, questions_data):
             if question_info:
                 dimension = question_info.get('category') or 'Sin Categoría'
                 dimension_scores[dimension][score_key].append(value)
+                
+                # Tema
+                theme = question_info.get('theme') or 'Sin Tema'
+                dimension_themes[dimension].add(theme)
+                theme_scores[theme][score_key].append(value)
 
             # Comportamiento
             question_scores[resp['question']][score_key].append(value)
 
     # Resumen Global
     leader_data['overall_score'] = average(scores)
+    leader_data['_all_scores'] = scores  # Guardar todas las respuestas individuales
     leader_data['total_responses_peers'] = total_responses_peers
     leader_data['total_responses_managers'] = total_responses_managers
     leader_data['total_responses_team'] = total_responses_team
@@ -315,6 +495,7 @@ def process_leader_data(survey_id, responses, questions_data):
 
     # Resumen por dimensión
     leader_data['dimension_summary'] = {}
+    leader_data['_raw_dimension_scores'] = {}
 
     for dim, roles in dimension_scores.items():
         dim_data = {}
@@ -335,8 +516,54 @@ def process_leader_data(survey_id, responses, questions_data):
 
         dim_data['others_score'] = average(others)
         dim_data['avg_score'] = average(all_values)
+        # Agregar temas encontrados en esta dimensión
+        dim_data['theme_name'] = ', '.join(sorted(dimension_themes.get(dim, [])))
 
         leader_data['dimension_summary'][dim] = dim_data
+        # Guardar los valores crudos para calcular promedios correctos a nivel de survey
+        leader_data['_raw_dimension_scores'][dim] = {
+            'all_values': all_values,
+            'others_values': others,
+        }
+        for role, values in roles.items():
+            if f'{role}_values' not in leader_data['_raw_dimension_scores'][dim]:
+                leader_data['_raw_dimension_scores'][dim][f'{role}_values'] = []
+            leader_data['_raw_dimension_scores'][dim][f'{role}_values'].extend(values)
+    
+    # Resumen por tema
+    leader_data['theme_summary'] = {}
+    leader_data['_raw_theme_scores'] = {}
+
+    for theme, roles in theme_scores.items():
+        theme_data = {}
+
+        for role, values in roles.items():
+            theme_data[role] = average(values)
+
+        others = [
+            v for role, values in roles.items()
+            if role != SCORE_KEY_SELF
+            for v in values
+        ]
+
+        # Total
+        all_values = []
+        for values in roles.values():
+            all_values.extend(values)
+
+        theme_data['others_score'] = average(others)
+        theme_data['avg_score'] = average(all_values)
+
+        leader_data['theme_summary'][theme] = theme_data
+        # Guardar los valores crudos para calcular promedios correctos a nivel de survey
+        leader_data['_raw_theme_scores'][theme] = {
+            'all_values': all_values,
+            'others_values': others,
+        }
+        for role, values in roles.items():
+            if f'{role}_values' not in leader_data['_raw_theme_scores'][theme]:
+                leader_data['_raw_theme_scores'][theme][f'{role}_values'] = []
+            leader_data['_raw_theme_scores'][theme][f'{role}_values'].extend(values)
 
       
     # Resumen por comportamiento
@@ -362,7 +589,12 @@ def process_leader_data(survey_id, responses, questions_data):
 
         q_data['question_text'] = q_info.get('text', question)
         q_data['question_dimension'] = q_info.get('category', 'Sin Categoría')
+        q_data['theme_name'] = q_info.get('theme', 'Sin Tema')
         q_data['others_score'] = average(others)
+        previous_others_score = previous_question_others_map.get(q_data['question_text'])
+        q_data['trend_delta'] = None
+        if previous_others_score is not None and q_data['others_score'] is not None:
+          q_data['trend_delta'] = q_data['others_score'] - previous_others_score
         q_data['gap_self_vs_others'] = q_data.get(SCORE_KEY_SELF, 0) - q_data.get('others_score', 0)
         q_data['std_dev'] = std_dev(all_values) if all_values else 0  
         #q_data['avg_score'] = average(all_values)
@@ -373,11 +605,12 @@ def process_leader_data(survey_id, responses, questions_data):
     leader_data['open_questions_answers'] = open_questions_answers
 
     logger.info(
-        'leader data processed | leader=%s total_responses=%s total_evaluators=%s dimension_rows=%s question_rows=%s open_questions=%s',
+        'leader data processed | leader=%s total_responses=%s total_evaluators=%s dimension_rows=%s theme_rows=%s question_rows=%s open_questions=%s',
         leader_data.get('leader_name'),
         leader_data.get('total_responses'),
         leader_data.get('total_evaluators'),
         len(leader_data.get('dimension_summary') or {}),
+        len(leader_data.get('theme_summary') or {}),
         len(leader_data.get('question_summary') or []),
         len(leader_data.get('open_questions_answers') or {}),
     )
@@ -429,12 +662,37 @@ def build_leader_report(leader_data):
   for dimension_name, values in (leader_data.get('dimension_summary') or {}).items():
     report.append('dimension_summary', {
       'dimension_name': dimension_name,
+      'theme_name': values.get('theme_name'),
       SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
       SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
       SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),
       SCORE_KEY_TEAM: _round2(values.get(SCORE_KEY_TEAM)),
       'others_score': _round2(values.get('others_score')),
       'avg_score': _round2(values.get('avg_score')),
+      'average_leaders_score': _round2(values.get('average_leaders_score')),
+      'average_leaders_others_score': _round2(values.get('average_leaders_others_score')),
+      'average_leaders_self_score': _round2(values.get('average_leaders_self_score')),
+      'average_leaders_manager_score': _round2(values.get('average_leaders_manager_score')),
+      'average_leaders_peers_score': _round2(values.get('average_leaders_peers_score')),
+      'average_leaders_team_score': _round2(values.get('average_leaders_team_score')),
+    })
+
+  report.set('theme_summary', [])
+  for theme_name, values in (leader_data.get('theme_summary') or {}).items():
+    report.append('theme_summary', {
+      'theme_name': theme_name,
+      SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
+      SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
+      SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),
+      SCORE_KEY_TEAM: _round2(values.get(SCORE_KEY_TEAM)),
+      'others_score': _round2(values.get('others_score')),
+      'avg_score': _round2(values.get('avg_score')),
+      'average_leaders_score': _round2(values.get('average_leaders_score')),
+      'average_leaders_others_score': _round2(values.get('average_leaders_others_score')),
+      'average_leaders_self_score': _round2(values.get('average_leaders_self_score')),
+      'average_leaders_manager_score': _round2(values.get('average_leaders_manager_score')),
+      'average_leaders_peers_score': _round2(values.get('average_leaders_peers_score')),
+      'average_leaders_team_score': _round2(values.get('average_leaders_team_score')),
     })
 
   report.set('question_summary', [])
@@ -442,11 +700,13 @@ def build_leader_report(leader_data):
     report.append('question_summary', {
       'question_text': values.get('question_text'),
       'question_dimension': values.get('question_dimension'),
+      'theme_name': values.get('theme_name'),
       SCORE_KEY_SELF: _round2(values.get(SCORE_KEY_SELF)),
       SCORE_KEY_MANAGER: _round2(values.get(SCORE_KEY_MANAGER)),
       SCORE_KEY_PEER: _round2(values.get(SCORE_KEY_PEER)),
       SCORE_KEY_TEAM: _round2(values.get(SCORE_KEY_TEAM)),
       'others_score': _round2(values.get('others_score')),
+      'trend_delta': _round2(values.get('trend_delta')),
       'gap_self_vs_others': _round2(values.get('gap_self_vs_others')),
       'std_deviation': _round2(values.get('std_dev')),
     })

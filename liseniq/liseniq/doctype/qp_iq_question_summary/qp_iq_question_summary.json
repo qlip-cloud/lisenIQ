@@ -13,7 +13,9 @@
   "peers_score",
   "team_score",
   "gap_self_vs_others",
-  "std_deviation"
+  "std_deviation",
+  "trend_delta",
+  "theme_name"
  ],
  "fields": [
   {
@@ -65,12 +67,22 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Pares"
+  },
+  {
+   "fieldname": "trend_delta",
+   "fieldtype": "Float",
+   "label": "Tendencia"
+  },
+  {
+   "fieldname": "theme_name",
+   "fieldtype": "Data",
+   "label": "Tema"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-30 14:38:59.178266",
+ "modified": "2026-05-06 10:53:09.979090",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question_Summary",

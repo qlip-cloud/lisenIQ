@@ -1,11 +1,10 @@
 {
  "actions": [],
- "creation": "2026-03-26 12:28:00.395296",
+ "creation": "2026-05-05 14:28:48.697125",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "dimension_name",
   "theme_name",
   "others_score",
   "self_score",
@@ -22,10 +21,15 @@
  ],
  "fields": [
   {
-   "fieldname": "dimension_name",
+   "fieldname": "theme_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Dimensi\u00f3n"
+   "label": "Tema"
+  },
+  {
+   "fieldname": "others_score",
+   "fieldtype": "Float",
+   "label": "Otros"
   },
   {
    "fieldname": "self_score",
@@ -40,6 +44,12 @@
    "label": "L\u00edder"
   },
   {
+   "fieldname": "peers_score",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Pares"
+  },
+  {
    "fieldname": "team_score",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -50,22 +60,6 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Promedio"
-  },
-  {
-   "fieldname": "others_score",
-   "fieldtype": "Float",
-   "label": "Otros"
-  },
-  {
-   "fieldname": "peers_score",
-   "fieldtype": "Float",
-   "in_list_view": 1,
-   "label": "Pares"
-  },
-  {
-   "fieldname": "average_leaders_score",
-   "fieldtype": "Float",
-   "label": "Promedio L\u00edderes"
   },
   {
    "fieldname": "average_leaders_others_score",
@@ -93,18 +87,18 @@
    "label": "Promedio Lideres Colaboradores"
   },
   {
-   "fieldname": "theme_name",
-   "fieldtype": "Data",
-   "label": "Teme"
+   "fieldname": "average_leaders_score",
+   "fieldtype": "Float",
+   "label": "Promedio L\u00edderes"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-05-05 14:27:15.097781",
+ "modified": "2026-05-05 15:05:33.529374",
  "modified_by": "Administrator",
  "module": "Liseniq",
- "name": "qp_IQ_Dimension_Summary",
+ "name": "qp_IQ_Theme_Summary",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",

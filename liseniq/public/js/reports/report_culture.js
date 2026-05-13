@@ -22,6 +22,7 @@ export function initCultureReport(dataConfig, surveyName) {
     // Procesar la data inyectada desde el backend para este reporte
     const cultureData = parseBackendData(dataConfig.culture_chart_data);
     const dimensionData = parseBackendData(dataConfig.dimension_chart_data);
+    const groupedDimensionData = parseBackendData(dataConfig.grouped_dimension_chart_data);
 
     // Inicializamos la sección de top 10 y bottom 10
     initTopBottomCards(dimensionData);
@@ -62,7 +63,7 @@ export function initCultureReport(dataConfig, surveyName) {
 
     // Renderizar Gráfico de Dimensiones
     if (appFeatures.includes('aiq_rep_dimension')) {
-        renderDimensionChart(dimensionChartType, dimensionData);
+        renderDimensionChart(dimensionChartType, groupedDimensionData);
         
         const btnDimension = document.getElementById('btn-toggle-dimension');
         if (btnDimension) {
@@ -74,7 +75,7 @@ export function initCultureReport(dataConfig, surveyName) {
                 this.title = tooltipText;
                 this.innerHTML = `<i class="fa ${icon}" aria-hidden="true"></i>`;
                 
-                renderDimensionChart(dimensionChartType, dimensionData);
+                renderDimensionChart(dimensionChartType, groupedDimensionData);
             });
         }
 
@@ -248,8 +249,8 @@ function renderDimensionChart(type, data) {
     const chartContainer = document.getElementById('dimension-chart-container');
     if (!chartContainer) return;
 
+    // Utilizamos solo las categorías agrupadas (sin preguntas individuales)
     const categories = data.map(item => item.culture || 'N/A');
-    const questions = data.map(item => item.question || 'Sin pregunta');
     const scores = data.map(item => item.score || 0);
     const colorsArr = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
 
@@ -328,10 +329,10 @@ function renderDimensionChart(type, data) {
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
                     const score = series[seriesIndex][dataPointIndex];
-                    const questionText = questions[dataPointIndex]; 
                     const category = categories[dataPointIndex]; 
                     const color = w.config.colors[dataPointIndex % w.config.colors.length];
-                    return buildCustomTooltip(category, questionText, score, color);
+                    // Pasamos null ya que no hay una pregunta específica para este grupo
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };
@@ -352,10 +353,10 @@ function renderDimensionChart(type, data) {
             tooltip: {
                 custom: function({series, seriesIndex, w}) {
                     const score = series[seriesIndex];
-                    const questionText = questions[seriesIndex]; 
                     const category = w.config.labels[seriesIndex]; 
                     const color = w.config.colors[seriesIndex % w.config.colors.length];
-                    return buildCustomTooltip(category, questionText, score, color);
+                    // Pasamos null ya que no hay una pregunta específica para este grupo
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };

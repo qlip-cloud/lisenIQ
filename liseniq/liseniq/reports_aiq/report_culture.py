@@ -10,6 +10,7 @@ def build_culture_context(context, survey_name):
     global_score = 0.0
     culture_chart_data = []
     dimension_chart_data = []
+    grouped_dimension_chart_data = []
 
     if likert_types:
         likert_questions_data = frappe.get_all("qp_IQ_Question", 
@@ -51,6 +52,11 @@ def build_culture_context(context, survey_name):
             
             dimension_totals = {}
             dimension_counts = {}
+            
+            # Diccionarios para agrupar por demográfico
+            grouped_dim_totals = {}
+            grouped_dim_counts = {}
+
             topic_totals = {}
             topic_counts = {}
 
@@ -70,8 +76,13 @@ def build_culture_context(context, survey_name):
                                 if q_name in q_to_culture:
                                     demo_id = q_to_culture[q_name]
                                     if not valid_demographics or demo_id in valid_demographics:
+                                        # Data por pregunta individual (para tablas Top/Bottom 10)
                                         dimension_totals[q_name] = dimension_totals.get(q_name, 0.0) + val
                                         dimension_counts[q_name] = dimension_counts.get(q_name, 0) + 1
+                                        
+                                        # Data agrupada por dimensión/demográfico (para el gráfico)
+                                        grouped_dim_totals[demo_id] = grouped_dim_totals.get(demo_id, 0.0) + val
+                                        grouped_dim_counts[demo_id] = grouped_dim_counts.get(demo_id, 0) + 1
 
                                 if q_name in q_to_topic:
                                     t_id = q_to_topic[q_name]
@@ -86,6 +97,7 @@ def build_culture_context(context, survey_name):
             if total_answers > 0:
                 global_score = round(total_score / total_answers, 2)
                 
+            # Armamos data detallada para Top/Bottom 10
             for q_name, t_score in dimension_totals.items():
                 avg = round(t_score / dimension_counts[q_name], 2)
                 statement_text = q_to_statement.get(q_name, q_name)
@@ -103,6 +115,18 @@ def build_culture_context(context, survey_name):
                 })
             dimension_chart_data.sort(key=lambda x: x["score"])
 
+            # Armamos data agrupada para el Gráfico de Dimensiones
+            for demo_id, t_score in grouped_dim_totals.items():
+                avg = round(t_score / grouped_dim_counts[demo_id], 2)
+                demo_title = demo_title_map.get(demo_id, demo_id)
+                
+                grouped_dimension_chart_data.append({
+                    "culture": demo_title,
+                    "score": avg
+                })
+            grouped_dimension_chart_data.sort(key=lambda x: x["score"])
+
+            # Armamos data para el Gráfico de Cultura (Topics)
             for t_id, t_score in topic_totals.items():
                 avg = round(t_score / topic_counts[t_id], 2)
                 t_title = topic_title_map.get(t_id, t_id)
@@ -119,7 +143,8 @@ def build_culture_context(context, survey_name):
     # Empaquetamos toda la data específica de Cultura en el JSON del frontend
     context.report_specific_data_json = json.dumps({
         "culture_chart_data": culture_chart_data,
-        "dimension_chart_data": dimension_chart_data
+        "dimension_chart_data": dimension_chart_data,
+        "grouped_dimension_chart_data": grouped_dimension_chart_data
     })
 
     return context

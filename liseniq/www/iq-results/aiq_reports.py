@@ -1,5 +1,4 @@
 import frappe
-import json
 from frappe import _
 from liseniq.utils.login_util import global_website_context
 
@@ -7,190 +6,84 @@ def get_context(context):
     if frappe.session.user == "Guest":
         frappe.throw(_("Debe iniciar sesión para acceder."), frappe.PermissionError)
 
-    # Inyectar el contexto global (Suscripciones, Features, Usuario, Compañía, etc.)
+    # Inyectar el contexto global
     context = global_website_context(context)
 
-    # Validar si tiene la funcionalidad para entrar directamente por URL
+    # Validar acceso
     if not context.get('app_features') or 'aiq_reports' not in context.get('app_features'):
         frappe.throw(_("Su plan no incluye acceso a Reportes Avanzados AIQ."), frappe.PermissionError)
 
-    # Configuración base de la página para Frappe
+    # Configuración base de la página
     context.no_cache = 1
     context.page_title = _("Reporte de Resultados")
     context.no_breadcrumbs = True
     context.is_navbar_custom = True
     
-    # Obtener el nombre de la encuesta desde la URL para inyectarlo en el HTML
     survey_name = frappe.form_dict.get('survey_name', '')
     context.survey_name = survey_name
     context.survey_title = frappe.form_dict.get('survey_title', _("Reporte de Resultados"))
 
-    # Calculo de metricas globales y datos para gráficos solo si hay una encuesta seleccionada
     if survey_name:
-        # Total de Participantes (Contactos enviados) y % de Respuesta
-        total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name})
+        # Métricas Globales (Comunes para todas las categorías)
+        context = calculate_global_metrics(context, survey_name)
         
-        # Obtener el estado 'Responded' de manera optimizada
-        rs_responded = frappe.db.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
-        total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name, "sr_status": rs_responded})
-
-        response_percentage = 0
-        if total_recipients > 0:
-            response_percentage = round((total_responses / total_recipients) * 100)
-
-        context.total_recipients = total_recipients
-        context.total_responses = total_responses
-        context.response_percentage = response_percentage
-
-        # Puntaje Global y Datos para Gráficos
-        likert_types = frappe.get_all("qp_IQ_QuestionType", 
-                                      filters={"qnt_type_name": ["like", "%Likert%"]}, 
-                                      pluck="name")
+        # Identificar el 'name' de la Categoría de la Encuesta y su mnemónico
+        category_name, category_mnemonic = get_survey_category_data(survey_name)
         
-        global_score = 0.0
-        culture_chart_data = []
-        dimension_chart_data = []
-        top_bottom_data = []
+        # Pasamos el name de la categoría y el mnemónico al contexto para la UI (HTML/JS)
+        context.report_category = category_name
+        context.report_category_mnemonic = category_mnemonic
 
-        if likert_types:
-            # Traemos las preguntas Likert incluyendo el enunciado y el topic
-            likert_questions_data = frappe.get_all("qp_IQ_Question", 
-                                              filters={"qn_type": ["in", likert_types]}, 
-                                              fields=["name", "qn_demographic", "qn_statement", "qp_topic"])
-            
-            likert_questions = [q.name for q in likert_questions_data]
-            
-            # Mapeos
-            q_to_culture = {q.name: q.qn_demographic for q in likert_questions_data if q.qn_demographic}
-            q_to_statement = {q.name: q.qn_statement for q in likert_questions_data}
-            q_to_topic = {q.name: q.qp_topic for q in likert_questions_data if q.qp_topic}
-            
-            if likert_questions:
-                # Mapeo de demograficos
-                demo_types = frappe.get_all("qp_IQ_DemographicType", 
-                                            filters={"dt_object_type": "Pregunta"}, 
-                                            fields=["name", "dt_title"])
-                valid_demographics = [d.name for d in demo_types]
-                demo_title_map = {d.name: (d.dt_title or d.name) for d in demo_types}
-
-                # Mapeo de Topics/Temas
-                topic_title_map = {}
-                try:
-                    topic_field = frappe.get_meta("qp_IQ_Question").get_field("qp_topic")
-                    if topic_field and topic_field.fieldtype == "Link" and topic_field.options:
-                        t_doctype = topic_field.options
-                        t_title_field = frappe.get_meta(t_doctype).title_field or "name"
-                        td_list = frappe.get_all(t_doctype, fields=["name", t_title_field])
-                        topic_title_map = {d["name"]: (d.get(t_title_field) or d["name"]) for d in td_list}
-                except Exception as e:
-                    frappe.log_error(f"Error extrayendo metadata de qp_topic: {e}", "AIQ Reports")
-
-                su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
-                
-                survey_responses = frappe.get_all("Survey Response", 
-                                                  filters={"survey": ["in", [survey_name, su_name]]}, 
-                                                  pluck="response_json")
-                
-                total_score = 0.0
-                total_answers = 0
-                
-                dimension_group_totals = {}
-                dimension_group_counts = {}
-
-                question_totals = {}
-                question_counts = {}
-
-                topic_totals = {}
-                topic_counts = {}
-
-                for resp_json in survey_responses:
-                    if not resp_json:
-                        continue
-                    try:
-                        data = json.loads(resp_json)
-                        for q_name, answer in data.items():
-                            if q_name in likert_questions:
-                                try:
-                                    val = float(answer)
-                                    
-                                    # Acumular para el Promedio Global
-                                    total_score += val
-                                    total_answers += 1
-                                    
-                                    # Acumular para Top 10 y Bottom 10 (por pregunta individual)
-                                    question_totals[q_name] = question_totals.get(q_name, 0.0) + val
-                                    question_counts[q_name] = question_counts.get(q_name, 0) + 1
-
-                                    # Acumular para el Gráfico de Dimensiones (agrupado por demográfico)
-                                    if q_name in q_to_culture:
-                                        demo_id = q_to_culture[q_name]
-                                        if not valid_demographics or demo_id in valid_demographics:
-                                            dimension_group_totals[demo_id] = dimension_group_totals.get(demo_id, 0.0) + val
-                                            dimension_group_counts[demo_id] = dimension_group_counts.get(demo_id, 0) + 1
-
-                                    # Acumular para el Gráfico de Tipo Cultura (por qp_topic)
-                                    if q_name in q_to_topic:
-                                        t_id = q_to_topic[q_name]
-                                        topic_totals[t_id] = topic_totals.get(t_id, 0.0) + val
-                                        topic_counts[t_id] = topic_counts.get(t_id, 0) + 1
-                                        
-                                except (ValueError, TypeError):
-                                    pass
-                    except Exception:
-                        continue
-                
-                if total_answers > 0:
-                    global_score = round(total_score / total_answers, 2)
-                    
-                # Construir Data: Gráfico de Dimensiones (Agrupado por Demográfico)
-                for demo_id, t_score in dimension_group_totals.items():
-                    avg = round(t_score / dimension_group_counts[demo_id], 2)
-                    demo_title = demo_title_map.get(demo_id, demo_id)
-                    
-                    dimension_chart_data.append({
-                        "culture": demo_title, 
-                        "score": avg
-                    })
-                dimension_chart_data.sort(key=lambda x: x["score"])
-
-                # Construir Data: Top y Bottom 10 (Por pregunta individual)
-                for q_name, t_score in question_totals.items():
-                    avg = round(t_score / question_counts[q_name], 2)
-                    statement_text = q_to_statement.get(q_name, q_name)
-                    
-                    t_id = q_to_topic.get(q_name)
-                    t_title = topic_title_map.get(t_id, "N/A") if t_id else "N/A"
-                    
-                    top_bottom_data.append({
-                        "question": statement_text,
-                        "topic": t_title,
-                        "score": avg
-                    })
-                top_bottom_data.sort(key=lambda x: x["score"])
-
-                # Construir Data: Gráfico de Tipo de Cultura
-                for t_id, t_score in topic_totals.items():
-                    avg = round(t_score / topic_counts[t_id], 2)
-                    t_title = topic_title_map.get(t_id, t_id)
-                    
-                    culture_chart_data.append({
-                        "topic": t_title,
-                        "score": avg
-                    })
-                culture_chart_data.sort(key=lambda x: x["score"])
-        
-        context.global_score = global_score
-        context.culture_chart_data = json.dumps(culture_chart_data)
-        context.dimension_chart_data = json.dumps(dimension_chart_data)
-        context.top_bottom_data = json.dumps(top_bottom_data)
+        # Enrutar a la Estrategia Específica usando el mnemónico explícito
+        if category_mnemonic == "template_culture":
+            try:
+                # Contexto específico para reportes de Cultura
+                from liseniq.liseniq.reports_aiq.report_culture import build_culture_context
+                context = build_culture_context(context, survey_name)
+            except ImportError as e:
+                frappe.log_error(f"Error cargando módulo de Cultura: {e}", "AIQ Reports")
+                context.is_unsupported_report = True
+        else:
+            # Si no es Cultura ni otra soportada, marcamos como no soportado
+            context.is_unsupported_report = True
     else:
-        # Valores por defecto de seguridad si no hay medición seleccionada
+        # Valores por defecto de seguridad
         context.total_recipients = 0
         context.total_responses = 0
         context.response_percentage = 0
         context.global_score = 0.0
-        context.culture_chart_data = "[]"
-        context.dimension_chart_data = "[]"
-        context.top_bottom_data = "[]"
+        context.report_specific_data_json = "{}"
 
+    return context
+
+def get_survey_category_data(survey_name):
+    """Obtiene el 'name' de la categoría (qp_IQ_TemplateCategory) y su mnemónico explícito."""
+    template_id = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_template")
+    if not template_id: return "", ""
+    
+    category_link = frappe.db.get_value("qp_IQ_Template", template_id, "tp_category")
+    if not category_link: return "", ""
+    
+    category_data = frappe.db.get_value("qp_IQ_TemplateCategory", category_link, ["name", "qnc_mnemonico"], as_dict=True)
+    
+    if category_data:
+        return category_data.get("name") or "", category_data.get("qnc_mnemonico") or ""
+        
+    return "", ""
+
+def calculate_global_metrics(context, survey_name):
+    """Calcula las métricas de participación que aplican a todo tipo de medición."""
+    total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name})
+    
+    rs_responded = frappe.db.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
+    total_responses = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name, "sr_status": rs_responded})
+
+    response_percentage = 0
+    if total_recipients > 0:
+        response_percentage = round((total_responses / total_recipients) * 100)
+
+    context.total_recipients = total_recipients
+    context.total_responses = total_responses
+    context.response_percentage = response_percentage
+    
     return context

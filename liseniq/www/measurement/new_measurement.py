@@ -208,7 +208,7 @@ def get_context(context):
             # Identificar si la plantilla corresponde a Liderazgo
             cat_id = frappe.db.get_value("qp_IQ_Template", template_name, "tp_category")
             if cat_id:
-                cat_name = frappe.db.get_value("qp_IQ_QuestionCategory", cat_id, "qnc_category")
+                cat_name = frappe.db.get_value("qp_IQ_TemplateCategory", cat_id, "qnc_category")
                 if cat_name == "Liderazgo":
                     template_is_leadership = True
 

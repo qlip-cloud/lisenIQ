@@ -1,0 +1,70 @@
+<!-- Título y botones de Sección para Gráfico de Tipo de Cultura -->
+<div class="chart-header-flex" id="culture-header-container">
+    <h3 class="chart-section-title">Tipos de cultura</h3>
+    <div class="chart-actions-group">
+        <button id="btn-toggle-culture" class="btn btn-outline-secondary btn-sm" title="Ver Gráfico de Torta">
+            <i class="fa fa-pie-chart" aria-hidden="true"></i>
+        </button>
+        <button id="btn-export-culture-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+            <i class="fa fa-image" aria-hidden="true"></i>
+        </button>
+        <button id="btn-export-culture-pdf" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+            <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Contenedor del Gráfico de Tipo de Cultura -->
+<div class="chart-card" id="culture-card-container">
+    <div id="culture-chart-container" class="chart-wrapper"></div>
+</div>
+
+<!-- Título y botones de Sección para Gráfico de Dimensiones -->
+<div class="chart-header-flex" id="dimension-header-container">
+    <h3 class="chart-section-title">Dimensiones</h3>
+    <div class="chart-actions-group">
+        <button id="btn-toggle-dimension" class="btn btn-outline-secondary btn-sm" title="Ver Gráfico de Torta">
+            <i class="fa fa-pie-chart" aria-hidden="true"></i>
+        </button>
+        <button id="btn-export-dimension-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+            <i class="fa fa-image" aria-hidden="true"></i>
+        </button>
+        <button id="btn-export-dimension-pdf" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+            <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Contenedor del Gráfico de Dimensiones -->
+<div class="chart-card" id="dimension-card-container">
+    <div id="dimension-chart-container" class="chart-wrapper"></div>
+</div>
+
+<!-- Título de Sección para Top y Bottom 10 -->
+<h3 class="chart-section-title">Atributos más altos y más bajos</h3>
+
+<!-- Contenedor Top / Bottom -->
+<div class="top-bottom-container">
+    <div class="tb-card">
+        <h4 class="tb-header-title">10 más altos — mayor puntaje</h4>
+        <div class="tb-table-header">
+            <span>Tema</span>
+            <span>Atributo</span>
+            <span style="text-align: right;">Puntaje</span>
+        </div>
+        <div id="top-10-list">
+            <!-- Llenado dinámicamente con JS -->
+        </div>
+    </div>
+    <div class="tb-card">
+        <h4 class="tb-header-title">10 más bajos — menor puntaje</h4>
+        <div class="tb-table-header">
+            <span>Tema</span>
+            <span>Atributo</span>
+            <span style="text-align: right;">Puntaje</span>
+        </div>
+        <div id="bottom-10-list">
+            <!-- Llenado dinámicamente con JS -->
+        </div>
+    </div>
+</div>

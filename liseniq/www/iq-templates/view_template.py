@@ -19,7 +19,7 @@ def get_context(context):
         template_doc.has_permission("read")
 
         if template_doc.tp_category:
-            category_name = frappe.db.get_value("qp_IQ_QuestionCategory", template_doc.tp_category, "qnc_category")
+            category_name = frappe.db.get_value("qp_IQ_TemplateCategory", template_doc.tp_category, "qnc_category")
         else:
             category_name = "Sin categoría"
 
@@ -36,7 +36,7 @@ def get_context(context):
                 q_doc = frappe.get_doc("qp_IQ_Question", tq.tq_question)
                 
                 type_name = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, "qnt_type_name") if q_doc.qn_type else "No definido"
-                q_category_name = frappe.db.get_value("qp_IQ_QuestionCategory", q_doc.qn_category, "qnc_category") if q_doc.qn_category else "General"
+                q_category_name = frappe.db.get_value("qp_IQ_TemplateCategory", q_doc.qn_category, "qnc_category") if q_doc.qn_category else "General"
                 demographic_name = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else "General"
 
                 question_data = {

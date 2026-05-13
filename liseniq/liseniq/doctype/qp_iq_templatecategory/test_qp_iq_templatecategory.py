@@ -4,5 +4,5 @@
 # import frappe
 import unittest
 
-class Testqp_IQ_QuestionCategory(unittest.TestCase):
+class Testqp_IQ_TemplateCategory(unittest.TestCase):
 	pass

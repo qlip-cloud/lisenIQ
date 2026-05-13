@@ -4,5 +4,5 @@
 # import frappe
 from frappe.model.document import Document
 
-class qp_IQ_QuestionCategory(Document):
+class qp_IQ_TemplateCategory(Document):
 	pass

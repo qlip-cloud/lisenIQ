@@ -146,7 +146,7 @@ def get_power_bi_embed_config(report_id: Optional[str] = None,
                 
                 if category_link_name:
                     # Obtener el nombre real de la categoría
-                    category_name = frappe.db.get_value("qp_IQ_QuestionCategory", category_link_name, "qnc_category") or ""
+                    category_name = frappe.db.get_value("qp_IQ_TemplateCategory", category_link_name, "qnc_category") or ""
                     
                     # Lógica de asignación de mnemónico según categoría
                     if "Cultura" in category_name:

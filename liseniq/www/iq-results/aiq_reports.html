@@ -48,7 +48,7 @@
     <!-- Renderizado Dinámico de Reportes por Categoría -->
     {% if is_unsupported_report %}
         <div class="alert alert-warning mt-4">
-            <i class="fa fa-exclamation-triangle"></i> Esta categoría de reporte ({{ report_category }}) aún no está soportada en visualización interactiva avanzada.
+            <i class="fa fa-exclamation-triangle"></i> Esta categoría de reporte ({{ report_category_desc }}) aún no está soportada en visualización interactiva avanzada.
         </div>
     {% elif report_category_mnemonic == 'template_culture' %}
         {% include "liseniq/templates/includes/reports_aiq/report_culture.html" %}

@@ -27,12 +27,13 @@ def get_context(context):
         # Métricas Globales (Comunes para todas las categorías)
         context = calculate_global_metrics(context, survey_name)
         
-        # Identificar el 'name' de la Categoría de la Encuesta y su mnemónico
-        category_name, category_mnemonic = get_survey_category_data(survey_name)
+        # Identificar el 'name' de la Categoría de la Encuesta, su mnemónico y su descripción
+        category_name, category_mnemonic, category_desc = get_survey_category_data(survey_name)
         
-        # Pasamos el name de la categoría y el mnemónico al contexto para la UI (HTML/JS)
+        # Pasamos el name de la categoría, el mnemónico y la descripción al contexto para la UI (HTML/JS)
         context.report_category = category_name
         context.report_category_mnemonic = category_mnemonic
+        context.report_category_desc = category_desc
 
         # Enrutar a la Estrategia Específica usando el mnemónico explícito
         if category_mnemonic == "template_culture":
@@ -57,19 +58,19 @@ def get_context(context):
     return context
 
 def get_survey_category_data(survey_name):
-    """Obtiene el 'name' de la categoría (qp_IQ_TemplateCategory) y su mnemónico explícito."""
+    """Obtiene el 'name' de la categoría (qp_IQ_TemplateCategory), su mnemónico explícito y su descripción (qnc_category)."""
     template_id = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_template")
-    if not template_id: return "", ""
+    if not template_id: return "", "", ""
     
     category_link = frappe.db.get_value("qp_IQ_Template", template_id, "tp_category")
-    if not category_link: return "", ""
+    if not category_link: return "", "", ""
     
-    category_data = frappe.db.get_value("qp_IQ_TemplateCategory", category_link, ["name", "qnc_mnemonico"], as_dict=True)
+    category_data = frappe.db.get_value("qp_IQ_TemplateCategory", category_link, ["name", "qnc_mnemonico", "qnc_category"], as_dict=True)
     
     if category_data:
-        return category_data.get("name") or "", category_data.get("qnc_mnemonico") or ""
+        return category_data.get("name") or "", category_data.get("qnc_mnemonico") or "", category_data.get("qnc_category") or ""
         
-    return "", ""
+    return "", "", ""
 
 def calculate_global_metrics(context, survey_name):
     """Calcula las métricas de participación que aplican a todo tipo de medición."""

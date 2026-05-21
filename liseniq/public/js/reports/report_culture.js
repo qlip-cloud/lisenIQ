@@ -1,3 +1,6 @@
+// Importamos la función de inicialización del reporte de contactos para poder llamarla desde este archivo (report_culture.js)
+import { initContactsReport } from './report_by_contacts.js';
+
 let cultureChartInstance = null;
 let dimensionChartInstance = null;
 let cultureChartType = 'bar'; 
@@ -94,6 +97,11 @@ export function initCultureReport(dataConfig, surveyName) {
     } else {
         hideSection('dimension-header-container', 'dimension-card-container');
     }
+
+    // Inicializamos los gráficos de contactos
+    if (window.contactDemographicsData) {
+        initContactsReport(window.contactDemographicsData);
+    }
 }
 
 function parseBackendData(rawData) {
@@ -115,6 +123,7 @@ function parseBackendData(rawData) {
     return data;
 }
 
+// Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas agrupada por dimensión (dimensionData)
 function initTopBottomCards(data) {
     const topContainer = document.getElementById('top-10-list');
     const bottomContainer = document.getElementById('bottom-10-list');
@@ -148,13 +157,24 @@ function initTopBottomCards(data) {
     renderRows(bottom10, bottomContainer, 'fill-orange');
 }
 
+// Renderizar el grafico de cultura utilizando la data agrupada por topic (cultureData)
 function renderCultureChart(type, data) {
     const chartContainer = document.getElementById('culture-chart-container');
     if (!chartContainer) return;
 
     const categories = data.map(item => item.topic || 'N/A');
     const scores = data.map(item => item.score || 0);
-    const colorsArr = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
+    
+    // Asignar el color dinámicamente
+    const colorsArr = data.map(item => {
+        let c = item.color ? String(item.color).trim().toLowerCase() : "";
+        if (!c || c === 'none' || c === 'null') return '#7c3aed';
+        
+        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
+        if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
+        
+        return item.color;
+    });
 
     if (cultureChartInstance) cultureChartInstance.destroy();
 
@@ -245,6 +265,7 @@ function renderCultureChart(type, data) {
     cultureChartInstance.render();
 }
 
+// Renderizar el grafico de dimensiones utilizando la data agrupada por dimensión (groupedDimensionData)
 function renderDimensionChart(type, data) {
     const chartContainer = document.getElementById('dimension-chart-container');
     if (!chartContainer) return;
@@ -252,7 +273,17 @@ function renderDimensionChart(type, data) {
     // Utilizamos solo las categorías agrupadas (sin preguntas individuales)
     const categories = data.map(item => item.culture || 'N/A');
     const scores = data.map(item => item.score || 0);
-    const colorsArr = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
+
+    // Asignar el color dinámicamente
+    const colorsArr = data.map(item => {
+        let c = item.color ? String(item.color).trim().toLowerCase() : "";
+        if (!c || c === 'none' || c === 'null') return '#7c3aed';
+        
+        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
+        if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
+        
+        return item.color;
+    });
 
     let globalScore = 0;
     const metricElements = document.querySelectorAll('.metric-value');
@@ -331,7 +362,6 @@ function renderDimensionChart(type, data) {
                     const score = series[seriesIndex][dataPointIndex];
                     const category = categories[dataPointIndex]; 
                     const color = w.config.colors[dataPointIndex % w.config.colors.length];
-                    // Pasamos null ya que no hay una pregunta específica para este grupo
                     return buildCustomTooltip(category, null, score, color);
                 }
             }
@@ -355,7 +385,6 @@ function renderDimensionChart(type, data) {
                     const score = series[seriesIndex];
                     const category = w.config.labels[seriesIndex]; 
                     const color = w.config.colors[seriesIndex % w.config.colors.length];
-                    // Pasamos null ya que no hay una pregunta específica para este grupo
                     return buildCustomTooltip(category, null, score, color);
                 }
             }
@@ -379,7 +408,7 @@ function buildCustomTooltip(category, questionText, score, color) {
             </div>
             ${questionHtml}
             <div style="font-size: 14px; font-weight: 700; color: ${color};">
-                ${score.toFixed(2)} puntos
+                ${score.toFixed(2)}
             </div>
         </div>
     `;

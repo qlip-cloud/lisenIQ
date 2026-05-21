@@ -94,11 +94,14 @@ function renderContactChart(containerId, categoryName, data, dtColor) {
                 columnWidth: '55%',
                 borderRadius: 4, 
                 distributed: false,
-                dataLabels: { position: 'top' }
+                dataLabels: { position: 'center' } // Se ajusta la posición al centro
             } 
         },
         dataLabels: { 
-            enabled: false 
+            enabled: true, // Se habilitan las etiquetas
+            formatter: function (val) { return val.toFixed(2); },
+            style: { fontSize: '13px', fontWeight: 700, colors: ["#ffffff"] },
+            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.45 }
         },
         legend: { show: false },
         xaxis: {

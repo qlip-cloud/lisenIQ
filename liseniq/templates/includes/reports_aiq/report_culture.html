@@ -2,9 +2,9 @@
 <div class="chart-header-flex" id="culture-header-container">
     <h3 class="chart-section-title">Tipos de cultura</h3>
     <div class="chart-actions-group">
-        <button id="btn-toggle-culture" class="btn btn-outline-secondary btn-sm" title="Ver Gráfico de Torta">
+        <!-- <button id="btn-toggle-culture" class="btn btn-outline-secondary btn-sm" title="Ver Gráfico de Torta">
             <i class="fa fa-pie-chart" aria-hidden="true"></i>
-        </button>
+        </button> -->
         <button id="btn-export-culture-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
             <i class="fa fa-image" aria-hidden="true"></i>
         </button>
@@ -23,9 +23,9 @@
 <div class="chart-header-flex" id="dimension-header-container">
     <h3 class="chart-section-title">Dimensiones</h3>
     <div class="chart-actions-group">
-        <button id="btn-toggle-dimension" class="btn btn-outline-secondary btn-sm" title="Ver Gráfico de Torta">
+        <!-- <button id="btn-toggle-dimension" class="btn btn-outline-secondary btn-sm" title="Ver Gráfico de Torta">
             <i class="fa fa-pie-chart" aria-hidden="true"></i>
-        </button>
+        </button> -->
         <button id="btn-export-dimension-img" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
             <i class="fa fa-image" aria-hidden="true"></i>
         </button>
@@ -68,3 +68,11 @@
         </div>
     </div>
 </div>
+
+<!-- Insertamos el HTML de los gráficos de contactos -->
+{% include "liseniq/templates/includes/reports_aiq/report_by_contacts.html" %}
+
+<!-- Declaramos la data en el entorno global de JS para que el reporte de contactos (JS) pueda consumirla -->
+<script>
+    window.contactDemographicsData = '{{ contact_demographics_json | default("{}") | safe }}';
+</script>

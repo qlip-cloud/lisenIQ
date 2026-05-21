@@ -9,7 +9,8 @@
   "qnc_category",
   "qnc_mnemonico",
   "column_break_4",
-  "qnc_description"
+  "qnc_description",
+  "qnc_color"
  ],
  "fields": [
   {
@@ -40,11 +41,16 @@
   {
    "fieldname": "column_break_4",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qnc_color",
+   "fieldtype": "Color",
+   "label": "Color de Etiqueta"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-08 19:23:03.813227",
+ "modified": "2026-05-18 11:14:59.160764",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_TemplateCategory",

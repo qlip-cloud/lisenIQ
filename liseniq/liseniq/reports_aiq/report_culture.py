@@ -1,6 +1,9 @@
 import frappe
 import json
 
+# Importar el py que construye el contexto específico de demográficos por contacto para el reporte de Cultura
+from .report_by_contacts import inject_contacts_demographics_data
+
 def build_culture_context(context, survey_name):
 
     likert_types = frappe.get_all("qp_IQ_QuestionType", 
@@ -26,20 +29,29 @@ def build_culture_context(context, survey_name):
         if likert_questions:
             demo_types = frappe.get_all("qp_IQ_DemographicType", 
                                         filters={"dt_object_type": "Pregunta"}, 
-                                        fields=["name", "dt_title"])
+                                        fields=["name", "dt_title", "dt_tag_color"])
             valid_demographics = [d.name for d in demo_types]
             demo_title_map = {d.name: (d.dt_title or d.name) for d in demo_types}
+            demo_color_map = {d.name: d.dt_tag_color for d in demo_types if d.dt_tag_color}
 
             topic_title_map = {}
+            topic_color_map = {}
             try:
                 topic_field = frappe.get_meta("qp_IQ_Question").get_field("qp_topic")
                 if topic_field and topic_field.fieldtype == "Link" and topic_field.options:
                     t_doctype = topic_field.options
                     t_title_field = frappe.get_meta(t_doctype).title_field or "name"
+                    
                     td_list = frappe.get_all(t_doctype, fields=["name", t_title_field])
                     topic_title_map = {d["name"]: (d.get(t_title_field) or d["name"]) for d in td_list}
             except Exception as e:
                 frappe.log_error(f"Error extrayendo metadata de qp_topic: {e}", "AIQ Reports - Cultura")
+
+            # Extraemos el color de los temas desde qp_IQ_DemographicType
+            tema_types = frappe.get_all("qp_IQ_DemographicType", 
+                                        filters={"dt_object_type": "Tema"}, 
+                                        fields=["name", "dt_tag_color"])
+            topic_color_map = {d.name: d.dt_tag_color for d in tema_types if d.dt_tag_color}
 
             su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
             
@@ -119,21 +131,25 @@ def build_culture_context(context, survey_name):
             for demo_id, t_score in grouped_dim_totals.items():
                 avg = round(t_score / grouped_dim_counts[demo_id], 2)
                 demo_title = demo_title_map.get(demo_id, demo_id)
+                demo_color = demo_color_map.get(demo_id, "") 
                 
                 grouped_dimension_chart_data.append({
                     "culture": demo_title,
-                    "score": avg
+                    "score": avg,
+                    "color": demo_color
                 })
             grouped_dimension_chart_data.sort(key=lambda x: x["score"])
 
-            # Armamos data para el Gráfico de Cultura (Topics)
+            # Armamos data para el Gráfico de Cultura/Topics
             for t_id, t_score in topic_totals.items():
                 avg = round(t_score / topic_counts[t_id], 2)
                 t_title = topic_title_map.get(t_id, t_id)
+                topic_color = topic_color_map.get(t_id, "")
                 
                 culture_chart_data.append({
                     "topic": t_title,
-                    "score": avg
+                    "score": avg,
+                    "color": topic_color
                 })
             culture_chart_data.sort(key=lambda x: x["score"])
     
@@ -146,5 +162,8 @@ def build_culture_context(context, survey_name):
         "dimension_chart_data": dimension_chart_data,
         "grouped_dimension_chart_data": grouped_dimension_chart_data
     })
+
+    # Llamamos al controlador que inyecta la data de demográficos de contactos para el reporte de Cultura
+    context = inject_contacts_demographics_data(context, survey_name)
 
     return context

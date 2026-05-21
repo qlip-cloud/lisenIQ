@@ -1,3 +1,6 @@
+// Importamos la función de inicialización del reporte de contactos para poder llamarla desde este archivo (report_culture.js)
+import { initContactsReport } from './report_by_contacts.js';
+
 let cultureChartInstance = null;
 let dimensionChartInstance = null;
 let cultureChartType = 'bar'; 
@@ -93,6 +96,11 @@ export function initCultureReport(dataConfig, surveyName) {
         }
     } else {
         hideSection('dimension-header-container', 'dimension-card-container');
+    }
+
+    // Inicializamos los gráficos de contactos
+    if (window.contactDemographicsData) {
+        initContactsReport(window.contactDemographicsData);
     }
 }
 
@@ -354,7 +362,6 @@ function renderDimensionChart(type, data) {
                     const score = series[seriesIndex][dataPointIndex];
                     const category = categories[dataPointIndex]; 
                     const color = w.config.colors[dataPointIndex % w.config.colors.length];
-                    // Pasamos null ya que no hay una pregunta específica para este grupo
                     return buildCustomTooltip(category, null, score, color);
                 }
             }
@@ -378,7 +385,6 @@ function renderDimensionChart(type, data) {
                     const score = series[seriesIndex];
                     const category = w.config.labels[seriesIndex]; 
                     const color = w.config.colors[seriesIndex % w.config.colors.length];
-                    // Pasamos null ya que no hay una pregunta específica para este grupo
                     return buildCustomTooltip(category, null, score, color);
                 }
             }
@@ -402,7 +408,7 @@ function buildCustomTooltip(category, questionText, score, color) {
             </div>
             ${questionHtml}
             <div style="font-size: 14px; font-weight: 700; color: ${color};">
-                ${score.toFixed(2)} puntos
+                ${score.toFixed(2)}
             </div>
         </div>
     `;

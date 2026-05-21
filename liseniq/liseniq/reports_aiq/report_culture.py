@@ -1,6 +1,9 @@
 import frappe
 import json
 
+# Importar el py que construye el contexto específico de demográficos por contacto para el reporte de Cultura
+from .report_by_contacts import inject_contacts_demographics_data
+
 def build_culture_context(context, survey_name):
 
     likert_types = frappe.get_all("qp_IQ_QuestionType", 
@@ -24,7 +27,6 @@ def build_culture_context(context, survey_name):
         q_to_topic = {q.name: q.qp_topic for q in likert_questions_data if q.qp_topic}
         
         if likert_questions:
-            # Añadimos la extracción del color 'dt_tag_color' de DemographicType
             demo_types = frappe.get_all("qp_IQ_DemographicType", 
                                         filters={"dt_object_type": "Pregunta"}, 
                                         fields=["name", "dt_title", "dt_tag_color"])
@@ -129,7 +131,7 @@ def build_culture_context(context, survey_name):
             for demo_id, t_score in grouped_dim_totals.items():
                 avg = round(t_score / grouped_dim_counts[demo_id], 2)
                 demo_title = demo_title_map.get(demo_id, demo_id)
-                demo_color = demo_color_map.get(demo_id, "") # Obtenemos el color
+                demo_color = demo_color_map.get(demo_id, "") 
                 
                 grouped_dimension_chart_data.append({
                     "culture": demo_title,
@@ -142,7 +144,7 @@ def build_culture_context(context, survey_name):
             for t_id, t_score in topic_totals.items():
                 avg = round(t_score / topic_counts[t_id], 2)
                 t_title = topic_title_map.get(t_id, t_id)
-                topic_color = topic_color_map.get(t_id, "") # Obtenemos el color
+                topic_color = topic_color_map.get(t_id, "")
                 
                 culture_chart_data.append({
                     "topic": t_title,
@@ -160,5 +162,8 @@ def build_culture_context(context, survey_name):
         "dimension_chart_data": dimension_chart_data,
         "grouped_dimension_chart_data": grouped_dimension_chart_data
     })
+
+    # Llamamos al controlador que inyecta la data de demográficos de contactos para el reporte de Cultura
+    context = inject_contacts_demographics_data(context, survey_name)
 
     return context

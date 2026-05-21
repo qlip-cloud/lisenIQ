@@ -229,6 +229,14 @@
     text-align: right;
 }
 
+/* Estilos específicos para la cuadricula de contactos */
+.contacts-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
 @media (max-width: 768px) {
     .chart-wrapper {
         height: 350px;
@@ -244,5 +252,8 @@
     .chart-actions-group {
         width: 100%;
         flex-wrap: wrap;
+    }
+    .contacts-charts-grid {
+        grid-template-columns: 1fr;
     }
 }

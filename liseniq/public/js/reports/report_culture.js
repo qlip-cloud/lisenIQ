@@ -26,9 +26,13 @@ export function initCultureReport(dataConfig, surveyName) {
     const cultureData = parseBackendData(dataConfig.culture_chart_data);
     const dimensionData = parseBackendData(dataConfig.dimension_chart_data);
     const groupedDimensionData = parseBackendData(dataConfig.grouped_dimension_chart_data);
+    const topicQuestionsData = parseBackendData(dataConfig.topic_questions_data);
 
     // Inicializamos la sección de top 10 y bottom 10
     initTopBottomCards(dimensionData);
+
+    // Inicializamos las tablas desglosadas por tema
+    initTopicsTables(topicQuestionsData);
 
     // Renderizar Gráfico de Cultura
     if (appFeatures.includes('aiq_rep_cultura')) {
@@ -155,6 +159,68 @@ function initTopBottomCards(data) {
 
     renderRows(top10, topContainer, 'fill-green');
     renderRows(bottom10, bottomContainer, 'fill-orange');
+}
+
+// Inicializar y agrupar las tablas de preguntas por cada tema de manera dinámica
+function initTopicsTables(data) {
+    const container = document.getElementById('topics-tables-container');
+    if (!container) return;
+    if (!data || data.length === 0) return;
+
+    // Agrupamos las preguntas por su topic
+    const grouped = {};
+    data.forEach(item => {
+        const topic = item.topic || 'Sin Tema';
+        if (!grouped[topic]) grouped[topic] = [];
+        grouped[topic].push(item);
+    });
+
+    let html = '';
+    // Ordenamos los temas alfabéticamente para mantener consistencia visual
+    const sortedTopics = Object.keys(grouped).sort();
+
+    sortedTopics.forEach(topic => {
+        const items = grouped[topic];
+        // Ordenar las preguntas dentro de cada tema de mayor a menor puntaje
+        items.sort((a, b) => b.score - a.score);
+
+        const rowsHtml = items.map(item => {
+            const percentage = Math.min(100, Math.max(0, (item.score / 5) * 100));
+            
+            // Asignación de color según el tema
+            let c = item.color ? String(item.color).trim().toLowerCase() : "";
+            let hexColor = '#7c3aed';
+            if (c && c !== 'none' && c !== 'null') {
+                hexColor = /^[0-9a-f]{6}$/i.test(c) ? '#' + c : c;
+            }
+
+            return `
+                <div class="tb-row two-cols">
+                    <div class="tb-question">${item.question}</div>
+                    <div class="tb-score-wrapper">
+                        <div class="tb-score-bar-bg">
+                            <div class="tb-score-bar-fill" style="width: ${percentage}%; background-color: ${hexColor};"></div>
+                        </div>
+                        <div class="tb-score-value">${item.score.toFixed(2)}</div>
+                    </div>
+                </div>`;
+        }).join('');
+
+        html += `
+            <div class="tb-card">
+                <h4 class="tb-header-title">${topic}</h4>
+                <div class="tb-table-header two-cols">
+                    <span>Pregunta</span>
+                    <span style="text-align: right;">Puntaje</span>
+                </div>
+                <div>
+                    ${rowsHtml}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
 }
 
 // Renderizar el grafico de cultura utilizando la data agrupada por topic (cultureData)

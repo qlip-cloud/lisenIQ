@@ -39,17 +39,21 @@ export function initContactsReport(contactDemographicsData) {
         
         const data = Array.isArray(payload) ? payload : payload.data;
         const categoryColor = payload.color || '';
+        const isFixed = payload.is_fixed || false;
 
         if (!data || data.length === 0) return;
 
         const cardId = `contact-chart-card-${index}`;
         const chartId = `contact-chart-${index}`;
         
+        // Formatear título asegurando compatibilidad con los gráficos fijos
+        const titleText = `Puntaje por ${demoCategory.toLowerCase()}`;
+        
         // Crear la tarjeta para cada categoría demográfica con su respectivo gráfico
         const cardHtml = `
             <div id="${cardId}">
                 <div class="chart-header-flex" style="margin-top: 0; padding-left: 0;">
-                    <h3 class="chart-section-title">Puntaje por ${demoCategory.toLowerCase()}</h3>
+                    <h3 class="chart-section-title">${titleText}</h3>
                 </div>
                 <div class="chart-card" style="margin-bottom: 0;">
                     <div id="${chartId}" class="chart-wrapper" style="height: 380px;"></div>
@@ -58,24 +62,37 @@ export function initContactsReport(contactDemographicsData) {
         `;
         container.insertAdjacentHTML('beforeend', cardHtml);
 
-        renderContactChart(chartId, demoCategory, data, categoryColor);
+        renderContactChart(chartId, demoCategory, data, categoryColor, isFixed);
     });
 }
 
-function renderContactChart(containerId, categoryName, data, dtColor) {
+function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
     const categories = data.map(item => item.value || 'N/A');
     const scores = data.map(item => item.score || 0);
     
-    // Asignar el color dinámicamente
-    let colorToUse = '#7c3aed';
-    let c = dtColor ? String(dtColor).trim().toLowerCase() : "";
-    
-    if (c && c !== 'none' && c !== 'null') {
-        if (/^[0-9a-f]{6}$/i.test(c)) {
-            colorToUse = '#' + dtColor.trim();
-        } else {
-            colorToUse = dtColor;
+    let isDistributed = false;
+    let colorsArray = [];
+
+    // Lógica para asignar colores dinámicamente
+    if (dtColor === 'DYNAMIC') {
+        isDistributed = true;
+        colorsArray = scores.map(score => {
+            // El umbral se establece cercano a 2.7 basado en la imagen de referencia
+            return score >= 2.7 ? '#26a374' : '#e05a33'; 
+        });
+    } else {
+        // Asignar el color dinámicamente según lo traído de la base de datos
+        let colorToUse = '#7c3aed';
+        let c = dtColor ? String(dtColor).trim().toLowerCase() : "";
+        
+        if (c && c !== 'none' && c !== 'null') {
+            if (/^[0-9a-f]{6}$/i.test(c)) {
+                colorToUse = '#' + dtColor.trim();
+            } else {
+                colorToUse = dtColor;
+            }
         }
+        colorsArray = [colorToUse];
     }
 
     const options = {
@@ -87,13 +104,13 @@ function renderContactChart(containerId, categoryName, data, dtColor) {
             fontFamily: 'inherit',
             parentHeightOffset: 0
         },
-        colors: [colorToUse],
+        colors: colorsArray,
         plotOptions: { 
             bar: { 
                 horizontal: false, 
                 columnWidth: '55%',
                 borderRadius: 4, 
-                distributed: false,
+                distributed: isDistributed,
                 dataLabels: { position: 'center' }
             } 
         },
@@ -110,7 +127,7 @@ function renderContactChart(containerId, categoryName, data, dtColor) {
                 style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 },
                 trim: true,
                 hideOverlappingLabels: false,
-                rotate: -45
+                rotate: isFixed ? 0 : -45
             } 
         },
         yaxis: {
@@ -130,6 +147,7 @@ function renderContactChart(containerId, categoryName, data, dtColor) {
             custom: function({series, seriesIndex, dataPointIndex, w}) {
                 const score = series[seriesIndex][dataPointIndex];
                 const category = categories[dataPointIndex]; 
+                const toolTipColor = isDistributed ? colorsArray[dataPointIndex] : colorsArray[0];
                 
                 return `
                     <div style="padding: 12px; background: #ffffff;">
@@ -139,7 +157,7 @@ function renderContactChart(containerId, categoryName, data, dtColor) {
                         <div style="font-size: 13px; color: #1f2937; margin-bottom: 8px;">
                             ${category}
                         </div>
-                        <div style="font-size: 14px; font-weight: 700; color: ${colorToUse};">
+                        <div style="font-size: 14px; font-weight: 700; color: ${toolTipColor};">
                             ${score.toFixed(2)}
                         </div>
                     </div>

@@ -73,7 +73,7 @@ def build_culture_context(context, survey_name):
             topic_totals = {}
             topic_counts = {}
 
-            # Diccionarios para guardar todas las preguntas sin importar si tienen demográfico (para las tablas)
+            # Diccionarios para guardar todas las preguntas sin importar si tienen demográfico
             question_totals = {}
             question_counts = {}
 

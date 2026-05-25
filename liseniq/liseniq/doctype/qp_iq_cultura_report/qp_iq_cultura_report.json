@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "creation": "2026-05-12 15:10:59.720785",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sb_1",
+  "survey_name",
+  "demographic_name",
+  "total_respondents",
+  "cutoff_score",
+  "cb_1",
+  "cutoff_name",
+  "response_rate",
+  "overall_score",
+  "sb_2",
+  "theme_summary",
+  "sb_3",
+  "dimension_summary",
+  "sb_4",
+  "question_summary",
+  "sb_5",
+  "open_questions_answers"
+ ],
+ "fields": [
+  {
+   "fieldname": "sb_1",
+   "fieldtype": "Section Break",
+   "label": "Informaci\u00f3n General"
+  },
+  {
+   "fieldname": "demographic_name",
+   "fieldtype": "Data",
+   "label": "Demogr\u00e1fico "
+  },
+  {
+   "fieldname": "total_respondents",
+   "fieldtype": "Int",
+   "label": "Total de Encuestados"
+  },
+  {
+   "fieldname": "cutoff_score",
+   "fieldtype": "Float",
+   "label": "Puntaje Corte"
+  },
+  {
+   "fieldname": "cb_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cutoff_name",
+   "fieldtype": "Data",
+   "label": "Corte"
+  },
+  {
+   "fieldname": "response_rate",
+   "fieldtype": "Int",
+   "label": "Respuestas Esperadas "
+  },
+  {
+   "fieldname": "overall_score",
+   "fieldtype": "Float",
+   "label": "Puntaje General"
+  },
+  {
+   "fieldname": "sb_2",
+   "fieldtype": "Section Break",
+   "label": "Resultados por Tema"
+  },
+  {
+   "fieldname": "theme_summary",
+   "fieldtype": "Table",
+   "label": "Resultados",
+   "options": "qp_IQ_Theme_Summary_Cultura"
+  },
+  {
+   "fieldname": "sb_3",
+   "fieldtype": "Section Break",
+   "label": "Resultados por Dimensi\u00f3n"
+  },
+  {
+   "fieldname": "dimension_summary",
+   "fieldtype": "Table",
+   "label": "Resultados",
+   "options": "qp_IQ_Dimension_Summary_Cultura"
+  },
+  {
+   "fieldname": "sb_4",
+   "fieldtype": "Section Break",
+   "label": "Resultados por Atributo"
+  },
+  {
+   "fieldname": "question_summary",
+   "fieldtype": "Table",
+   "label": "Resultados",
+   "options": "qp_IQ_Question_Summary_Cultura"
+  },
+  {
+   "fieldname": "sb_5",
+   "fieldtype": "Section Break",
+   "label": "Resultados Preguntas Abiertas"
+  },
+  {
+   "fieldname": "open_questions_answers",
+   "fieldtype": "Long Text",
+   "label": "Resultados"
+  },
+  {
+   "fieldname": "survey_name",
+   "fieldtype": "Data",
+   "label": "Medici\u00f3n"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-14 14:39:35.209469",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_Cultura_Report",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,12 +1,13 @@
 import frappe
 import json
+from frappe.utils import getdate, date_diff, nowdate
 
 def inject_contacts_demographics_data(context, survey_name):
     """
-    Función para ser llamada desde el controlador principal (ej: aiq_reports.py o report_culture.py).
-    Extrae los contactos que respondieron, busca sus demográficos en custom_additional_details,
-    los agrupa y calcula el promedio de respuestas.
-    Inyecta un string JSON en el context: 'contact_demographics_json'
+    Función para ser llamada desde el controlador principal.
+    Agrega primero los gráficos fijos (Rango de Edad y Antigüedad),
+    luego extrae los demográficos en custom_additional_details,
+    y calcula el promedio de respuestas.
     """
 
     chart_data = {}
@@ -28,7 +29,7 @@ def inject_contacts_demographics_data(context, survey_name):
         
     su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
     
-    # Buscar primero las respuestas en el dt Survey Response para obtener los contactos
+    # Buscar respuestas para obtener los contactos
     responses = frappe.get_all("Survey Response",
         filters={"survey": ["in", [survey_name, su_name]]},
         fields=["name", "response_json", "user"]
@@ -41,9 +42,7 @@ def inject_contacts_demographics_data(context, survey_name):
         if not r.response_json: 
             continue
             
-        # Obtenemos el contacto directamente de la respuesta
         contact_id = r.user
-            
         if not contact_id: 
             continue
             
@@ -60,7 +59,6 @@ def inject_contacts_demographics_data(context, survey_name):
                     except (ValueError, TypeError):
                         pass
             
-            # Promedio de la encuesta para este contacto
             if resp_count > 0:
                 avg_response_score = resp_score / resp_count
                 contact_scores[contact_id] = contact_scores.get(contact_id, 0.0) + avg_response_score
@@ -73,8 +71,103 @@ def inject_contacts_demographics_data(context, survey_name):
     if not contacts_with_responses:
         context.contact_demographics_json = json.dumps(chart_data)
         return context
-        
-    # Buscar los demográficos de cada contacto en qp_IQ_ContactAdditionalDetail
+
+    # Seección 1: Gráficos Demográficos Fijos (Edad, Antigüedad, Género)
+    today = getdate(nowdate())
+
+    # Obtener data base de contactos para Edad, Antigüedad y Género
+    contacts_info = frappe.get_all("Contact",
+        filters={"name": ["in", contacts_with_responses]},
+        fields=["name", "custom_dob", "custom_entry_date", "gender"]
+    )
+
+    # Diccionarios pre-inicializados para mantener el orden exacto deseado
+    age_ranges = {
+        "< 25 años": {"score": 0.0, "count": 0},
+        "25-35 años": {"score": 0.0, "count": 0},
+        "35-45 años": {"score": 0.0, "count": 0},
+        "45-55 años": {"score": 0.0, "count": 0},
+        "> 55 años": {"score": 0.0, "count": 0}
+    }
+
+    seniority_ranges = {
+        "< 6 meses": {"score": 0.0, "count": 0},
+        "6m - 1 año": {"score": 0.0, "count": 0},
+        "1 - 3 años": {"score": 0.0, "count": 0},
+        "3 - 5 años": {"score": 0.0, "count": 0},
+        "5 - 10 años": {"score": 0.0, "count": 0},
+        "10 - 20 años": {"score": 0.0, "count": 0}
+    }
+    
+    gender_ranges = {}
+
+    for c in contacts_info:
+        c_id = c.name
+        if c_id not in contact_scores: continue
+        avg_score = contact_scores[c_id] / contact_counts[c_id]
+
+        # Cálculo de Rango de Edad
+        if c.custom_dob:
+            dob = getdate(c.custom_dob)
+            days = date_diff(today, dob)
+            years = days / 365.25
+            
+            if years < 25: k = "< 25 años"
+            elif 25 <= years < 35: k = "25-35 años"
+            elif 35 <= years < 45: k = "35-45 años"
+            elif 45 <= years <= 55: k = "45-55 años"
+            else: k = "> 55 años"
+
+            age_ranges[k]["score"] += avg_score
+            age_ranges[k]["count"] += 1
+
+        # Cálculo de Antigüedad
+        if c.custom_entry_date:
+            entry = getdate(c.custom_entry_date)
+            days = date_diff(today, entry)
+            months = days / 30.44
+            years = days / 365.25
+
+            if months < 6: k = "< 6 meses"
+            elif 6 <= months < 12: k = "6m - 1 año"
+            elif 1 <= years < 3: k = "1 - 3 años"
+            elif 3 <= years < 5: k = "3 - 5 años"
+            elif 5 <= years < 10: k = "5 - 10 años"
+            else: k = "10 - 20 años"
+
+            seniority_ranges[k]["score"] += avg_score
+            seniority_ranges[k]["count"] += 1
+
+        # Cálculo de Género
+        g = c.gender or "Sin Especificar"
+        if g not in gender_ranges:
+            gender_ranges[g] = {"score": 0.0, "count": 0}
+            
+        gender_ranges[g]["score"] += avg_score
+        gender_ranges[g]["count"] += 1
+
+    def build_fixed_data(title, ranges_dict, fixed_color="DYNAMIC"):
+        data_list = []
+        for k, v in ranges_dict.items():
+            if v["count"] > 0:
+                data_list.append({
+                    "value": k,
+                    "score": round(v["score"] / v["count"], 2)
+                })
+        if data_list:
+            chart_data[title] = {
+                "color": fixed_color,
+                "is_fixed": True,
+                "data": data_list
+            }
+
+    # Insertamos primero los fijos en el objeto final
+    build_fixed_data("Rango de Edad", age_ranges)
+    build_fixed_data("Antigüedad", seniority_ranges)
+    build_fixed_data("Género", gender_ranges, "#3b82f6")
+   
+
+    # Segunda parte: Demográficos dinámicos definidos en custom_additional_details
     demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail",
         filters={
             "parent": ["in", contacts_with_responses], 
@@ -129,6 +222,7 @@ def inject_contacts_demographics_data(context, survey_name):
     for demo_title, payload in grouped_data.items():
         chart_data[demo_title] = {
             "color": payload["color"],
+            "is_fixed": False,
             "data": []
         }
         for val_name, stats in payload["values"].items():
@@ -137,7 +231,7 @@ def inject_contacts_demographics_data(context, survey_name):
                 "value": val_name,
                 "score": avg
             })
-        # Ordenar cada categoría de mayor a menor puntaje
+        # Ordenar categoría dinámica de mayor a menor puntaje
         chart_data[demo_title]["data"].sort(key=lambda x: x["score"], reverse=True)
             
     context.contact_demographics_json = json.dumps(chart_data)

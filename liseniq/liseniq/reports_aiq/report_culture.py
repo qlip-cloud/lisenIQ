@@ -14,6 +14,7 @@ def build_culture_context(context, survey_name):
     culture_chart_data = []
     dimension_chart_data = []
     grouped_dimension_chart_data = []
+    topic_questions_data = []
 
     if likert_types:
         likert_questions_data = frappe.get_all("qp_IQ_Question", 
@@ -72,6 +73,10 @@ def build_culture_context(context, survey_name):
             topic_totals = {}
             topic_counts = {}
 
+            # Diccionarios para guardar todas las preguntas sin importar si tienen demográfico
+            question_totals = {}
+            question_counts = {}
+
             for resp_json in survey_responses:
                 if not resp_json:
                     continue
@@ -84,6 +89,10 @@ def build_culture_context(context, survey_name):
                                 
                                 total_score += val
                                 total_answers += 1
+
+                                # Agrupación global de preguntas
+                                question_totals[q_name] = question_totals.get(q_name, 0.0) + val
+                                question_counts[q_name] = question_counts.get(q_name, 0) + 1
                                 
                                 if q_name in q_to_culture:
                                     demo_id = q_to_culture[q_name]
@@ -127,6 +136,23 @@ def build_culture_context(context, survey_name):
                 })
             dimension_chart_data.sort(key=lambda x: x["score"])
 
+            # Armamos data para TODAS las preguntas, para las tablas por Tema
+            for q_name, t_score in question_totals.items():
+                if question_counts[q_name] > 0:
+                    avg = round(t_score / question_counts[q_name], 2)
+                    statement_text = q_to_statement.get(q_name, q_name)
+                    
+                    t_id = q_to_topic.get(q_name)
+                    t_title = topic_title_map.get(t_id, "Sin Tema") if t_id else "Sin Tema"
+                    t_color = topic_color_map.get(t_id, "") if t_id else ""
+                    
+                    topic_questions_data.append({
+                        "question": statement_text,
+                        "topic": t_title,
+                        "score": avg,
+                        "color": t_color
+                    })
+
             # Armamos data agrupada para el Gráfico de Dimensiones
             for demo_id, t_score in grouped_dim_totals.items():
                 avg = round(t_score / grouped_dim_counts[demo_id], 2)
@@ -160,7 +186,8 @@ def build_culture_context(context, survey_name):
     context.report_specific_data_json = json.dumps({
         "culture_chart_data": culture_chart_data,
         "dimension_chart_data": dimension_chart_data,
-        "grouped_dimension_chart_data": grouped_dimension_chart_data
+        "grouped_dimension_chart_data": grouped_dimension_chart_data,
+        "topic_questions_data": topic_questions_data
     })
 
     # Llamamos al controlador que inyecta la data de demográficos de contactos para el reporte de Cultura

@@ -145,10 +145,15 @@ def build_culture_context(context, survey_name):
                     t_id = q_to_topic.get(q_name)
                     t_title = topic_title_map.get(t_id, "Sin Tema") if t_id else "Sin Tema"
                     t_color = topic_color_map.get(t_id, "") if t_id else ""
+
+                    # Obtenemos la dimensión para agregarla a la tabla
+                    demo_id = q_to_culture.get(q_name)
+                    demo_title = demo_title_map.get(demo_id, "Sin Dimensión") if demo_id else "Sin Dimensión"
                     
                     topic_questions_data.append({
                         "question": statement_text,
                         "topic": t_title,
+                        "dimension": demo_title,
                         "score": avg,
                         "color": t_color
                     })

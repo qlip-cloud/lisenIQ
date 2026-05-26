@@ -195,7 +195,8 @@ function initTopicsTables(data) {
             }
 
             return `
-                <div class="tb-row two-cols">
+                <div class="tb-row">
+                    <div class="tb-topic">${item.dimension || 'Sin Dimensión'}</div>
                     <div class="tb-question">${item.question}</div>
                     <div class="tb-score-wrapper">
                         <div class="tb-score-bar-bg">
@@ -209,7 +210,8 @@ function initTopicsTables(data) {
         html += `
             <div class="tb-card">
                 <h4 class="tb-header-title">${topic}</h4>
-                <div class="tb-table-header two-cols">
+                <div class="tb-table-header">
+                    <span>Dimensión</span>
                     <span>Pregunta</span>
                     <span style="text-align: right;">Puntaje</span>
                 </div>

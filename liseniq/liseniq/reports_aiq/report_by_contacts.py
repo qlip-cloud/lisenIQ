@@ -164,7 +164,7 @@ def inject_contacts_demographics_data(context, survey_name):
     # Insertamos primero los fijos en el objeto final
     build_fixed_data("Rango de Edad", age_ranges)
     build_fixed_data("Antigüedad", seniority_ranges)
-    build_fixed_data("Género", gender_ranges, "#3b82f6") # Azul por defecto para género
+    build_fixed_data("Género", gender_ranges, "#3b82f6")
    
 
     # Segunda parte: Demográficos dinámicos definidos en custom_additional_details

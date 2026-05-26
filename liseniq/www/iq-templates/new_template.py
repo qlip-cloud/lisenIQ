@@ -27,7 +27,7 @@ def get_context(context):
 
     try:
         question_categories = frappe.get_all(
-            "qp_IQ_QuestionCategory",
+            "qp_IQ_TemplateCategory",
             fields=["name", "qnc_category"],
             order_by="qnc_category",
             ignore_permissions=True

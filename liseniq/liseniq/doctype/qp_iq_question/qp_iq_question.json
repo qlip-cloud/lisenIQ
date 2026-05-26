@@ -66,7 +66,7 @@
    "in_list_view": 1,
    "in_preview": 1,
    "label": "Categoria de la Pregunta",
-   "options": "qp_IQ_QuestionCategory"
+   "options": "qp_IQ_TemplateCategory"
   },
   {
    "default": "0",
@@ -193,7 +193,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-30 18:36:20.335726",
+ "modified": "2026-05-08 19:18:29.750490",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

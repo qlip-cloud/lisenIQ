@@ -5,15 +5,18 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "qnc_is_popular",
   "qnc_category",
+  "qnc_mnemonico",
+  "column_break_4",
   "qnc_description",
-  "qnc_is_popular"
+  "qnc_color"
  ],
  "fields": [
   {
    "fieldname": "qnc_category",
    "fieldtype": "Data",
-   "label": "Categoria de Pregunta"
+   "label": "Categor\u00eda"
   },
   {
    "fieldname": "qnc_description",
@@ -24,15 +27,33 @@
    "default": "0",
    "fieldname": "qnc_is_popular",
    "fieldtype": "Check",
-   "label": "Es popular"
+   "label": "\u00bfEs Popular?"
+  },
+  {
+   "fieldname": "qnc_mnemonico",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Mnem\u00f3nico"
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qnc_color",
+   "fieldtype": "Color",
+   "label": "Color de Etiqueta"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-09 18:57:45.642818",
+ "modified": "2026-05-18 11:14:59.160764",
  "modified_by": "Administrator",
  "module": "Liseniq",
- "name": "qp_IQ_QuestionCategory",
+ "name": "qp_IQ_TemplateCategory",
  "owner": "Administrator",
  "permissions": [
   {

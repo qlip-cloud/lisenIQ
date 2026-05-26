@@ -155,6 +155,17 @@
                                         picture_as_pdf
                                     </span>
                                 {% endif %}
+                                {% if m.status == "Finalizada" and m.has_generated_reports and not m.is_leadership %}
+                                    <span 
+                                        data-survey="{{ m.name }}" 
+                                        data-url="/api/method/liseniq.utils.export.export_leadership_reports_zip?survey_name={{ m.name }}" 
+                                        class="results-link-icon download-leadership-reports-zip-btn material-symbols-outlined" 
+                                        title="Descargar informes PDF" 
+                                        aria-label="Descargar informes PDF de {{ m.title }}"
+                                        style="cursor: pointer;">
+                                        picture_as_pdf
+                                    </span>
+                                {% endif %}
                                 </div>
                                 {% elif m.status == "En Progreso" and not m.is_leadership %}
                                 <span 

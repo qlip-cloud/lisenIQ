@@ -283,12 +283,12 @@
    "default": "0",
    "fieldname": "su_report_generated",
    "fieldtype": "Check",
-   "label": "\u00bfReporte de Liderazgo Generado?"
+   "label": "Informes PDF Generados?"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-07 12:38:11.711344",
+ "modified": "2026-05-21 13:52:59.267461",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

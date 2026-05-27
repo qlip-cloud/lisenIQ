@@ -383,8 +383,8 @@ export class QuestionBuilder {
                         `}
                     </div>
                     <div class="question-item-tags">
-                        <span>Tema: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
-                        ${question.culture ? `<span style="margin-top:2px;">Cultura: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
+                        <span>Dimensión: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                        ${question.culture ? `<span style="margin-top:2px;">Tema: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
                     </div>
                 </div>
             </div>

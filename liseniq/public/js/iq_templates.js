@@ -181,8 +181,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="review-question-details">
                         <span>Tipo: ${frappe.utils.escape_html(questionDisplayName)}</span>
                         <div>
-                            <span class="review-question-tag">Tema: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
-                            ${question.culture ? `<span class="review-question-tag" style="margin-left:10px;">Cultura: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
+                            <span class="review-question-tag">Dimensión: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                            ${question.culture ? `<span class="review-question-tag" style="margin-left:10px;">Tema: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
                         </div>
                     </div>
                     ${optionsHtml}

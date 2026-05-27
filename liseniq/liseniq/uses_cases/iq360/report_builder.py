@@ -34,9 +34,9 @@ Fields:
 """
 
 ROLE_SELF = 'Autoevaluación'
-ROLE_MANAGER = 'Líder/Jefe'
-ROLE_PEER = 'Par/Igual'
-ROLE_TEAM = 'Persona a Cargo'
+ROLE_MANAGER = 'Jefe'
+ROLE_PEER = 'Par'
+ROLE_TEAM = 'Colaborador'
 
 SCORE_KEY_SELF = 'self_score'
 SCORE_KEY_MANAGER = 'manager_score'

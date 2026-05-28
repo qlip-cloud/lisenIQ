@@ -773,17 +773,38 @@ def get_valid_engagement_surveys(filters=None):
 def get_all_unique_questions(valid_surveys):
     """
     Obtiene todas las preguntas únicas de todas las encuestas válidas
+    Primero obtiene del survey_json, luego actualiza con los textos más recientes de qp_IQ_Question
     """
     all_questions = {}
     
     for survey in valid_surveys:
         survey_json = survey.get('survey_json', '{}')
         questions = get_question_labels(survey_json)
-        
-        # Agregar preguntas que no existan ya
+
         for qid, title in questions.items():
             if qid not in all_questions:
                 all_questions[qid] = title
+    
+
+    if all_questions:
+        question_ids = list(all_questions.keys())
+        placeholders = ', '.join(['%s'] * len(question_ids))
+        
+        try:
+            query = f"""
+                SELECT name, qn_statement
+                FROM `tabqp_IQ_Question`
+                WHERE name IN ({placeholders})
+            """
+            results = frappe.db.sql(query, question_ids, as_dict=True)
+            
+            for row in results:
+                question_id = row.get('name')
+                statement = row.get('qn_statement')
+                if question_id and statement:
+                    all_questions[question_id] = statement
+        except Exception as e:
+            frappe.log_error(f"Error updating question labels from qp_IQ_Question: {str(e)}")
     
     return all_questions
 

@@ -290,12 +290,19 @@ def export_leadership_reports_zip(survey_name):
         frappe.flags.ignore_permissions = True
         survey = _get_survey_doc(survey_name)
         survey_display_name = survey.su_name
-
+        if not survey.su_is_leadership:
+            doctype_name = "qp_IQ_Cultura_Report"
+            filter_field = "cutoff_name"
+            print_format = "Reporte de Cultura"
+        else:
+            doctype_name = "qp_IQ_Leader_360_Report"
+            filter_field = "leader_name"
+            print_format = "Reporte Individual Liderazgo"
         reports = frappe.get_all(
-            "qp_IQ_Leader_360_Report",
+            doctype_name,
             filters={"survey_name": survey_display_name},
-            fields=["name", "leader_name"],
-            order_by="leader_name asc",
+            fields=["name", filter_field],
+            order_by= filter_field + " asc",
         )
 
         if not reports:
@@ -304,19 +311,23 @@ def export_leadership_reports_zip(survey_name):
         zip_buffer = BytesIO()
         with ZipFile(zip_buffer, "w", ZIP_DEFLATED) as zip_file:
             for report_row in reports:
-                report_doc = frappe.get_doc("qp_IQ_Leader_360_Report", report_row.name)
+                report_doc = frappe.get_doc(doctype_name, report_row.name)
                 html = frappe.get_print(
-                    "qp_IQ_Leader_360_Report",
+                    doctype_name,
                     report_doc.name,
-                    print_format="Reporte Individual Liderazgo",
+                    print_format=print_format,
                     as_pdf=False,
                     no_letterhead=1,
                 )
                 html = _ensure_pdf_header_footer_placeholders(html)
                 html = _compile_css_for_pdf(html)
                 pdf_bytes = get_pdf(html, options=_leadership_pdf_options())
-                leader_name = _sanitize_filename(report_row.leader_name or report_doc.leader_name or report_doc.name)
-                zip_file.writestr(f"{leader_name}_{report_doc.name}.pdf", pdf_bytes)
+                if not survey.su_is_leadership:
+                    cutoff_name = report_row.cutoff_name or "cutoff"
+                    file_name = _sanitize_filename(cutoff_name)
+                else:
+                    file_name = _sanitize_filename(report_row.leader_name or report_doc.leader_name or report_doc.name)
+                zip_file.writestr(f"{file_name}_{report_doc.name}.pdf", pdf_bytes)
 
         zip_buffer.seek(0)
 

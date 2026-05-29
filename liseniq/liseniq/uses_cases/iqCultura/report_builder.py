@@ -377,6 +377,15 @@ def _process_responses_for_global_metrics(
 
             value = resp['answer']
             question = resp['question']
+            
+            # Get question metadata to check if it's an open question
+            question_info = questions_metadata.get(question, {})
+            dimension = question_info.get('dimension') or 'Sin Dimensión'
+            theme = question_info.get('theme') or 'Sin Tema'
+            
+            # Skip open-ended questions (dimension = 'Abierta')
+            if dimension == 'Abierta':
+                continue
 
             # Add to global scores
             all_scores.append(value)
@@ -385,14 +394,9 @@ def _process_responses_for_global_metrics(
             all_question_scores[question].append(value)
 
             # Add to theme and dimension scores
-            question_info = questions_metadata.get(question, {})
-            theme = question_info.get('theme') or 'Sin Tema'
-            dimension = question_info.get('dimension') or 'Sin Dimensión'
-
             all_theme_scores[theme].append(value)
             all_dimension_scores[dimension].append(value)
-            
-            # Track engagement index scores (only AMBIENTE LABORAL POSITIVO theme + Índice de Engagement dimension)
+
             if (all_engagement_scores is not None and 
                 dimension == 'Índice de Engagement' and 
                 theme == 'AMBIENTE LABORAL POSITIVO'):
@@ -446,20 +450,22 @@ def process_demographic_cutoff_data(
     # Process responses for this cutoff
     for response_name, resp_list in normalized_responses.items():
         for resp in resp_list:
-            if resp['answer_type'] == 'text':
-                question_text = questions_metadata.get(resp['question'], {}).get('text', resp['question'])
+            # Get question info first to check if it's an open question
+            question = resp['question']
+            question_info = questions_metadata.get(question, {})
+            dimension = question_info.get('dimension') or 'Sin Dimensión'
+            theme = question_info.get('theme') or 'Sin Tema'
+            
+            # Handle open-ended questions (text or dimension = 'Abierta')
+            if resp['answer_type'] == 'text' or dimension == 'Abierta':
+                question_text = question_info.get('text', question)
                 open_questions_answers[question_text].append(resp['answer'])
                 continue
 
             value = resp['answer']
-            question = resp['question']
             scores.append(value)
 
-            question_info = questions_metadata.get(question, {})
-            theme = question_info.get('theme') or 'Sin Tema'
-            dimension = question_info.get('dimension') or 'Sin Dimensión'
-
-            # Accumulate scores
+            # Accumulate scores (only numeric values from non-open questions)
             theme_scores[theme].append(value)
             dimension_scores[dimension].append(value)
             question_scores[question].append(value)

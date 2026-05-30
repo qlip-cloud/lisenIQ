@@ -44,8 +44,16 @@ def get_context(context):
             except ImportError as e:
                 frappe.log_error(f"Error cargando módulo de Cultura: {e}", "AIQ Reports")
                 context.is_unsupported_report = True
+        elif category_mnemonic == "template_engagement":
+            try:
+                # Contexto específico para reportes de Engagement
+                from liseniq.liseniq.reports_aiq.report_by_engagement import build_engagement_context
+                context = build_engagement_context(context, survey_name)
+            except ImportError as e:
+                frappe.log_error(f"Error cargando módulo de Engagement: {e}", "AIQ Reports")
+                context.is_unsupported_report = True
         else:
-            # Si no es Cultura ni otra soportada, marcamos como no soportado
+            # Si no es Cultura, Engagement ni otra soportada, marcamos como no soportado
             context.is_unsupported_report = True
     else:
         # Valores por defecto de seguridad

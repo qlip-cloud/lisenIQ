@@ -56,7 +56,7 @@ export function initContactsReport(contactDemographicsData) {
                     <h3 class="chart-section-title">${titleText}</h3>
                 </div>
                 <div class="chart-card" style="margin-bottom: 0;">
-                    <div id="${chartId}" class="chart-wrapper" style="height: 380px;"></div>
+                    <div id="${chartId}" class="chart-wrapper" style="min-height: 380px;"></div>
                 </div>
             </div>
         `;
@@ -72,6 +72,10 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
     
     let isDistributed = false;
     let colorsArray = [];
+
+    // Cálculo de Altura Dinámica: 35px por cada barra para evitar que se aplasten.
+    // Mínimo será 380px para mantener estética en gráficos de pocos datos.
+    const calculatedHeight = Math.max(380, categories.length * 35);
 
     // Lógica para asignar colores dinámicamente
     if (dtColor === 'DYNAMIC') {
@@ -99,7 +103,7 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
         series: [{ name: 'Puntaje Promedio', data: scores }],
         chart: { 
             type: 'bar', 
-            height: '100%', 
+            height: calculatedHeight,
             toolbar: { show: false }, 
             fontFamily: 'inherit',
             parentHeightOffset: 0
@@ -107,8 +111,8 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
         colors: colorsArray,
         plotOptions: { 
             bar: { 
-                horizontal: false, 
-                columnWidth: '55%',
+                horizontal: true, 
+                barHeight: '65%',
                 borderRadius: 4, 
                 distributed: isDistributed,
                 dataLabels: { position: 'center' }
@@ -117,25 +121,27 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
         dataLabels: { 
             enabled: true,
             formatter: function (val) { return val.toFixed(2); },
-            style: { fontSize: '13px', fontWeight: 700, colors: ["#ffffff"] },
-            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.45 }
+            style: { fontSize: '10px', fontWeight: 600, colors: ["#ffffff"] },
+            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.6 }
         },
         legend: { show: false },
         xaxis: {
-            categories: categories,
+            categories: categories, 
+            max: function(max) { return max > 5 ? max : 5; }, 
             labels: { 
-                style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 },
-                trim: true,
-                hideOverlappingLabels: false,
-                rotate: isFixed ? 0 : -45
+                formatter: function (val) { 
+                    if(typeof val === 'number' || !isNaN(val)) {
+                        return Number(val).toFixed(2).replace('.', ',');
+                    }
+                    return val;
+                },
+                style: { colors: '#6b7280', fontSize: '11px', fontWeight: 600 }
             } 
         },
         yaxis: {
-            max: function(max) { return max > 5 ? max : 5; }, 
             labels: {
-                // Forzamos 2 decimales para el Eje Y
-                formatter: function (val) { return val.toFixed(2).replace('.', ','); }, 
-                style: { colors: '#6b7280', fontSize: '11px', fontWeight: 600 }
+                style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 },
+                maxWidth: 160 
             }
         },
         grid: { 

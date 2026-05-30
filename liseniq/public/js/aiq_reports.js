@@ -39,14 +39,21 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     if (mnemonic === 'template_culture') {
         try {
-            // Importación dinámica del módulo específico
+            // Importación dinámica del módulo específico de Cultura
             const cultureModule = await import('/assets/liseniq/js/reports/report_culture.js');
             cultureModule.initCultureReport(config.data, surveyName);
         } catch (err) {
             console.error("Error al cargar el módulo del reporte de Cultura", err);
         }
-    } 
-    // Aquí puedes agregar en el futuro: else if (mnemonic === 'template_engagement') { ... }
+    } else if (mnemonic === 'template_engagement') {
+        try {
+            // Importación dinámica del módulo específico de Engagement
+            const engagementModule = await import('/assets/liseniq/js/reports/report_by_engagement.js');
+            engagementModule.initEngagementReport(config.data, surveyName);
+        } catch (err) {
+            console.error("Error al cargar el módulo del reporte de Engagement", err);
+        }
+    }
 });
 
 // Carga dinámica de librerías

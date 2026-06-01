@@ -211,11 +211,11 @@ def process_historical_response_row(hist_record, question_map, demographics_map,
     rows = []
     for qid, question_label in question_map.items():
         row = base_row.copy()
-        row['question'] = question_label
+        question_info = question_variables_map.get(qid, {})
+        row['question'] = question_info.get('question_text', qid)
         row['answer'] = parsed_responses.get(qid, '')
         
         # Agregar variable y tema
-        question_info = question_variables_map.get(question_label, {})
         variable = question_info.get('variable', '')
         row['variable'] = variable
         
@@ -411,11 +411,11 @@ def process_response_row(response, question_map, demographics_map, demographics_
     rows = []
     for qid, question_label in question_map.items():
         row = base_row.copy()
-        row['question'] = question_label
+        question_info = question_variables_map.get(qid, {})
+        row['question'] = question_info.get('question_text', qid)
         row['answer'] = parsed_responses.get(qid, '')
         
         # Agregar variable y tema
-        question_info = question_variables_map.get(question_label, {})
         variable = question_info.get('variable', '')
         row['variable'] = variable
         
@@ -636,6 +636,7 @@ def get_question_variables_map():
         
         mapping = {}
         for row in results:
+            question_id = row.get('question_id', '')
             question_text = row.get('question_text', '')
             variable = row.get('variable', '')
             
@@ -647,7 +648,8 @@ def get_question_variables_map():
                 if variable == 'Índice de Engagement':
                     tema = TEMAS_INDICE_DE_ENGAGEMENT.get(question_text, '')
                 
-                mapping[question_text] = {
+                mapping[question_id] = {
+                    'question_text': question_text,
                     'variable': variable,
                     'tema': tema
                 }

@@ -43,6 +43,27 @@ def _round2(value):
         return value
 
 
+def convert_score_10_to_5(score):
+    """Convert score from 1-10 scale to 1-5 scale"""
+    if score is None:
+        return None
+    # If already in 1-5 range, return as is
+    if score <= 5:
+        return score
+    # Convert 1-10 to 1-5
+    if 1 <= score <= 2:
+        return 1
+    elif 3 <= score <= 4:
+        return 2
+    elif 5 <= score <= 6:
+        return 3
+    elif 7 <= score <= 8:
+        return 4
+    elif 9 <= score <= 10:
+        return 5
+    return score
+
+
 def parse_answer(value):
     """Parse answer and determine if it's a score or text"""
     try:
@@ -54,21 +75,46 @@ def parse_answer(value):
 def normalize_responses(responses):
     """
     Normalize survey responses from JSON format to structured format.
-    Returns dict: {response_name: [{question, answer, answer_type, evaluator}, ...]}
+    Converts numeric answers from 1-10 to 1-5 scale (if needed).
+    Returns dict: {response_name: [{question, answer, answer_converted, answer_type, evaluator}, ...]}
+    
+    Fields:
+    - answer: Original value (1-10 scale, used ONLY for ENPS/NPS calculations)
+    - answer_converted: Converted to 1-5 scale (used for all other metrics)
     """
     parsed_data = defaultdict(list)
 
     for response in responses:
-        json_data = json.loads(response.response_json) if response.response_json else {}
+        # Handle both dict (from history) and object responses
+        if isinstance(response, dict):
+            # For historic data, use response_data; for regular, use response_json
+            json_text = response.get('response_data') or response.get('response_json')
+            evaluator = response.get('user')
+            response_name = response.get('name')
+            survey = response.get('survey')
+        else:
+            json_text = response.response_json
+            evaluator = response.user
+            response_name = response.name
+            survey = response.survey
+            
+        json_data = json.loads(json_text) if json_text else {}
         json_data.pop('__token', None)
 
         for key, value in json_data.items():
             answer, answer_type = parse_answer(value)
-            parsed_data[response.name].append({
-                'survey': response.survey,
-                'evaluator': response.user,
+            
+            # Convert score to 1-5 scale if it's numeric
+            answer_converted = answer
+            if answer_type == 'score':
+                answer_converted = convert_score_10_to_5(answer)
+            
+            parsed_data[response_name].append({
+                'survey': survey,
+                'evaluator': evaluator,
                 'question': key,
-                'answer': answer,
+                'answer': answer,  # Original value (1-10), used ONLY for ENPS/NPS
+                'answer_converted': answer_converted,  # Converted to 1-5, use for metrics
                 'answer_type': answer_type,
             })
 

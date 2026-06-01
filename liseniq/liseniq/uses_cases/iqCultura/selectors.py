@@ -2,12 +2,33 @@ import frappe
 
 
 def get_all_responses_for_survey(survey_name):
-    """Get all survey responses for a given survey"""
-    responses = frappe.get_all(
-        "Survey Response",
-        filters={"survey": survey_name},
-        fields=["*"]
-    )
+    survey_doc = frappe.get_doc('qp_IQ_Survey', {'su_name': survey_name})
+    in_history = survey_doc.su_in_history
+    if not in_history:
+        """Get all survey responses for a given survey"""
+        responses = frappe.get_all(
+            "Survey Response",
+            filters={"survey": survey_name},
+            fields=["*"]
+        )
+    else:
+        """Get all survey responses for a given survey from history"""
+        responses_historic = frappe.get_all(
+            "qp_IQ_SurveyHistoricData",
+            filters={"shd_survey_name": survey_name},
+            fields=["*"]
+        )
+        responses = []
+        for resp in responses_historic:
+            survey_response = {
+                "name": resp.name,
+                "survey": resp.shd_survey_name,
+                "user": resp.shd_contact_name,
+                "creation": resp.creation,
+                "modified": resp.modified,
+                "response_json": resp.shd_measurement_response,
+            }
+            responses.append(survey_response)
  
     return responses
 
@@ -130,7 +151,12 @@ def get_responses_by_respondent(survey_name):
     responses_by_respondent = {}
     
     for response in responses:
-        respondent = response.user or response.name
+        # Handle both dict (from history) and object responses
+        if isinstance(response, dict):
+            respondent = response.get('user') or response.get('name')
+        else:
+            respondent = response.user or response.name
+        
         if respondent not in responses_by_respondent:
             responses_by_respondent[respondent] = []
         responses_by_respondent[respondent].append(response)

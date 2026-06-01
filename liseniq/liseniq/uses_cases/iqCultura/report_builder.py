@@ -13,6 +13,7 @@ from liseniq.liseniq.uses_cases.iqCultura.calculations import (
     average,
     std_dev,
     _round2,
+    convert_score_10_to_5,
 )
 
 """
@@ -59,14 +60,6 @@ def _print_log(msg):
     """Imprime mensaje en logs y stdout para debug"""
     print(f'[iqCultura] {msg}')
     return msg
-
-
-def _convert_score_10_to_5(score):
-    """Convert score from 1-10 scale to 1-5 scale using linear conversion."""
-    if score is None:
-        return None
-    # Linear conversion: (value - 1) / 9 * 4 + 1
-    return round((score - 1) / 9 * 4 + 1, 2)
 
 
 def _calculate_nps(scores):
@@ -226,15 +219,26 @@ def build_cultura_report(survey_id, demographic_field):
             print(f'[iqCultura DEBUG] Procesando cutoff: {demographic_value} con {len(respondent_ids)} respondents')
 
             # Get responses for this demographic cutoff
-            cutoff_responses = [
-                r for r in responses
-                if r.user in respondent_ids or r.name in [
-                    resp_name for resp_name, resp_list in responses_by_respondent.items()
-                    if responses_by_respondent.get(resp_name) and any(
-                        rr.user in respondent_ids for rr in responses_by_respondent.get(resp_name, [])
-                    )
-                ]
-            ]
+            cutoff_responses = []
+            for r in responses:
+                # Handle both dict (from history) and object responses
+                user_field = r.get('user') if isinstance(r, dict) else r.user
+                name_field = r.get('name') if isinstance(r, dict) else r.name
+                
+                if user_field in respondent_ids:
+                    cutoff_responses.append(r)
+                    continue
+                
+                # Check in responses_by_respondent
+                for resp_name, resp_list in responses_by_respondent.items():
+                    if resp_name in respondent_ids or any(
+                        (rr.get('user') if isinstance(rr, dict) else rr.user) in respondent_ids
+                        for rr in resp_list
+                    ):
+                        if name_field == resp_name or user_field == resp_name:
+                            cutoff_responses.append(r)
+                            break
+
 
             print(f'[iqCultura DEBUG] Respuestas para cutoff {demographic_value}: {len(cutoff_responses)}')
 
@@ -367,7 +371,11 @@ def _process_responses_for_global_metrics(
     all_question_scores,
     all_engagement_scores=None,
 ):
-    """Process all responses to calculate global metrics."""
+    """Process all responses to calculate global metrics.
+    
+    Uses answer_converted (1-5 scale) for all metrics.
+    Uses answer (original 1-10 scale) ONLY for ENPS/NPS calculations.
+    """
     normalized_responses = normalize_responses(responses)
 
     for response_name, resp_list in normalized_responses.items():
@@ -375,7 +383,8 @@ def _process_responses_for_global_metrics(
             if resp['answer_type'] == 'text':
                 continue
 
-            value = resp['answer']
+            # Use converted value (1-5 scale) for metrics
+            value = resp['answer_converted']
             question = resp['question']
             
             # Get question metadata to check if it's an open question
@@ -387,7 +396,7 @@ def _process_responses_for_global_metrics(
             if dimension == 'Abierta':
                 continue
 
-            # Add to global scores
+            # Add to global scores (using converted 1-5 values)
             all_scores.append(value)
 
             # Add to question scores
@@ -397,10 +406,11 @@ def _process_responses_for_global_metrics(
             all_theme_scores[theme].append(value)
             all_dimension_scores[dimension].append(value)
 
+            # For engagement index (NPS/ENPS), use original 1-10 values
             if (all_engagement_scores is not None and 
                 dimension == 'Índice de Engagement' and 
                 theme == 'AMBIENTE LABORAL POSITIVO'):
-                all_engagement_scores.append(value)
+                all_engagement_scores.append(resp['answer'])  # Original 1-10 value
 
 
 def process_demographic_cutoff_data(
@@ -447,7 +457,6 @@ def process_demographic_cutoff_data(
     # Accumulators for engagement index (NPS/ENPS)
     engagement_scores_cutoff = []  # For this cutoff
 
-    # Process responses for this cutoff
     for response_name, resp_list in normalized_responses.items():
         for resp in resp_list:
             # Get question info first to check if it's an open question
@@ -462,18 +471,19 @@ def process_demographic_cutoff_data(
                 open_questions_answers[question_text].append(resp['answer'])
                 continue
 
-            value = resp['answer']
+            # Use converted value (1-5 scale) for all metrics
+            value = resp['answer_converted']
             scores.append(value)
 
-            # Accumulate scores (only numeric values from non-open questions)
+            # Accumulate scores (already in 1-5 scale)
             theme_scores[theme].append(value)
             dimension_scores[dimension].append(value)
             question_scores[question].append(value)
             dimension_themes[dimension].add(theme)
             
-            # Track engagement index scores (only AMBIENTE LABORAL POSITIVO theme + Índice de Engagement dimension)
+            # Track engagement index scores - use ORIGINAL 1-10 values for ENPS/NPS
             if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
-                engagement_scores_cutoff.append(value)
+                engagement_scores_cutoff.append(resp['answer'])  # Original 1-10 value
 
     # Calculate cutoff metrics
     cutoff_data['overall_score'] = global_overall_score
@@ -481,63 +491,57 @@ def process_demographic_cutoff_data(
     cutoff_data['response_rate'] = len(respondent_ids) if respondent_ids else 0
     cutoff_data['_all_scores'] = scores
     
-    # Calculate NPS and ENPS for engagement index
+    # Calculate NPS and ENPS for engagement index (using original 1-10 values)
     cutoff_data['nps_cutoff'] = _calculate_nps(engagement_scores_cutoff)
     cutoff_data['enps_cutoff'] = _calculate_enps(engagement_scores_cutoff)
     cutoff_data['nps_org'] = global_nps_org
     cutoff_data['enps_org'] = global_enps_org
 
-    # Theme summary (convert scores to 1-5 scale)
+    # Theme summary (values already in 1-5 scale, no conversion needed)
     cutoff_data['theme_summary'] = {}
     for theme, values in theme_scores.items():
-        # Convert scores to 1-5 scale for average calculation
-        values_converted = [_convert_score_10_to_5(v) for v in values]
-        theme_avg = average(values_converted)
+        # Values are already in 1-5 scale from normalize_responses
+        theme_avg = average(values)
         
-        # Get global average and convert to 1-5 scale
+        # Global average is also in 1-5 scale
         global_avg = global_theme_scores.get(theme)
-        global_avg_converted = _convert_score_10_to_5(global_avg) if global_avg else None
         
         cutoff_data['theme_summary'][theme] = {
             'avg_score': theme_avg,
-            'overall_avg_score': global_avg_converted,
-            'gap': (theme_avg - global_avg_converted) if (theme_avg and global_avg_converted) else None,
+            'overall_avg_score': global_avg,
+            'gap': (theme_avg - global_avg) if (theme_avg and global_avg) else None,
             'trend_delta': None,  # Will be calculated if there's a previous report
         }
 
-    # Dimension summary (convert scores to 1-5 scale)
+    # Dimension summary (values already in 1-5 scale, no conversion needed)
     cutoff_data['dimension_summary'] = {}
     for dimension, values in dimension_scores.items():
-        # Convert scores to 1-5 scale for average calculation
-        values_converted = [_convert_score_10_to_5(v) for v in values]
-        dim_avg = average(values_converted)
+        # Values are already in 1-5 scale from normalize_responses
+        dim_avg = average(values)
         
-        # Get global average and convert to 1-5 scale
+        # Global average is also in 1-5 scale
         global_avg = global_dimension_scores.get(dimension)
-        global_avg_converted = _convert_score_10_to_5(global_avg) if global_avg else None
         
         cutoff_data['dimension_summary'][dimension] = {
             'avg_score': dim_avg,
-            'overall_avg_score': global_avg_converted,
-            'gap': (dim_avg - global_avg_converted) if (dim_avg and global_avg_converted) else None,
+            'overall_avg_score': global_avg,
+            'gap': (dim_avg - global_avg) if (dim_avg and global_avg) else None,
             'trend_delta': None,
             'theme_name': ', '.join(sorted(dimension_themes.get(dimension, []))),
         }
 
-    # Question summary (convert scores to 1-5 scale)
+    # Question summary (values already in 1-5 scale, no conversion needed)
     cutoff_data['question_summary'] = []
     for question, values in question_scores.items():
-        # Convert scores to 1-5 scale for average calculation
-        values_converted = [_convert_score_10_to_5(v) for v in values]
-        q_avg = average(values_converted)
+        # Values are already in 1-5 scale from normalize_responses
+        q_avg = average(values)
         
         question_info = questions_metadata.get(question, {})
         theme = question_info.get('theme') or 'Sin Tema'
         dimension = question_info.get('dimension') or 'Sin Dimensión'
         
-        # Get global average and convert to 1-5 scale
+        # Global average is also in 1-5 scale
         global_avg = global_question_scores.get(question)
-        global_avg_converted = _convert_score_10_to_5(global_avg) if global_avg else None
 
         previous_score = previous_cutoff_data.get(question_info.get('text', question))
         trend_delta = None
@@ -549,8 +553,8 @@ def process_demographic_cutoff_data(
             'dimension_name': dimension,
             'theme_name': theme,
             'avg_score': q_avg,
-            'overall_avg_score': global_avg_converted,
-            'gap': (q_avg - global_avg_converted) if (q_avg and global_avg_converted) else None,
+            'overall_avg_score': global_avg,
+            'gap': (q_avg - global_avg) if (q_avg and global_avg) else None,
             'trend_delta': trend_delta,
         })
 

@@ -7,6 +7,7 @@
  "field_order": [
   "dt_title",
   "dt_object_type",
+  "dt_mnemonico",
   "dt_description",
   "column_break_5",
   "dt_creator_company",
@@ -46,11 +47,16 @@
    "fieldtype": "Link",
    "label": "Compa\u00f1ia",
    "options": "qp_IQ_Company"
+  },
+  {
+   "fieldname": "dt_mnemonico",
+   "fieldtype": "Data",
+   "label": "Mnem\u00f3nico"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-30 18:35:31.723435",
+ "modified": "2026-06-02 17:45:22.281708",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_DemographicType",

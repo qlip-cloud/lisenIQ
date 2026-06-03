@@ -6,34 +6,44 @@ from .report_by_contacts import inject_contacts_demographics_data
 
 def build_engagement_context(context, survey_name):
 
-    likert_types = frappe.get_all("qp_IQ_QuestionType", 
-                                  filters={"qnt_type_name": ["like", "%Likert%"]}, 
-                                  pluck="name")
+    all_q_types = frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_mnemonico"])
+    valid_types = []
+    nps_types = []
+    for qt in all_q_types:
+        t_mnemonic = qt.qnt_mnemonico or ""
+        if t_mnemonic in ["scale_likert", "score_nps"]:
+            valid_types.append(qt.name)
+        if t_mnemonic == "score_nps":
+            nps_types.append(qt.name)
     
     global_score = 0.0
+    engagement_index_score = 0.0
     engagement_chart_data = []
     dimension_chart_data = []
     grouped_dimension_chart_data = []
     topic_questions_data = []
+    engagement_index_chart_data = []
 
-    if likert_types:
-        likert_questions_data = frappe.get_all("qp_IQ_Question", 
-                                          filters={"qn_type": ["in", likert_types]}, 
-                                          fields=["name", "qn_demographic", "qn_statement", "qp_topic"])
+    if valid_types:
+        valid_questions_data = frappe.get_all("qp_IQ_Question", 
+                                          filters={"qn_type": ["in", valid_types]}, 
+                                          fields=["name", "qn_demographic", "qn_statement", "qp_topic", "qn_type"])
         
-        likert_questions = [q.name for q in likert_questions_data]
+        valid_questions = [q.name for q in valid_questions_data]
+        nps_questions = [q.name for q in valid_questions_data if q.qn_type in nps_types]
         
-        q_to_engagement = {q.name: q.qn_demographic for q in likert_questions_data if q.qn_demographic}
-        q_to_statement = {q.name: q.qn_statement for q in likert_questions_data}
-        q_to_topic = {q.name: q.qp_topic for q in likert_questions_data if q.qp_topic}
+        q_to_engagement = {q.name: q.qn_demographic for q in valid_questions_data if q.qn_demographic}
+        q_to_statement = {q.name: q.qn_statement for q in valid_questions_data}
+        q_to_topic = {q.name: q.qp_topic for q in valid_questions_data if q.qp_topic}
         
-        if likert_questions:
+        if valid_questions:
             demo_types = frappe.get_all("qp_IQ_DemographicType", 
                                         filters={"dt_object_type": "Pregunta"}, 
-                                        fields=["name", "dt_title", "dt_tag_color"])
+                                        fields=["name", "dt_title", "dt_tag_color", "dt_mnemonico"])
             valid_demographics = [d.name for d in demo_types]
             demo_title_map = {d.name: (d.dt_title or d.name) for d in demo_types}
             demo_color_map = {d.name: d.dt_tag_color for d in demo_types if d.dt_tag_color}
+            demo_mnemonic_map = {d.name: d.dt_mnemonico for d in demo_types if d.dt_mnemonico}
 
             topic_title_map = {}
             topic_color_map = {}
@@ -73,6 +83,10 @@ def build_engagement_context(context, survey_name):
             topic_totals = {}
             topic_counts = {}
 
+            # Diccionarios para el Índice de Engagement
+            ei_question_totals = {}
+            ei_question_counts = {}
+
             # Diccionarios para guardar todas las preguntas sin importar si tienen demográfico
             question_totals = {}
             question_counts = {}
@@ -83,10 +97,23 @@ def build_engagement_context(context, survey_name):
                 try:
                     data = json.loads(resp_json)
                     for q_name, answer in data.items():
-                        if q_name in likert_questions:
+                        if q_name in valid_questions:
                             try:
                                 val = float(answer)
                                 
+                                # Conversión de escala NPS a Likert (1 - 5)
+                                if q_name in nps_questions:
+                                    if val <= 2:
+                                        val = 1.0
+                                    elif val <= 4:
+                                        val = 2.0
+                                    elif val <= 6:
+                                        val = 3.0
+                                    elif val <= 8:
+                                        val = 4.0
+                                    else:
+                                        val = 5.0
+
                                 total_score += val
                                 total_answers += 1
 
@@ -96,6 +123,7 @@ def build_engagement_context(context, survey_name):
                                 
                                 if q_name in q_to_engagement:
                                     demo_id = q_to_engagement[q_name]
+                                    
                                     if not valid_demographics or demo_id in valid_demographics:
                                         # Data por pregunta individual (para tablas Top/Bottom 10)
                                         dimension_totals[q_name] = dimension_totals.get(q_name, 0.0) + val
@@ -104,6 +132,11 @@ def build_engagement_context(context, survey_name):
                                         # Data agrupada por dimensión/demográfico (para el gráfico)
                                         grouped_dim_totals[demo_id] = grouped_dim_totals.get(demo_id, 0.0) + val
                                         grouped_dim_counts[demo_id] = grouped_dim_counts.get(demo_id, 0) + 1
+
+                                    # Lógica de Índice de Engagement
+                                    if demo_mnemonic_map.get(demo_id) == "question_engagement_index":
+                                        ei_question_totals[q_name] = ei_question_totals.get(q_name, 0.0) + val
+                                        ei_question_counts[q_name] = ei_question_counts.get(q_name, 0) + 1
 
                                 if q_name in q_to_topic:
                                     t_id = q_to_topic[q_name]
@@ -117,6 +150,16 @@ def build_engagement_context(context, survey_name):
             
             if total_answers > 0:
                 global_score = round(total_score / total_answers, 2)
+                
+            # Calculamos el puntaje global del Índice de Engagement
+            ei_total_score = 0.0
+            ei_total_answers = 0
+            for q_name, count in ei_question_counts.items():
+                ei_total_score += ei_question_totals.get(q_name, 0.0)
+                ei_total_answers += count
+
+            if ei_total_answers > 0:
+                engagement_index_score = round(ei_total_score / ei_total_answers, 2)
                 
             # Armamos data detallada para Top/Bottom 10
             for q_name, t_score in dimension_totals.items():
@@ -135,6 +178,22 @@ def build_engagement_context(context, survey_name):
                     "score": avg
                 })
             dimension_chart_data.sort(key=lambda x: x["score"])
+
+            # Armamos data para el nuevo Gráfico de Índice de Engagement
+            for q_name, t_score in ei_question_totals.items():
+                if ei_question_counts[q_name] > 0:
+                    avg = round(t_score / ei_question_counts[q_name], 2)
+                    statement_text = q_to_statement.get(q_name, q_name)
+                    demo_id = q_to_engagement.get(q_name)
+                    demo_color = demo_color_map.get(demo_id, "") 
+                    
+                    engagement_index_chart_data.append({
+                        "question": statement_text,
+                        "score": avg,
+                        "color": demo_color
+                    })
+            # Ordenamos el índice de mayor a menor para una mejor visualización en el gráfico
+            engagement_index_chart_data.sort(key=lambda x: x["score"], reverse=True)
 
             # Armamos data para TODAS las preguntas, para las tablas por Tema
             for q_name, t_score in question_totals.items():
@@ -184,15 +243,17 @@ def build_engagement_context(context, survey_name):
                 })
             engagement_chart_data.sort(key=lambda x: x["score"])
     
-    # Asignamos el score global calculado al contexto
+    # Asignamos los scores calculados al contexto
     context.global_score = global_score
+    context.engagement_index_score = engagement_index_score
     
     # Empaquetamos toda la data específica de Engagement en el JSON del frontend
     context.report_specific_data_json = json.dumps({
         "engagement_chart_data": engagement_chart_data,
         "dimension_chart_data": dimension_chart_data,
         "grouped_dimension_chart_data": grouped_dimension_chart_data,
-        "topic_questions_data": topic_questions_data
+        "topic_questions_data": topic_questions_data,
+        "engagement_index_chart_data": engagement_index_chart_data
     })
 
     # Llamamos al controlador que inyecta la data de demográficos de contactos para el reporte

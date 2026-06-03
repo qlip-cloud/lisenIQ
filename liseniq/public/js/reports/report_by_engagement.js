@@ -3,6 +3,7 @@ import { initContactsReport } from './report_by_contacts.js';
 
 let engagementChartInstance = null;
 let dimensionChartInstance = null;
+let engagementIndexChartInstance = null;
 let engagementChartType = 'bar'; 
 let dimensionChartType = 'bar'; 
 
@@ -27,6 +28,7 @@ export function initEngagementReport(dataConfig, surveyName) {
     const dimensionData = parseBackendData(dataConfig.dimension_chart_data);
     const groupedDimensionData = parseBackendData(dataConfig.grouped_dimension_chart_data);
     const topicQuestionsData = parseBackendData(dataConfig.topic_questions_data);
+    const engagementIndexData = parseBackendData(dataConfig.engagement_index_chart_data);
 
     // Inicializamos la sección de top 10 y bottom 10
     initTopBottomCards(dimensionData);
@@ -104,6 +106,26 @@ export function initEngagementReport(dataConfig, surveyName) {
         }
     } else {
         hideSection('dimension-header-container', 'dimension-card-container');
+    }
+
+    // Renderizar Gráfico de Índice de Engagement
+    if (engagementIndexData && engagementIndexData.length > 0) {
+        renderEngagementIndexChart(engagementIndexData);
+        
+        const btnExpImgEI = document.getElementById('btn-export-eng-index-img');
+        if (btnExpImgEI) {
+            btnExpImgEI.addEventListener('click', () => {
+                exportChart(engagementIndexChartInstance, `Reporte_Indice_Engagement_${surveyName}`, 'img');
+            });
+        }
+        const btnExpPdfEI = document.getElementById('btn-export-eng-index-pdf');
+        if (btnExpPdfEI) {
+            btnExpPdfEI.addEventListener('click', () => {
+                exportChart(engagementIndexChartInstance, `Reporte_Indice_Engagement_${surveyName}`, 'pdf');
+            });
+        }
+    } else {
+        hideSection('engagement-index-header-container', 'engagement-index-card-container');
     }
 
     // Inicializamos los gráficos de contactos
@@ -343,7 +365,7 @@ function renderDimensionChart(type, data) {
     if (!chartContainer) return;
 
     // Utilizamos solo las categorías agrupadas (sin preguntas individuales)
-    const categories = data.map(item => item.engagement || 'N/A'); // Modificado de 'culture' a 'engagement' según Python adaptado
+    const categories = data.map(item => item.engagement || 'N/A'); 
     const scores = data.map(item => item.score || 0);
 
     // Asignar el color dinámicamente
@@ -351,7 +373,6 @@ function renderDimensionChart(type, data) {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
         
-        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
         
         return item.color;
@@ -465,6 +486,85 @@ function renderDimensionChart(type, data) {
 
     dimensionChartInstance = new ApexCharts(chartContainer, options);
     dimensionChartInstance.render();
+}
+
+// Renderizar el gráfico especial del Índice de Engagement
+function renderEngagementIndexChart(data) {
+    const chartContainer = document.getElementById('engagement-index-chart-container');
+    if (!chartContainer) return;
+
+    const categories = data.map(item => item.question || 'N/A');
+    const scores = data.map(item => item.score || 0);
+
+    const colorsArr = data.map(item => {
+        let c = item.color ? String(item.color).trim().toLowerCase() : "";
+        if (!c || c === 'none' || c === 'null') return '#10b981';
+        
+        if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
+        return item.color;
+    });
+
+    if (engagementIndexChartInstance) engagementIndexChartInstance.destroy();
+
+    const options = {
+        series: [{ name: 'Puntaje Promedio', data: scores }],
+        chart: { type: 'bar', height: '100%', minHeight: 350, toolbar: { show: false }, fontFamily: 'inherit' },
+        colors: colorsArr,
+        plotOptions: { 
+            bar: { 
+                horizontal: false, columnWidth: '45%', borderRadius: 4, distributed: true,
+                dataLabels: { position: 'center' }
+            } 
+        },
+        dataLabels: { 
+            enabled: true,
+            formatter: function (val) { return val.toFixed(2); },
+            style: { fontSize: '13px', fontWeight: 700, colors: ["#ffffff"] },
+            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.45 }
+        },
+        legend: { show: false },
+        xaxis: {
+            categories: categories,
+            labels: {
+                formatter: function (value) {
+                    if (typeof value !== 'string') return value;
+                    const maxLength = 15;
+                    const words = value.split(' ');
+                    let lines = [];
+                    let currentLine = '';
+                    words.forEach(word => {
+                        if ((currentLine + word).length > maxLength) {
+                            if (currentLine.trim()) lines.push(currentLine.trim());
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine += word + ' ';
+                        }
+                    });
+                    if (currentLine.trim()) lines.push(currentLine.trim());
+                    return lines; 
+                },
+                style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 }
+            }
+        },
+        yaxis: { 
+            max: function(max) { return max * 1.15; },
+            labels: { formatter: function (val) { return val.toFixed(2); }, style: { colors: '#6b7280', fontWeight: 500 } } 
+        },
+        grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
+        title: { text: 'Índice de Engagement', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+        subtitle: { text: 'Desglose del comportamiento del Índice de Engagement', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
+        tooltip: {
+            custom: function({series, seriesIndex, dataPointIndex, w}) {
+                const score = series[seriesIndex][dataPointIndex];
+                const category = categories[dataPointIndex]; 
+                const color = w.config.colors[dataPointIndex % w.config.colors.length];
+                return buildCustomTooltip('Pregunta Clave', category, score, color);
+            }
+        }
+    };
+
+    engagementIndexChartInstance = new ApexCharts(chartContainer, options);
+    engagementIndexChartInstance.render();
 }
 
 function buildCustomTooltip(category, questionText, score, color) {

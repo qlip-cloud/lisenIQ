@@ -657,3 +657,468 @@ def build_cultura_culture_report(cutoff_data, survey_name, demographic_field, de
 
     frappe.db.commit()
     return report
+
+
+# ============================================================================
+# BATCH PROCESSING IMPLEMENTATION
+# ============================================================================
+
+def build_cultura_report_batched(survey_id, demographic_field, batch_size=None, async_mode=True):
+    """
+    Build culture survey reports using batch processing.
+    
+    This version processes responses in batches to handle large datasets without timeouts.
+    
+    Args:
+        survey_id: ID of the qp_IQ_Survey
+        demographic_field: Field name to group by (e.g., 'custom_department')
+        batch_size: Optional override for batch size (default: 1000)
+        async_mode: If True, process in background; if False, process synchronously
+    
+    Returns:
+        progress_doc_name if successful, False if skipped
+    """
+    logger = _get_logger()
+    logger.info('build_cultura_report_batched start | survey_id=%s batch_size=%s async_mode=%s', survey_id, batch_size, async_mode)
+    
+    try:
+        # Get the survey doc
+        survey = frappe.get_doc('qp_IQ_Survey', survey_id)
+        survey_name = survey.su_name
+        
+        if getattr(survey, 'su_report_generated', 0):
+            logger.info('build_cultura_report_batched skipped | survey_id=%s reason=already_generated', survey_id)
+            return False
+        
+        # Get all responses upfront (needed for slicing)
+        responses = get_all_responses_for_survey(survey_name)
+        if not responses:
+            logger.info('build_cultura_report_batched skipped | survey_id=%s reason=no_responses', survey_id)
+            return False
+        
+        # Get demographic groups
+        respondents_by_demographic = get_respondents_by_demographic(survey_id, demographic_field)
+        if not respondents_by_demographic:
+            logger.info('build_cultura_report_batched skipped | survey_id=%s reason=no_demographic_data', survey_id)
+            return False
+        
+        logger.info(
+            'batch processing initialized | survey=%s responses=%s demographics=%s batch_size=%s',
+            survey_name,
+            len(responses),
+            len(respondents_by_demographic),
+            batch_size or 1000
+        )
+        
+        # Create progress tracking document
+        from liseniq.batch_processor import BatchProcessor
+        processor = BatchProcessor(survey_id, 'iqCultura', batch_size=batch_size, async_mode=async_mode)
+        
+        progress_name = processor.start_batch_processing(
+            total_responses=len(responses),
+            callback_method=process_cultura_batch_worker,
+            survey_name=survey_name,
+            demographic_field=demographic_field,
+            respondents_by_demographic=json.dumps(respondents_by_demographic, default=str),
+            all_responses=json.dumps(responses, default=str),
+        )
+        
+        return progress_name
+        
+    except Exception as e:
+        logger.error(f'Error en build_cultura_report_batched: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        return False
+
+
+def process_cultura_batch_worker(survey_id, progress_name, batch_num, batch_size, survey_name, demographic_field, respondents_by_demographic, all_responses):
+    """
+    Worker function for processing a single batch of responses.
+    
+    This is called for each batch (either sync or async via enqueue).
+    
+    Args:
+        survey_id: Survey ID
+        progress_name: Name of qp_IQ_Report_Progress document
+        batch_num: Which batch number (0-indexed)
+        batch_size: Size of each batch
+        survey_name: Name of the survey
+        demographic_field: Field to group by
+        respondents_by_demographic: JSON string of demographic groups
+        all_responses: JSON string of all responses
+    """
+    logger = _get_logger()
+    logger.info('process_cultura_batch_worker start | survey_id=%s batch_num=%s', survey_id, batch_num)
+    
+    try:
+        from liseniq.batch_processor import BatchProcessor, serialize_accumulated_data, deserialize_accumulated_data
+        
+        # Deserialize the data
+        respondents_by_demo = json.loads(respondents_by_demographic)
+        all_responses_list = json.loads(all_responses)
+        
+        # Get the slice for this batch
+        processor = BatchProcessor(survey_id, 'iqCultura', batch_size=batch_size, async_mode=False)
+        batch_responses = processor.get_batch_slice(all_responses_list, batch_num)
+        
+        if not batch_responses:
+            logger.info('process_cultura_batch_worker empty batch | batch_num=%s', batch_num)
+            return
+        
+        # Get metadata once
+        questions_metadata = get_question_metadata(survey_id)
+        responses_by_respondent = get_responses_by_respondent(survey_name)
+        
+        # Process this batch of responses and accumulate raw values
+        accumulated_data = _accumulate_cultura_batch(
+            batch_responses,
+            respondents_by_demo,
+            questions_metadata,
+            batch_num,
+            survey_id
+        )
+        
+        # Store accumulated data in progress document
+        progress_doc = frappe.get_doc('qp_IQ_Report_Progress', progress_name)
+        
+        # Deserialize existing accumulated data
+        existing_accumulated = deserialize_accumulated_data(progress_doc.accumulated_data)
+        
+        # Merge with new batch data
+        _merge_accumulated_data(existing_accumulated, accumulated_data)
+        
+        # Save back
+        progress_doc.accumulated_data = serialize_accumulated_data(existing_accumulated)
+        progress_doc.save(ignore_permissions=True)
+        
+        # Update progress
+        BatchProcessor.update_batch_progress(
+            progress_name,
+            batch_num,
+            len(batch_responses),
+            status='in_progress'
+        )
+        
+        logger.info('process_cultura_batch_worker completed | batch_num=%s responses_processed=%s', batch_num, len(batch_responses))
+        
+    except Exception as e:
+        logger.error(f'Error en process_cultura_batch_worker: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        BatchProcessor.update_batch_progress(
+            progress_name,
+            batch_num,
+            0,
+            status='failed',
+            error=str(e)
+        )
+        raise
+
+
+def _accumulate_cultura_batch(batch_responses, respondents_by_demographic, questions_metadata, batch_num, survey_id):
+    """
+    Accumulate raw scores from a batch of responses.
+    
+    Returns a dict with raw values (not averages) that can be merged with other batches.
+    """
+    logger = _get_logger()
+    
+    accumulated = {
+        'all_scores': [],
+        'theme_scores': defaultdict(list),
+        'dimension_scores': defaultdict(list),
+        'question_scores': defaultdict(list),
+        'engagement_scores': [],
+        'demographic_cutoff_data': {},
+    }
+    
+    # Normalize responses for this batch
+    normalized_responses = normalize_responses(batch_responses)
+    
+    # Process each response in the batch
+    for response_name, resp_list in normalized_responses.items():
+        for resp in resp_list:
+            if resp['answer_type'] == 'text':
+                continue
+            
+            value = resp['answer_converted']  # 1-5 scale
+            question = resp['question']
+            
+            question_info = questions_metadata.get(question, {})
+            dimension = question_info.get('dimension') or 'Sin Dimensión'
+            theme = question_info.get('theme') or 'Sin Tema'
+            
+            # Skip open-ended questions
+            if dimension == 'Abierta':
+                continue
+            
+            # Add to global scores (using converted 1-5 values)
+            accumulated['all_scores'].append(value)
+            accumulated['question_scores'][question].append(value)
+            accumulated['theme_scores'][theme].append(value)
+            accumulated['dimension_scores'][dimension].append(value)
+            
+            # For engagement index, use original 1-10 values
+            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+                accumulated['engagement_scores'].append(resp['answer'])
+    
+    # Also process by demographic cutoff for this batch
+    for demographic_value, respondent_ids in respondents_by_demographic.items():
+        cutoff_responses = []
+        for r in batch_responses:
+            user_field = r.get('user') if isinstance(r, dict) else r.user
+            if user_field in respondent_ids:
+                cutoff_responses.append(r)
+        
+        if not cutoff_responses:
+            continue
+        
+        # Accumulate scores by demographic cutoff
+        if demographic_value not in accumulated['demographic_cutoff_data']:
+            accumulated['demographic_cutoff_data'][demographic_value] = {
+                'scores': [],
+                'theme_scores': defaultdict(list),
+                'dimension_scores': defaultdict(list),
+                'question_scores': defaultdict(list),
+                'engagement_scores': [],
+                'respondent_ids': set(respondent_ids),
+            }
+        
+        cutoff_data = accumulated['demographic_cutoff_data'][demographic_value]
+        normalized_cutoff = normalize_responses(cutoff_responses)
+        
+        for response_name, resp_list in normalized_cutoff.items():
+            for resp in resp_list:
+                if resp['answer_type'] == 'text':
+                    continue
+                
+                value = resp['answer_converted']
+                question = resp['question']
+                
+                question_info = questions_metadata.get(question, {})
+                dimension = question_info.get('dimension') or 'Sin Dimensión'
+                theme = question_info.get('theme') or 'Sin Tema'
+                
+                if dimension == 'Abierta':
+                    continue
+                
+                cutoff_data['scores'].append(value)
+                cutoff_data['question_scores'][question].append(value)
+                cutoff_data['theme_scores'][theme].append(value)
+                cutoff_data['dimension_scores'][dimension].append(value)
+                
+                if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+                    cutoff_data['engagement_scores'].append(resp['answer'])
+    
+    return accumulated
+
+
+def _merge_accumulated_data(target, source):
+    """Merge source accumulated data into target (in-place)."""
+    # Merge global scores
+    if 'all_scores' in source:
+        if 'all_scores' not in target:
+            target['all_scores'] = []
+        target['all_scores'].extend(source['all_scores'])
+    
+    # Merge theme, dimension, question scores
+    for key in ['theme_scores', 'dimension_scores', 'question_scores']:
+        if key in source:
+            if key not in target:
+                target[key] = defaultdict(list)
+            for name, values in source[key].items():
+                target[key][name].extend(values)
+    
+    # Merge engagement scores
+    if 'engagement_scores' in source:
+        if 'engagement_scores' not in target:
+            target['engagement_scores'] = []
+        target['engagement_scores'].extend(source['engagement_scores'])
+    
+    # Merge demographic cutoff data
+    if 'demographic_cutoff_data' in source:
+        if 'demographic_cutoff_data' not in target:
+            target['demographic_cutoff_data'] = {}
+        
+        for demo_value, demo_data in source['demographic_cutoff_data'].items():
+            if demo_value not in target['demographic_cutoff_data']:
+                target['demographic_cutoff_data'][demo_value] = {
+                    'scores': [],
+                    'theme_scores': defaultdict(list),
+                    'dimension_scores': defaultdict(list),
+                    'question_scores': defaultdict(list),
+                    'engagement_scores': [],
+                    'respondent_ids': set(),
+                }
+            
+            target_demo = target['demographic_cutoff_data'][demo_value]
+            target_demo['scores'].extend(demo_data['scores'])
+            target_demo['engagement_scores'].extend(demo_data['engagement_scores'])
+            
+            # Ensure respondent_ids is always a set
+            if isinstance(demo_data['respondent_ids'], set):
+                target_demo['respondent_ids'].update(demo_data['respondent_ids'])
+            else:
+                target_demo['respondent_ids'].update(set(demo_data['respondent_ids']))
+            
+            for name, values in demo_data['theme_scores'].items():
+                target_demo['theme_scores'][name].extend(values)
+            for name, values in demo_data['dimension_scores'].items():
+                target_demo['dimension_scores'][name].extend(values)
+            for name, values in demo_data['question_scores'].items():
+                target_demo['question_scores'][name].extend(values)
+
+
+def finalize_cultura_reports_from_batches(survey_id, progress_name):
+    """
+    Finalize report generation after all batches are processed.
+    
+    This calculates final metrics from accumulated raw values and creates all report documents.
+    """
+    logger = _get_logger()
+    logger.info('finalize_cultura_reports_from_batches start | survey_id=%s progress_name=%s', survey_id, progress_name)
+    
+    try:
+        from liseniq.batch_processor import deserialize_accumulated_data
+        
+        progress_doc = frappe.get_doc('qp_IQ_Report_Progress', progress_name)
+        survey = frappe.get_doc('qp_IQ_Survey', survey_id)
+        survey_name = survey.su_name
+        
+        # Deserialize accumulated data
+        accumulated_data = deserialize_accumulated_data(progress_doc.accumulated_data)
+        
+        if not accumulated_data or not accumulated_data.get('all_scores'):
+            logger.info('finalize_cultura_reports_from_batches | no accumulated data found')
+            return False
+        
+        # Calculate global metrics
+        questions_metadata = get_question_metadata(survey_id)
+        
+        global_overall_score = average(accumulated_data.get('all_scores', []))
+        global_theme_scores = {
+            theme: average(scores)
+            for theme, scores in accumulated_data.get('theme_scores', {}).items()
+        }
+        global_dimension_scores = {
+            dim: average(scores)
+            for dim, scores in accumulated_data.get('dimension_scores', {}).items()
+        }
+        global_question_scores = {
+            q: average(scores)
+            for q, scores in accumulated_data.get('question_scores', {}).items()
+        }
+        global_nps_org = _calculate_nps(accumulated_data.get('engagement_scores', []))
+        global_enps_org = _calculate_enps(accumulated_data.get('engagement_scores', []))
+        
+        logger.info(
+            'global metrics calculated | overall_score=%s themes=%s dimensions=%s questions=%s',
+            global_overall_score,
+            len(global_theme_scores),
+            len(global_dimension_scores),
+            len(global_question_scores),
+        )
+        
+        # Resolve previous survey for trend
+        previous_survey_name = _resolve_previous_comparable_survey_name(survey)
+        
+        # Build reports for each demographic cutoff
+        reports_count = 0
+        for demographic_value, cutoff_data in accumulated_data.get('demographic_cutoff_data', {}).items():
+            try:
+                logger.info(
+                    'processing demographic cutoff from batches | cutoff=%s respondents=%s',
+                    demographic_value,
+                    len(cutoff_data.get('respondent_ids', set())),
+                )
+                
+                # Calculate cutoff metrics from accumulated raw values
+                cutoff_input = {
+                    'demographic_value': demographic_value,
+                    'total_respondents': len(cutoff_data.get('respondent_ids', set())),
+                    'overall_score': global_overall_score,
+                    'cutoff_score': average(cutoff_data.get('scores', [])),
+                    'response_rate': len(cutoff_data.get('respondent_ids', set())),
+                    'nps_cutoff': _calculate_nps(cutoff_data.get('engagement_scores', [])),
+                    'enps_cutoff': _calculate_enps(cutoff_data.get('engagement_scores', [])),
+                    'nps_org': global_nps_org,
+                    'enps_org': global_enps_org,
+                    'theme_summary': {},
+                    'dimension_summary': {},
+                    'question_summary': [],
+                    'open_questions_answers': {},
+                }
+                
+                # Build theme summary from accumulated scores
+                for theme, values in cutoff_data.get('theme_scores', {}).items():
+                    theme_avg = average(values)
+                    global_avg = global_theme_scores.get(theme)
+                    cutoff_input['theme_summary'][theme] = {
+                        'avg_score': theme_avg,
+                        'overall_avg_score': global_avg,
+                        'gap': (theme_avg - global_avg) if (theme_avg and global_avg) else None,
+                        'trend_delta': None,
+                    }
+                
+                # Build dimension summary from accumulated scores
+                for dimension, values in cutoff_data.get('dimension_scores', {}).items():
+                    dim_avg = average(values)
+                    global_avg = global_dimension_scores.get(dimension)
+                    cutoff_input['dimension_summary'][dimension] = {
+                        'avg_score': dim_avg,
+                        'overall_avg_score': global_avg,
+                        'gap': (dim_avg - global_avg) if (dim_avg and global_avg) else None,
+                        'trend_delta': None,
+                        'theme_name': ', '.join(sorted(
+                            set(questions_metadata.get(q, {}).get('theme', 'Sin Tema')
+                                for q in cutoff_data.get('question_scores', {}))
+                        )),
+                    }
+                
+                # Build question summary from accumulated scores
+                for question, values in cutoff_data.get('question_scores', {}).items():
+                    q_avg = average(values)
+                    question_info = questions_metadata.get(question, {})
+                    theme = question_info.get('theme') or 'Sin Tema'
+                    dimension = question_info.get('dimension') or 'Sin Dimensión'
+                    global_avg = global_question_scores.get(question)
+                    
+                    cutoff_input['question_summary'].append({
+                        'question_name': question_info.get('text', question),
+                        'dimension_name': dimension,
+                        'theme_name': theme,
+                        'avg_score': q_avg,
+                        'overall_avg_score': global_avg,
+                        'gap': (q_avg - global_avg) if (q_avg and global_avg) else None,
+                        'trend_delta': None,
+                    })
+                
+                # Get demographic field name
+                demographic_field = progress_doc.demographic_field or 'custom_department'
+                
+                # Build the report
+                report = build_cultura_culture_report(
+                    cutoff_input,
+                    survey_name,
+                    demographic_field,
+                    demographic_value
+                )
+                
+                if report:
+                    reports_count += 1
+                
+            except Exception as e:
+                logger.error(f'Error procesando cutoff {demographic_value}: {type(e).__name__}: {str(e)}')
+                logger.exception('Stack trace:')
+                continue
+        
+        # Mark survey as report generated
+        frappe.db.set_value('qp_IQ_Survey', survey_id, 'su_report_generated', 1, update_modified=False)
+        frappe.db.commit()
+        
+        logger.info('finalize_cultura_reports_from_batches end | reports_generated=%s', reports_count)
+        return True
+        
+    except Exception as e:
+        logger.error(f'Error en finalize_cultura_reports_from_batches: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        raise

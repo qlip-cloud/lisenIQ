@@ -91,6 +91,11 @@ def build_engagement_context(context, survey_name):
             question_totals = {}
             question_counts = {}
 
+            # Variables para el eNPS
+            nps_promoters = 0
+            nps_detractors = 0
+            nps_total_answers = 0
+
             for resp_json in survey_responses:
                 if not resp_json:
                     continue
@@ -99,17 +104,26 @@ def build_engagement_context(context, survey_name):
                     for q_name, answer in data.items():
                         if q_name in valid_questions:
                             try:
-                                val = float(answer)
+                                # Capturamos el valor original para los cálculos de NPS y detractores/promotores antes de que mute
+                                original_val = float(answer)
+                                val = original_val
                                 
-                                # Conversión de escala NPS a Likert (1 - 5)
+                                # Lógica para eNPS (antes de convertirlo a escala Likert)
                                 if q_name in nps_questions:
-                                    if val <= 2:
+                                    if original_val <= 6.0:
+                                        nps_detractors += 1
+                                    elif original_val >= 9.0:
+                                        nps_promoters += 1
+                                    nps_total_answers += 1
+
+                                    # Conversión de escala NPS a Likert (1 - 5) para el global de la encuesta
+                                    if original_val <= 2:
                                         val = 1.0
-                                    elif val <= 4:
+                                    elif original_val <= 4:
                                         val = 2.0
-                                    elif val <= 6:
+                                    elif original_val <= 6:
                                         val = 3.0
-                                    elif val <= 8:
+                                    elif original_val <= 8:
                                         val = 4.0
                                     else:
                                         val = 5.0
@@ -160,7 +174,16 @@ def build_engagement_context(context, survey_name):
 
             if ei_total_answers > 0:
                 engagement_index_score = round(ei_total_score / ei_total_answers, 2)
-                
+            
+            # Calculamos los porcentajes y el score de eNPS
+            nps_promoters_perc = 0
+            nps_detractors_perc = 0
+            nps_score = 0
+            if nps_total_answers > 0:
+                nps_promoters_perc = round((nps_promoters / nps_total_answers) * 100)
+                nps_detractors_perc = round((nps_detractors / nps_total_answers) * 100)
+                nps_score = nps_promoters_perc - nps_detractors_perc
+
             # Armamos data detallada para Top/Bottom 10
             for q_name, t_score in dimension_totals.items():
                 avg = round(t_score / dimension_counts[q_name], 2)
@@ -253,7 +276,10 @@ def build_engagement_context(context, survey_name):
         "dimension_chart_data": dimension_chart_data,
         "grouped_dimension_chart_data": grouped_dimension_chart_data,
         "topic_questions_data": topic_questions_data,
-        "engagement_index_chart_data": engagement_index_chart_data
+        "engagement_index_chart_data": engagement_index_chart_data,
+        "nps_data": {
+            "score": nps_score
+        }
     })
 
     # Llamamos al controlador que inyecta la data de demográficos de contactos para el reporte

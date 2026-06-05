@@ -29,6 +29,10 @@ export function initEngagementReport(dataConfig, surveyName) {
     const groupedDimensionData = parseBackendData(dataConfig.grouped_dimension_chart_data);
     const topicQuestionsData = parseBackendData(dataConfig.topic_questions_data);
     const engagementIndexData = parseBackendData(dataConfig.engagement_index_chart_data);
+    const npsData = dataConfig.nps_data || { score: 0 };
+
+    // Inicializamos la sección eNPS
+    renderNpsGaugeChart(npsData);
 
     // Inicializamos la sección de top 10 y bottom 10
     initTopBottomCards(dimensionData);
@@ -151,6 +155,101 @@ function parseBackendData(rawData) {
         console.error("Error parseando datos", e);
     }
     return data;
+}
+
+// Inicializar Gráfico eNPS (Nativo Live Needle Gauge de ApexCharts)
+function renderNpsGaugeChart(data) {
+    const chartContainer = document.getElementById('nps-gauge-chart');
+    if (!chartContainer) return;
+    
+    chartContainer.innerHTML = '';
+
+    // Convertimos el score original del NPS (-100 a 100) en porcentaje (0 a 100) para llenar la barra
+    let mappedScore = ((data.score + 100) / 200) * 100;
+
+    const options = {
+        series: [mappedScore],
+        chart: {
+            height: 160,
+            type: 'gauge',
+            sparkline: { enabled: true }, // Quita padding innecesario
+            animations: {
+                enabled: true,
+                dynamicAnimation: { enabled: true, speed: 800 },
+            },
+        },
+        colors: ['#7B24FF'],
+        plotOptions: {
+            radialBar: {
+                shape: 'needle',
+                startAngle: -90,
+                endAngle: 90,
+                min: 0,
+                max: 100,
+                ticks: {
+                    show: true,
+                    major: {
+                        count: 11,
+                        length: 0,
+                        width: 0,
+                        color: 'transparent',
+                        placement: 'outside',
+                    },
+                    minor: {
+                        count: 0,
+                        length: 0,
+                        width: 0,
+                        color: 'transparent',
+                    },
+                    labels: {
+                        show: false
+                    },
+                },
+                needle: {
+                    color: '#4b5563',
+                    length: '75%',
+                    baseWidth: 10,
+                    tipWidth: 1,
+                    showValueArc: true,
+                },
+                track: {
+                    show: true,
+                    background: '#e7e7e7',
+                    strokeWidth: '100%',
+                    margin: 0,
+                },
+                hollow: {
+                    margin: 0,
+                    size: '60%',
+                    background: 'transparent',
+                },
+                dataLabels: {
+                    name: { show: false },
+                    value: {
+                        offsetY: 35,
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        color: '#1f2937',
+                        formatter: function (val) {
+                            return data.score + '%';
+                        },
+                    },
+                },
+            },
+        },
+        grid: {
+            padding: {
+                bottom: 20
+            }
+        },
+        stroke: {
+            lineCap: 'round',
+        },
+        labels: ['eNPS'],
+    };
+
+    const chart = new ApexCharts(chartContainer, options);
+    chart.render();
 }
 
 // Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas agrupada por dimensión (dimensionData)
@@ -319,7 +418,7 @@ function renderEngagementChart(type, data) {
                 labels: { formatter: function (val) { return val.toFixed(2); }, style: { colors: '#6b7280', fontWeight: 500 } } 
             },
             grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
-            title: { text: 'Puntaje por tipo de Cultura', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por Dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: 'Promedio de respuestas (escala 1 a 5)', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
@@ -448,7 +547,7 @@ function renderDimensionChart(type, data) {
                 labels: { formatter: function (val) { return val.toFixed(1); }, style: { colors: '#6b7280', fontWeight: 500 } } 
             },
             grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
-            title: { text: 'Puntaje por dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por Atributos', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: `De menor a mayor — línea de referencia en promedio global (${globalScore.toFixed(2)})`, align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {

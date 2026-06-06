@@ -719,3 +719,381 @@ def build_leader_report(leader_data):
     logger.info('build_leader_report saved | report=%s', report.name)
   frappe.db.commit()
   return report
+
+
+def build_leaders_report_batched(survey_id, batch_size=None, async_mode=True):
+    """
+    Build leadership 360 reports using batch processing.
+    
+    This version processes responses in batches to handle large datasets without timeouts.
+    
+    Args:
+        survey_id: ID of the qp_IQ_Survey
+        batch_size: Optional override for batch size (default: 500)
+        async_mode: If True, process in background; if False, process synchronously
+    
+    Returns:
+        progress_doc_name if successful, False if skipped
+    """
+    logger = _get_logger()
+    logger.info('build_leaders_report_batched start | survey_id=%s batch_size=%s async_mode=%s', survey_id, batch_size, async_mode)
+    
+    try:
+        # Get the survey doc
+        survey = frappe.get_doc('qp_IQ_Survey', survey_id)
+        
+        if not getattr(survey, 'su_is_leadership', 0):
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=not_leadership', survey_id)
+            return False
+        
+        if getattr(survey, 'su_report_generated', 0):
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=already_generated', survey_id)
+            return False
+        
+        survey_name = survey.su_name
+        
+        # Get all responses upfront (needed for slicing)
+        responses = get_all_responses_for_survey(survey_name)
+        if not responses:
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=no_responses', survey_id)
+            return False
+        
+        # Group responses by leader
+        leaders_responses = group_responses_by_leader(responses)
+        if not leaders_responses:
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=no_leaders', survey_id)
+            return False
+        
+        logger.info(
+            'batch processing initialized | survey=%s responses=%s leaders=%s batch_size=%s',
+            survey_name,
+            len(responses),
+            len(leaders_responses),
+            batch_size or 500
+        )
+        
+        # Create progress tracking document
+        from liseniq.batch_processor import BatchProcessor
+        processor = BatchProcessor(survey_id, 'iq360', batch_size=batch_size, async_mode=async_mode)
+        
+        progress_name = processor.start_batch_processing(
+            total_responses=len(responses),
+            callback_method=process_iq360_batch_worker,
+            survey_name=survey_name,
+            all_responses=json.dumps(responses, default=str),
+        )
+        
+        return progress_name
+        
+    except Exception as e:
+        logger.error(f'Error en build_leaders_report_batched: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        return False
+
+
+def process_iq360_batch_worker(survey_id, progress_name, batch_num, batch_size, survey_name, all_responses):
+    """
+    Worker function for processing a single batch of responses for leadership reports.
+    
+    This is called for each batch (either sync or async via enqueue).
+    """
+    logger = _get_logger()
+    logger.info('process_iq360_batch_worker start | survey_id=%s batch_num=%s', survey_id, batch_num)
+    
+    try:
+        from liseniq.batch_processor import BatchProcessor, serialize_accumulated_data, deserialize_accumulated_data
+        
+        # Deserialize the responses
+        all_responses_list = json.loads(all_responses)
+        
+        # Get the slice for this batch
+        processor = BatchProcessor(survey_id, 'iq360', batch_size=batch_size, async_mode=False)
+        batch_responses = processor.get_batch_slice(all_responses_list, batch_num)
+        
+        if not batch_responses:
+            logger.info('process_iq360_batch_worker empty batch | batch_num=%s', batch_num)
+            return
+        
+        # Get metadata once
+        questions_data = get_question_text_and_category(survey_id)
+        
+        # Process this batch and accumulate raw values
+        accumulated_data = _accumulate_iq360_batch(batch_responses, questions_data, survey_id)
+        
+        # Store accumulated data in progress document
+        progress_doc = frappe.get_doc('qp_IQ_Report_Progress', progress_name)
+        
+        # Deserialize existing accumulated data
+        existing_accumulated = deserialize_accumulated_data(progress_doc.accumulated_data)
+        
+        # Merge with new batch data
+        _merge_iq360_accumulated_data(existing_accumulated, accumulated_data)
+        
+        # Save back
+        progress_doc.accumulated_data = serialize_accumulated_data(existing_accumulated)
+        progress_doc.save(ignore_permissions=True)
+        
+        # Update progress
+        BatchProcessor.update_batch_progress(
+            progress_name,
+            batch_num,
+            len(batch_responses),
+            status='in_progress'
+        )
+        
+        logger.info('process_iq360_batch_worker completed | batch_num=%s responses_processed=%s', batch_num, len(batch_responses))
+        
+    except Exception as e:
+        logger.error(f'Error en process_iq360_batch_worker: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        BatchProcessor.update_batch_progress(
+            progress_name,
+            batch_num,
+            0,
+            status='failed',
+            error=str(e)
+        )
+        raise
+
+
+def _accumulate_iq360_batch(batch_responses, questions_data, survey_id):
+    """
+    Accumulate raw scores from a batch of responses for leadership reports.
+    
+    Returns a dict with raw values organized by leader.
+    """
+    logger = _get_logger()
+    
+    accumulated = {
+        'leaders_data': {},  # leader_name -> raw scores and metrics
+        'all_scores': [],
+    }
+    
+    # Normalize responses for this batch
+    normalized_responses = normalize_responses(batch_responses)
+    
+    # Group by leader as we process
+    for response_name, resp_list in normalized_responses.items():
+        for resp in resp_list:
+            if resp['answer_type'] == 'text':
+                continue
+            
+            # Get leader from first response in the response doc
+            # (In iq360, leader is in custom_evaluatee field)
+            leader_name = resp.get('custom_evaluatee')
+            if not leader_name:
+                continue
+            
+            if leader_name not in accumulated['leaders_data']:
+                accumulated['leaders_data'][leader_name] = {
+                    'scores': [],
+                    'group_scores': defaultdict(list),
+                    'dimension_scores': defaultdict(lambda: defaultdict(list)),
+                    'theme_scores': defaultdict(lambda: defaultdict(list)),
+                    'question_scores': defaultdict(lambda: defaultdict(list)),
+                }
+            
+            leader_data = accumulated['leaders_data'][leader_name]
+            
+            # Get evaluator role (will be determined during finalization)
+            value = resp['answer']
+            
+            # Accumulate raw scores
+            leader_data['scores'].append(value)
+            accumulated['all_scores'].append(value)
+            
+            # Get question metadata
+            question_info = questions_data.get(resp['question'], {})
+            dimension = question_info.get('category', 'Sin Categoría')
+            theme = question_info.get('theme', 'Sin Tema')
+            
+            # Store scores by dimension and theme for later calculation
+            leader_data['dimension_scores'][dimension]['all'].append(value)
+            leader_data['theme_scores'][theme]['all'].append(value)
+            leader_data['question_scores'][resp['question']]['all'].append(value)
+    
+    return accumulated
+
+
+def _merge_iq360_accumulated_data(target, source):
+    """Merge source accumulated data into target (in-place) for iq360."""
+    # Merge all_scores
+    if 'all_scores' in source:
+        if 'all_scores' not in target:
+            target['all_scores'] = []
+        target['all_scores'].extend(source['all_scores'])
+    
+    # Merge leader data
+    if 'leaders_data' in source:
+        if 'leaders_data' not in target:
+            target['leaders_data'] = {}
+        
+        for leader_name, leader_data in source['leaders_data'].items():
+            if leader_name not in target['leaders_data']:
+                target['leaders_data'][leader_name] = {
+                    'scores': [],
+                    'group_scores': defaultdict(list),
+                    'dimension_scores': defaultdict(lambda: defaultdict(list)),
+                    'theme_scores': defaultdict(lambda: defaultdict(list)),
+                    'question_scores': defaultdict(lambda: defaultdict(list)),
+                }
+            
+            target_leader = target['leaders_data'][leader_name]
+            target_leader['scores'].extend(leader_data['scores'])
+            
+            # Merge dimension scores
+            for dim, role_scores in leader_data['dimension_scores'].items():
+                if dim not in target_leader['dimension_scores']:
+                    target_leader['dimension_scores'][dim] = defaultdict(list)
+                for role, values in role_scores.items():
+                    target_leader['dimension_scores'][dim][role].extend(values)
+            
+            # Merge theme scores
+            for theme, role_scores in leader_data['theme_scores'].items():
+                if theme not in target_leader['theme_scores']:
+                    target_leader['theme_scores'][theme] = defaultdict(list)
+                for role, values in role_scores.items():
+                    target_leader['theme_scores'][theme][role].extend(values)
+            
+            # Merge question scores
+            for question, role_scores in leader_data['question_scores'].items():
+                if question not in target_leader['question_scores']:
+                    target_leader['question_scores'][question] = defaultdict(list)
+                for role, values in role_scores.items():
+                    target_leader['question_scores'][question][role].extend(values)
+
+
+def finalize_iq360_reports_from_batches(survey_id, progress_name):
+    """
+    Finalize leadership report generation after all batches are processed.
+    
+    This calculates final metrics from accumulated raw values and creates all report documents.
+    """
+    logger = _get_logger()
+    logger.info('finalize_iq360_reports_from_batches start | survey_id=%s progress_name=%s', survey_id, progress_name)
+    
+    try:
+        from liseniq.batch_processor import deserialize_accumulated_data
+        
+        progress_doc = frappe.get_doc('qp_IQ_Report_Progress', progress_name)
+        survey = frappe.get_doc('qp_IQ_Survey', survey_id)
+        survey_name = survey.su_name
+        
+        # Deserialize accumulated data
+        accumulated_data = deserialize_accumulated_data(progress_doc.accumulated_data)
+        
+        if not accumulated_data or not accumulated_data.get('leaders_data'):
+            logger.info('finalize_iq360_reports_from_batches | no accumulated data found')
+            return False
+        
+        # Get metadata
+        questions_data = get_question_text_and_category(survey_id)
+        
+        # Calculate organization-wide average (for comparison)
+        all_scores = accumulated_data.get('all_scores', [])
+        avg_leaders_score = average(all_scores)
+        
+        logger.info('organization average calculated | avg_score=%s', avg_leaders_score)
+        
+        # Resolve previous survey for trends
+        previous_survey_name = _resolve_previous_comparable_survey_name(survey)
+        
+        # Build reports for each leader
+        reports_count = 0
+        for leader_name, leader_data in accumulated_data.get('leaders_data', {}).items():
+            try:
+                logger.info('processing leader from batches | leader=%s', leader_name)
+                
+                # Now we need to get evaluator roles (this requires DB access per leader)
+                # For now, we'll recalculate with proper roles during finalization
+                
+                final_leader_data = _finalize_leader_scores_from_batches(
+                    survey_id,
+                    leader_name,
+                    leader_data,
+                    questions_data,
+                    avg_leaders_score,
+                    previous_survey_name
+                )
+                
+                if not final_leader_data:
+                    logger.info('leader skipped during finalization | leader=%s', leader_name)
+                    continue
+                
+                # Build the report
+                report = build_leader_report(final_leader_data)
+                
+                if report:
+                    reports_count += 1
+                
+            except Exception as e:
+                logger.error(f'Error procesando leader {leader_name}: {type(e).__name__}: {str(e)}')
+                logger.exception('Stack trace:')
+                continue
+        
+        # Mark survey as report generated
+        frappe.db.set_value('qp_IQ_Survey', survey_id, 'su_report_generated', 1, update_modified=False)
+        frappe.db.commit()
+        
+        logger.info('finalize_iq360_reports_from_batches end | reports_generated=%s', reports_count)
+        return True
+        
+    except Exception as e:
+        logger.error(f'Error en finalize_iq360_reports_from_batches: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        raise
+
+
+def _finalize_leader_scores_from_batches(survey_id, leader_name, accumulated_leader_data, questions_data, avg_leaders_score, previous_survey_name):
+    """
+    Convert accumulated batch data into final leader report data with proper role-based calculations.
+    """
+    logger = _get_logger()
+    
+    try:
+        # Get evaluators and their roles
+        evaluators = get_leader_evaluators(leader_name, survey_id)
+        
+        if not evaluators:
+            logger.warn(f'No evaluators found for leader: {leader_name}')
+            return None
+        
+        # Build evaluator map
+        evaluator_map = {
+            e.sr_evaluating_to: e.sr_evaluation_role
+            for e in evaluators
+            if e.sr_evaluating_to
+        }
+        
+        leader_responses = frappe.get_all(
+            'qp_IQ_Response_Item',
+            filters={'custom_evaluatee': leader_name},
+            fields=['name', 'user', 'custom_evaluator', 'custom_evaluatee']
+        )
+        
+        if not leader_responses:
+            return None
+        
+        # Build response evaluator map
+        response_evaluator_map = {
+            r.name: (r.custom_evaluator or r.user)
+            for r in leader_responses
+        }
+        
+        # Now recalculate with proper roles
+        final_data = process_leader_data(
+            survey_id,
+            leader_responses,
+            questions_data,
+            previous_survey_name=previous_survey_name
+        )
+        
+        if final_data:
+            final_data['avg_leaders_score'] = avg_leaders_score
+        
+        return final_data
+        
+    except Exception as e:
+        logger.error(f'Error en _finalize_leader_scores_from_batches: {type(e).__name__}: {str(e)}')
+        return None
+    return report

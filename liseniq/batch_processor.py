@@ -74,16 +74,18 @@ class BatchProcessor:
     
     @staticmethod
     def update_batch_progress(progress_name, batch_num, processed_count, status='in_progress', error=None):
-        """Update progress after batch completion."""
-        update_data = {
-            'current_batch': batch_num + 1,
-            'processed_responses': frappe.db.get_value('qp_IQ_Report_Progress', progress_name, 'processed_responses') + processed_count,
-            'status': status,
-        }
-        if error:
-            update_data['error_message'] = error
         
-        frappe.db.set_value('qp_IQ_Report_Progress', progress_name, update_data, update_modified=False)
+        frappe.db.sql("""
+            UPDATE `tabqp_IQ_Report_Progress` 
+            SET current_batch = %s, 
+                processed_responses = processed_responses + %s, 
+                status = %s 
+            WHERE name = %s
+        """, (batch_num + 1, processed_count, status, progress_name))
+        
+        if error:
+            frappe.db.set_value('qp_IQ_Report_Progress', progress_name, 'error_message', error, update_modified=False)
+            
         frappe.db.commit()
     
     @staticmethod
@@ -116,26 +118,21 @@ class BatchProcessor:
             frappe.db.commit()
             raise
 
-
 def deserialize_accumulated_data(json_str):
-    """Deserialize accumulated data from JSON and reconstruct complex types."""
+    """Deserialize organizational accumulated data from JSON."""
     if not json_str:
         return {}
     try:
-        data = json.loads(json_str)
-        # Reconstruct sets for respondent_ids
-        if 'demographic_cutoff_data' in data:
-            for demo_value, demo_data in data['demographic_cutoff_data'].items():
-                if 'respondent_ids' in demo_data and isinstance(demo_data['respondent_ids'], list):
-                    demo_data['respondent_ids'] = set(demo_data['respondent_ids'])
-        return data
+        return json.loads(json_str) if isinstance(json_str, str) else json_str
     except Exception as e:
         frappe.logger('batch_processor').error(f'Error deserializing accumulated data: {str(e)}')
         return {}
 
 
 def serialize_accumulated_data(data):
-    """Serialize accumulated data to JSON, converting sets to lists."""
-    # Convert sets to lists for JSON serialization
-    data_copy = json.loads(json.dumps(data, ensure_ascii=False, default=str))
-    return json.dumps(data_copy, ensure_ascii=False, default=str)
+    """Serialize accumulated data back to a clean JSON string."""
+    try:
+        return json.dumps(data, ensure_ascii=False)
+    except Exception as e:
+        frappe.logger('batch_processor').error(f'Error serializing accumulated data: {str(e)}')
+        return "{}"

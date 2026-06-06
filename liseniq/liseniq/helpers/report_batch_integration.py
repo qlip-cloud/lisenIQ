@@ -22,12 +22,12 @@ def start_cultura_report_generation(survey_id, demographic_field, batch_size=Non
                 'status': 'success',
                 'progress_name': progress_name,
                 'async_mode': async_mode,
-                'message': f'Report generation started. Progress: {progress_name}'
+                'message': f'Generación de reporte iniciada. Progreso: {progress_name}'
             }
         else:
             return {
                 'status': 'skipped',
-                'message': 'Report generation was skipped (possibly already generated)'
+                'message': 'La generación de reporte fue omitida (posiblemente ya generada)'
             }
     
     except Exception as e:

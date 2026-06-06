@@ -79,65 +79,48 @@ def get_question_metadata(survey_id):
 
 
 def get_respondents_by_demographic(survey_id, demographic_field):
-    """
-    Get unique values of a demographic field for respondents in a survey.
-    Returns dict: {demographic_value: [respondent_ids]}
+    in_history = frappe.db.get_value('qp_IQ_Survey', survey_id, 'su_in_history')
     
-    Args:
-        survey_id: ID of the survey
-        demographic_field: Field name to group by (e.g., 'department', 'area')
-    
-    Returns:
-        Dictionary mapping demographic values to lists of respondent IDs
-    """
-
-    survey_doc = frappe.get_doc('qp_IQ_Survey', survey_id)
-    in_history = survey_doc.su_in_history
-    # Get all recipients of the survey
-    recipients = frappe.get_all(
-        'qp_IQ_SurveyRecipient',
-        filters={'sr_survey': survey_id},
-        fields=['sr_contact', 'sr_survey']
-    )
-    
-    if not recipients:
-        return {}
-    
-    recipient_ids = [r.sr_contact for r in recipients]
-    
-    # Get demographic data from Contact
     demographic_map = {}
+    
     if not in_history:
         query = """
-        SELECT c.name, cad.cad_value as demographic_value
-        FROM `tabContact` c
-        INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
-        INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cad.cad_demographic_type
-        WHERE c.name IN ({}) AND cad.cad_demographic_type = %s
+            SELECT 
+                c.name, 
+                IFNULL(cad.cad_value, 'Sin clasificar') as demographic_value
+            FROM `tabContact` c
+            INNER JOIN `tabqp_IQ_ContactAdditionalDetail` cad ON cad.parent = c.name
+            INNER JOIN `tabqp_IQ_SurveyRecipient` sr ON sr.sr_contact = c.name
+            WHERE sr.sr_survey = %s 
+              AND cad.cad_demographic_type = %s
         """
-
-        formatted_query = query.format(','.join(['%s'] * len(recipient_ids)))
+        results = frappe.db.sql(query, (survey_id, demographic_field), as_dict=True)
+        
     else:
         query = """
-        SELECT shd.shd_contact_name as name, cdh.cdh_value as demographic_value
-        FROM `tabqp_IQ_SurveyHistoricData` shd
-        INNER JOIN `tabqp_IQ_ContactDetailHistoric` cdh ON cdh.parent = shd.name
-        INNER JOIN `tabqp_IQ_DemographicType` dt ON dt.name = cdh.cdh_demographic_type
-        WHERE shd.shd_contact_name IN ({}) AND cdh.cdh_demographic_type = %s AND shd.shd_survey_id = %s
+            SELECT 
+                shd.shd_contact_name as name, 
+                IFNULL(cdh.cdh_value, 'Sin clasificar') as demographic_value
+            FROM `tabqp_IQ_SurveyHistoricData` shd
+            INNER JOIN `tabqp_IQ_ContactDetailHistoric` cdh ON cdh.parent = shd.name
+            INNER JOIN `tabqp_IQ_SurveyRecipient` sr ON sr.sr_contact = shd.shd_contact_name
+            WHERE sr.sr_survey = %s 
+              AND shd.shd_survey_id = %s
+              AND cdh.cdh_demographic_type = %s
         """
+        results = frappe.db.sql(query, (survey_id, survey_id, demographic_field), as_dict=True)
 
-        formatted_query = query.format(','.join(['%s'] * len(recipient_ids)))
+    if not results:
+        return {}
 
-    results = frappe.db.sql(formatted_query, recipient_ids + [demographic_field, survey_id], as_dict=True)
-    
     for contact in results:
-        demographic_value = contact.get('demographic_value')
-        if not demographic_value:
-            demographic_value = 'Sin clasificar'
-        
-        if demographic_value not in demographic_map:
-            demographic_map[demographic_value] = []
-        demographic_map[demographic_value].append(contact.name)
+        demo_val = contact.demographic_value
+        if not demo_val or str(demo_val).strip() == "":
+            demo_val = 'Sin clasificar'
+            
+        if demo_val not in demographic_map:
+            demographic_map[demo_val] = []
+        demographic_map[demo_val].append(contact.name)
     
     return demographic_map
 
@@ -151,7 +134,6 @@ def get_responses_by_respondent(survey_name):
     responses_by_respondent = {}
     
     for response in responses:
-        # Handle both dict (from history) and object responses
         if isinstance(response, dict):
             respondent = response.get('user') or response.get('name')
         else:

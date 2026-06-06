@@ -89,12 +89,12 @@ def normalize_responses(responses):
         if isinstance(response, dict):
             # For historic data, use response_data; for regular, use response_json
             json_text = response.get('response_data') or response.get('response_json')
-            evaluator = response.get('user')
+            user = response.get('user')
             response_name = response.get('name')
             survey = response.get('survey')
         else:
             json_text = response.response_json
-            evaluator = response.user
+            user = response.user
             response_name = response.name
             survey = response.survey
             
@@ -111,9 +111,9 @@ def normalize_responses(responses):
             
             parsed_data[response_name].append({
                 'survey': survey,
-                'evaluator': evaluator,
+                'user': user,
                 'question': key,
-                'answer': answer,  # Original value (1-10), used ONLY for ENPS/NPS
+                'answer': answer, 
                 'answer_converted': answer_converted,  # Converted to 1-5, use for metrics
                 'answer_type': answer_type,
             })

@@ -134,7 +134,7 @@ export function initEngagementReport(dataConfig, surveyName) {
 
     // Inicializamos los gráficos de contactos
     if (window.contactDemographicsData) {
-        initContactsReport(window.contactDemographicsData);
+        initContactsReport(window.contactDemographicsData, surveyName);
     }
 }
 

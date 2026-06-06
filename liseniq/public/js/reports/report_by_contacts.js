@@ -1,5 +1,5 @@
 // Función de entrada para inicializar los gráficos de demográficos de contacto
-export function initContactsReport(contactDemographicsData) {
+export function initContactsReport(contactDemographicsData, surveyName = 'Encuesta') {
     const container = document.getElementById('contacts-charts-container');
     const header = document.getElementById('contacts-demographics-header');
     
@@ -49,11 +49,19 @@ export function initContactsReport(contactDemographicsData) {
         // Formatear título asegurando compatibilidad con los gráficos fijos
         const titleText = `Puntaje por ${demoCategory.toLowerCase()}`;
         
-        // Crear la tarjeta para cada categoría demográfica con su respectivo gráfico
+        // Crear la tarjeta para cada categoría demográfica con su respectivo gráfico y BOTONES DE EXPORTACIÓN
         const cardHtml = `
             <div id="${cardId}">
-                <div class="chart-header-flex" style="margin-top: 0; padding-left: 0;">
-                    <h3 class="chart-section-title">${titleText}</h3>
+                <div class="chart-header-flex" style="margin-top: 0; padding-left: 0; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 class="chart-section-title" style="margin-bottom: 0;">${titleText}</h3>
+                    <div class="chart-actions-group">
+                        <button id="btn-export-img-${chartId}" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+                            <i class="fa fa-image" aria-hidden="true"></i>
+                        </button>
+                        <button id="btn-export-pdf-${chartId}" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+                            <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="chart-card" style="margin-bottom: 0;">
                     <div id="${chartId}" class="chart-wrapper" style="min-height: 380px;"></div>
@@ -62,7 +70,24 @@ export function initContactsReport(contactDemographicsData) {
         `;
         container.insertAdjacentHTML('beforeend', cardHtml);
 
-        renderContactChart(chartId, demoCategory, data, categoryColor, isFixed);
+        const chartInstance = renderContactChart(chartId, demoCategory, data, categoryColor, isFixed);
+
+        // Lógica de los botones de exportación para este gráfico específico
+        const btnImg = document.getElementById(`btn-export-img-${chartId}`);
+        if (btnImg) {
+            btnImg.addEventListener('click', () => {
+                const cleanCategory = demoCategory.replace(/\s+/g, '_');
+                exportChart(chartInstance, `Reporte_Contactos_${cleanCategory}_${surveyName}`, 'img');
+            });
+        }
+        
+        const btnPdf = document.getElementById(`btn-export-pdf-${chartId}`);
+        if (btnPdf) {
+            btnPdf.addEventListener('click', () => {
+                const cleanCategory = demoCategory.replace(/\s+/g, '_');
+                exportChart(chartInstance, `Reporte_Contactos_${cleanCategory}_${surveyName}`, 'pdf');
+            });
+        }
     });
 }
 
@@ -174,4 +199,50 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
 
     const chart = new ApexCharts(document.getElementById(containerId), options);
     chart.render();
+    
+    // Devolver la instancia del gráfico para poder exportarla
+    return chart;
+}
+
+// Lógica reutilizable para la exportación que servirá a todos los gráficos de contactos
+async function exportChart(chartInstance, fileName, format) {
+    if (!chartInstance) return;
+    try {
+        const { imgURI } = await chartInstance.dataURI();
+        
+        if (format === 'img') {
+            const link = document.createElement('a');
+            link.href = imgURI;
+            link.download = `${fileName}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else if (format === 'pdf') {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            
+            const margin = 15;
+            const pdfWidth = 297 - (margin * 2);
+            const pdfHeight = 210 - (margin * 2);
+            
+            const imgProps = pdf.getImageProperties(imgURI);
+            const ratio = imgProps.width / imgProps.height;
+            
+            let drawWidth = pdfWidth;
+            let drawHeight = pdfWidth / ratio;
+            
+            if (drawHeight > pdfHeight) {
+                drawHeight = pdfHeight;
+                drawWidth = pdfHeight * ratio;
+            }
+            
+            const x = margin + (pdfWidth - drawWidth) / 2;
+            const y = margin + (pdfHeight - drawHeight) / 2;
+            
+            pdf.addImage(imgURI, 'PNG', x, y, drawWidth, drawHeight);
+            pdf.save(`${fileName}.pdf`);
+        }
+    } catch (error) {
+        console.error("Error exportando el gráfico:", error);
+    }
 }

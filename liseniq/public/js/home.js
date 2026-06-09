@@ -76,12 +76,84 @@ document.addEventListener('DOMContentLoaded', function() {
         const btn = e.target.closest('.download-leadership-reports-zip-btn');
         if (!btn) return;
 
-        const url = btn.getAttribute('data-url');
-        if (!url) return;
+        const surveyName = btn.getAttribute('data-survey');
+        if (!surveyName) return;
 
-        window.location.href = url;
+        exportarInformes(surveyName, btn);
     });
-    
+
+    async function exportarInformes(surveyName, btn) {
+        if (btn.classList.contains('loading')) return;
+        btn.classList.add('loading');
+        const originalIcon = btn.innerText;
+        btn.innerText = 'hourglass_empty';
+        btn.title = 'Generando ZIP...';
+
+        try {
+            const res1 = await fetch(
+                `/api/method/liseniq.utils.export.export_leadership_reports_zip`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Frappe-CSRF-Token': frappe.csrf_token,
+                    },
+                    body: JSON.stringify({ survey_name: surveyName }),
+                }
+            );
+            const data1 = await res1.json();
+            const jobId = data1?.message?.job_id;
+            const cacheKey = data1?.message?.cache_key;
+
+            if (!jobId) throw new Error('No se recibió job_id del servidor.');
+
+            frappe.msgprint({ message: 'Generando informes en background...', indicator: 'blue' });
+
+            await new Promise((resolve, reject) => {
+                const interval = setInterval(async () => {
+                    try {
+                        const res2 = await fetch(
+                            `/api/method/liseniq.utils.export.get_export_job_status?job_id=${encodeURIComponent(jobId)}&cache_key=${encodeURIComponent(cacheKey)}`, //  pasar cache_key
+                            { headers: { 'X-Frappe-CSRF-Token': frappe.csrf_token } }
+                        );
+                        const data2 = await res2.json();
+                        const status = data2?.message?.status;
+
+                        if (status === 'finished') {
+                            clearInterval(interval);
+                            frappe.msgprint({ message: ' ZIP listo, descargando...', indicator: 'green' });
+
+                            const downloadUrl = `/api/method/liseniq.utils.export.download_export_file?cache_key=${encodeURIComponent(cacheKey)}`;
+                            const a = document.createElement('a');
+                            a.href = downloadUrl;
+                            a.download = '';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+
+                            resolve();
+                        }
+                        else if (status === 'failed') {
+                            clearInterval(interval);
+                            frappe.msgprint({ title: 'Error al generar ZIP', message: data2.message.error, indicator: 'red' });
+                            reject(new Error(data2.message.error));
+                        }
+                    } catch (err) {
+                        clearInterval(interval);
+                        reject(err);
+                    }
+                }, 4000);
+            });
+
+        } catch (err) {
+            console.error('exportarInformes error:', err);
+            frappe.msgprint({ message: 'Error: ' + err.message, indicator: 'red' });
+        } finally {
+            btn.classList.remove('loading');
+            btn.innerText = originalIcon;
+            btn.title = 'Descargar informes PDF';
+        }
+    }
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.download-follow-up-btn');
         if (!btn) return;

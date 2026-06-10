@@ -1,5 +1,5 @@
 // Función de entrada para inicializar los gráficos de demográficos de contacto
-export function initContactsReport(contactDemographicsData) {
+export function initContactsReport(contactDemographicsData, surveyName = 'Encuesta') {
     const container = document.getElementById('contacts-charts-container');
     const header = document.getElementById('contacts-demographics-header');
     
@@ -49,20 +49,45 @@ export function initContactsReport(contactDemographicsData) {
         // Formatear título asegurando compatibilidad con los gráficos fijos
         const titleText = `Puntaje por ${demoCategory.toLowerCase()}`;
         
-        // Crear la tarjeta para cada categoría demográfica con su respectivo gráfico
+        // Crear la tarjeta para cada categoría demográfica con su respectivo gráfico y BOTONES DE EXPORTACIÓN
         const cardHtml = `
             <div id="${cardId}">
-                <div class="chart-header-flex" style="margin-top: 0; padding-left: 0;">
-                    <h3 class="chart-section-title">${titleText}</h3>
+                <div class="chart-header-flex" style="margin-top: 0; padding-left: 0; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 class="chart-section-title" style="margin-bottom: 0;">${titleText}</h3>
+                    <div class="chart-actions-group">
+                        <button id="btn-export-img-${chartId}" class="btn btn-outline-secondary btn-sm" title="Exportar a Imagen">
+                            <i class="fa fa-image" aria-hidden="true"></i>
+                        </button>
+                        <button id="btn-export-pdf-${chartId}" class="btn btn-outline-secondary btn-sm" title="Exportar a PDF">
+                            <i class="fa fa-file-pdf-o" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="chart-card" style="margin-bottom: 0;">
-                    <div id="${chartId}" class="chart-wrapper" style="height: 380px;"></div>
+                    <div id="${chartId}" class="chart-wrapper" style="min-height: 380px;"></div>
                 </div>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', cardHtml);
 
-        renderContactChart(chartId, demoCategory, data, categoryColor, isFixed);
+        const chartInstance = renderContactChart(chartId, demoCategory, data, categoryColor, isFixed);
+
+        // Lógica de los botones de exportación para este gráfico específico
+        const btnImg = document.getElementById(`btn-export-img-${chartId}`);
+        if (btnImg) {
+            btnImg.addEventListener('click', () => {
+                const cleanCategory = demoCategory.replace(/\s+/g, '_');
+                exportChart(chartInstance, `Reporte_Contactos_${cleanCategory}_${surveyName}`, 'img');
+            });
+        }
+        
+        const btnPdf = document.getElementById(`btn-export-pdf-${chartId}`);
+        if (btnPdf) {
+            btnPdf.addEventListener('click', () => {
+                const cleanCategory = demoCategory.replace(/\s+/g, '_');
+                exportChart(chartInstance, `Reporte_Contactos_${cleanCategory}_${surveyName}`, 'pdf');
+            });
+        }
     });
 }
 
@@ -72,6 +97,10 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
     
     let isDistributed = false;
     let colorsArray = [];
+
+    // Cálculo de Altura Dinámica: 35px por cada barra para evitar que se aplasten.
+    // Mínimo será 380px para mantener estética en gráficos de pocos datos.
+    const calculatedHeight = Math.max(380, categories.length * 35);
 
     // Lógica para asignar colores dinámicamente
     if (dtColor === 'DYNAMIC') {
@@ -99,7 +128,7 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
         series: [{ name: 'Puntaje Promedio', data: scores }],
         chart: { 
             type: 'bar', 
-            height: '100%', 
+            height: calculatedHeight,
             toolbar: { show: false }, 
             fontFamily: 'inherit',
             parentHeightOffset: 0
@@ -107,8 +136,8 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
         colors: colorsArray,
         plotOptions: { 
             bar: { 
-                horizontal: false, 
-                columnWidth: '55%',
+                horizontal: true, 
+                barHeight: '65%',
                 borderRadius: 4, 
                 distributed: isDistributed,
                 dataLabels: { position: 'center' }
@@ -117,25 +146,27 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
         dataLabels: { 
             enabled: true,
             formatter: function (val) { return val.toFixed(2); },
-            style: { fontSize: '13px', fontWeight: 700, colors: ["#ffffff"] },
-            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.45 }
+            style: { fontSize: '10px', fontWeight: 600, colors: ["#ffffff"] },
+            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.6 }
         },
         legend: { show: false },
         xaxis: {
-            categories: categories,
+            categories: categories, 
+            max: function(max) { return max > 5 ? max : 5; }, 
             labels: { 
-                style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 },
-                trim: true,
-                hideOverlappingLabels: false,
-                rotate: isFixed ? 0 : -45
+                formatter: function (val) { 
+                    if(typeof val === 'number' || !isNaN(val)) {
+                        return Number(val).toFixed(2).replace('.', ',');
+                    }
+                    return val;
+                },
+                style: { colors: '#6b7280', fontSize: '11px', fontWeight: 600 }
             } 
         },
         yaxis: {
-            max: function(max) { return max > 5 ? max : 5; }, 
             labels: {
-                // Forzamos 2 decimales para el Eje Y
-                formatter: function (val) { return val.toFixed(2).replace('.', ','); }, 
-                style: { colors: '#6b7280', fontSize: '11px', fontWeight: 600 }
+                style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 },
+                maxWidth: 160 
             }
         },
         grid: { 
@@ -168,4 +199,50 @@ function renderContactChart(containerId, categoryName, data, dtColor, isFixed) {
 
     const chart = new ApexCharts(document.getElementById(containerId), options);
     chart.render();
+    
+    // Devolver la instancia del gráfico para poder exportarla
+    return chart;
+}
+
+// Lógica reutilizable para la exportación que servirá a todos los gráficos de contactos
+async function exportChart(chartInstance, fileName, format) {
+    if (!chartInstance) return;
+    try {
+        const { imgURI } = await chartInstance.dataURI();
+        
+        if (format === 'img') {
+            const link = document.createElement('a');
+            link.href = imgURI;
+            link.download = `${fileName}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else if (format === 'pdf') {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            
+            const margin = 15;
+            const pdfWidth = 297 - (margin * 2);
+            const pdfHeight = 210 - (margin * 2);
+            
+            const imgProps = pdf.getImageProperties(imgURI);
+            const ratio = imgProps.width / imgProps.height;
+            
+            let drawWidth = pdfWidth;
+            let drawHeight = pdfWidth / ratio;
+            
+            if (drawHeight > pdfHeight) {
+                drawHeight = pdfHeight;
+                drawWidth = pdfHeight * ratio;
+            }
+            
+            const x = margin + (pdfWidth - drawWidth) / 2;
+            const y = margin + (pdfHeight - drawHeight) / 2;
+            
+            pdf.addImage(imgURI, 'PNG', x, y, drawWidth, drawHeight);
+            pdf.save(`${fileName}.pdf`);
+        }
+    } catch (error) {
+        console.error("Error exportando el gráfico:", error);
+    }
 }

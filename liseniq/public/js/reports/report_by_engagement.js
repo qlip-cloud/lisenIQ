@@ -1,13 +1,14 @@
-// Importamos la función de inicialización del reporte de contactos para poder llamarla desde este archivo (report_culture.js)
+// Importamos la función de inicialización del reporte de contactos para poder llamarla desde este archivo (report_by_engagement.js)
 import { initContactsReport } from './report_by_contacts.js';
 
-let cultureChartInstance = null;
+let engagementChartInstance = null;
 let dimensionChartInstance = null;
-let cultureChartType = 'bar'; 
+let engagementIndexChartInstance = null;
+let engagementChartType = 'bar'; 
 let dimensionChartType = 'bar'; 
 
 // Función de entrada que es llamada por el orquestador
-export function initCultureReport(dataConfig, surveyName) {
+export function initEngagementReport(dataConfig, surveyName) {
     let appFeatures = [];
     try {
         appFeatures = typeof window.liseniqAppFeatures === 'string' ? JSON.parse(window.liseniqAppFeatures) : (window.liseniqAppFeatures || []);
@@ -23,10 +24,15 @@ export function initCultureReport(dataConfig, surveyName) {
     };
 
     // Procesar la data inyectada desde el backend para este reporte
-    const cultureData = parseBackendData(dataConfig.culture_chart_data);
+    const engagementData = parseBackendData(dataConfig.engagement_chart_data);
     const dimensionData = parseBackendData(dataConfig.dimension_chart_data);
     const groupedDimensionData = parseBackendData(dataConfig.grouped_dimension_chart_data);
     const topicQuestionsData = parseBackendData(dataConfig.topic_questions_data);
+    const engagementIndexData = parseBackendData(dataConfig.engagement_index_chart_data);
+    const npsData = dataConfig.nps_data || { score: 0 };
+
+    // Inicializamos la sección eNPS
+    renderNpsGaugeChart(npsData);
 
     // Inicializamos la sección de top 10 y bottom 10
     initTopBottomCards(dimensionData);
@@ -34,42 +40,46 @@ export function initCultureReport(dataConfig, surveyName) {
     // Inicializamos las tablas desglosadas por tema
     initTopicsTables(topicQuestionsData);
 
-    // Renderizar Gráfico de Cultura
-    if (appFeatures.includes('aiq_rep_cultura')) {
-        renderCultureChart(cultureChartType, cultureData);
+    // Renderizar Gráfico de Engagement
+    if (appFeatures.includes('aiq_rep_engagement')) {
+        renderEngagementChart(engagementChartType, engagementData);
         
-        const btnCulture = document.getElementById('btn-toggle-culture');
-        if (btnCulture) {
-            btnCulture.addEventListener('click', function() {
-                cultureChartType = cultureChartType === 'bar' ? 'pie' : 'bar';
-                const icon = cultureChartType === 'bar' ? 'fa-pie-chart' : 'fa-bar-chart';
-                const tooltipText = cultureChartType === 'bar' ? 'Ver Gráfico de Torta' : 'Ver Gráfico de Barras';
+        const btnEngagement = document.getElementById('btn-toggle-engagement');
+        if (btnEngagement) {
+            btnEngagement.addEventListener('click', function() {
+                engagementChartType = engagementChartType === 'bar' ? 'pie' : 'bar';
+                const icon = engagementChartType === 'bar' ? 'fa-pie-chart' : 'fa-bar-chart';
+                const tooltipText = engagementChartType === 'bar' ? 'Ver Gráfico de Torta' : 'Ver Gráfico de Barras';
                 
                 this.title = tooltipText;
                 this.innerHTML = `<i class="fa ${icon}" aria-hidden="true"></i>`;
                 
-                renderCultureChart(cultureChartType, cultureData);
+                renderEngagementChart(engagementChartType, engagementData);
             });
         }
 
-        const btnExpImgCulture = document.getElementById('btn-export-culture-img');
-        if (btnExpImgCulture) {
-            btnExpImgCulture.addEventListener('click', () => {
-                exportChart(cultureChartInstance, `Reporte_Cultura_${surveyName}`, 'img');
+        const btnExpImgEngagement = document.getElementById('btn-export-engagement-img');
+        if (btnExpImgEngagement) {
+            btnExpImgEngagement.addEventListener('click', () => {
+                exportChart(engagementChartInstance, `Reporte_Engagement_${surveyName}`, 'img');
             });
         }
-        const btnExpPdfCulture = document.getElementById('btn-export-culture-pdf');
-        if (btnExpPdfCulture) {
-            btnExpPdfCulture.addEventListener('click', () => {
-                exportChart(cultureChartInstance, `Reporte_Cultura_${surveyName}`, 'pdf');
+        const btnExpPdfEngagement = document.getElementById('btn-export-engagement-pdf');
+        if (btnExpPdfEngagement) {
+            btnExpPdfEngagement.addEventListener('click', () => {
+                exportChart(engagementChartInstance, `Reporte_Engagement_${surveyName}`, 'pdf');
             });
         }
     } else {
-        hideSection('culture-header-container', 'culture-card-container');
+        renderEngagementChart(engagementChartType, engagementData);
+        const btnExpImgEngagement = document.getElementById('btn-export-engagement-img');
+        if (btnExpImgEngagement) btnExpImgEngagement.addEventListener('click', () => exportChart(engagementChartInstance, `Reporte_Engagement_${surveyName}`, 'img'));
+        const btnExpPdfEngagement = document.getElementById('btn-export-engagement-pdf');
+        if (btnExpPdfEngagement) btnExpPdfEngagement.addEventListener('click', () => exportChart(engagementChartInstance, `Reporte_Engagement_${surveyName}`, 'pdf'));
     }
 
     // Renderizar Gráfico de Dimensiones
-    if (appFeatures.includes('aiq_rep_dimension')) {
+    if (appFeatures.includes('aiq_rep_dimension') || true) {
         renderDimensionChart(dimensionChartType, groupedDimensionData);
         
         const btnDimension = document.getElementById('btn-toggle-dimension');
@@ -102,6 +112,26 @@ export function initCultureReport(dataConfig, surveyName) {
         hideSection('dimension-header-container', 'dimension-card-container');
     }
 
+    // Renderizar Gráfico de Índice de Engagement
+    if (engagementIndexData && engagementIndexData.length > 0) {
+        renderEngagementIndexChart(engagementIndexData);
+        
+        const btnExpImgEI = document.getElementById('btn-export-eng-index-img');
+        if (btnExpImgEI) {
+            btnExpImgEI.addEventListener('click', () => {
+                exportChart(engagementIndexChartInstance, `Reporte_Indice_Engagement_${surveyName}`, 'img');
+            });
+        }
+        const btnExpPdfEI = document.getElementById('btn-export-eng-index-pdf');
+        if (btnExpPdfEI) {
+            btnExpPdfEI.addEventListener('click', () => {
+                exportChart(engagementIndexChartInstance, `Reporte_Indice_Engagement_${surveyName}`, 'pdf');
+            });
+        }
+    } else {
+        hideSection('engagement-index-header-container', 'engagement-index-card-container');
+    }
+
     // Inicializamos los gráficos de contactos
     if (window.contactDemographicsData) {
         initContactsReport(window.contactDemographicsData, surveyName);
@@ -125,6 +155,101 @@ function parseBackendData(rawData) {
         console.error("Error parseando datos", e);
     }
     return data;
+}
+
+// Inicializar Gráfico eNPS (Nativo Live Needle Gauge de ApexCharts)
+function renderNpsGaugeChart(data) {
+    const chartContainer = document.getElementById('nps-gauge-chart');
+    if (!chartContainer) return;
+    
+    chartContainer.innerHTML = '';
+
+    // Convertimos el score original del NPS (-100 a 100) en porcentaje (0 a 100) para llenar la barra
+    let mappedScore = ((data.score + 100) / 200) * 100;
+
+    const options = {
+        series: [mappedScore],
+        chart: {
+            height: 160,
+            type: 'gauge',
+            sparkline: { enabled: true }, // Quita padding innecesario
+            animations: {
+                enabled: true,
+                dynamicAnimation: { enabled: true, speed: 800 },
+            },
+        },
+        colors: ['#7B24FF'],
+        plotOptions: {
+            radialBar: {
+                shape: 'needle',
+                startAngle: -90,
+                endAngle: 90,
+                min: 0,
+                max: 100,
+                ticks: {
+                    show: true,
+                    major: {
+                        count: 11,
+                        length: 0,
+                        width: 0,
+                        color: 'transparent',
+                        placement: 'outside',
+                    },
+                    minor: {
+                        count: 0,
+                        length: 0,
+                        width: 0,
+                        color: 'transparent',
+                    },
+                    labels: {
+                        show: false
+                    },
+                },
+                needle: {
+                    color: '#4b5563',
+                    length: '75%',
+                    baseWidth: 10,
+                    tipWidth: 1,
+                    showValueArc: true,
+                },
+                track: {
+                    show: true,
+                    background: '#e7e7e7',
+                    strokeWidth: '100%',
+                    margin: 0,
+                },
+                hollow: {
+                    margin: 0,
+                    size: '60%',
+                    background: 'transparent',
+                },
+                dataLabels: {
+                    name: { show: false },
+                    value: {
+                        offsetY: 35,
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        color: '#1f2937',
+                        formatter: function (val) {
+                            return data.score + '%';
+                        },
+                    },
+                },
+            },
+        },
+        grid: {
+            padding: {
+                bottom: 20
+            }
+        },
+        stroke: {
+            lineCap: 'round',
+        },
+        labels: ['eNPS'],
+    };
+
+    const chart = new ApexCharts(chartContainer, options);
+    chart.render();
 }
 
 // Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas agrupada por dimensión (dimensionData)
@@ -225,9 +350,9 @@ function initTopicsTables(data) {
     container.innerHTML = html;
 }
 
-// Renderizar el grafico de cultura utilizando la data agrupada por topic (cultureData)
-function renderCultureChart(type, data) {
-    const chartContainer = document.getElementById('culture-chart-container');
+// Renderizar el grafico de engagement utilizando la data agrupada por topic (engagementData)
+function renderEngagementChart(type, data) {
+    const chartContainer = document.getElementById('engagement-chart-container');
     if (!chartContainer) return;
 
     const categories = data.map(item => item.topic || 'N/A');
@@ -244,7 +369,7 @@ function renderCultureChart(type, data) {
         return item.color;
     });
 
-    if (cultureChartInstance) cultureChartInstance.destroy();
+    if (engagementChartInstance) engagementChartInstance.destroy();
 
     let options = {};
     if (type === 'bar') {
@@ -293,7 +418,7 @@ function renderCultureChart(type, data) {
                 labels: { formatter: function (val) { return val.toFixed(2); }, style: { colors: '#6b7280', fontWeight: 500 } } 
             },
             grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
-            title: { text: 'Puntaje por tipo de cultura', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por Dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: 'Promedio de respuestas (escala 1 a 5)', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
@@ -316,7 +441,7 @@ function renderCultureChart(type, data) {
                 style: { fontSize: '14px', fontFamily: 'inherit', fontWeight: 700 }
             },
             legend: { position: 'bottom' },
-            title: { text: 'Puntaje por tipo de cultura', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por tipo de Cultura', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: 'Representación proporcional del promedio (escala 1 a 5)', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, w}) {
@@ -329,8 +454,8 @@ function renderCultureChart(type, data) {
         };
     }
 
-    cultureChartInstance = new ApexCharts(chartContainer, options);
-    cultureChartInstance.render();
+    engagementChartInstance = new ApexCharts(chartContainer, options);
+    engagementChartInstance.render();
 }
 
 // Renderizar el grafico de dimensiones utilizando la data agrupada por dimensión (groupedDimensionData)
@@ -339,7 +464,7 @@ function renderDimensionChart(type, data) {
     if (!chartContainer) return;
 
     // Utilizamos solo las categorías agrupadas (sin preguntas individuales)
-    const categories = data.map(item => item.culture || 'N/A');
+    const categories = data.map(item => item.engagement || 'N/A'); 
     const scores = data.map(item => item.score || 0);
 
     // Asignar el color dinámicamente
@@ -347,7 +472,6 @@ function renderDimensionChart(type, data) {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
         
-        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
         
         return item.color;
@@ -423,7 +547,7 @@ function renderDimensionChart(type, data) {
                 labels: { formatter: function (val) { return val.toFixed(1); }, style: { colors: '#6b7280', fontWeight: 500 } } 
             },
             grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
-            title: { text: 'Puntaje por dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por Atributos', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: `De menor a mayor — línea de referencia en promedio global (${globalScore.toFixed(2)})`, align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
@@ -461,6 +585,85 @@ function renderDimensionChart(type, data) {
 
     dimensionChartInstance = new ApexCharts(chartContainer, options);
     dimensionChartInstance.render();
+}
+
+// Renderizar el gráfico especial del Índice de Engagement
+function renderEngagementIndexChart(data) {
+    const chartContainer = document.getElementById('engagement-index-chart-container');
+    if (!chartContainer) return;
+
+    const categories = data.map(item => item.question || 'N/A');
+    const scores = data.map(item => item.score || 0);
+
+    const colorsArr = data.map(item => {
+        let c = item.color ? String(item.color).trim().toLowerCase() : "";
+        if (!c || c === 'none' || c === 'null') return '#10b981';
+        
+        if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
+        return item.color;
+    });
+
+    if (engagementIndexChartInstance) engagementIndexChartInstance.destroy();
+
+    const options = {
+        series: [{ name: 'Puntaje Promedio', data: scores }],
+        chart: { type: 'bar', height: '100%', minHeight: 350, toolbar: { show: false }, fontFamily: 'inherit' },
+        colors: colorsArr,
+        plotOptions: { 
+            bar: { 
+                horizontal: false, columnWidth: '45%', borderRadius: 4, distributed: true,
+                dataLabels: { position: 'center' }
+            } 
+        },
+        dataLabels: { 
+            enabled: true,
+            formatter: function (val) { return val.toFixed(2); },
+            style: { fontSize: '13px', fontWeight: 700, colors: ["#ffffff"] },
+            dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.45 }
+        },
+        legend: { show: false },
+        xaxis: {
+            categories: categories,
+            labels: {
+                formatter: function (value) {
+                    if (typeof value !== 'string') return value;
+                    const maxLength = 15;
+                    const words = value.split(' ');
+                    let lines = [];
+                    let currentLine = '';
+                    words.forEach(word => {
+                        if ((currentLine + word).length > maxLength) {
+                            if (currentLine.trim()) lines.push(currentLine.trim());
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine += word + ' ';
+                        }
+                    });
+                    if (currentLine.trim()) lines.push(currentLine.trim());
+                    return lines; 
+                },
+                style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 }
+            }
+        },
+        yaxis: { 
+            max: function(max) { return max * 1.15; },
+            labels: { formatter: function (val) { return val.toFixed(2); }, style: { colors: '#6b7280', fontWeight: 500 } } 
+        },
+        grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
+        title: { text: 'Índice de Engagement', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+        subtitle: { text: 'Desglose del comportamiento del Índice de Engagement', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
+        tooltip: {
+            custom: function({series, seriesIndex, dataPointIndex, w}) {
+                const score = series[seriesIndex][dataPointIndex];
+                const category = categories[dataPointIndex]; 
+                const color = w.config.colors[dataPointIndex % w.config.colors.length];
+                return buildCustomTooltip('Pregunta Clave', category, score, color);
+            }
+        }
+    };
+
+    engagementIndexChartInstance = new ApexCharts(chartContainer, options);
+    engagementIndexChartInstance.render();
 }
 
 function buildCustomTooltip(category, questionText, score, color) {

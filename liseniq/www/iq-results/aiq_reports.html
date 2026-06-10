@@ -33,6 +33,22 @@
             <div class="metric-value">{{ global_score | default('0') }}</div>
             <div class="metric-subtitle">Escala (1 - 5)</div>
         </div>
+
+        {% if report_category_mnemonic == 'template_engagement' %}
+        <!-- Índice de Engagement -->
+        <div class="metric-card">
+            <h3 class="metric-title">Índice de Engagement</h3>
+            <div class="metric-value">{{ engagement_index_score | default('0') }}</div>
+            <div class="metric-subtitle">Promedio global</div>
+        </div>
+
+        <!-- eNPS -->
+        <div class="metric-card" style="padding-bottom: 10px;">
+            <h3 class="metric-title">eNPS</h3>
+            <div id="nps-gauge-chart" style="margin-top: 10px; margin-bottom: 10px; position: relative;"></div>
+        </div>
+        {% endif %}
+
         <div class="metric-card">
             <h3 class="metric-title">Participantes / Esperado</h3>
             <div class="metric-value">{{ total_responses | default('0') }} / {{ total_recipients | default('0') }}</div>
@@ -52,6 +68,8 @@
         </div>
     {% elif report_category_mnemonic == 'template_culture' %}
         {% include "liseniq/templates/includes/reports_aiq/report_culture.html" %}
+    {% elif report_category_mnemonic == 'template_engagement' %}
+        {% include "liseniq/templates/includes/reports_aiq/report_by_engagement.html" %}
     {% endif %}
 
 </div>

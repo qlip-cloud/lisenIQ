@@ -21,7 +21,20 @@
   "sb_4",
   "question_summary",
   "sb_5",
-  "open_questions_answers"
+  "open_questions_answers",
+  "sb_6",
+  "enps_cutoff",
+  "nps_cutoff",
+  "cb_2",
+  "enps_org",
+  "nps_org",
+  "enps_promotores",
+  "enps_detractores",
+  "progress_reference",
+  "total_score_accumulator",
+  "engagement_score_accumulator",
+  "engagement_response_count",
+  "total_responses_processed"
  ],
  "fields": [
   {
@@ -110,11 +123,76 @@
    "fieldname": "survey_name",
    "fieldtype": "Data",
    "label": "Medici\u00f3n"
+  },
+  {
+   "fieldname": "sb_6",
+   "fieldtype": "Section Break",
+   "label": "Resultados ENPS"
+  },
+  {
+   "fieldname": "enps_cutoff",
+   "fieldtype": "Data",
+   "label": "Promedio ENPS Corte"
+  },
+  {
+   "fieldname": "nps_cutoff",
+   "fieldtype": "Data",
+   "label": "Promedio NPS Corte"
+  },
+  {
+   "fieldname": "cb_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "enps_org",
+   "fieldtype": "Data",
+   "label": "Promedio ENPS Organizaci\u00f3n"
+  },
+  {
+   "fieldname": "nps_org",
+   "fieldtype": "Data",
+   "label": "Promedio NPS Organizaci\u00f3n"
+  },
+  {
+   "fieldname": "enps_promotores",
+   "fieldtype": "Int",
+   "label": "enps_promotores"
+  },
+  {
+   "fieldname": "enps_detractores",
+   "fieldtype": "Int",
+   "label": "enps_detractores"
+  },
+  {
+   "fieldname": "progress_reference",
+   "fieldtype": "Link",
+   "label": "progress_reference",
+   "options": "qp_IQ_Report_Progress"
+  },
+  {
+   "fieldname": "total_score_accumulator",
+   "fieldtype": "Float",
+   "label": "total_score_accumulator"
+  },
+  {
+   "fieldname": "engagement_score_accumulator",
+   "fieldtype": "Float",
+   "label": "engagement_score_accumulator"
+  },
+  {
+   "fieldname": "engagement_response_count",
+   "fieldtype": "Int",
+   "label": "engagement_response_count"
+  },
+  {
+   "fieldname": "total_responses_processed",
+   "fieldtype": "Int",
+   "label": "total_responses_processed"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-14 14:39:35.209469",
+ "modified": "2026-06-05 20:49:11.577117",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Cultura_Report",

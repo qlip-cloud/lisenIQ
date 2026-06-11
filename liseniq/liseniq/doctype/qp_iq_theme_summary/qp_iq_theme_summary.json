@@ -17,7 +17,17 @@
   "average_leaders_manager_score",
   "average_leaders_peers_score",
   "average_leaders_team_score",
-  "average_leaders_score"
+  "average_leaders_score",
+  "total_score",
+  "response_count",
+  "self_score_accum",
+  "self_count",
+  "manager_score_accum",
+  "manager_count",
+  "peers_score_accum",
+  "peers_count",
+  "team_score_accum",
+  "team_count"
  ],
  "fields": [
   {
@@ -90,12 +100,62 @@
    "fieldname": "average_leaders_score",
    "fieldtype": "Float",
    "label": "Promedio L\u00edderes"
+  },
+  {
+   "fieldname": "total_score",
+   "fieldtype": "Float",
+   "label": "total_score"
+  },
+  {
+   "fieldname": "response_count",
+   "fieldtype": "Int",
+   "label": "response_count"
+  },
+  {
+   "fieldname": "self_score_accum",
+   "fieldtype": "Float",
+   "label": "self_score_accum"
+  },
+  {
+   "fieldname": "self_count",
+   "fieldtype": "Int",
+   "label": "self_count"
+  },
+  {
+   "fieldname": "manager_score_accum",
+   "fieldtype": "Float",
+   "label": "manager_score_accum"
+  },
+  {
+   "fieldname": "manager_count",
+   "fieldtype": "Int",
+   "label": "manager_count"
+  },
+  {
+   "fieldname": "peers_score_accum",
+   "fieldtype": "Float",
+   "label": "peers_score_accum"
+  },
+  {
+   "fieldname": "peers_count",
+   "fieldtype": "Int",
+   "label": "peers_count"
+  },
+  {
+   "fieldname": "team_score_accum",
+   "fieldtype": "Float",
+   "label": "team_score_accum"
+  },
+  {
+   "fieldname": "team_count",
+   "fieldtype": "Int",
+   "label": "team_count"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-05-05 15:05:33.529374",
+ "modified": "2026-06-09 17:31:45.038356",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Theme_Summary",

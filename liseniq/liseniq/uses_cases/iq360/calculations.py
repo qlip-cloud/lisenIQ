@@ -39,16 +39,31 @@ def normalize_responses(responses):
     parsed_data = defaultdict(list)
 
     for response in responses:
-        json_data = json.loads(response.response_json) if response.response_json else {}
+        # 1. Identificar si es un diccionario o un objeto
+        is_dict = isinstance(response, dict)
+        
+        # 2. Extraer de forma segura el JSON crudo
+        raw_json = response.get('response_json') if is_dict else getattr(response, 'response_json', None)
+        json_data = json.loads(raw_json) if raw_json else {}
 
+        # 3. Extraer de forma segura los metadatos del documento de respuesta
+        resp_name = response.get('name') if is_dict else getattr(response, 'name', None)
+        resp_survey = response.get('survey') if is_dict else getattr(response, 'survey', None)
+        resp_user = response.get('user') if is_dict else getattr(response, 'user', None)
+        resp_evaluatee = response.get('custom_evaluatee') if is_dict else getattr(response, 'custom_evaluatee', None)
+
+        # Quitar token de seguridad si existe
         json_data.pop('__token', None)
 
+        # 4. Iterar sobre las respuestas del JSON
         for key, value in json_data.items():
             answer, answer_type = parse_answer(value)
-            parsed_data[response.name].append({
-                'survey': response.survey,
-                'evaluator': response.user,
-                'custom_evaluatee': response.custom_evaluatee,
+            
+            # Usamos las variables seguras que extrajimos arriba
+            parsed_data[resp_name].append({
+                'survey': resp_survey,
+                'evaluator': resp_user,
+                'custom_evaluatee': resp_evaluatee,
                 'question': key,
                 'answer': answer,
                 'answer_type': answer_type

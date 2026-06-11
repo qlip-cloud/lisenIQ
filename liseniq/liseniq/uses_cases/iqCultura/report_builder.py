@@ -800,7 +800,7 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
         return {'total': 0.0, 'count': 0}
         
     accumulated = {
-        'total_respondents': 0, # Lo calcularemos al final del lote de forma única
+        'total_respondents': 0, 
         'global_score': empty_stat(),
         'theme_scores': defaultdict(empty_stat),
         'dimension_scores': defaultdict(empty_stat),

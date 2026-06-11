@@ -1,11 +1,19 @@
+import os
+
 import frappe
 from io import BytesIO
 from zipfile import ZipFile, ZIP_DEFLATED
 from frappe.utils.pdf import get_pdf
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
+from frappe.utils.background_jobs import enqueue
+from frappe.utils.file_manager import save_file
+from rq.job import Job
+from redis import Redis
+
 import re
 from bs4 import BeautifulSoup
+
 
 
 def _sanitize_filename(value):
@@ -284,58 +292,147 @@ def export_seguimiento_360(survey_name):
 
 @frappe.whitelist()
 def export_leadership_reports_zip(survey_name):
-    current_user = frappe.session.user
-    frappe.session.user = "Administrator"
+    frappe.cache().delete_value(f"export_job_{survey_name}")
+
+    job = enqueue(
+        _generate_zip_job,
+        queue="long",
+        timeout=1800,
+        survey_name=survey_name,
+        enqueued_by=frappe.session.user,
+    )
+    return {"job_id": job.id, "cache_key": f"export_job_{survey_name}"}
+
+
+
+@frappe.whitelist()
+def get_export_job_status(job_id, cache_key):
+    cached = frappe.cache().get_value(cache_key)
+    if cached:
+        return cached
+
     try:
-        frappe.flags.ignore_permissions = True
+
+        redis_conn = Redis.from_url(frappe.conf.redis_queue)
+        job = Job.fetch(job_id, connection=redis_conn)
+        status = job.get_status()
+
+        if status == "failed":
+            return {"status": "failed", "error": str(job.exc_info)}
+
+        return {"status": str(status)}
+
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+
+def _generate_zip_job(survey_name, enqueued_by):
+    frappe.set_user("Administrator")
+    frappe.flags.ignore_permissions = True
+
+    try:
         survey = _get_survey_doc(survey_name)
         survey_display_name = survey.su_name
+
         if not survey.su_is_leadership:
-            doctype_name = "qp_IQ_Cultura_Report"
-            filter_field = "cutoff_name"
-            print_format = "Reporte de Cultura"
+            doctype_name   = "qp_IQ_Cultura_Report"
+            filter_field   = "cutoff_name"
+            print_format   = "Reporte de Cultura"
         else:
-            doctype_name = "qp_IQ_Leader_360_Report"
-            filter_field = "leader_name"
-            print_format = "Reporte Individual Liderazgo"
+            doctype_name   = "qp_IQ_Leader_360_Report"
+            filter_field   = "leader_name"
+            print_format   = "Reporte Individual Liderazgo"
+
         reports = frappe.get_all(
             doctype_name,
             filters={"survey_name": survey_display_name},
             fields=["name", filter_field],
-            order_by= filter_field + " asc",
+            order_by=filter_field + " asc",
         )
 
         if not reports:
-            frappe.throw("No se encontraron informes de liderazgo para esta medición.")
+            frappe.throw("No se encontraron informes para esta medición.")
 
         zip_buffer = BytesIO()
         with ZipFile(zip_buffer, "w", ZIP_DEFLATED) as zip_file:
             for report_row in reports:
-                report_doc = frappe.get_doc(doctype_name, report_row.name)
-                html = frappe.get_print(
-                    doctype_name,
-                    report_doc.name,
-                    print_format=print_format,
-                    as_pdf=False,
-                    no_letterhead=1,
-                )
-                html = _ensure_pdf_header_footer_placeholders(html)
-                html = _compile_css_for_pdf(html)
-                pdf_bytes = get_pdf(html, options=_leadership_pdf_options())
-                if not survey.su_is_leadership:
-                    cutoff_name = report_row.cutoff_name or "cutoff"
-                    file_name = _sanitize_filename(cutoff_name)
-                else:
-                    file_name = _sanitize_filename(report_row.leader_name or report_doc.leader_name or report_doc.name)
-                zip_file.writestr(f"{file_name}_{report_doc.name}.pdf", pdf_bytes)
+                pdf_bytes = _render_report_pdf(doctype_name, report_row, print_format)
+                file_name = _resolve_file_name(survey, doctype_name, report_row)
+                zip_file.writestr(f"{file_name}.pdf", pdf_bytes)
 
         zip_buffer.seek(0)
+        filename = f"{_sanitize_filename(survey_display_name)}_informes.zip"
 
-        filename = f"{_sanitize_filename(survey_display_name)}_informes_liderazgo.zip"
-        frappe.local.response.filename = filename
-        frappe.local.response.filecontent = zip_buffer.read()
-        frappe.local.response.type = "download"
-        frappe.local.response.display_content_as = "attachment"
+        saved = save_file(
+            fname=filename,
+            content=zip_buffer.read(),
+            dt='qp_IQ_Survey',
+            dn=survey_name,
+            is_private=1,
+        )
+        frappe.db.commit()
+
+        file_url = saved.file_url
+        frappe.cache().set_value(
+            f"export_job_{survey_name}",
+            {"status": "finished", "file_url": file_url},
+            expires_in_sec=3600,
+        )
+
+        return file_url
+
+    except Exception as e:
+        frappe.cache().set_value(
+            f"export_job_{survey_name}",
+            {"status": "failed", "error": str(e)},
+            expires_in_sec=3600,
+        )
+        raise
+
     finally:
         frappe.flags.ignore_permissions = False
-        frappe.session.user = current_user
+
+@frappe.whitelist()
+def download_export_file(cache_key):
+    cached = frappe.cache().get_value(cache_key)
+    
+    if not cached or cached.get("status") != "finished":
+        frappe.throw("Archivo no disponible", frappe.PermissionError)
+
+    file_url = cached.get("file_url")
+
+    file_path = frappe.get_site_path("private", "files", file_url.split("/private/files/")[-1])
+
+    if not os.path.exists(file_path):
+        frappe.throw("Archivo no encontrado en disco")
+
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    fname = file_url.split("/")[-1]
+    frappe.local.response.filename = fname
+    frappe.local.response.filecontent = content
+    frappe.local.response.type = "download"
+    frappe.local.response.display_content_as = "attachment"
+
+
+def _render_report_pdf(doctype_name, report_row, print_format):
+    html = frappe.get_print(
+        doctype_name,
+        report_row.name,
+        print_format=print_format,
+        as_pdf=False,
+        no_letterhead=1,
+    )
+    html = _ensure_pdf_header_footer_placeholders(html)
+    html = _compile_css_for_pdf(html)
+    return get_pdf(html, options=_leadership_pdf_options())
+
+
+def _resolve_file_name(survey, doctype_name, report_row):
+    if not survey.su_is_leadership:
+        label = report_row.get("cutoff_name") or "cutoff"
+    else:
+        label = report_row.get("leader_name") or report_row.name
+    return f"{_sanitize_filename(label)}_{report_row.name}"

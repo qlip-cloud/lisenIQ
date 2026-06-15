@@ -553,9 +553,6 @@ def launch_pending_surveys():
 def send_survey_reminders(survey_name=None):
 	frappe.log_error(f"Iniciando tarea: send_survey_reminders (Manual: {bool(survey_name)})", "send_survey_reminders - Inicio")
 	try:
-		now_dt = get_datetime(now())
-		today_date = now_dt.date()
-
 		status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
 		if not status_in_progress:
 			frappe.log_error("No se encontró el estado 'En Progreso'.", "send_survey_reminders - Config Error")
@@ -596,33 +593,57 @@ def send_survey_reminders(survey_name=None):
 		for survey in surveys_in_progress:
 			try:
 				survey_doc = frappe.get_doc("qp_IQ_Survey", survey.name)
-				now_dt = _now_in_survey_tz(survey_doc)
-				today_date = now_dt.date()
+				system_now_dt = get_datetime(now())
+				today_date = system_now_dt.date()
 
-				base_date = None
+				# Evitar procesar envíos automáticos si el día actual es fin de semana (Sábado = 5, Domingo = 6)
+				if not survey_name and today_date.weekday() in [5, 6]:
+					frappe.log_error(f"Encuesta {survey.name} omitida temporalmente: Hoy es fin de semana.", "send_survey_reminders - Fin de semana")
+					continue
+
+				# Extraemos la fecha y hora base garantizando siempre rescatar la hora original
+				base_dt = None
 				if survey.su_start_date:
 					try:
-						base_date = get_datetime(survey.su_start_date).date()
+						base_dt = get_datetime(survey.su_start_date)
 					except Exception:
-						base_date = None
-				if not base_date:
+						pass
+				if not base_dt:
 					try:
-						base_date = get_datetime(survey.creation).date()
+						base_dt = get_datetime(survey.creation)
 					except Exception:
-						base_date = today_date
+						base_dt = system_now_dt
 
-				# Extraemos siempre la frecuencia para calcular correctamente las próximas fechas
+				base_time = base_dt.time()
+				base_date = base_dt.date()
+				
+				# Combinamos la fecha actual con la hora de inicio de la medición
+				today_base_dt = datetime.combine(today_date, base_time)
+
+				# Extraemos siempre la frecuencia para calcular correctamente
 				freq_raw = (survey.su_reminder_frequency or "").strip().lower()
 				is_daily = freq_raw.startswith("diari")
 				is_weekly = freq_raw.startswith("seman")
 				if not is_daily and not is_weekly:
-					is_daily = True  # Por defecto, si no se reconoce la frecuencia, asumimos diaria para cálculo de próximos envíos
+					is_daily = True
 				
+				cycle_days = 1 if is_daily else 7
+				
+				# El siguiente recordatorio será siempre un ciclo exacto partiendo de la fecha actual
+				# garantizando que mantendrá la hora de inicio original (su_start_date)
+				survey_next_reminder_date = add_to_date(today_base_dt, days=cycle_days)
+				
+				# Validación para reprogramar si el próximo recordatorio cae en fin de semana
+				next_dt_obj = get_datetime(survey_next_reminder_date)
+				if next_dt_obj.weekday() == 5: # Sábado -> Lunes (+2 días)
+					survey_next_reminder_date = add_to_date(survey_next_reminder_date, days=2)
+				elif next_dt_obj.weekday() == 6: # Domingo -> Lunes (+1 día)
+					survey_next_reminder_date = add_to_date(survey_next_reminder_date, days=1)
+
 				days_since = (today_date - base_date).days if base_date else 0
 				calc_expected = days_since if is_daily else (days_since // 7)
 				max_allowed = int(survey.su_reminder_max) if survey.su_reminder_max else 999
 
-				# En modo manual, forzamos expected_sends alto para que se procesen los destinatarios, pero respetamos la lógica de frecuencia para actualizar las fechas de próximos envíos.
 				if not survey_name:
 					if not survey.su_reminder_max or survey.su_reminder_max == 0:
 						continue
@@ -635,8 +656,6 @@ def send_survey_reminders(survey_name=None):
 					
 					expected_sends = min(calc_expected, max_allowed)
 				else:
-					# Modo manual: forzamos a que siempre tenga envíos esperados altos para que se ejecute la parte de abajo,
-					# pero usamos la misma configuración 'is_daily' para actualizar las fechas de los próximos envíos.
 					expected_sends = 999
 
 				filters = {
@@ -649,7 +668,7 @@ def send_survey_reminders(survey_name=None):
 				recipients_to_remind = frappe.get_all(
 					"qp_IQ_SurveyRecipient",
 					filters=filters,
-					fields=["name", "sr_contact", "sr_evaluating_to", "sr_link", "sr_token", "sr_reminder_send", "sr_last_reminder_send"]
+					fields=["name", "sr_contact", "sr_evaluating_to", "sr_link", "sr_token", "sr_reminder_send", "sr_last_reminder_send", "sr_next_reminder"]
 				)
 
 				if not recipients_to_remind:
@@ -692,8 +711,18 @@ def send_survey_reminders(survey_name=None):
 								first_rec = records[0]
 								current_sent = int(first_rec.sr_reminder_send or 0)
 								
-								if not survey_name and current_sent >= expected_sends: 
-									continue
+								# Validación unificada para recordatorios automáticos (Evita spam)
+								if not survey_name:
+									skip_group = False
+									if first_rec.sr_next_reminder:
+										if system_now_dt < get_datetime(first_rec.sr_next_reminder):
+											skip_group = True
+									else:
+										if current_sent >= expected_sends:
+											skip_group = True
+									
+									if skip_group:
+										continue
 
 								cinfo = contact_info_map.get(eval_id)
 								if not cinfo: 
@@ -722,20 +751,14 @@ def send_survey_reminders(survey_name=None):
 									frappe.log_error(f"Evaluador '{eval_id}' sin correo.", "send_survey_reminders - Sin Email")
 
 								next_count = current_sent + 1
-								
-								if is_daily: 
-									next_reminder_date = add_to_date(base_date, days=(next_count))
-								else: 
-									next_reminder_date = add_to_date(base_date, days=(7 * next_count))
 
 								for r in records:
 									try:
 										update_dict = {
 											"sr_reminder_send": next_count,
-											"sr_last_reminder_send": now_dt
+											"sr_last_reminder_send": system_now_dt,
+											"sr_next_reminder": survey_next_reminder_date
 										}
-										if next_reminder_date:
-											update_dict["sr_next_reminder"] = next_reminder_date
 										if link_error_msg: 
 											update_dict["sr_error_link"] = link_error_msg
 										
@@ -766,8 +789,17 @@ def send_survey_reminders(survey_name=None):
 							try:
 								current_sent = int(recipient.sr_reminder_send or 0)
 								
-								if not survey_name and current_sent >= expected_sends: 
-									continue
+								if not survey_name:
+									skip_recipient = False
+									if recipient.sr_next_reminder:
+										if system_now_dt < get_datetime(recipient.sr_next_reminder):
+											skip_recipient = True
+									else:
+										if current_sent >= expected_sends:
+											skip_recipient = True
+									
+									if skip_recipient:
+										continue
 
 								cinfo = contact_info_map.get(recipient.sr_contact)
 								if not cinfo: 
@@ -793,19 +825,13 @@ def send_survey_reminders(survey_name=None):
 									frappe.log_error(f"Contacto '{recipient.sr_contact}' sin correo.", "send_survey_reminders - Sin Email")
 
 								next_count = current_sent + 1
-								
-								if is_daily: 
-									next_reminder_date = add_to_date(base_date, days=(next_count))
-								else: 
-									next_reminder_date = add_to_date(base_date, days=(7 * next_count))
 
 								try:
 									update_dict = {
 										"sr_reminder_send": next_count,
-										"sr_last_reminder_send": now_dt
+										"sr_last_reminder_send": system_now_dt,
+										"sr_next_reminder": survey_next_reminder_date
 									}
-									if next_reminder_date:
-										update_dict["sr_next_reminder"] = next_reminder_date
 									if link_error_msg: 
 										update_dict["sr_error_link"] = link_error_msg
 									
@@ -822,6 +848,14 @@ def send_survey_reminders(survey_name=None):
 				frappe.log_error(f"Recordatorios para {survey.name} finalizados. Avances: {enviados}, Errores: {errores}", "send_survey_reminders - Éxito")
 				total_enviados += enviados
 				total_errores += errores
+
+				# Actualizamos el campo de proximo recordatorio general en la encuesta si es necesario
+				if enviados > 0 or survey_name:
+					try:
+						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_next_reminder", survey_next_reminder_date)
+						frappe.db.commit()
+					except Exception as e:
+						frappe.log_error(f"Error actualizando su_next_reminder en encuesta {survey.name}: {e}", "send_survey_reminders - Error DB")
 
 			except Exception as e:
 				frappe.log_error(f"Error general evaluando recordatorios para {survey.name}: {e}\n{frappe.get_traceback()}", "send_survey_reminders - Error Bucle Principal")

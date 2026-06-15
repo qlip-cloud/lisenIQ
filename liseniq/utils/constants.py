@@ -107,7 +107,7 @@ frappe.web_form.after_load = () => {
       }
 
       // Agregamos la excepción "!hasRid" para no pedir DNI en enlaces directos de 360
-      if (uqFlag && (!dni || String(dni).trim() === "") && !is_anonymous && !hasRid) {
+      if (!window.liseniq_is_anonymous_survey && (!dni || String(dni).trim() === "") && !hasRid) {
           frappe.msgprint({
               title: __("Acceso denegado"),
               indicator: "red",
@@ -152,7 +152,7 @@ frappe.web_form.after_load = () => {
               window.location.href = register_url;
               return;
           }
-          if (res.require_dni && uqFlag && !is_anonymous && !hasRid) {
+          if (res.require_dni && !is_anonymous && !hasRid) {
               window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
               return;
           }
@@ -367,7 +367,7 @@ const submit_response = function (data) {
           window.location.href = buildRegisterUrl(reg_token, res.message);
           return;
       }
-      if (res.require_dni && uqFlag && !window.liseniq_is_anonymous_survey && !hasRid) {
+      if (res.require_dni && !window.liseniq_is_anonymous_survey && !hasRid) {
           window.location.href = buildRegisterUrl(token, res.message || __("Debe ingresar su DNI para continuar."));
           return;
       }

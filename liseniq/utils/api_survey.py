@@ -238,7 +238,11 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
         return {"allow": True}
 
       # Lógica para encuestas no públicas (con destinatarios)
-      if not rid and dni:
+      if not rid:
+          public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
+          if not dni:
+              return {"allow": False, "redirect_register": True, "message": "Debe identificarse para responder esta encuesta.", "register_token": public_token}
+              
           survey_owner_company = survey_doc.su_owner
           if not survey_owner_company:
               return {"allow": False, "message": "No se pudo determinar la empresa propietaria de la encuesta."}
@@ -249,7 +253,6 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
               ["name", "custom_company", "status"],
               as_dict=True
           )
-          public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
 
           if not contact_info:
               return {"allow": False, "valid_dni": False, "message": "El DNI proporcionado no corresponde a un contacto registrado.", "redirect_register": True, "register_token": public_token}

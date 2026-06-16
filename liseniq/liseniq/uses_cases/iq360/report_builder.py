@@ -2,7 +2,7 @@ import json
 
 import frappe
 from collections import defaultdict
-from liseniq.liseniq.uses_cases.iq360.selectors import  get_all_responses_for_survey, get_survey_questions, get_question_text_and_category, get_leader_evaluators
+from liseniq.liseniq.uses_cases.iq360.selectors import  get_all_responses_for_survey, get_survey_questions, get_question_text_and_category, get_leader_evaluators, get_question_metadata, get_survey_evaluator_map
 from liseniq.liseniq.uses_cases.iq360.calculations import normalize_responses, average, std_dev, _round2
 """
 qp_IQ_LeaderReport- DocType to store the report for each leader based on the survey responses. 
@@ -391,7 +391,7 @@ def process_leader_data(survey_id, responses, questions_data, previous_survey_na
 
     # Evaluador por respuesta (prioriza custom_evaluator si existe)
     response_evaluator_map = {
-      r.name: (r.get('custom_evaluator') or r.get('user'))
+      r.get('name'): (r.get('custom_evaluator') or r.get('user'))
       for r in responses
     }
 
@@ -451,7 +451,7 @@ def process_leader_data(survey_id, responses, questions_data, previous_survey_na
             # Dimensión
             question_info = questions_data.get(resp['question'])
             if question_info:
-                dimension = question_info.get('category') or 'Sin Categoría'
+                dimension = question_info.get('dimension') or 'Sin Categoría'
                 dimension_scores[dimension][score_key].append(value)
                 
                 # Tema
@@ -588,7 +588,7 @@ def process_leader_data(survey_id, responses, questions_data, previous_survey_na
             all_values.extend(values)
 
         q_data['question_text'] = q_info.get('text', question)
-        q_data['question_dimension'] = q_info.get('category', 'Sin Categoría')
+        q_data['question_dimension'] = q_info.get('dimension', 'Sin Categoría')
         q_data['theme_name'] = q_info.get('theme', 'Sin Tema')
         q_data['others_score'] = average(others)
         previous_others_score = previous_question_others_map.get(q_data['question_text'])
@@ -616,6 +616,7 @@ def process_leader_data(survey_id, responses, questions_data, previous_survey_na
     )
 
     return leader_data
+
 
 def build_leader_report(leader_data):
   logger = _get_logger()
@@ -719,3 +720,545 @@ def build_leader_report(leader_data):
     logger.info('build_leader_report saved | report=%s', report.name)
   frappe.db.commit()
   return report
+
+# ============================================================================
+# BATCH PROCESSING IMPLEMENTATION
+# ============================================================================
+
+def build_leaders_report_batched(survey_id, batch_size=None, async_mode=True):
+    """
+    Build leadership 360 reports using batch processing.
+    
+    This version processes responses in batches to handle large datasets without timeouts.
+    
+    Args:
+        survey_id: ID of the qp_IQ_Survey
+        batch_size: Optional override for batch size (default: 500)
+        async_mode: If True, process in background; if False, process synchronously
+    
+    Returns:
+        progress_doc_name if successful, False if skipped
+    """
+    logger = _get_logger()
+    logger.info('build_leaders_report_batched start | survey_id=%s batch_size=%s async_mode=%s', survey_id, batch_size, async_mode)
+    
+    try:
+        # Get the survey doc
+        survey = frappe.get_doc('qp_IQ_Survey', survey_id)
+        
+        if not getattr(survey, 'su_is_leadership', 0):
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=not_leadership', survey_id)
+            return False
+        
+        if getattr(survey, 'su_report_generated', 0):
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=already_generated', survey_id)
+            return False
+        
+        survey_name = survey.su_name
+        
+        # Get all responses upfront (needed for slicing)
+        responses = get_all_responses_for_survey(survey_name)
+        if not responses:
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=no_responses', survey_id)
+            return False
+        
+        # Group responses by leader
+        leaders_responses = group_responses_by_leader(responses)
+        if not leaders_responses:
+            logger.info('build_leaders_report_batched skipped | survey_id=%s reason=no_leaders', survey_id)
+            return False
+        
+        logger.info(
+            'batch processing initialized | survey=%s responses=%s leaders=%s batch_size=%s',
+            survey_name,
+            len(responses),
+            len(leaders_responses),
+            batch_size or 500
+        )
+        
+        # Create progress tracking document
+        from liseniq.batch_processor import BatchProcessor
+        processor = BatchProcessor(survey_id, 'iq360', batch_size=batch_size, async_mode=async_mode)
+        
+        progress_name = processor.start_batch_processing(
+            total_responses=len(responses),
+            callback_method=process_iq360_batch_worker,
+            survey_name=survey_name,
+            leaders_responses=json.dumps(leaders_responses, default=str),
+            all_responses=json.dumps(responses, default=str),
+        )
+        
+        return progress_name
+        
+    except Exception as e:
+        logger.error(f'Error en build_leaders_report_batched: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        return False
+
+
+
+def process_iq360_batch_worker(survey_id, progress_name, batch_num, batch_size, survey_name, leaders_responses, all_responses):
+    logger = _get_logger()
+    logger.info('process_iq360_batch_worker start | survey_id=%s batch_num=%s', survey_id, batch_num)
+    
+    try:
+        from liseniq.batch_processor import BatchProcessor, serialize_accumulated_data, deserialize_accumulated_data
+        
+        leaders_responses_dict = json.loads(leaders_responses)
+        all_responses_list = json.loads(all_responses)
+        
+        processor = BatchProcessor(survey_id, 'iq360', batch_size=batch_size, async_mode=False)
+        batch_responses = processor.get_batch_slice(all_responses_list, batch_num)
+        
+        if not batch_responses:
+            logger.info('process_iq360_batch_worker empty batch | batch_num=%s', batch_num)
+            return
+        
+        questions_metadata = get_question_metadata(survey_id)
+
+        evaluator_map = get_survey_evaluator_map(survey_id)
+        
+        accumulated_data = _accumulate_360_batch(batch_responses, questions_metadata, evaluator_map)
+        
+        progress_doc = frappe.get_doc('qp_IQ_Report_Progress', progress_name)
+        existing_accumulated = deserialize_accumulated_data(progress_doc.accumulated_data)
+        
+        _merge_accumulated_data(existing_accumulated, accumulated_data)
+        
+        progress_doc.accumulated_data = serialize_accumulated_data(existing_accumulated)
+        progress_doc.save(ignore_permissions=True)
+        
+        _update_leader_reports_from_batch(
+            batch_responses=batch_responses,
+            questions_data=questions_metadata,
+            evaluator_map=evaluator_map,
+            survey_name=survey_name,
+            progress_name=progress_name
+        )
+        
+        BatchProcessor.update_batch_progress(
+            progress_name,
+            batch_num,
+            len(batch_responses),
+            status='in_progress'
+        )
+        
+        logger.info('process_iq360_batch_worker completed | batch_num=%s responses_processed=%s', batch_num, len(batch_responses))
+
+        from liseniq.batch_processor import BatchProcessor
+        
+        BatchProcessor.finalize_batch_processing(
+            progress_name=progress_name,
+            finalize_callback=finalize_360_reports_from_batches
+        )
+        
+        logger.info('process_iq360_batch_worker completed | batch_num=%s responses_processed=%s', batch_num, len(batch_responses))
+
+    except Exception as e:
+        logger.error(f'Error en process_iq360_batch_worker: {type(e).__name__}: {str(e)}')
+        logger.exception('Stack trace:')
+        BatchProcessor.update_batch_progress(
+            progress_name,
+            batch_num,
+            0,
+            status='failed',
+            error=str(e)
+        )
+        raise
+
+def _accumulate_360_batch(batch_responses, questions_data, evaluator_map):
+    """
+    batch_responses: lista de respuestas del lote actual.
+    questions_data: metadatos de las preguntas de la encuesta.
+    evaluator_map: diccionario global de Contact.name/DNI -> sr_evaluation_role.
+    """
+    def empty_stat(): 
+        return {'total': 0.0, 'count': 0}
+    
+    # Estructura que guardará las sumas crudas de TODA la organización en este lote
+    accumulated = {
+        'global_scores': empty_stat(),
+        'global_role_scores': defaultdict(empty_stat),
+        'theme_scores': defaultdict(lambda: defaultdict(empty_stat)),
+        'dimension_scores': defaultdict(lambda: defaultdict(empty_stat)),
+        'question_scores': defaultdict(lambda: defaultdict(empty_stat))
+    }
+    
+    normalized_responses = normalize_responses(batch_responses)
+    
+    # Mapeo rápido de ID de respuesta a su evaluador principal
+    response_evaluator_map = {
+        r.get('name'): (r.get('custom_evaluator') or r.get('user'))
+        for r in batch_responses
+    }
+    
+    for response_name, resp_list in normalized_responses.items():
+        mapped_evaluator_id = response_evaluator_map.get(response_name)
+        
+        for resp in resp_list:
+            # Saltamos texto, las abiertas se manejan directo en el reporte del líder
+            value = resp.get('answer')
+            question = resp.get('question')
+            question_info = questions_data.get(question, {})
+            dimension = question_info.get('dimension') or 'Sin Categoría'
+            theme = question_info.get('theme') or 'Sin Tema'
+            if dimension == 'Abierta':
+                continue
+                
+            
+            leader_target = resp.get('custom_evaluatee')
+
+            role = evaluator_map.get((mapped_evaluator_id, leader_target))
+            if not role:
+                 role = evaluator_map.get((resp_list[0].get('evaluator'), leader_target)) if resp_list else None
+            
+            score_key = ROLE_TO_SCORE_KEY.get(role)
+            if not score_key:
+                continue
+                
+            
+            # 1. Acumuladores Globales de la Organización
+            accumulated['global_scores']['total'] += value
+            accumulated['global_scores']['count'] += 1
+            
+            # 2. Acumuladores por Dimensión
+            accumulated['dimension_scores'][dimension]['all']['total'] += value
+            accumulated['dimension_scores'][dimension]['all']['count'] += 1
+            accumulated['dimension_scores'][dimension][score_key]['total'] += value
+            accumulated['dimension_scores'][dimension][score_key]['count'] += 1
+            
+            # 3. Acumuladores por Tema
+            accumulated['theme_scores'][theme]['all']['total'] += value
+            accumulated['theme_scores'][theme]['all']['count'] += 1
+            accumulated['theme_scores'][theme][score_key]['total'] += value
+            accumulated['theme_scores'][theme][score_key]['count'] += 1
+            
+    return accumulated
+   
+
+def _merge_accumulated_data(target, source):
+    def merge_stat_nodes(target_node, source_node):
+        if 'total' not in target_node:
+            target_node['total'] = 0.0
+        if 'count' not in target_node:
+            target_node['count'] = 0
+            
+        target_node['total'] += source_node.get('total', 0.0)
+        target_node['count'] += source_node.get('count', 0)
+
+    if 'global_scores' in source:
+        if 'global_scores' not in target:
+            target['global_scores'] = {'total': 0.0, 'count': 0}
+        merge_stat_nodes(target['global_scores'], source['global_scores'])
+
+    if 'global_role_scores' in source:
+        if 'global_role_scores' not in target:
+            target['global_role_scores'] = {}
+        for r_key, r_stats in source['global_role_scores'].items():
+            if r_key not in target['global_role_scores']:
+                target['global_role_scores'][r_key] = {'total': 0.0, 'count': 0}
+            merge_stat_nodes(target['global_role_scores'][r_key], r_stats)
+
+    if 'total_respondents' in source:
+        target['total_respondents'] = target.get('total_respondents', 0) + source['total_respondents']
+
+    for key in ['theme_scores', 'dimension_scores']:
+        if key in source:
+            if key not in target:
+                target[key] = {}
+                
+            for name, roles_dict in source[key].items():
+                if name not in target[key]:
+                    target[key][name] = {}
+                
+                for role_key, source_node in roles_dict.items():
+                    if role_key not in target[key][name]:
+                        target[key][name][role_key] = {'total': 0.0, 'count': 0}
+                    
+                    merge_stat_nodes(target[key][name][role_key], source_node)
+
+   
+
+
+def _update_leader_reports_from_batch(batch_responses, questions_data, evaluator_map, survey_name, progress_name):
+    # Agrupamos las respuestas del lote exclusivamente por líder evaluado
+    leaders_responses = group_responses_by_leader(batch_responses)
+    
+    response_evaluator_map = {
+        r.get('name'): (r.get('custom_evaluator') or r.get('user'))
+        for r in batch_responses
+    }
+    
+    for leader_name, leader_responses in leaders_responses.items():
+        if not leader_name:
+            continue
+            
+        report_name = frappe.db.get_value('qp_IQ_Leader_360_Report', {
+            'survey_name': survey_name,
+            'leader_name': leader_name,
+            'progress_reference': progress_name
+        }, 'name')
+        
+        if report_name:
+            report_doc = frappe.get_doc('qp_IQ_Leader_360_Report', report_name)
+        else:
+            report_doc = frappe.new_doc('qp_IQ_Leader_360_Report')
+            report_doc.survey_name = survey_name
+            report_doc.leader_name = leader_name
+            report_doc.progress_reference = progress_name
+            report_doc.total_responses_peers = 0
+            report_doc.total_responses_managers = 0
+            report_doc.total_responses_team = 0
+            # Inicializadores de acumuladores numéricos del líder
+            report_doc.total_responses = 0
+            report_doc.total_score_accumulator = 0.0
+            report_doc.total_score_count = 0
+            report_doc.self_score_accumulator = 0.0
+            report_doc.self_score_count = 0
+            report_doc.manager_score_accumulator = 0.0
+            report_doc.manager_score_count = 0
+            report_doc.peers_score_accumulator = 0.0
+            report_doc.peers_score_count = 0
+            report_doc.team_score_accumulator = 0.0
+            report_doc.team_score_count = 0
+            
+        # Deserializar respuestas abiertas previas del líder
+        
+        normalized_leader = normalize_responses(leader_responses)
+        open_answers = json.loads(report_doc.open_questions_answer) if getattr(report_doc, 'open_questions_answer', None) else {}
+        logger = _get_logger()
+        logger.info('Updating leader report from batch | leader=%s batch_responses=%s existing_open_answers=%s', leader_name, len(leader_responses), len(open_answers))
+        for response_name, resp_list in normalized_leader.items():
+            mapped_evaluator_id = response_evaluator_map.get(response_name)
+            leader_target = resp_list[0].get('custom_evaluatee') if resp_list else None
+            role = evaluator_map.get((mapped_evaluator_id, leader_target))
+            if not role:
+                role = evaluator_map.get((resp_list[0].get('evaluator'), leader_target)) if resp_list else None
+
+            score_key = ROLE_TO_SCORE_KEY.get(role)
+            report_doc.total_responses += 1
+            if role == ROLE_PEER:
+                report_doc.total_responses_peers += 1
+            elif role == ROLE_MANAGER:
+                report_doc.total_responses_managers += 1
+            elif role == ROLE_TEAM:
+                report_doc.total_responses_team += 1
+            
+            for resp in resp_list:
+                question = resp.get('question')
+                question_info = questions_data.get(question, {})
+                question_text = question_info.get('text') or question
+                dimension = question_info.get('dimension') or 'Sin Categoría'
+                theme = question_info.get('theme') or 'Sin Tema'
+                
+                if dimension == 'Abierta':
+                    text_val = resp.get('answer')
+                    logger.info('Processing open question | leader=%s question=%s text_val=%s', leader_name, question_text, text_val)
+                    if text_val and str(text_val).strip():
+                        if question_text not in open_answers:
+                            open_answers[question_text] = []
+                        open_answers[question_text].append(text_val)
+                    continue
+                
+                value = resp.get('answer')
+                if not score_key:
+                    continue
+                
+                # Incrementar contadores globales del Líder
+                report_doc.total_score_accumulator += value
+                report_doc.total_score_count += 1
+                # Incrementar acumulador por rol del Líder
+                if score_key == SCORE_KEY_SELF:
+                    report_doc.self_score_accumulator += value
+                    report_doc.self_score_count += 1
+                elif score_key == SCORE_KEY_MANAGER:
+                    report_doc.manager_score_accumulator += value
+                    report_doc.manager_score_count += 1
+                elif score_key == SCORE_KEY_PEER:
+                    report_doc.peers_score_accumulator += value
+                    report_doc.peers_score_count += 1
+                elif score_key == SCORE_KEY_TEAM:
+                    report_doc.team_score_accumulator += value
+                    report_doc.team_score_count += 1
+                    
+                # --- Actualizar Tablas Hijas (Acumulación Cruda del Líder) ---
+                if not getattr(report_doc, 'question_summary', None): report_doc.question_summary = []
+                if not getattr(report_doc, 'theme_summary', None): report_doc.theme_summary = []
+                if not getattr(report_doc, 'dimension_summary', None): report_doc.dimension_summary = []
+                
+                # 1. Tabla de Preguntas (Comportamientos)
+                q_row = next((r for r in report_doc.question_summary if r.question_text == question_text), None)
+                if not q_row:
+                    q_row = report_doc.append('question_summary', {
+                        'question_text': question_text, 'question_dimension': dimension, 'theme_name': theme,
+                        'total_score': 0.0, 'response_count': 0, 'total_squares': 0.0, 'self_score_accum': 0.0, 'self_count': 0,
+                        'manager_score_accum': 0.0, 'manager_count': 0, 'peers_score_accum': 0.0, 'peers_count': 0,
+                        'team_score_accum': 0.0, 'team_count': 0
+                    })
+                q_row.total_score += value
+                q_row.response_count += 1
+                _add_role_accum(q_row, score_key, value)
+
+                # 2. Tabla de Temas
+                t_row = next((r for r in report_doc.theme_summary if r.theme_name == theme), None)
+                if not t_row:
+                    t_row = report_doc.append('theme_summary', {
+                        'theme_name': theme, 'total_score': 0.0, 'response_count': 0,
+                        'self_score_accum': 0.0, 'self_count': 0, 'manager_score_accum': 0.0, 'manager_count': 0,
+                        'peers_score_accum': 0.0, 'peers_count': 0, 'team_score_accum': 0.0, 'team_count': 0
+                    })
+                t_row.total_score += value
+                t_row.response_count += 1
+                current_squares = getattr(q_row, 'total_squares', 0.0) or 0.0
+                q_row.total_squares = current_squares + (float(value) ** 2)
+                _add_role_accum(t_row, score_key, value)
+
+                # 3. Tabla de Dimensiones
+                d_row = next((r for r in report_doc.dimension_summary if r.dimension_name == dimension), None)
+                if not d_row:
+                    d_row = report_doc.append('dimension_summary', {
+                        'dimension_name': dimension, 'theme_name': theme, 'total_score': 0.0, 'response_count': 0,
+                        'self_score_accum': 0.0, 'self_count': 0, 'manager_score_accum': 0.0, 'manager_count': 0,
+                        'peers_score_accum': 0.0, 'peers_count': 0, 'team_score_accum': 0.0, 'team_count': 0
+                    })
+                d_row.total_score += value
+                d_row.response_count += 1
+                _add_role_accum(d_row, score_key, value)
+        json_string = json.dumps(open_answers, ensure_ascii=False)
+        report_doc.open_questions_answer = json_string
+        report_doc.save(ignore_permissions=True)
+
+def _add_role_accum(row, score_key, value):
+    """Función helper para sumas dinámicas en las filas de las tablas hijas."""
+    if score_key == SCORE_KEY_SELF:
+        row.self_score_accum += value
+        row.self_count += 1
+    elif score_key == SCORE_KEY_MANAGER:
+        row.manager_score_accum += value
+        row.manager_count += 1
+    elif score_key == SCORE_KEY_PEER:
+        row.peers_score_accum += value
+        row.peers_count += 1
+    elif score_key == SCORE_KEY_TEAM:
+        row.team_score_accum += value
+        row.team_count += 1
+
+
+def finalize_360_reports_from_batches(survey_id, progress_name):
+    from liseniq.batch_processor import deserialize_accumulated_data
+    
+    progress_doc = frappe.get_doc('qp_IQ_Report_Progress', progress_name)
+    survey = frappe.get_doc('qp_IQ_Survey', survey_id)
+    survey_name = survey.su_name
+    
+    previous_survey_name = _resolve_previous_comparable_survey_name(survey)
+    
+    # 1. Cargar la data acumulada cruda de toda la ORGANIZACIÓN
+    org_data = deserialize_accumulated_data(progress_doc.accumulated_data)
+    
+    def _calc_avg(node):
+        return node['total'] / node['count'] if node and node.get('count', 0) > 0 else 0.0
+        
+    # Calcular Benchmarks Organizacionales Globales
+    avg_leaders_score_org = _calc_avg(org_data.get('global_scores'))
+    
+    # Obtener todos los reportes de líderes creados en los lotes
+    leader_reports = frappe.get_all('qp_IQ_Leader_360_Report', 
+        filters={'progress_reference': progress_name}, 
+        fields=['name', 'leader_name']
+    )
+    
+    for r_info in leader_reports:
+        report_doc = frappe.get_doc('qp_IQ_Leader_360_Report', r_info['name'])
+        leader_name = report_doc.leader_name
+        
+        # Cargar mapeo histórico para tendencias (deltas) si aplica
+        previous_question_others_map = {}
+        if previous_survey_name:
+            previous_question_others_map = _get_previous_leader_question_others_map(leader_name, previous_survey_name)
+            
+        # Calcular totales de evaluadores únicos del líder (Conserva tu lógica relacional)
+        evaluators = get_leader_evaluators(leader_name, survey_id)
+        report_doc.total_evaluators = len({e.sr_evaluating_to for e in evaluators if e.sr_evaluating_to})
+        report_doc.total_evaluators_peers = len({e.sr_evaluating_to for e in evaluators if e.sr_evaluation_role == ROLE_PEER})
+        report_doc.total_evaluators_managers = len({e.sr_evaluating_to for e in evaluators if e.sr_evaluation_role == ROLE_MANAGER})
+        report_doc.total_evaluators_team = len({e.sr_evaluating_to for e in evaluators if e.sr_evaluation_role == ROLE_TEAM})
+        
+        # Calcular promedios globales individuales del Líder
+        report_doc.overall_score = round(report_doc.total_score_accumulator / report_doc.total_score_count, 2) if report_doc.total_score_count > 0 else 0.0
+        report_doc.self_score = round(report_doc.self_score_accumulator / report_doc.self_score_count, 2) if report_doc.self_score_count > 0 else 0.0
+        report_doc.manager_score = round(report_doc.manager_score_accumulator / report_doc.manager_score_count, 2) if report_doc.manager_score_count > 0 else 0.0
+        report_doc.peers_score = round(report_doc.peers_score_accumulator / report_doc.peers_score_count, 2) if report_doc.peers_score_count > 0 else 0.0
+        report_doc.team_score = round(report_doc.team_score_accumulator / report_doc.team_score_count, 2) if report_doc.team_score_count > 0 else 0.0
+        
+        # Cálculo de OTHERS (Todo menos Autoevaluación) para el líder
+        others_score_accum = report_doc.manager_score_accumulator + report_doc.peers_score_accumulator + report_doc.team_score_accumulator
+        others_score_count = report_doc.manager_score_count + report_doc.peers_score_count + report_doc.team_score_count
+        report_doc.others_score = round(others_score_accum / others_score_count, 2) if others_score_count > 0 else 0.0
+        
+        # Inyectar benchmark general de la empresa
+        report_doc.avg_leaders_score = round(avg_leaders_score_org, 2)
+        
+       
+        def _finalize_table_rows(summary_field, org_node_key, name_attr, is_question=False):
+            for row in getattr(report_doc, summary_field, []):
+                identifier = getattr(row, name_attr)
+                
+                row.avg_score = round(row.total_score / row.response_count, 2) if row.response_count > 0 else 0.0
+                row.self_score = round(row.self_score_accum / row.self_count, 2) if row.self_count > 0 else 0.0
+                row.manager_score = round(row.manager_score_accum / row.manager_count, 2) if row.manager_count > 0 else 0.0
+                row.peers_score = round(row.peers_score_accum / row.peers_count, 2) if row.peers_count > 0 else 0.0
+                row.team_score = round(row.team_score_accum / row.team_count, 2) if row.team_count > 0 else 0.0
+                
+                row_others_accum = row.manager_score_accum + row.peers_score_accum + row.team_score_accum
+                row_others_count = row.manager_count + row.peers_count + row.team_count
+                row.others_score = round(row_others_accum / row_others_count, 2) if row_others_count > 0 else 0.0
+                
+
+                if is_question:
+                    row.gap_self_vs_others = round(row.self_score - row.others_score, 2)
+                    prev_others = previous_question_others_map.get(identifier)
+                    if prev_others is not None:
+                        row.trend_delta = round(row.others_score - prev_others, 2)
+                
+                # 2. Benchmarks de la ORGANIZACIÓN extraídos del JSON unificado
+                org_node = org_data.get(org_node_key, {}).get(identifier, {})
+                row.average_leaders_score = round(_calc_avg(org_node.get('all')), 2)
+                row.average_leaders_self_score = round(_calc_avg(org_node.get(SCORE_KEY_SELF)), 2)
+                row.average_leaders_manager_score = round(_calc_avg(org_node.get(SCORE_KEY_MANAGER)), 2)
+                row.average_leaders_peers_score = round(_calc_avg(org_node.get(SCORE_KEY_PEER)), 2)
+                row.average_leaders_team_score = round(_calc_avg(org_node.get(SCORE_KEY_TEAM)), 2)
+                
+                # Calcular el benchmark 'others' de la organización (Manager + Peers + Team)
+                org_others_total = (org_node.get(SCORE_KEY_MANAGER, {}).get('total', 0.0) + 
+                                    org_node.get(SCORE_KEY_PEER, {}).get('total', 0.0) + 
+                                    org_node.get(SCORE_KEY_TEAM, {}).get('total', 0.0))
+                org_others_count = (org_node.get(SCORE_KEY_MANAGER, {}).get('count', 0) + 
+                                    org_node.get(SCORE_KEY_PEER, {}).get('count', 0) + 
+                                    org_node.get(SCORE_KEY_TEAM, {}).get('count', 0))
+                row.average_leaders_others_score = round(org_others_total / org_others_count, 2) if org_others_count > 0 else 0.0
+
+                if summary_field == 'question_summary':
+                    sum_squares = getattr(row, 'total_squares', 0.0) or 0.0
+                    count = row.response_count
+                    
+                    if count > 1: 
+                        mean = row.avg_score
+                        
+                        variance = (sum_squares / count) - (mean ** 2)
+                      
+                        row.std_deviation = round(max(0.0, variance) ** 0.5, 2)
+                    else:
+                        row.std_deviation = 0.0
+
+        # Ejecutar los cierres en las tres tablas hijas del reporte del líder
+        _finalize_table_rows('dimension_summary', 'dimension_scores', 'dimension_name')
+        _finalize_table_rows('theme_summary', 'theme_scores', 'theme_name')
+        _finalize_table_rows('question_summary', 'question_scores', 'question_text', is_question=True)
+        
+        report_doc.save(ignore_permissions=True)
+        
+    #frappe.db.set_value('qp_IQ_Survey', survey_id, 'su_report_generated', 1, update_modified=False)
+    frappe.db.commit()
+    return True
+

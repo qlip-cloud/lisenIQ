@@ -211,11 +211,11 @@ def process_historical_response_row(hist_record, question_map, demographics_map,
     rows = []
     for qid, question_label in question_map.items():
         row = base_row.copy()
-        row['question'] = question_label
+        question_info = question_variables_map.get(qid, {})
+        row['question'] = question_info.get('question_text', qid)
         row['answer'] = parsed_responses.get(qid, '')
         
         # Agregar variable y tema
-        question_info = question_variables_map.get(question_label, {})
         variable = question_info.get('variable', '')
         row['variable'] = variable
         
@@ -411,11 +411,11 @@ def process_response_row(response, question_map, demographics_map, demographics_
     rows = []
     for qid, question_label in question_map.items():
         row = base_row.copy()
-        row['question'] = question_label
+        question_info = question_variables_map.get(qid, {})
+        row['question'] = question_info.get('question_text', qid)
         row['answer'] = parsed_responses.get(qid, '')
         
         # Agregar variable y tema
-        question_info = question_variables_map.get(question_label, {})
         variable = question_info.get('variable', '')
         row['variable'] = variable
         
@@ -627,27 +627,32 @@ def get_question_variables_map():
                 a.name as question_id,
                 a.qn_statement as question_text,
                 b.dt_title as variable,
-                b.dt_title as tag
+                b.dt_title as tag,
+                c.dt_title as tema
             FROM `tabqp_IQ_Question` a
             INNER JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            INNER JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
             WHERE b.dt_object_type = 'Pregunta'
+            LIMIT 10
         """
         results = frappe.db.sql(query, as_dict=True)
         
         mapping = {}
         for row in results:
+            question_id = row.get('question_id', '')
             question_text = row.get('question_text', '')
             variable = row.get('variable', '')
-            
+            tema = row.get('tema', '')
+
             if question_text:
-                # Determinar el tema basado en CATEGORIES
-                tema = CATEGORIES.get(variable, '')
-                
+                # Determinar el tema basado en CATEGORIE
+                tema = row.get('tema', '')
                 # Si la variable es "Índice de Engagement", sobreescribir con tema específico
                 if variable == 'Índice de Engagement':
                     tema = TEMAS_INDICE_DE_ENGAGEMENT.get(question_text, '')
                 
-                mapping[question_text] = {
+                mapping[question_id] = {
+                    'question_text': question_text,
                     'variable': variable,
                     'tema': tema
                 }

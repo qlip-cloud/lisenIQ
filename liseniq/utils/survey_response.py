@@ -128,67 +128,68 @@ def process_survey_response(doc, method):
             frappe.throw("Enlace inválido o expirado.")
 
         if not rid:
-            # frappe.log_error(f"Respuesta de enlace genérico para {doc.survey}. User/DNI: {doc.user}", "Survey Response Hook")
-            
+            # Si es Anonimo, solicito un DNI válido que corresponda a un Contacto registrado para esta encuesta
+            if doc.user == "Anonimo":
+                frappe.throw("Se requiere un documento de identidad válido. La medición no admite respuestas anónimas.")
+
             contact_name = None
-            if doc.user and doc.user != "Anonimo":
-                survey_owner_company = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_owner")
-                if not survey_owner_company:
-                    frappe.throw("No se pudo determinar la empresa propietaria de la encuesta.")
+            survey_owner_company = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_owner")
+            if not survey_owner_company:
+                frappe.throw("No se pudo determinar la empresa propietaria de la encuesta.")
 
-                contact_info = frappe.db.get_value("Contact", {"custom_document_number": doc.user, "custom_company": survey_owner_company}, ["name", "custom_company"], as_dict=True)
+            contact_info = frappe.db.get_value("Contact", {"custom_document_number": doc.user, "custom_company": survey_owner_company}, ["name", "custom_company"], as_dict=True)
 
-                if not contact_info:
-                    frappe.throw("El DNI proporcionado no corresponde a un contacto registrado.")
-                
-                if contact_info.custom_company != survey_owner_company:
-                    frappe.throw("El DNI proporcionado no pertenece a un contacto válido para esta encuesta.")
+            if not contact_info:
+                frappe.throw("El DNI proporcionado no corresponde a un contacto registrado.")
+            
+            if contact_info.custom_company != survey_owner_company:
+                frappe.throw("El DNI proporcionado no pertenece a un contacto válido para esta encuesta.")
 
-                contact_name = contact_info.name
+            contact_name = contact_info.name
 
-                if contact_name:
-                    survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
-                    if survey_name_id:
-                        existing_response_by_contact = frappe.db.exists(
-                            "Survey Response",
-                            {
-                                "survey": doc.survey,
-                                "user": contact_name,
-                                "name": ["!=", doc.name]
-                            }
-                        )
-                        if existing_response_by_contact:
-                            frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
+            if contact_name:
+                survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
+                if survey_name_id:
+                    existing_response_by_contact = frappe.db.exists(
+                        "Survey Response",
+                        {
+                            "survey": doc.survey,
+                            "user": contact_name,
+                            "name": ["!=", doc.name]
+                        }
+                    )
+                    if existing_response_by_contact:
+                        frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
-                        recipient_exists = frappe.db.exists(
+                    recipient_exists = frappe.db.exists(
+                        "qp_IQ_SurveyRecipient",
+                        {
+                            "sr_survey": survey_name_id,
+                            "sr_contact": contact_name,
+                        }
+                    )
+                    if recipient_exists:
+                        frappe.db.set_value(
                             "qp_IQ_SurveyRecipient",
                             {
                                 "sr_survey": survey_name_id,
                                 "sr_contact": contact_name,
-                            }
+                            },
+                            {"sr_status": rs_responded, "sr_survey_response": doc.name}
                         )
-                        if recipient_exists:
-                            frappe.db.set_value(
-                                "qp_IQ_SurveyRecipient",
-                                {
-                                    "sr_survey": survey_name_id,
-                                    "sr_contact": contact_name,
-                                },
-                                {"sr_status": rs_responded, "sr_survey_response": doc.name}
-                            )
-                        else:
-                            pass
+                    else:
+                        pass
 
-                existing_response = frappe.db.exists(
-                    "Survey Response",
-                    {
-                        "survey": doc.survey,
-                        "user": doc.user,
-                        "name": ["!=", doc.name]
-                    }
-                )
-                if existing_response:
-                    frappe.throw("Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación.")
+            existing_response = frappe.db.exists(
+                "Survey Response",
+                {
+                    "survey": doc.survey,
+                    "user": doc.user,
+                    "name": ["!=", doc.name]
+                }
+            )
+            if existing_response:
+                frappe.throw("Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación.")
             
             if contact_name:
                 doc.user = contact_name

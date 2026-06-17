@@ -47,9 +47,6 @@ def convert_score_10_to_5(score):
     """Convert score from 1-10 scale to 1-5 scale"""
     if score is None:
         return None
-    # If already in 1-5 range, return as is
-    if score <= 5:
-        return score
     # Convert 1-10 to 1-5
     if 1 <= score <= 2:
         return 1

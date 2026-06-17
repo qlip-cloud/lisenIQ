@@ -42,6 +42,7 @@
   "su_send_reminders",
   "su_reminder_frequency",
   "su_reminder_max",
+  "su_next_reminder",
   "su_default_notif",
   "column_break_34",
   "su_invitation_subject",
@@ -283,12 +284,17 @@
    "default": "0",
    "fieldname": "su_report_generated",
    "fieldtype": "Check",
-   "label": "Informes PDF Generados?"
+   "label": "\u00bfReporte de Liderazgo Generado?"
+  },
+  {
+   "fieldname": "su_next_reminder",
+   "fieldtype": "Datetime",
+   "label": "Fecha de proximo Recordatorio"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-02 20:15:39.426900",
+ "modified": "2026-06-15 16:48:07.019041",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",

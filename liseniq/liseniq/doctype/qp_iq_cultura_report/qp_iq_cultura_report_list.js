@@ -114,8 +114,8 @@ function show_cultura_batch_dialog(frm) {
                 label: __('Batch Size'),
                 fieldname: 'batch_size',
                 fieldtype: 'Int',
-                default: 1000,
-                description: __('Respuestas a procesar por lote. Valor por defecto: 1000.')
+                default: 10000,
+                description: __('Respuestas a procesar por lote. Valor por defecto: 10000.')
             }
         ],
 
@@ -143,7 +143,7 @@ function start_cultura_report_batch(values) {
         args: {
             survey_id: values.survey_id,
             demographic_field: values.demographic_field,
-            batch_size: values.batch_size || 1000,
+            batch_size: values.batch_size || 10000,
             async_mode: true
         },
 

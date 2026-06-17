@@ -633,7 +633,6 @@ def get_question_variables_map():
             INNER JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
             INNER JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
             WHERE b.dt_object_type = 'Pregunta'
-            LIMIT 10
         """
         results = frappe.db.sql(query, as_dict=True)
         

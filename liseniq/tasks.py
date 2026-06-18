@@ -756,9 +756,12 @@ def send_survey_reminders(survey_name=None):
 									try:
 										update_dict = {
 											"sr_reminder_send": next_count,
-											"sr_last_reminder_send": system_now_dt,
-											"sr_next_reminder": survey_next_reminder_date
+											"sr_last_reminder_send": system_now_dt
 										}
+										
+										if not survey_name:
+											update_dict["sr_next_reminder"] = survey_next_reminder_date
+											
 										if link_error_msg: 
 											update_dict["sr_error_link"] = link_error_msg
 										
@@ -829,9 +832,12 @@ def send_survey_reminders(survey_name=None):
 								try:
 									update_dict = {
 										"sr_reminder_send": next_count,
-										"sr_last_reminder_send": system_now_dt,
-										"sr_next_reminder": survey_next_reminder_date
+										"sr_last_reminder_send": system_now_dt
 									}
+									
+									if not survey_name:
+										update_dict["sr_next_reminder"] = survey_next_reminder_date
+										
 									if link_error_msg: 
 										update_dict["sr_error_link"] = link_error_msg
 									
@@ -849,8 +855,7 @@ def send_survey_reminders(survey_name=None):
 				total_enviados += enviados
 				total_errores += errores
 
-				# Actualizamos el campo de proximo recordatorio general en la encuesta si es necesario
-				if enviados > 0 or survey_name:
+				if not survey_name and enviados > 0:
 					try:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_next_reminder", survey_next_reminder_date)
 						frappe.db.commit()

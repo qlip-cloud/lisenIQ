@@ -388,7 +388,7 @@ def _process_responses_for_global_metrics(
                 continue
 
             # Use converted value (1-5 scale) for metrics
-            value = resp['answer_converted']
+            value = resp['answer']
             question = resp['question']
             
             # Get question metadata to check if it's an open question
@@ -399,7 +399,8 @@ def _process_responses_for_global_metrics(
             # Skip open-ended questions (dimension = 'Abierta')
             if dimension == 'Abierta':
                 continue
-
+            if dimension == 'Índice de Engagement':
+                value = resp['answer_converted']
             # Add to global scores (using converted 1-5 values)
             all_scores.append(value)
 
@@ -480,7 +481,9 @@ def process_demographic_cutoff_data(
                 continue
 
             # Use converted value (1-5 scale) for all metrics
-            value = resp['answer_converted']
+            value = resp['answer']
+            if dimension == 'Índice de Engagement':
+                value = resp['answer_converted']
             scores.append(value)
 
             # Accumulate scores (already in 1-5 scale)
@@ -819,7 +822,7 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
             if resp.get('answer_type') == 'text':
                 continue
             
-            value = resp.get('answer_converted') 
+            value = resp.get('answer') 
             question = resp.get('question')
             
             question_info = questions_metadata.get(question, {})
@@ -829,6 +832,8 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
             if dimension == 'Abierta':
                 continue
             
+            if dimension == 'Índice de Engagement':
+                value = resp.get('answer_converted')
 
             accumulated['global_score']['total'] += value
             accumulated['global_score']['count'] += 1
@@ -959,7 +964,7 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                 
                 question = resp.get('question')
                 user_field = resp.get('user')
-                value = resp.get('answer_converted')
+                value = resp.get('answer')
                 
                 if user_field:
                     unique_users_in_batch.add(user_field)
@@ -969,6 +974,9 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                 theme = question_info.get('theme') or 'Sin Tema'
                 dimension = question_info.get('dimension') or 'Sin Dimensión'
                 question_text = question_info.get('text', question)
+
+                if dimension == 'Índice de Engagement':
+                    value = resp.get('answer_converted')
                 
                 if dimension == 'Abierta':
                     text_val = resp.get('answer')

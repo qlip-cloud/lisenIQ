@@ -434,7 +434,6 @@ def _render_report_pdf(doctype_name, report_row, print_format):
     )
     html = _ensure_pdf_header_footer_placeholders(html)
     html = _compile_css_for_pdf(html)
-    frappe.log_error(f"Rendering PDF for {doctype_name} - {report_row.name} HTML: {html}", "export_report")
     return get_pdf(html, options=_leadership_pdf_options())
 
 

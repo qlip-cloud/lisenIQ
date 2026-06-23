@@ -1485,6 +1485,7 @@ def get_demographics_labels():
         return {}
 
 
+
 def get_question_variables_map():
     """
     Obtiene el mapeo de preguntas a sus variables (tags) y temas
@@ -1492,43 +1493,39 @@ def get_question_variables_map():
     try:
         query = """
             SELECT 
+                a.name as question_id,
                 a.qn_statement as question_text,
                 b.dt_title as variable,
-                b.dt_title as tag
+                b.dt_title as tag,
+                c.dt_title as tema
             FROM `tabqp_IQ_Question` a
-            INNER JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            LEFT JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            LEFT JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
             WHERE b.dt_object_type = 'Pregunta'
         """
         results = frappe.db.sql(query, as_dict=True)
         
         mapping = {}
         for row in results:
+            question_id = row.get('question_id', '')
             question_text = row.get('question_text', '')
             variable = row.get('variable', '')
-            
+            tema = row.get('tema', '')
+
             if question_text:
-                """
-                TODO: Para preguntas de mediciones de Carvajal, asignar tema "CULTURA CARVAJAL"
-                basado en el mapeo de CATEGORIES
-                """
-                tema = CATEGORIES.get(variable, '')
-                mapping[question_text] = {
-                    'variable': variable,
-                    'tema': tema
-                }
-            if variable=='Índice de Engagement':
-                tema = TEMAS_INDICE_DE_ENGAGEMENT.get(question_text, '')
-                mapping[question_text] = {
+                # Determinar el tema basado en CATEGORIE
+                tema = row.get('tema', '') if row.get('tema') else ""
+                
+                mapping[question_id] = {
+                    'question_text': question_text,
                     'variable': variable,
                     'tema': tema
                 }
                 
         return mapping
-        
     except Exception as e:
         frappe.log_error(f"Error getting question variables map: {str(e)}")
         return {}
-
 
 def get_question_types_map():
     """
@@ -1714,32 +1711,17 @@ def transform_data_by_question(
             question_object['answer'] = answer
 
             # Agregar variable y tema basado en la pregunta
-            question_info = question_variables_map.get(question_text, {})
+            question_info = question_variables_map.get(qid, {})
             variable = question_info.get('variable', '')
             question_object['variable'] = variable
             question_object['question_type'] = question_types_map.get(qid, '')
             
             # Determinar el tema según el template
             tema = ''
-            template_name_normalized = (template_name or '').lower()
-            if 'bhd' in template_name_normalized:
-                tema = 'Cultura BHD'
-            elif template_name == 'Plantilla Modelo Vedanta bienestar':
-                tema = VEDANTA_BIENESTAR.get(variable, '')
-            else:
-                tema = question_info.get('tema', '')
+            
+            tema = question_info.get('tema', '')
                 
-            # Lógica especial para empresas Carvajal
-            try:
-                company_name_val = (demographic_data.get('company_name') or '').lower().strip()
-                carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
-                if company_name_val and company_name_val in carvajal_names:
-                    tema = "CULTURA CARVAJAL"
-            except Exception:
-                pass
-
             question_object['tema'] = tema
-            # Agregar un id númerico único para preguntas abiertas para agruparlas por ese número en el dashboard (ej: open_question_1, open_question_2, etc.)
             if question_object['question_type'] in ['Abierta', 'Abierta texto corto']:
                 survey_id = demographic_data.get('survey_id', '')
                 question_object['question_group'] = open_questions_dict.get(survey_id, {}).get(question_text, '')

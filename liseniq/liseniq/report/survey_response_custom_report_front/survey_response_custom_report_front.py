@@ -221,19 +221,7 @@ def process_historical_response_row(hist_record, question_map, demographics_map,
         
         # Determinar el tema según el template y la compañía
         tema = ''
-        if template_name == 'Plantilla Modelo Vedanta bienestar':
-            tema = VEDANTA_BIENESTAR.get(variable, '')
-        else:
-            tema = question_info.get('tema', '')
-        
-        # Lógica especial para empresas Carvajal
-        try:
-            company_name_val = (company_name or '').lower().strip()
-            carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
-            if company_name_val and company_name_val in carvajal_names:
-                tema = "CULTURA CARVAJAL"
-        except Exception:
-            pass
+        tema = question_info.get('tema', '')
         
         row['theme'] = tema
         rows.append(row)
@@ -421,19 +409,7 @@ def process_response_row(response, question_map, demographics_map, demographics_
         
         # Determinar el tema según el template y la compañía
         tema = ''
-        if template_name == 'Plantilla Modelo Vedanta bienestar':
-            tema = VEDANTA_BIENESTAR.get(variable, '')
-        else:
-            tema = question_info.get('tema', '')
-        
-        # Lógica especial para empresas Carvajal
-        try:
-            company_name_val = (company_name or '').lower().strip()
-            carvajal_names = {n.lower().strip() for n in CARVAJAL_COMPANIES.values()}
-            if company_name_val and company_name_val in carvajal_names:
-                tema = "CULTURA CARVAJAL"
-        except Exception:
-            pass
+        tema = question_info.get('tema', '')
         
         row['theme'] = tema
         rows.append(row)
@@ -630,8 +606,8 @@ def get_question_variables_map():
                 b.dt_title as tag,
                 c.dt_title as tema
             FROM `tabqp_IQ_Question` a
-            INNER JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
-            INNER JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
+            LEFT JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            LEFT JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
             WHERE b.dt_object_type = 'Pregunta'
         """
         results = frappe.db.sql(query, as_dict=True)
@@ -642,19 +618,11 @@ def get_question_variables_map():
             question_text = row.get('question_text', '')
             variable = row.get('variable', '')
             tema = row.get('tema', '')
-
-            if question_text:
-                # Determinar el tema basado en CATEGORIE
-                tema = row.get('tema', '')
-                # Si la variable es "Índice de Engagement", sobreescribir con tema específico
-                if variable == 'Índice de Engagement':
-                    tema = TEMAS_INDICE_DE_ENGAGEMENT.get(question_text, '')
-                
-                mapping[question_id] = {
-                    'question_text': question_text,
-                    'variable': variable,
-                    'tema': tema
-                }
+            mapping[question_id] = {
+                'question_text': question_text,
+                'variable': variable,
+                'tema': tema
+            }
                 
         return mapping
     except Exception as e:

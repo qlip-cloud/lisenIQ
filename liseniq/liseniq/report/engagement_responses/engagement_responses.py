@@ -732,9 +732,11 @@ def get_question_variables_map():
                 a.name as question_id,
                 a.qn_statement as question_text,
                 b.dt_title as variable,
-                b.dt_title as tag
+                b.dt_title as tag,
+                c.dt_title as tema
             FROM `tabqp_IQ_Question` a
-            INNER JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            LEFT JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
+            LEFT JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
             WHERE b.dt_object_type = 'Pregunta'
         """
         results = frappe.db.sql(query, as_dict=True)
@@ -745,12 +747,7 @@ def get_question_variables_map():
             variable = row.get("variable", "")
 
             if question_text:
-                # Determinar el tema basado en CATEGORIES
-                tema = CATEGORIES.get(variable, "")
-
-                # Si la variable es "Índice de Engagement", sobreescribir con tema específico
-                if variable == "Índice de Engagement":
-                    tema = TEMAS_INDICE_DE_ENGAGEMENT.get(question_text, "")
+                tema = row.get("tema", "")
 
                 mapping[question_text] = {"variable": variable, "tema": tema}
 

@@ -431,3 +431,18 @@ function showGlobalNotification(message, type, duration = 5000) {
         notificationBar.classList.remove('show');
     }, duration);
 }
+
+// Lógica para Selección de Compañía
+window.selectActiveCompany = function(companyId) {
+    frappe.call({
+        method: "liseniq.utils.login_util.set_active_company",
+        args: { company_id: companyId },
+        freeze: true,
+        freeze_message: "Cargando entorno de trabajo...",
+        callback: function(r) {
+            if (r.message) {
+                window.location.href = r.message;
+            }
+        }
+    });
+};

@@ -1,0 +1,31 @@
+{
+ "actions": [],
+ "creation": "2026-06-19 22:54:23.215949",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "prf_feature"
+ ],
+ "fields": [
+  {
+   "fieldname": "prf_feature",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Funcionalidad",
+   "options": "qp_IQ_AppFeature"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-19 22:54:23.215949",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_PortalRoleFeature",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

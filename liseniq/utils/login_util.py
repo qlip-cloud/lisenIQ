@@ -2,77 +2,116 @@ import frappe
 import json
 from frappe import _
 
-# Función para obtener el nombre de la compañía del usuario y cachearlo en sesión
+@frappe.whitelist()
+def set_active_company(company_id):
+    """
+    Establece la compañía activa en la sesión del usuario.
+    Al cerrar sesión, este dato se destruye automáticamente.
+    """
+    user = frappe.session.user
+    if user == "Guest":
+        return "/login"
+    
+    if "Administrator" in frappe.get_roles(user):
+        return "/app"
+
+    contact_name = frappe.db.get_value("Contact", {"user": user}, "name")
+    
+    relation = frappe.get_all("qp_IQ_ContactCompany", filters={
+        "parent": contact_name,
+        "parenttype": "Contact",
+        "cc_company": company_id
+    }, fields=["name", "cc_role_profile"])
+
+    if not relation:
+        frappe.throw(_("No tienes permisos para acceder a esta compañía."))
+
+    frappe.session.data["liseniq_active_company"] = company_id
+    # Guardamos el perfil en sesión para no re-consultarlo
+    frappe.session.data["liseniq_active_role_profile"] = relation[0].cc_role_profile
+    
+    session_key = "liseniq_company_name"
+    frappe.session.data[session_key] = None
+
+    if hasattr(frappe.local, "session_obj") and frappe.local.session_obj:
+        frappe.local.session_obj.update()
+
+    return "/iq-home"
+
 @frappe.whitelist()
 def get_user_company_name(user=None):
+    session_key = "liseniq_company_name"
+    user = user or frappe.session.user
+    
+    if not user or user == "Guest" or "Administrator" in frappe.get_roles(user):
+        return ""
 
-	session_key = "liseniq_company_name"
-	user = user or frappe.session.user
-	if not user or user == "Guest":
-		return ""
+    cached_name = (getattr(frappe.session, "data", {}) or {}).get(session_key)
+    if cached_name:
+        return cached_name
 
-	cached_name = (getattr(frappe.session, "data", {}) or {}).get(session_key)
-	if cached_name:
-		return cached_name
+    active_company_id = frappe.session.data.get("liseniq_active_company")
+    
+    if not active_company_id:
+        contact_name = frappe.db.get_value("Contact", {"user": user}, "name")
+        if contact_name:
+            companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": contact_name, "parenttype": "Contact"}, fields=["cc_company", "cc_role_profile"], order_by="cc_is_default desc")
+            
+            if len(companies) == 1:
+                active_company_id = companies[0].cc_company
+                frappe.session.data["liseniq_active_company"] = active_company_id
+                frappe.session.data["liseniq_active_role_profile"] = companies[0].cc_role_profile
+                if hasattr(frappe.local, "session_obj") and frappe.local.session_obj:
+                    frappe.local.session_obj.update()
 
-	contact_info = frappe.db.get_value(
-		"Contact",
-		{"user": user, "custom_is_liseniq_contact": 0},
-		["custom_company"],
-		as_dict=True,
-	)
-	if contact_info and contact_info.custom_company:
-		company_name = frappe.db.get_value("qp_IQ_Company", contact_info.custom_company, "co_name") or ""
-	else:
-		company_name = ""
+    company_name = ""
+    if active_company_id:
+        company_name = frappe.db.get_value("qp_IQ_Company", active_company_id, "co_name") or ""
 
-	try:
-		session_obj = getattr(frappe.local, "session_obj", None)
-		if session_obj:
-			session_obj.data[session_key] = company_name
-			if hasattr(session_obj, "update"):
-				session_obj.update()
-		else:
-			if hasattr(frappe, "session") and hasattr(frappe.session, "data"):
-				frappe.session.data[session_key] = company_name
-	except Exception:
-		pass
+    try:
+        session_obj = getattr(frappe.local, "session_obj", None)
+        if session_obj:
+            session_obj.data[session_key] = company_name
+            if hasattr(session_obj, "update"):
+                session_obj.update()
+        else:
+            if hasattr(frappe, "session") and hasattr(frappe.session, "data"):
+                frappe.session.data[session_key] = company_name
+    except Exception:
+        pass
 
-	return company_name
+    return company_name
 
 def set_company_name_on_session_creation(login_manager):
-	try:
-		user = getattr(login_manager, "user", None) or frappe.session.user
-		if user and user != "Guest":
-			get_user_company_name(user=user)
-	except Exception:
-		frappe.log_error(frappe.get_traceback(), "liseniq: set_company_name_on_session_creation")
+    try:
+        user = getattr(login_manager, "user", None) or frappe.session.user
+        if user and user != "Guest":
+            get_user_company_name(user=user)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "liseniq: set_company_name_on_session_creation")
 
-# Función para inyectar contexto global en páginas del portal
 def global_website_context(context):
-
     if context is None:
         context = frappe._dict()
 
     user = frappe.session.user
     
-    # Valores por defecto
     context.has_portal_access = False
     context.access_error_message = ""
     context.liseniq_company_name = ""
     context.first_login = False
-    
-    # Valores por defecto para Suscripciones
     context.subscription_plan = ""
     context.app_features = []
     context.app_features_json = "[]"
 
-    # Validación de Invitado
     if user == "Guest":
         context.access_error_message = _("Debe iniciar sesión para acceder.")
         return context
 
-    # Obtener datos del Contacto
+    if "Administrator" in frappe.get_roles(user):
+        context.has_portal_access = True
+        return context
+
     contact = frappe.db.get_value(
         "Contact", 
         {"user": user}, 
@@ -82,66 +121,88 @@ def global_website_context(context):
     
     if not contact:
         context.access_error_message = _("El usuario no se encuentra registrado o no tiene permisos de acceso (Contacto no encontrado).")
-        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin contacto asociado.")
         return context
 
-    if not contact.custom_company:
+    active_company_id = frappe.session.data.get("liseniq_active_company")
+    active_role_profile = frappe.session.data.get("liseniq_active_role_profile")
+    
+    companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": contact.name, "parenttype": "Contact"}, fields=["cc_company", "cc_role_profile"])
+    
+    if not active_company_id:
+        if len(companies) == 1:
+            active_company_id = companies[0].cc_company
+            active_role_profile = companies[0].cc_role_profile
+        elif len(companies) == 0:
+            active_company_id = contact.custom_company
+            active_role_profile = None
+
+    if not active_company_id and len(companies) <= 1:
         context.access_error_message = _("El usuario no tiene una compañía asignada. Contacte al administrador.")
-        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin compañía asignada.")
         return context
 
     if contact.custom_is_liseniq_contact:
         context.access_error_message = _("Su usuario no tiene perfil administrativo para acceder a este portal.")
-        frappe.log_error(title="Acceso al portal fallido", message=f"Usuario {user} sin perfil administrativo.")
         return context
 
     context.has_portal_access = True
-    context.liseniq_company_name = contact.custom_company
-		
+    context.liseniq_company_name = active_company_id or "" 
     context.first_login = contact.custom_first_login
-		
+        
     tours_list = frappe.get_all(
         "qp_IQ_Tour",
         filters={"parent": contact.name},
         fields=["tour_name", "completed"]
     )
-    
     context.user_tours = {t.tour_name: t.completed for t in tours_list}
     
-    # Logica de suscripciones y funcionalidades
-    try:
-        # Buscamos la suscripción activa de la compañía
-        active_sub = frappe.get_all(
-            "qp_IQ_CompanySubscription",
-            filters={
-                "sub_company": contact.custom_company,
-                "sub_is_active": 1
-            },
-            fields=["sub_plan"],
-            limit=1
-        )
+    if active_company_id:
+        try:
+            # 1. Cargamos funcionalidades del PLAN DE SUSCRIPCIÓN de la empresa
+            active_sub = frappe.get_all(
+                "qp_IQ_CompanySubscription",
+                filters={"sub_company": active_company_id, "sub_is_active": 1},
+                fields=["sub_plan"],
+                limit=1
+            )
 
-        if active_sub and active_sub[0].sub_plan:
-            context.subscription_plan = active_sub[0].sub_plan
+            if active_sub and active_sub[0].sub_plan:
+                context.subscription_plan = active_sub[0].sub_plan
+                plan_doc = frappe.get_doc("qp_IQ_AppPlan", active_sub[0].sub_plan)
+                feature_names = [f.pf_feature for f in plan_doc.pl_features if f.pf_feature]
+                
+                if feature_names:
+                    features = frappe.get_all(
+                        "qp_IQ_AppFeature",
+                        filters={"name": ("in", feature_names)},
+                        fields=["fe_code"]
+                    )
+                    context.app_features = [f.fe_code for f in features if f.fe_code]
             
-            # Obtenemos el listado de funcionalidades (Child Table) asociadas al plan
-            plan_doc = frappe.get_doc("qp_IQ_AppPlan", active_sub[0].sub_plan)
-            feature_names = [f.pf_feature for f in plan_doc.pl_features if f.pf_feature]
-            
-            if feature_names:
-                # Obtenemos el código de las funcionalidades (fe_code)
-                features = frappe.get_all(
-                    "qp_IQ_AppFeature",
-                    filters={"name": ("in", feature_names)},
-                    fields=["fe_code"]
+            # 2. Cargamos funcionalidades extra del PERFIL DEL USUARIO (Dinámico)
+            if active_role_profile:
+                role_features = frappe.get_all(
+                    "qp_IQ_PortalRoleFeature",
+                    filters={"parent": active_role_profile, "parenttype": "qp_IQ_PortalRole"},
+                    fields=["feature"]
                 )
-                context.app_features = [f.fe_code for f in features if f.fe_code]
-        
-        # Guardamos en formato JSON estricto para poder renderizarlo en Javascript
-        context.app_features_json = json.dumps(context.app_features)
+                
+                if role_features:
+                    role_feature_names = [f.feature for f in role_features if f.feature]
+                    if role_feature_names:
+                        features_codes = frappe.get_all(
+                            "qp_IQ_AppFeature",
+                            filters={"name": ("in", role_feature_names)},
+                            fields=["fe_code"]
+                        )
+                        extra_features = [f.fe_code for f in features_codes if f.fe_code]
+                        context.app_features.extend(extra_features)
 
-    except Exception as e:
-        frappe.log_error(title="Error al cargar funcionalidades del plan", message=str(e))
+            # Eliminamos duplicados (por si el plan y el rol comparten features)
+            context.app_features = list(set(context.app_features))
+            context.app_features_json = json.dumps(context.app_features)
+
+        except Exception as e:
+            frappe.log_error(title="Error al cargar funcionalidades combinadas", message=str(e))
 
     return context
 
@@ -158,10 +219,7 @@ def set_first_login_false():
         contact_name = frappe.db.get_value("Contact", {"user": user}, "name")
         if contact_name:
             try:
-                contact_doc = frappe.get_doc("Contact", contact_name)
-                contact_doc.custom_first_login = False
-                contact_doc.save(ignore_permissions=True)
+                frappe.db.set_value("Contact", contact_name, "custom_first_login", 0)
                 frappe.db.commit()
             except Exception as e:
                 frappe.log_error(frappe.get_traceback(), "liseniq: set_first_login_false")
-                frappe.throw(_("Error al actualizar el estado de primer inicio: {0}").format(str(e)))

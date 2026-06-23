@@ -34,14 +34,15 @@
   },
   {
    "fieldname": "cc_role_profile",
-   "fieldtype": "Data",
-   "label": "Perfil de Roles"
+   "fieldtype": "Link",
+   "label": "Perfil de Roles",
+   "options": "qp_IQ_PortalRole"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-19 20:33:51.756611",
+ "modified": "2026-06-19 22:56:20.688572",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_ContactCompany",

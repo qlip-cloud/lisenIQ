@@ -487,3 +487,20 @@
     color: var(--text-color-primary, #212529);
     font-weight: 500;
 }
+
+.btn-purple-card {
+    background-color: var(--brand-primary-light, #f3e8ff);
+    border: 1px solid var(--brand-primary, #7B24FF);
+    color: var(--brand-primary, #7B24FF);
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.btn-purple-card:hover,
+.btn-purple-card:focus {
+    background-color: var(--brand-primary, #7B24FF);
+    color: white;
+}

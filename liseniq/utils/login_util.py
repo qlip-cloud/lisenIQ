@@ -157,7 +157,7 @@ def global_website_context(context):
     
     if active_company_id:
         try:
-            # 1. Cargamos funcionalidades del PLAN DE SUSCRIPCIÓN de la empresa
+            # Cargamos funcionalidades del PLAN DE SUSCRIPCIÓN de la empresa
             active_sub = frappe.get_all(
                 "qp_IQ_CompanySubscription",
                 filters={"sub_company": active_company_id, "sub_is_active": 1},
@@ -178,7 +178,7 @@ def global_website_context(context):
                     )
                     context.app_features = [f.fe_code for f in features if f.fe_code]
             
-            # 2. Cargamos funcionalidades extra del PERFIL DEL USUARIO (Dinámico)
+            # Cargamos funcionalidades extra del PERFIL DEL USUARIO
             if active_role_profile:
                 role_features = frappe.get_all(
                     "qp_IQ_PortalRoleFeature",
@@ -223,3 +223,37 @@ def set_first_login_false():
                 frappe.db.commit()
             except Exception as e:
                 frappe.log_error(frappe.get_traceback(), "liseniq: set_first_login_false")
+
+@frappe.whitelist()
+def get_user_companies():
+    """Devuelve la lista de empresas a las que tiene acceso el usuario para el Company Switcher)."""
+    user = frappe.session.user
+    if user == "Guest": return []
+    
+    contact_name = frappe.db.get_value("Contact", {"user": user}, "name")
+    if not contact_name: return []
+
+    contact_companies = frappe.get_all(
+        "qp_IQ_ContactCompany",
+        filters={"parent": contact_name, "parenttype": "Contact"},
+        fields=["cc_company"]
+    )
+
+    companies_data = []
+    for cc in contact_companies:
+        company_id = cc.cc_company
+        company_info = frappe.db.get_value(
+            "qp_IQ_Company", 
+            company_id, 
+            ["co_name", "co_logo"], 
+            as_dict=True
+        )
+        
+        if company_info:
+            companies_data.append({
+                "company_id": company_id,
+                "company_name": company_info.co_name or company_id,
+                "logo": company_info.co_logo
+            })
+
+    return companies_data

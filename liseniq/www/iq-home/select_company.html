@@ -39,6 +39,9 @@
             <h4 class="company-name">
                 {{ company.company_name }}
             </h4>
+            <button class="btn btn-purple-card btn-block mb-2" onclick="event.stopPropagation(); selectActiveCompany('{{ company.company_id }}')" style="width: 100%; margin-top: 10px;">
+                Seleccionar
+            </button>
         </div>
         {% endfor %}
     </div>

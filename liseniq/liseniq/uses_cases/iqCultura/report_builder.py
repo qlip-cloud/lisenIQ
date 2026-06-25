@@ -1,5 +1,8 @@
 import json
+from urllib.parse import quote_plus
+import requests
 import frappe
+from frappe.utils.file_manager import save_file
 from collections import defaultdict
 from liseniq.liseniq.uses_cases.iqCultura.selectors import (
     get_all_responses_for_survey,
@@ -1149,8 +1152,55 @@ def finalize_cultura_reports_from_batches(survey_id, progress_name):
                     row.overall_avg_score = round(global_question_scores.get(row.question_id, 0.0), 2)
                     row.gap = round(row.avg_score - row.overall_avg_score, 2)
                     row.trend_delta = None
-                
+        
 
+                questions = json.loads(report_doc.open_questions_answers or "{}")
+                wordcloud_images = {}
+
+                for question, answers in questions.items():
+                    text = ",".join(answers)
+                    
+                    if not text.strip():
+                        continue
+
+                    url = "https://quickchart.io/wordcloud"
+                    
+                    payload = {
+                        "width": 1000,
+                        "height": 550,
+                        "useWordList": True,
+                        "fontScale": 18,
+                        "scale": "linear",
+                        "maxNumWords": 35,
+                        "minWordLength": 4,
+                        "removeStopwords": True,
+                        "backgroundColor": "white",
+                        "text": text,
+                        "format": "png"
+                    }
+
+                    try:
+                        response = requests.post(url, json=payload, timeout=30)
+                        if response.status_code != 200:
+                            frappe.logger().error(
+                                f"Error de QuickChart para la pregunta '{question}': "
+                                f"Status {response.status_code} - {response.text}"
+                            )
+                        file_doc = save_file(
+                            f"wordcloud_{frappe.generate_hash(length=8)}.png",
+                            response.content,
+                            "qp_IQ_Cultura_Report",
+                            report_doc.name,
+                            is_private=0
+                        )
+
+                        wordcloud_images[question] = file_doc.file_url
+                        
+                    except Exception as e:
+                        frappe.logger().error(f"Fallo en la conexión con QuickChart para '{question}': {str(e)}")
+                        continue
+
+                report_doc.wordcloud_images = json.dumps(wordcloud_images)
                 report_doc.save(ignore_permissions=True)
                 reports_count += 1
                 

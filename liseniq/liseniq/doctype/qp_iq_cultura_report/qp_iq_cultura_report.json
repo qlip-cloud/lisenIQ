@@ -34,7 +34,8 @@
   "total_score_accumulator",
   "engagement_score_accumulator",
   "engagement_response_count",
-  "total_responses_processed"
+  "total_responses_processed",
+  "wordcloud_images"
  ],
  "fields": [
   {
@@ -188,11 +189,16 @@
    "fieldname": "total_responses_processed",
    "fieldtype": "Int",
    "label": "total_responses_processed"
+  },
+  {
+   "fieldname": "wordcloud_images",
+   "fieldtype": "Long Text",
+   "label": "Word Cloud Images"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-05 20:49:11.577117",
+ "modified": "2026-06-25 08:35:32.236245",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Cultura_Report",

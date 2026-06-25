@@ -482,7 +482,7 @@ def process_demographic_cutoff_data(
 
             # Use converted value (1-5 scale) for all metrics
             value = resp['answer']
-            if dimension == 'Índice de Engagement':
+            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                 value = resp['answer_converted']
             scores.append(value)
 
@@ -832,7 +832,7 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
             if dimension == 'Abierta':
                 continue
             
-            if dimension == 'Índice de Engagement':
+            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                 value = resp.get('answer_converted')
 
             accumulated['global_score']['total'] += value
@@ -975,7 +975,7 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                 dimension = question_info.get('dimension') or 'Sin Dimensión'
                 question_text = question_info.get('text', question)
 
-                if dimension == 'Índice de Engagement':
+                if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                     value = resp.get('answer_converted')
                 
                 if dimension == 'Abierta':

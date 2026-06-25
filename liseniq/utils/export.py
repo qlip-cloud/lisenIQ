@@ -46,8 +46,7 @@ def _leadership_pdf_options():
         "disable-smart-shrinking": "",
         "enable-local-file-access": "",  
         "dpi": "300",  
-        "print-media-type": "",
-        "javascript-delay": "5000",
+        "print-media-type": ""
     }
 
 

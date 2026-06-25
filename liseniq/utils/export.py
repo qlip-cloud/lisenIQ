@@ -47,7 +47,7 @@ def _leadership_pdf_options():
         "enable-local-file-access": "",  
         "dpi": "300",  
         "print-media-type": "",
-        "javascript-delay": "10000",
+        "javascript-delay": "500",
     }
 
 

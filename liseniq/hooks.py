@@ -235,11 +235,5 @@ fixtures = [
 		"filters": [
 			["dt", "in", ["User", "Contact"]]
 		]
-	},
-	{
-		"doctype": "qp_IQ_RecipientStatus",
-		"filters": [
-			["rs_status", "in", ["Not Sent", "Sent", "Responded"]]
-		]
-	},
+	}
 ]

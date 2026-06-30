@@ -10,7 +10,6 @@
   "co_logo",
   "co_section_break_1",
   "co_tax_id",
-  "co_economic_group",
   "co_sector",
   "co_country",
   "column_break_2",
@@ -39,15 +38,23 @@
    "label": "Nombre de la Compa\u00f1ia"
   },
   {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "co_logo",
    "fieldtype": "Attach Image",
    "label": "Logo"
   },
   {
-   "fieldname": "co_economic_group",
-   "fieldtype": "Link",
-   "label": "Grupo Econ\u00f3mico",
-   "options": "qp_IQ_EconomicGroup"
+   "fieldname": "co_section_break_1",
+   "fieldtype": "Section Break",
+   "label": "Informaci\u00f3n de la Empresa"
+  },
+  {
+   "fieldname": "co_tax_id",
+   "fieldtype": "Data",
+   "label": "N\u00famero de Identificaci\u00f3n Tributaria"
   },
   {
    "fieldname": "co_sector",
@@ -60,6 +67,10 @@
    "fieldtype": "Link",
    "label": "Pa\u00eds",
    "options": "Country"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "co_headquarters",
@@ -90,23 +101,9 @@
    "options": "qp_IQ_DocumentType"
   },
   {
-   "fieldname": "co_id_document",
-   "fieldtype": "Data",
-   "label": "Documento de Identidad"
-  },
-  {
    "fieldname": "co_admin_name",
    "fieldtype": "Data",
    "label": "Nombre del Administrador"
-  },
-  {
-   "fieldname": "column_break_1",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "co_admin_email",
-   "fieldtype": "Data",
-   "label": "Correo Electr\u00f3nico"
   },
   {
    "fieldname": "co_admin_phone",
@@ -114,9 +111,18 @@
    "label": "N\u00famero de Tel\u00e9fono"
   },
   {
-   "fieldname": "co_section_break_1",
-   "fieldtype": "Section Break",
-   "label": "Informaci\u00f3n de la Empresa"
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "co_id_document",
+   "fieldtype": "Data",
+   "label": "Documento de Identidad"
+  },
+  {
+   "fieldname": "co_admin_email",
+   "fieldtype": "Data",
+   "label": "Correo Electr\u00f3nico"
   },
   {
    "fieldname": "co_legal_agreements_sb",
@@ -134,24 +140,11 @@
    "fieldname": "co_accept_privacy_policy",
    "fieldtype": "Check",
    "label": "Acepto Pol\u00edticas de Protecci\u00f3n de Datos"
-  },
-  {
-   "fieldname": "column_break_2",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_3",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "co_tax_id",
-   "fieldtype": "Data",
-   "label": "N\u00famero de Identificaci\u00f3n Tributaria"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-27 18:56:51.956424",
+ "modified": "2026-06-19 21:23:29.556197",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Company",

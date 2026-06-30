@@ -5,6 +5,9 @@ def execute():
     Script idempotente para migrar la empresa actual (custom_company)
     de un Contact a la nueva tabla hija Multicompañía (custom_iq_companies).
     """
+
+    frappe.reload_doc("liseniq", "doctype", "qp_iq_contactcompany")
+
     # Obtenemos todos los contactos que tienen un custom_company asignado
     contacts = frappe.db.sql("""
         SELECT name, custom_company

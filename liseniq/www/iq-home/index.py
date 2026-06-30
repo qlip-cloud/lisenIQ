@@ -3,7 +3,6 @@ from frappe.utils import getdate, formatdate
 from frappe import _
 from liseniq.utils.login_util import global_website_context
 
-
 def get_context(context):
 
     context = global_website_context(context)
@@ -15,14 +14,37 @@ def get_context(context):
     context.is_navbar_custom = True
     context.show_summary_section = False
 
+    user = frappe.session.user
+
     if not context.get("has_portal_access"):
         context.measurements = []
         return context
 
+    # Logica para determinar la empresa activa del usuario
     user_company = context.get("liseniq_company_name")
     
-    if not user_company:
-        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    if "Administrator" not in frappe.get_roles(user):
+        # Leemos estrictamente de la sesión actual
+        active_company = frappe.session.data.get("liseniq_active_company")
+        
+        # Si no hay empresa activa en sesión, forzamos a que seleccione
+        if not active_company:
+            contact_name = frappe.db.get_value("Contact", {"user": user}, "name")
+            if contact_name:
+                companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": contact_name, "parenttype": "Contact"}, fields=["cc_company"])
+                
+                if len(companies) > 1:
+                    frappe.local.flags.redirect_location = "/iq-home/select_company"
+                    raise frappe.Redirect
+                elif len(companies) == 1:
+                    active_company = companies[0].cc_company
+                    frappe.session.data["liseniq_active_company"] = active_company
+                    if hasattr(frappe.local, "session_obj") and frappe.local.session_obj:
+                        frappe.local.session_obj.update()
+
+        if active_company:
+            user_company = active_company
+
 
     try:
         survey_statuses = frappe.get_all("qp_IQ_SurveyStatus", fields=["name", "se_status"], order_by="se_status")

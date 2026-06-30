@@ -1,0 +1,54 @@
+{% extends "templates/web.html" %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/liseniq_base.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+{% endblock %}
+
+{% block page_content %}
+<div class="select-company-wrapper">
+    <div class="select-company-header">
+        <h2 class="select-company-title">Selecciona tu empresa</h2>
+        <p class="select-company-subtitle">Tienes acceso a múltiples compañías. Elige a cuál deseas ingresar.</p>
+    </div>
+
+    <div class="company-cards-container">
+        {% for company in companies %}
+        <div class="company-card" onclick="selectActiveCompany('{{ company.company_id }}')">
+            <div class="company-logo-wrapper">
+                {% if company.logo and company.logo != '/assets/liseniq/images/default-company-logo.png' %}
+                    <img src="{{ company.logo }}" alt="{{ company.company_name }}" class="company-logo-img">
+                {% else %}
+                    <!-- Asigamos un ícono genérico -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7B24FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                        <path d="M9 22v-4h6v4"></path>
+                        <path d="M8 6h.01"></path>
+                        <path d="M16 6h.01"></path>
+                        <path d="M12 6h.01"></path>
+                        <path d="M12 10h.01"></path>
+                        <path d="M12 14h.01"></path>
+                        <path d="M16 10h.01"></path>
+                        <path d="M16 14h.01"></path>
+                        <path d="M8 10h.01"></path>
+                        <path d="M8 14h.01"></path>
+                    </svg>
+                {% endif %}
+            </div>
+            <h4 class="company-name">
+                {{ company.company_name }}
+            </h4>
+            <button class="btn btn-purple-card btn-block mb-2" onclick="event.stopPropagation(); selectActiveCompany('{{ company.company_id }}')" style="width: 100%; margin-top: 10px;">
+                Seleccionar
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script src="/assets/liseniq/js/liseniq_base.js"></script>
+{% endblock %}

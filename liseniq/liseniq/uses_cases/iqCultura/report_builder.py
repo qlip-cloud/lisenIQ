@@ -1055,8 +1055,7 @@ def finalize_cultura_reports_from_batches(survey_id, progress_name):
         
         
         accumulated_data = deserialize_accumulated_data(progress_doc.accumulated_data)
-        
-        # Validación de seguridad adaptada a la nueva estructura
+
         global_score_data = accumulated_data.get('global_score', {})
         if not accumulated_data or global_score_data.get('count', 0) == 0:
             logger.info('finalize_cultura_reports_from_batches | no organizational data found')
@@ -1155,52 +1154,31 @@ def finalize_cultura_reports_from_batches(survey_id, progress_name):
         
 
                 questions = json.loads(report_doc.open_questions_answers or "{}")
-                wordcloud_images = {}
+                if report_doc.open_questions_answers:
+                    new_images = {}
+                    for question, answers in questions.items():
+                        text = ",".join([str(ans) for ans in answers if ans is not None])
+            
+                        if not text.strip():
+                            continue
 
-                for question, answers in questions.items():
-                    text = ",".join(answers)
-                    
-                    if not text.strip():
-                        continue
+                        try:
+                            safe_text = text.replace(" ", "%20").replace("\n", "%20").replace(",", "%2C")
+                            
+                            if len(safe_text) > 1500:
+                                safe_text = safe_text[:1500]
 
-                    url = "https://quickchart.io/wordcloud"
-                    
-                    payload = {
-                        "width": 1000,
-                        "height": 550,
-                        "useWordList": True,
-                        "fontScale": 18,
-                        "scale": "linear",
-                        "maxNumWords": 35,
-                        "minWordLength": 4,
-                        "removeStopwords": True,
-                        "backgroundColor": "white",
-                        "text": text,
-                        "format": "png"
-                    }
-
-                    try:
-                        response = requests.post(url, json=payload, timeout=30)
-                        if response.status_code != 200:
-                            frappe.logger().error(
-                                f"Error de QuickChart para la pregunta '{question}': "
-                                f"Status {response.status_code} - {response.text}"
+                            url_publica = f"https://quickchart.io/wordcloud?width=1000&height=550&useWordList=true&fontScale=18&scale=linear&maxNumWords=35&minWordLength=4&removeStopwords=true&backgroundColor=white&text={safe_text}"
+                            
+                            new_images[question] = url_publica
+                        except Exception as img_ex:
+                            frappe.log_error(
+                                message=f"Error generando URL de QuickChart en finalize_report para {question}: {str(img_ex)}", 
+                                title="IQ Cultura Report Finalize Fix"
                             )
-                        file_doc = save_file(
-                            f"wordcloud_{frappe.generate_hash(length=8)}.png",
-                            response.content,
-                            "qp_IQ_Cultura_Report",
-                            report_doc.name,
-                            is_private=0
-                        )
-
-                        wordcloud_images[question] = file_doc.file_url
-                        
-                    except Exception as e:
-                        frappe.logger().error(f"Fallo en la conexión con QuickChart para '{question}': {str(e)}")
-                        continue
-
-                report_doc.wordcloud_images = json.dumps(wordcloud_images)
+                            continue
+                if new_images:
+                    report_doc.wordcloud_images = json.dumps(new_images)
                 report_doc.save(ignore_permissions=True)
                 reports_count += 1
                 

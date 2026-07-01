@@ -334,6 +334,25 @@ def _generate_zip_job(survey_name, enqueued_by):
     try:
         survey = _get_survey_doc(survey_name)
         survey_display_name = survey.su_name
+        filename = f"{_sanitize_filename(survey_display_name)}_informes.zip"
+        
+        existing_file_url = frappe.db.get_value(
+            "File", 
+            {
+                "attached_to_doctype": "qp_IQ_Survey", 
+                "attached_to_name": survey_name, 
+                "file_name": filename
+            }, 
+            "file_url"
+        )
+
+        if existing_file_url:
+            frappe.cache().set_value(
+                f"export_job_{survey_name}",
+                {"status": "finished", "file_url": existing_file_url},
+                expires_in_sec=3600,
+            )
+            return existing_file_url
         template_category_id = frappe.db.get_value("qp_IQ_Template", {"name": survey.su_template}, "tp_category")
         template_category = frappe.db.get_value("qp_IQ_TemplateCategory", {"name": template_category_id}, "qnc_category")
         if not survey.su_is_leadership:

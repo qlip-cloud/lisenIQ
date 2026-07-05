@@ -51,7 +51,8 @@
                                 </a>
                             </li>
                             <li class="nav-item" id="results-sec"><a href="/iq-results" class="nav-link {% if frappe.request.path == '/iq-results' %}active-link{% endif %}"><i class="fa fa-bar-chart fa-fw mr-3"></i>Resultados</a></li>
-                            
+                            <li class="nav-item" id="contacts-sec"><a href="/contacts" class="nav-link {% if frappe.request.path == '/contacts' %}active-link{% endif %}"><i class="fa fa-users fa-fw mr-3"></i>Contactos</a></li>
+
                             {% set is_consultant = false %}
                             {% if frappe.session.user != "Guest" %}
                                 {% set consultant_role_name = frappe.db.get_value("qp_IQ_PortalRole", {"pr_mnemonico": "consultant_user"}, "name") %}

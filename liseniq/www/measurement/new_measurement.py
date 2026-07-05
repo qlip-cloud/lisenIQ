@@ -655,9 +655,15 @@ def save_measurement(data):
             manual_question_map = {}
             if data.get("questions"):
                 for q in data["questions"]:
-                    if q.get("id", "").startswith("manual-"):
+                    q_id = q.get("id", "")
+                    if q_id.startswith("manual-"):
                         question_text = q["text"]
-                        existing_question = frappe.db.exists("qp_IQ_Question", {"qn_statement": question_text, "qn_owner": user_company})
+                        
+                        # Evitar reusar la pregunta si fue editada explícitamente desde una plantilla
+                        # para asegurar que cambios en las opciones o tipo se guarden correctamente.
+                        existing_question = None
+                        if not q_id.startswith("manual-edited-"):
+                            existing_question = frappe.db.exists("qp_IQ_Question", {"qn_statement": question_text, "qn_owner": user_company})
 
                         if existing_question:
                             manual_question_map[q["id"]] = existing_question

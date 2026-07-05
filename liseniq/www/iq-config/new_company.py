@@ -121,21 +121,6 @@ def create_new_company(data):
             except Exception as e:
                 frappe.log_error(f"Error guardando logo de compañia: {str(e)}", "Frontend Company Creation")
 
-        # Crear el Customer relacionado
-        try:
-            customer = frappe.new_doc("Customer")
-            customer.customer_name = payload.get("co_name")
-            customer.customer_type = "Company"
-            customer.customer_group = "Todas las categorías de clientes"
-            customer.qp_typeid = payload.get("co_type_id")
-            
-            if payload.get("co_tax_id"):
-                customer.tax_id = payload.get("co_tax_id")
-                
-            customer.insert(ignore_permissions=True)
-        except Exception as ce:
-            frappe.log_error(f"Error al crear Customer: {str(ce)}", "Frontend Customer Creation")
-
         # Asignar compañía al Contact del usuario creador (Consultor)
         try:
             contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")

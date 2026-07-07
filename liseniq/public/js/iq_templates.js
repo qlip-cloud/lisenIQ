@@ -49,9 +49,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const templateStepper = new Stepper('template-stepper-container', ['Nombre', 'Preguntas', 'Revisión']);
     
+    // Instanciar QuestionBuilder con modo 'template' para que la edición actúe sobre la BD y no clone.
     const questionBuilder = new QuestionBuilder((questions) => {
         if (btnStep2) btnStep2.disabled = questions.length === 0;
-    });
+    }, 'template');
 
     function showStep(stepNumber) {
         step1.classList.toggle('d-none', stepNumber !== 1);

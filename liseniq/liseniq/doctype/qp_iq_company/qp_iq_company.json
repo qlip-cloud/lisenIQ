@@ -9,6 +9,7 @@
   "column_break_3",
   "co_logo",
   "co_section_break_1",
+  "co_type_id",
   "co_tax_id",
   "co_sector",
   "co_country",
@@ -79,9 +80,8 @@
   },
   {
    "fieldname": "co_address",
-   "fieldtype": "Link",
-   "label": "Direcci\u00f3n",
-   "options": "Address"
+   "fieldtype": "Small Text",
+   "label": "Direcci\u00f3n"
   },
   {
    "fieldname": "co_company_size",
@@ -140,11 +140,17 @@
    "fieldname": "co_accept_privacy_policy",
    "fieldtype": "Check",
    "label": "Acepto Pol\u00edticas de Protecci\u00f3n de Datos"
+  },
+  {
+   "fieldname": "co_type_id",
+   "fieldtype": "Select",
+   "label": "Tipo de ID",
+   "options": "CC\nNIT\nPP\nCE\nDE"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-19 21:23:29.556197",
+ "modified": "2026-07-05 11:47:45.256108",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Company",

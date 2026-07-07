@@ -1,0 +1,121 @@
+.company-form-section {
+    background-color: #fff;
+    border: 1px solid var(--brand-border-color, #e9ecef);
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.02);
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.company-form-section:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+.company-form-section .section-title {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: var(--brand-primary, #7B24FF);
+    font-size: 1.15rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--brand-border-color, #e9ecef);
+    padding-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.custom-checkbox-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.custom-checkbox-row input[type="checkbox"],
+.contact-checkbox {
+    margin: 0;
+    margin-right: 0.6rem;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.custom-checkbox-row label {
+    margin: 0 !important;
+    padding: 0;
+    display: inline-block !important;
+    font-size: 0.95rem;
+    color: var(--text-color-primary, #212529);
+    cursor: pointer;
+}
+
+.form-actions {
+    margin-top: 1rem;
+}
+
+.file-upload-container { position: relative; width: 100%; }
+.file-upload-input {
+    position: absolute;
+    width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;
+}
+.file-upload-label {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: .375rem .75rem; width: 100%; height: calc(1.5em + .75rem + 2px);
+    font-size: 0.8rem; font-weight: 400; line-height: 1.5; color: #495057;
+    background-color: #fff; border: 1px solid #ced4da; border-radius: .25rem;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    cursor: pointer; margin-bottom: 0;
+}
+.file-upload-label:hover { border-color: #80bdff; }
+
+#co_logo-name-display {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding-right: 1rem; color: #6c757d;
+}
+#co_logo-name-display.has-file { color: #495057; }
+.upload-icon { color: #6c757d; flex-shrink: 0; }
+
+.form-scroll-container {
+    max-height: calc(100vh - 170px); /* Ajusta según el alto del header principal */
+    overflow-y: auto;
+    padding-right: 15px; /* Evita que el scrollbar tape el contenido */
+}
+
+.form-scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.form-scroll-container::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.form-scroll-container::-webkit-scrollbar-thumb {
+    background-color: #dee2e6;
+    border-radius: 10px;
+}
+
+.form-scroll-container::-webkit-scrollbar-thumb:hover {
+    background-color: #adb5bd;
+}
+
+/* Ajustes Responsivos */
+@media (max-width: 768px) {
+    .company-form-section {
+        padding: 1.5rem;
+    }
+    .form-actions {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .form-actions .btn-outline-purple {
+        margin-right: 0 !important;
+        width: 100%;
+    }
+    .form-actions .btn-purple-main {
+        width: 100%;
+    }
+    .form-scroll-container {
+        max-height: calc(100vh - 120px);
+        padding-right: 5px;
+    }
+}

@@ -14,6 +14,7 @@
    "fieldname": "pr_role_name",
    "fieldtype": "Data",
    "in_list_view": 1,
+   "in_preview": 1,
    "label": "Nombre del Perfil",
    "reqd": 1
   },
@@ -31,7 +32,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-19 23:04:03.926078",
+ "modified": "2026-07-02 22:47:37.651976",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_PortalRole",
@@ -52,5 +53,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
+ "title_field": "pr_role_name",
  "track_changes": 1
 }

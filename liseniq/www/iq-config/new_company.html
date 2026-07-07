@@ -1,0 +1,179 @@
+{% extends "templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Nueva Compañía") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="main-content-padding pt-4 form-scroll-container">
+
+    <form id="frm-create-company" novalidate>        
+        <!-- Sección 1: Información de la Empresa -->
+        <div class="company-form-section">
+            <h4 class="section-title"><i class="fa fa-building-o mr-2"></i> Información de la Empresa</h4>
+            <div class="row">
+                <div class="col-md-6 form-group">
+                    <label for="co_name">Nombre de la Compañía <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="co_name" required maxlength="140" placeholder="Ej. TechCorp C.A.">
+                    <small id="co_name-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+                
+                <div class="col-md-6 form-group">
+                    <label for="co_logo">Logo de la Compañía (Opcional)</label>
+                    <div class="file-upload-container">
+                        <input type="file" id="co_logo" accept="image/*" class="file-upload-input">
+                        <label for="co_logo" class="file-upload-label">
+                            <span id="co_logo-name-display">Adjuntar archivo</span>
+                            <i class="fa fa-upload upload-icon"></i>
+                        </label>
+                        <div id="logo-preview" class="mt-2" style="display: none;">
+                            <img src="" alt="Vista previa" style="max-height: 50px; border-radius: 6px; border: 1px solid #eaeaea; padding: 2px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 form-group">
+                    <label for="co_type_id">Tipo de ID (Empresa)</label>
+                    <select class="form-control" id="co_type_id" required>
+                        <option value="" disabled selected>Seleccione un tipo</option>
+                        <option value="CC">CC</option>
+                        <option value="NIT">NIT</option>
+                        <option value="PP">PP</option>
+                        <option value="CE">CE</option>
+                        <option value="DE">DE</option>
+                    </select>
+                    <small id="co_type_id-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+
+                <div class="col-md-6 form-group">
+                    <label for="co_tax_id">Número de Identificación Tributaria (NIT)</label>
+                    <input type="text" class="form-control" id="co_tax_id" required placeholder="Ej. J-12345678-9">
+                    <small id="co_tax_id-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+                
+                <div class="col-md-6 form-group d-none">
+                    <label for="co_sector">Sector</label>
+                    <select class="form-control" id="co_sector">
+                        <option value="" disabled selected>Seleccione un sector</option>
+                        {% for sector in sectors %}
+                            <option value="{{ sector.name }}">{{ sector.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-6 form-group">
+                    <label for="co_company_size">Tamaño de la Empresa</label>
+                    <select class="form-control" id="co_company_size">
+                        <option value="" disabled selected>Seleccione el tamaño</option>
+                        <option value="1-10 empleados">1-10 empleados</option>
+                        <option value="11-50 empleados">11-50 empleados</option>
+                        <option value="51-200 empleados">51-200 empleados</option>
+                        <option value="201+ empleados">201+ empleados</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6 form-group">
+                    <label for="co_country">País</label>
+                    <select class="form-control" id="co_country">
+                        <option value="" disabled selected>Seleccione un país</option>
+                        {% for country in countries %}
+                            <option value="{{ country.name }}">{{ country.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-6 form-group">
+                    <label for="co_headquarters">Sede (Ciudad/Estado)</label>
+                    <input type="text" class="form-control" id="co_headquarters" placeholder="Ej. Bogota, Cundinamarca">
+                </div>
+
+                <div class="col-md-12 form-group">
+                    <label for="co_address">Dirección</label>
+                    <textarea class="form-control" id="co_address" maxlength="255" rows="2" placeholder="Ej. Av. Principal..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 2: Datos del Administrador -->
+        <div class="company-form-section">
+            <h4 class="section-title"><i class="fa fa-user-circle-o mr-2"></i> Datos del Administrador</h4>
+            <div class="row">
+                <div class="col-md-6 form-group">
+                    <label for="co_admin_name">Nombre del Administrador <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="co_admin_name" required placeholder="Nombre completo">
+                    <small id="co_admin_name-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label for="co_admin_email">Correo Electrónico <span class="text-danger">*</span></label>
+                    <input type="email" class="form-control" id="co_admin_email" required placeholder="correo@ejemplo.com">
+                    <small id="co_admin_email-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+
+                <div class="col-md-6 form-group">
+                    <label for="co_id_document_type">Tipo de Doc. de Identidad</label>
+                    <select class="form-control" id="co_id_document_type" required>
+                        <option value="" disabled selected>Seleccione un tipo</option>
+                        {% for dt in doc_types %}
+                            <option value="{{ dt.name }}">{{ dt.dt_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small id="co_id_document_type-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label for="co_id_document">Documento de Identidad</label>
+                    <input type="text" class="form-control" id="co_id_document" required placeholder="Número de documento">
+                    <small id="co_id_document-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+
+                <div class="col-md-6 form-group">
+                    <label for="co_admin_phone">Número de Teléfono</label>
+                    <input type="tel" class="form-control" id="co_admin_phone" placeholder="+00 123 456 7890">
+                    <small id="co_admin_phone-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 3: Acuerdos Legales -->
+        <div class="company-form-section">
+            <h4 class="section-title"><i class="fa fa-gavel mr-2"></i> Acuerdos Legales</h4>
+            
+            <div class="mb-4">
+                <div class="custom-checkbox-row">
+                    <input type="checkbox" id="co_accept_terms" required>
+                    <label for="co_accept_terms">Acepto los Términos y Condiciones de Uso <span class="text-danger">*</span></label>
+                </div>
+                <small id="co_accept_terms-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+            </div>
+            
+            <div class="mb-2">
+                <div class="custom-checkbox-row">
+                    <input type="checkbox" id="co_accept_privacy_policy" required>
+                    <label for="co_accept_privacy_policy">Acepto las Políticas de Protección de Datos y Privacidad <span class="text-danger">*</span></label>
+                </div>
+                <small id="co_accept_privacy_policy-error" class="form-error-message d-none">Este campo es obligatorio.</small>
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="form-actions d-flex justify-content-end mb-5">
+            <a href="/iq-home" class="btn btn-outline-purple mr-3" style="text-decoration: none;">Cancelar</a>
+            <button type="submit" class="btn-purple-main" id="btn-submit-company">
+                <i class="fa fa-save mr-2"></i> Guardar Compañía
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_company.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script src="/assets/liseniq/js/iq_company.js"></script>
+{% endblock %}

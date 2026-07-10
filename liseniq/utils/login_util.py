@@ -49,12 +49,12 @@ def get_current_active_company(user=None):
     if not user or user == "Guest" or "Administrator" in frappe.get_roles(user):
         return None
 
-    # 1. Prioridad: Leer de la sesión (Empresa suichada)
+    # Leer de la sesión
     active_company_id = frappe.session.data.get("liseniq_active_company")
     if active_company_id:
         return active_company_id
 
-    # 2. Fallback: Leer del contacto directamente
+    # Leer del contacto directamente
     contact_company = frappe.db.get_value("Contact", {"user": user}, "custom_company")
     return contact_company
 

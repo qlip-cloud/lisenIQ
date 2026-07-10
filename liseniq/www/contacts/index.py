@@ -3,7 +3,7 @@ import json
 import random
 import re
 from frappe import _
-from liseniq.utils.login_util import global_website_context
+from liseniq.utils.login_util import global_website_context, get_current_active_company
 
 
 def get_context(context):
@@ -23,14 +23,16 @@ def get_context(context):
         user_doc = frappe.get_doc("User", frappe.session.user)
         context.user = user_doc
 
-        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, ["name", "custom_company"], as_dict=True)
+        # Obtener información del contacto para evitar omitir su existencia
+        contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
+        
+        # Uso del utilitario de compañía activa para el contexo
+        user_company = get_current_active_company(frappe.session.user)
 
-        if not contact_info or not contact_info.custom_company:
-            frappe.throw(_("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador."), title=_("Error de Configuración"))
+        if not user_company:
+            frappe.throw(_("El usuario actual no tiene una compañía asignada o activa. Por favor, contacte al administrador."), title=_("Error de Configuración"))
 
-        user_company = contact_info.custom_company
-        user_contact_name = contact_info.name
-
+        user_contact_name = contact_name
         context.user_company = frappe.get_doc("qp_IQ_Company", user_company)
         csrf_token = frappe.sessions.get_csrf_token()
 
@@ -63,7 +65,7 @@ def get_context(context):
         limit_page_length=30
     )
 
-    # Filtrar tipos demográficos por la compañía del usuario
+    # Filtrar tipos demográficos por la compañía activa del usuario
     demographic_types_list = frappe.get_all('qp_IQ_DemographicType', filters={'dt_object_type': 'Contacto', 'dt_creator_company': user_company}, fields=['name', 'dt_title'], order_by='dt_title asc')
     context.demographic_types_json = frappe.as_json(demographic_types_list or [])
     context.default_country = "Colombia"
@@ -124,10 +126,9 @@ def get_contact_details(contact_name):
 
     contact = frappe.get_doc("Contact", contact_name)
     
-    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
-    if not user_contact_info:
+    user_company = get_current_active_company(frappe.session.user)
+    if not user_company:
         frappe.throw(_("No se pudo determinar la compañía del usuario."))
-    user_company = user_contact_info
 
     if contact.custom_company != user_company:
         frappe.throw(_("No tienes permiso para ver este contacto"))
@@ -221,11 +222,11 @@ def _map_contact_data(contact_doc, data):
     contact_doc.last_name = last_name
     contact_doc.gender = data.get("gender") if data.get("gender") != "Seleccionar..." else None
     
-    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
-    if not user_contact_info:
+    user_company = get_current_active_company(frappe.session.user)
+    if not user_company:
         frappe.throw(_("No se pudo determinar la compañía del usuario."))
-    contact_doc.custom_company = user_contact_info
-
+    
+    contact_doc.custom_company = user_company
     contact_doc.custom_dob = data.get("birthdate") or None
     contact_doc.custom_language = data.get("language")
     contact_doc.custom_country = data.get("country")
@@ -249,7 +250,7 @@ def _map_contact_data(contact_doc, data):
         for item in demographics:
             demographic_type_title = item.get("type")
             if demographic_type_title:
-                demographic_doc_name = find_or_create_demographic_type(demographic_type_title, user_company=user_contact_info)
+                demographic_doc_name = find_or_create_demographic_type(demographic_type_title, user_company=user_company)
                 if demographic_doc_name:
                     contact_doc.append("custom_additional_details", {
                         "cad_demographic_type": demographic_doc_name,
@@ -262,10 +263,9 @@ def create_contact(contact_data):
     try:
         data = json.loads(contact_data)
 
-        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
-        if not user_contact_info:
+        user_company = get_current_active_company(frappe.session.user)
+        if not user_company:
             return {"status": "error", "message": _("No se pudo determinar la compañía del usuario.")}
-        user_company = user_contact_info
 
         doc_number = data.get("docNumber")
         if doc_number:
@@ -301,10 +301,9 @@ def update_contact(contact_name, contact_data):
     try:
         contact_doc = frappe.get_doc("Contact", contact_name)
         
-        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
-        if not user_contact_info:
+        user_company = get_current_active_company(frappe.session.user)
+        if not user_company:
             return {"status": "error", "message": _("No se pudo determinar la compañía del usuario.")}
-        user_company = user_contact_info
         
         if contact_doc.custom_company != user_company:
             return {"status": "error", "message": _("No tienes permiso para editar este contacto")}
@@ -335,10 +334,9 @@ def delete_contact(contact_name):
     try:
         contact_doc = frappe.get_doc("Contact", contact_name)
         
-        user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
-        if not user_contact_info:
+        user_company = get_current_active_company(frappe.session.user)
+        if not user_company:
             frappe.throw(_("No se pudo determinar la compañía del usuario."))
-        user_company = user_contact_info
 
         if contact_doc.custom_company != user_company:
             frappe.throw(_("No tienes permiso para eliminar este contacto"))
@@ -357,15 +355,15 @@ def get_demographic_suggestions(search_term):
     if not search_term:
         return []
         
-    user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_company")
+    user_company = get_current_active_company(frappe.session.user)
     
     filters = [
         ["dt_object_type", "=", "Contacto"],
         ["dt_title", "like", f"%{search_term}%"]
     ]
     
-    if user_contact_info:
-        filters.append(["dt_creator_company", "=", user_contact_info])
+    if user_company:
+        filters.append(["dt_creator_company", "=", user_company])
 
     return frappe.get_all(
         "qp_IQ_DemographicType",

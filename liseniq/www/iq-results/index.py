@@ -3,7 +3,7 @@ from frappe.utils import getdate, formatdate
 from frappe import _
 from liseniq.utils import power_bi_util
 from typing import Optional
-from liseniq.utils.login_util import global_website_context
+from liseniq.utils.login_util import global_website_context, get_current_active_company
 
 
 def get_context(context):
@@ -65,7 +65,7 @@ def _format_period_text(start, end) -> str:
 
 def _get_user_company() -> Optional[str]:
     try:
-        return frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        return get_current_active_company(frappe.session.user)
     except Exception:
         return None
 

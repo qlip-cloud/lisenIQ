@@ -39,6 +39,27 @@ def set_active_company(company_id):
     return "/iq-home"
 
 @frappe.whitelist()
+def get_current_active_company(user=None):
+    """
+    Función global para obtener la empresa ACTIVA del usuario en todo el backend.
+    Prioriza la empresa seleccionada en la sesión (Company Switcher).
+    Si no hay, hace fallback a la empresa por defecto del contacto.
+    """
+    user = user or frappe.session.user
+    if not user or user == "Guest" or "Administrator" in frappe.get_roles(user):
+        return None
+
+    # Leer de la sesión
+    active_company_id = frappe.session.data.get("liseniq_active_company")
+    if active_company_id:
+        return active_company_id
+
+    # Leer del contacto directamente
+    contact_company = frappe.db.get_value("Contact", {"user": user}, "custom_company")
+    return contact_company
+
+
+@frappe.whitelist()
 def get_user_company_name(user=None):
     session_key = "liseniq_company_name"
     user = user or frappe.session.user

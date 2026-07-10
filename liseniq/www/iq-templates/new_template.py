@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from liseniq.utils.login_util import global_website_context
+from liseniq.utils.login_util import global_website_context, get_current_active_company
 
 
 def get_context(context):
@@ -17,10 +17,10 @@ def get_context(context):
     context.no_cache = 1
 
     try:
-        contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
-        if not contact_info:
-            frappe.throw("El usuario actual no tiene una compañía asignada. Por favor, contacte al administrador.")
-        context.user_company = contact_info
+        user_company = get_current_active_company()
+        if not user_company:
+            frappe.throw("El usuario actual no tiene una compañía activa asignada. Por favor, contacte al administrador.")
+        context.user_company = user_company
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error obteniendo la compañía del usuario")
         frappe.throw(str(e))
@@ -126,7 +126,7 @@ def update_template_question(question_name, question_data):
             culture_doc = frappe.new_doc("qp_IQ_DemographicType")
             culture_doc.dt_title = culture_title
             culture_doc.dt_object_type = "Tema"
-            user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+            user_company = get_current_active_company()
             if user_company:
                 culture_doc.dt_creator_company = user_company
             culture_doc.insert(ignore_permissions=True)

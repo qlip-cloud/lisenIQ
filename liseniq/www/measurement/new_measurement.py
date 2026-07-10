@@ -7,7 +7,7 @@ from io import BytesIO
 from frappe import _
 from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
 from liseniq.utils.api_survey import generate_public_link_for_survey
-from liseniq.utils.login_util import global_website_context
+from liseniq.utils.login_util import global_website_context, get_current_active_company
 
 def get_context(context):
 
@@ -27,8 +27,8 @@ def get_context(context):
     context.page_title = _("Editar Medición") if context.is_edit_mode else _("Crear Medición")
     context.measurement_data_json = "null"
 
-    # Obtener compañía del usuario para los filtros
-    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    # Obtener compañía activa del usuario
+    user_company = get_current_active_company()
 
     # Preparar roles de liderazgo
     try:
@@ -236,7 +236,7 @@ def get_context(context):
 
 @frappe.whitelist()
 def search_company_contacts(search_term=""):
-    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    user_company = get_current_active_company()
     
     params = {}
     company_filter = ""
@@ -291,7 +291,7 @@ def search_company_contacts(search_term=""):
 
 @frappe.whitelist()
 def check_measurement_name(name, exclude_doc=None, only_open=False):
-    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    user_company = get_current_active_company()
     if not user_company:
         exists = frappe.db.exists("qp_IQ_Survey", {"su_name": name})
         return {"exists": bool(exists)}
@@ -340,7 +340,7 @@ def get_demographic_values_for_contacts(demographic_type):
 def get_filtered_contacts_count(filters='[]'):
     filters = json.loads(filters)
     user_contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
-    user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+    user_company = get_current_active_company()
 
     base_filters = [
         ["Contact", "status", "in", ["Enabled", "Passive"]],
@@ -466,7 +466,7 @@ def delete_measurement_contacts(survey_name, contact_names):
             return {"status": "error", "message": _("Lista de contactos inválida.")}
 
         survey = frappe.get_doc("qp_IQ_Survey", survey_name)
-        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        user_company = get_current_active_company()
         if not user_company or survey.su_owner != user_company:
             return {"status": "error", "message": _("No tiene permisos para modificar esta medición.")}
 
@@ -650,7 +650,8 @@ def save_measurement(data):
         else:
             question_types_map = {qt.name: qt for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name", "qnt_mnemonico"])}
             user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
-            user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+            
+            user_company = get_current_active_company()
 
             manual_question_map = {}
             if data.get("questions"):
@@ -862,12 +863,10 @@ def save_measurement(data):
                         })
                 web_form.insert(ignore_permissions=True)
 
-            user_contact_info = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
-            if not user_contact_info:
-                message = "El usuario actual no tiene una compañía asignada para definir la propiedad de la medición."
+            if not user_company:
+                message = "El usuario actual no tiene una compañía activa asignada para definir la propiedad de la medición."
                 frappe.log_error(message, "Error en save_measurement")
                 return {"status": "error", "message": message}
-            user_company = user_contact_info
             
             default_status_text = "Programada"
             status_name = frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": default_status_text}, "name")
@@ -1057,8 +1056,8 @@ def process_leadership_excel(file_base64):
         email_idx = headers.index("email")
         relacion_idx = headers.index("relacion")
 
-        # Obtener todos los contactos de la empresa del usuario actual
-        user_company = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "custom_company")
+        # Obtener todos los contactos de la empresa activa del usuario actual
+        user_company = get_current_active_company()
         contacts = frappe.db.sql("""
             SELECT c.name, CONCAT(IFNULL(c.first_name, ''), ' ', IFNULL(c.last_name, '')) as full_name, ce.email_id
             FROM `tabContact` c

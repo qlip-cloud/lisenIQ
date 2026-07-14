@@ -314,7 +314,7 @@ def generate_leadership_report_on_status_change(doc, method=None):
     logger.info('generate_leadership_report_on_status_change skipped | survey_id=%s reason=already_generated', doc.name)
     return
 
-  build_leaders_report(doc.name)
+  #build_leaders_report(doc.name)
 
 
 from collections import defaultdict
@@ -773,7 +773,7 @@ def build_leaders_report_batched(survey_id, batch_size=None, async_mode=True):
             survey_name,
             len(responses),
             len(leaders_responses),
-            batch_size or 500
+            batch_size or 10000
         )
         
         # Create progress tracking document
@@ -1258,7 +1258,7 @@ def finalize_360_reports_from_batches(survey_id, progress_name):
         
         report_doc.save(ignore_permissions=True)
         
-    #frappe.db.set_value('qp_IQ_Survey', survey_id, 'su_report_generated', 1, update_modified=False)
+    frappe.db.set_value('qp_IQ_Survey', survey_id, 'su_report_generated', 1, update_modified=False)
     frappe.db.commit()
     return True
 

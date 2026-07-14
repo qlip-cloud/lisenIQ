@@ -43,17 +43,33 @@ def get_question_metadata(survey_id):
                 question_doc.qp_topic,
                 'dt_title'
             ) if question_doc.qp_topic else None
-            
+            question_options = frappe.get_all(
+                'qp_IQ_QuestionOption',
+                filters={'parent': question},
+                fields=['qo_option_value']
+            )
+            numeric_values = []
+            for opt in question_options:
+                val = opt.get('qo_option_value')
+                if val is not None and str(val).strip() != "":
+                    try:
+                        numeric_values.append(float(val))
+                    except ValueError:
+                        pass
+
+            max_option_value = max(numeric_values) if numeric_values else None
             question_details[question] = {
                 'text': question_doc.qn_statement_others or question_doc.qn_statement,
                 'dimension': dimension,
                 'theme': theme,
+                'max_option_value': max_option_value
             }
         except Exception:
             question_details[question] = {
                 'text': question,
                 'dimension': None,
                 'theme': None,
+                'max_option_value': None
             }
     
     return question_details

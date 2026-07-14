@@ -8,7 +8,8 @@ from time import time
 from email.utils import formataddr
 from datetime import datetime, timezone
 import pytz
-from liseniq.liseniq.uses_cases.iq360.report_builder import build_leaders_report
+from liseniq.liseniq.helpers.report_batch_integration import start_iq360_report_generation
+from qlip.apps.liseniq.liseniq.liseniq.uses_cases.iq360.report_builder import build_leaders_report
 
 DEFAULT_SENDER_NAME = "Portal de Mediciones"
 BATCH_SIZE = 200  # Tamaño del lote/bloque para envío de correos y generación de links
@@ -908,7 +909,7 @@ def update_finished_surveys():
 					end_dt = get_datetime(survey.su_end_date)
 					if current_local >= end_dt:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
-						build_leaders_report(survey.name)
+						start_iq360_report_generation(survey.name)
 						frappe.db.commit()
 						frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys - Fecha")
 						continue
@@ -918,7 +919,7 @@ def update_finished_surveys():
 					responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
 					if total_recipients == responded_recipients:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
-						build_leaders_report(survey.name)
+						start_iq360_report_generation(survey.name)
 						frappe.db.commit()
 						frappe.log_error(f"Encuesta {survey.name} finalizada por completitud (100%).", "update_finished_surveys - Completitud")
 

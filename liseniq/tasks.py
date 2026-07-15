@@ -1237,7 +1237,7 @@ def delete_zip_files_attached_to_survey():
     	"File",
 				filters={
 						"attached_to_doctype": "qp_IQ_Survey",
-						"file_name": ["like", "%_informes.zip"],
+						"file_name": ["like", "%_informes%.zip"],
 						"creation": ["<", cutoff],
 				},
 				fields=["name", "file_url"],

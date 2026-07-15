@@ -7,9 +7,9 @@ import jwt
 from time import time
 from email.utils import formataddr
 from datetime import datetime, timezone
+from frappe.utils import add_days, now_datetime
 import pytz
 from liseniq.liseniq.helpers.report_batch_integration import start_iq360_report_generation
-from qlip.apps.liseniq.liseniq.liseniq.uses_cases.iq360.report_builder import build_leaders_report
 
 DEFAULT_SENDER_NAME = "Portal de Mediciones"
 BATCH_SIZE = 200  # Tamaño del lote/bloque para envío de correos y generación de links
@@ -1228,3 +1228,34 @@ def send_pending_links_for_survey(survey_name: str):
 		frappe.db.rollback()
 		frappe.log_error(f"Fallo general enviando enlaces pendientes: {e}\n{frappe.get_traceback()}", "send_pending_links_for_survey - Fallo Crítico")
 		return {"status": "error", "message": "Fallo al enviar enlaces pendientes."}
+
+
+def delete_zip_files_attached_to_survey():
+	try:
+		cutoff = add_days(now_datetime(), -1)
+		zip_attachments = frappe.get_all(
+    	"File",
+				filters={
+						"attached_to_doctype": "qp_IQ_Survey",
+						"file_name": ["like", "%_informes.zip"],
+						"creation": ["<", cutoff],
+				},
+				fields=["name", "file_url"],
+		)
+
+		if not zip_attachments:
+			return
+
+		for attachment in zip_attachments:
+			try:
+				frappe.delete_doc("File", attachment.name, force=1, ignore_permissions=True)
+			except Exception as e:
+				frappe.log_error(f"Error eliminando archivo ZIP {attachment.file_url}: {e}", "delete_zip_files_attached_to_survey - Error Bucle")
+
+		frappe.db.commit()
+
+
+
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(f"Fallo general en tarea cron delete_zip_files_attached_to_survey: {e}\n{frappe.get_traceback()}", "delete_zip_files_attached_to_survey - Fallo Crítico")

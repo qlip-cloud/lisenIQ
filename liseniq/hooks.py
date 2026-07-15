@@ -141,9 +141,9 @@ scheduler_events = {
 	# "hourly": [
 	# 	"liseniq.tasks.send_survey_reminders"
 	# ],
-# 	"daily": [
-# 		"liseniq.tasks.daily"
-# 	],
+	"daily": [
+	 		"liseniq.tasks.delete_zip_files_attached_to_survey"
+ 	],
 # 	"hourly": [
 # 		"liseniq.tasks.hourly"
 # 	],

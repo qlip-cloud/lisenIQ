@@ -325,6 +325,7 @@
 
 .email-type-toggle .btn-group {
     display: flex;
+    flex-wrap: wrap;
     gap: 1.5rem;
     padding-bottom: .25rem;
 }

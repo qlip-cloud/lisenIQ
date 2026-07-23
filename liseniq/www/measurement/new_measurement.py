@@ -98,7 +98,10 @@ def get_context(context):
                 "su_invitation_body": doc.su_invitation_body,
                 "su_reminder_subject": doc.su_reminder_subject,
                 "su_reminder_body": doc.su_reminder_body,
+                "su_term_subject": doc.su_term_subject,
+                "su_term_body": doc.su_term_body,
                 "su_default_notif": doc.su_default_notif,
+                "su_default_welcome": doc.su_default_welcome,
                 "questions": questions,
             }
 
@@ -530,6 +533,7 @@ def save_measurement(data):
         data = json.loads(data)
         email_data = data.get("email_customization") or {}
         email_use_default = bool(data.get("email_use_default"))
+        welcome_use_default = bool(data.get("welcome_use_default"))
         
         final_survey_name = None
 
@@ -572,7 +576,11 @@ def save_measurement(data):
             survey.su_invitation_body = email_data.get("invitation_body")
             survey.su_reminder_subject = email_data.get("reminder_subject")
             survey.su_reminder_body = email_data.get("reminder_body")
+            survey.su_term_subject = email_data.get("welcome_subject")
+            survey.su_term_body = email_data.get("welcome_body")
+            
             survey.su_default_notif = "1" if email_use_default else "0"
+            survey.su_default_welcome = "1" if welcome_use_default else "0"
 
             survey.save(ignore_permissions=True)
             frappe.db.commit()
@@ -922,7 +930,11 @@ def save_measurement(data):
             survey.su_invitation_body = email_data.get("invitation_body")
             survey.su_reminder_subject = email_data.get("reminder_subject")
             survey.su_reminder_body = email_data.get("reminder_body")
+            survey.su_term_subject = email_data.get("welcome_subject")
+            survey.su_term_body = email_data.get("welcome_body")
+            
             survey.su_default_notif = "1" if email_use_default else "0"
+            survey.su_default_welcome = "1" if welcome_use_default else "0"
 
             if data.get("questions"):
                 for q in data["questions"]:

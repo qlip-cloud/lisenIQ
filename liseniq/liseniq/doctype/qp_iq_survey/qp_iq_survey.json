@@ -49,7 +49,12 @@
   "su_invitation_body",
   "column_break_37",
   "su_reminder_subject",
-  "su_reminder_body"
+  "su_reminder_body",
+  "personalizaci\u00f3n_de_bienvenida_section",
+  "su_default_welcome",
+  "su_term_subject",
+  "column_break_49",
+  "su_term_body"
  ],
  "fields": [
   {
@@ -235,7 +240,7 @@
   {
    "fieldname": "section_break_5",
    "fieldtype": "Section Break",
-   "label": "Personalizaci\u00f3n"
+   "label": "Personalizaci\u00f3n de Recordatorios"
   },
   {
    "fieldname": "column_break_27",
@@ -290,11 +295,36 @@
    "fieldname": "su_next_reminder",
    "fieldtype": "Datetime",
    "label": "Fecha de proximo Recordatorio"
+  },
+  {
+   "fieldname": "su_term_subject",
+   "fieldtype": "Data",
+   "label": "Asunto de Bienvenida"
+  },
+  {
+   "fieldname": "su_term_body",
+   "fieldtype": "Text Editor",
+   "label": "Cuerpo de Msj de Bienvenida"
+  },
+  {
+   "fieldname": "personalizaci\u00f3n_de_bienvenida_section",
+   "fieldtype": "Section Break",
+   "label": "Personalizaci\u00f3n de Bienvenida"
+  },
+  {
+   "default": "0",
+   "fieldname": "su_default_welcome",
+   "fieldtype": "Check",
+   "label": "Bienvenida por Defecto"
+  },
+  {
+   "fieldname": "column_break_49",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-15 16:48:07.019041",
+ "modified": "2026-07-17 16:53:20.145507",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Survey",
@@ -327,6 +357,5 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "title_field": "su_name",
  "track_changes": 1
 }

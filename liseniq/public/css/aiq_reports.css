@@ -17,6 +17,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    page-break-inside: avoid; /* Previene cortes en impresión nativa */
 }
 
 .aiq-reports-header h2 {
@@ -32,6 +33,7 @@
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1.5rem;
     margin-bottom: 2rem;
+    page-break-inside: avoid;
 }
 
 .metric-card {
@@ -73,6 +75,7 @@
     margin-top: 2rem;
     margin-bottom: 1rem;
     padding-left: 0.5rem;
+    page-break-after: avoid;
 }
 
 .chart-section-title {
@@ -125,6 +128,7 @@
     padding: 1.5rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     margin-bottom: 2rem;
+    page-break-inside: avoid;
 }
 
 .chart-wrapper {
@@ -133,12 +137,13 @@
 }
 
 /* Estilos para la sección de top 10 y bottom 10 */
-.top-bottom-container {
+.top-bottom-container, .topics-tables-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
     margin-bottom: 2rem;
     margin-top: 2rem;
+    page-break-inside: avoid;
 }
 
 .tb-card {
@@ -147,6 +152,7 @@
     border-radius: 12px;
     padding: 1.5rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    page-break-inside: avoid;
 }
 
 .tb-header-title {
@@ -245,13 +251,14 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
     margin-bottom: 2rem;
+    page-break-inside: avoid;
 }
 
 @media (max-width: 768px) {
     .chart-wrapper {
         height: 350px;
     }
-    .top-bottom-container {
+    .top-bottom-container, .topics-tables-container {
         grid-template-columns: 1fr;
     }
     .chart-header-flex {

@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', async function() {
     const params = new URLSearchParams(window.location.search);
     const surveyName = params.get('survey_name');
-    const surveyTitle = params.get('survey_title') || 'Reporte de Resultados';
+    
+    const titleElement = document.getElementById('report-survey-title');
+    const finalSurveyTitle = titleElement ? titleElement.innerText.trim() : 'Reporte';
 
     if (!surveyName) {
         if(window.frappe) {
@@ -13,9 +15,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         return;
     }
-
-    const titleElement = document.getElementById('report-survey-title');
-    if (titleElement) titleElement.textContent = surveyTitle;
 
     // Cargamos de forma asíncrona las librerías comunes
     try {
@@ -32,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const btnExportFullPdf = document.getElementById('btn-export-full-pdf');
     if (btnExportFullPdf) {
         btnExportFullPdf.addEventListener('click', () => {
-            exportFullPageToPDF(surveyName);
+            exportFullPageToPDF(surveyName, finalSurveyTitle);
         });
     }
 
@@ -92,6 +91,7 @@ function loadHtml2Canvas() {
         document.head.appendChild(script);
     });
 }
+
 // Lógica de inyección y exportación de secciones individuales
 // Observa el DOM en caso de que los módulos carguen los grids dinámicamente 
 function observeAndInjectButtons() {
@@ -186,16 +186,17 @@ async function exportSingleSection(container, header, type) {
         ctx.drawImage(headerCanvas, 0, 0);
         ctx.drawImage(containerCanvas, 0, headerCanvas.height);
         
-        // Obtener el ID de medición desde la URL
-        const params = new URLSearchParams(window.location.search);
-        const surveyId = params.get('survey_name') || 'ID_Desconocido';
+        // Obtener el Título de medición
+        const titleEl = document.getElementById('report-survey-title');
+        const rawTitle = titleEl ? titleEl.innerText.trim() : 'Reporte';
+        const cleanTitle = rawTitle.replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_');
         
         // Obtener y formatear el título de la sección
         let sectionTitle = header.querySelector('.chart-section-title')?.innerText || 'Seccion';
         sectionTitle = sectionTitle.trim().replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_');
         
         // Armar el nombre final del archivo
-        const fileName = `Reporte_${sectionTitle}_${surveyId}`;
+        const fileName = `Reporte_${sectionTitle}_${cleanTitle}`;
         
         if (type === 'img') {
             // Exportar a JPG con calidad máxima
@@ -234,74 +235,97 @@ async function exportSingleSection(container, header, type) {
     }
 }
 
-// Lógica rediseñada para exportación total (previene cortes de gráficos)
-// Recorre recursivamente para agrupar dinámicamente títulos con sus gráficos
-function getExportBlocks(container) {
-    let blocks = [];
-    const nodes = Array.from(container.children);
-    let currentGroup = [];
-    
-    for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
+// Extrae de forma plana todas las páginas que componen el PDF
+function getExportPages(container) {
+    const pages = [];
+    let activeHeaders = [];
+
+    function traverse(node) {
+        if (node.nodeType !== 1) return;
+        
+        // Ignorar scripts, estilos y nodos ocultos/invisibles
         const style = window.getComputedStyle(node);
-        
-        if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || style.display === 'none' || node.offsetHeight === 0) {
-            continue;
-        }
-        
-        // Bloques que no debemos fragmentar por dentro
-        const keepTogetherClasses = ['metrics-container', 'top-bottom-container', 'topics-tables-container', 'contacts-charts-grid', 'chart-card'];
-        const isKeepTogether = keepTogetherClasses.some(c => node.classList.contains(c));
-        
-        // Si es un div wrapper de includes sin clase semántica, evaluamos sus hijos
-        if (!isKeepTogether && node.tagName === 'DIV' && !node.classList.contains('chart-header-flex') && !node.classList.contains('aiq-reports-header')) {
-            const hasSubBlocks = node.querySelector('.chart-card, .metric-card, .tb-card, .chart-header-flex, .top-bottom-container, .topics-tables-container');
-            if (hasSubBlocks) {
-                if (currentGroup.length > 0) {
-                    blocks.push({ elements: currentGroup });
-                    currentGroup = [];
-                }
-                blocks.push(...getExportBlocks(node));
-                continue;
-            }
+        if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || style.display === 'none' || style.opacity === '0' || node.offsetHeight === 0) {
+            return;
         }
 
-        // Agrupar TODOS los títulos consecutivos con su correspondiente contenedor de contenido
-        const isHeader = node.classList.contains('chart-header-flex') || node.tagName.match(/^H[1-6]$/);
-
+        //Headers (Título principal de página y títulos de sección)
+        const isHeader = node.classList.contains('aiq-reports-header') || 
+                         node.classList.contains('chart-header-flex') || 
+                         node.tagName.match(/^H[1-6]$/);
+        
         if (isHeader) {
-            currentGroup.push(node);
-        } else {
-            currentGroup.push(node); // Conectar contenido principal al grupo de headers
-            blocks.push({ elements: currentGroup }); // Cerrar el bloque completo
-            currentGroup = [];
+            activeHeaders.push(node);
+            return; // Se guarda en memoria para inyectarlo al próximo contenido visual
+        }
+
+        // ontenedores de Grillas que deben separarse
+        // Si hay una grilla de tablas top/bottom o múltiples gráficos, los separamos y copiamos el título
+        const isGridToSplit = node.classList.contains('top-bottom-container') || 
+                              node.classList.contains('topics-tables-container') || 
+                              node.classList.contains('contacts-charts-grid');
+        
+        if (isGridToSplit) {
+            const children = Array.from(node.children).filter(c => c.nodeType === 1);
+            children.forEach(child => {
+                // Cada elemento interno se va a una página distinta pero comparte el título de sección
+                pages.push({ headers: [...activeHeaders], content: child });
+            });
+            activeHeaders = []; // Se consumen los headers para no repetirlos luego
+            return;
+        }
+
+        // Contenedores Individuales que requieren una página completa
+        const isSinglePageItem = node.classList.contains('metrics-container') || 
+                                 node.classList.contains('chart-card') || 
+                                 node.classList.contains('tb-card');
+
+        if (isSinglePageItem) {
+            pages.push({ headers: [...activeHeaders], content: node });
+            activeHeaders = []; // Se consumen los headers
+            return;
+        }
+
+        // Si es un contenedor de agrupamiento genérico (ej. un Include div), buscamos dentro
+        const children = Array.from(node.children);
+        if (children.length > 0) {
+            children.forEach(child => traverse(child));
         }
     }
+
+    // Iniciamos la búsqueda recursiva a partir del contenedor envolvente
+    Array.from(container.children).forEach(child => traverse(child));
     
-    // Anexar cualquier grupo huérfano al final del DOM
-    if (currentGroup.length > 0) {
-        blocks.push({ elements: currentGroup });
+    // Por si quedó algún título huérfano sin contenido
+    if (activeHeaders.length > 0) {
+        pages.push({ headers: [...activeHeaders], content: null });
     }
     
-    return blocks;
+    return pages;
 }
 
-// Exportar TODO el reporte a un PDF multi-página, bloque por bloque
-async function exportFullPageToPDF(surveyName) {
+// Exportar TODO el reporte asignando forzosamente 1 página a cada gráfico/tabla
+async function exportFullPageToPDF(surveyName, surveyTitle) {
     const btnExport = document.getElementById('btn-export-full-pdf');
     const originalBtnText = btnExport ? btnExport.innerHTML : '';
     
     try {
         if (btnExport) btnExport.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Exportando...';
 
+        // Pequeña pausa para permitir que el navegador renderice el estado de "Exportando..." 
+        // y no congele la UI inmediatamente.
+        await new Promise(resolve => setTimeout(resolve, 50));
+
         const wrapper = document.querySelector('.aiq-reports-wrapper');
         const originalHeight = wrapper.style.height;
         const originalOverflow = wrapper.style.overflowY;
         
+        // Desbloquear restricciones de altura para que html2canvas pinte todo
         wrapper.style.height = 'auto';
         wrapper.style.overflowY = 'visible';
         
-        const buttonsToHide = document.querySelectorAll('.chart-actions-group, #btn-export-full-pdf, .btn-outline-purple');
+        // Ocultamos TODOS los botones visuales para que no ensucien el reporte
+        const buttonsToHide = document.querySelectorAll('.chart-actions-group, #btn-export-full-pdf, .btn-outline-purple, .btn-export-section-pdf, .btn-export-section-img');
         buttonsToHide.forEach(btn => btn.style.display = 'none');
 
         const { jsPDF } = window.jspdf;
@@ -311,90 +335,113 @@ async function exportFullPageToPDF(surveyName) {
         
         const margin = 10;
         const maxPdfWidth = pdfWidth - (margin * 2);
-        let currentY = margin;
 
-        const blocksInfo = getExportBlocks(wrapper);
+        // Obtenemos todos los componentes ordenados en páginas separadas con sus respectivos títulos
+        const pagesInfo = getExportPages(wrapper);
 
-        for (let i = 0; i < blocksInfo.length; i++) {
-            const blockInfo = blocksInfo[i];
-            const elements = blockInfo.elements;
+        let isFirstPage = true;
+
+        for (let i = 0; i < pagesInfo.length; i++) {
+            // Liberar el hilo principal periódicamente (Yielding) para evitar que el navegador
+            // bloquee la UI o arroje alertas de "Página no responde".
+            await new Promise(resolve => setTimeout(resolve, 50));
             
-            const capturedImages = [];
-            let totalHeightInPdf = 0;
+            const pageInfo = pagesInfo[i];
             
-            // Capturar elementos del grupo
-            for (let el of elements) {
-                const canvas = await html2canvas(el, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
-                if (canvas.width === 0 || canvas.height === 0) continue;
-                
-                const imgData = canvas.toDataURL('image/png');
-                if (!imgData || imgData === 'data:,') continue;
-                
-                const pdfImgHeight = (canvas.height * maxPdfWidth) / canvas.width;
-                
-                capturedImages.push({ imgData, pdfImgWidth: maxPdfWidth, pdfImgHeight });
-                totalHeightInPdf += pdfImgHeight;
+            // A partir del segundo componente forzamos siempre un salto de página
+            if (!isFirstPage) {
+                pdf.addPage();
             }
+            isFirstPage = false;
             
-            if (capturedImages.length === 0) continue;
+            let currentY = margin;
 
-            //  Comprobar Salto de Página agrupado
-            // Si el bloque de (Título + Gráfico) es mayor al espacio restante, los bajamos JUNTOS a una nueva pág
-            if (currentY + totalHeightInPdf > pageHeight - margin) {
-                if (currentY > margin) {
-                    pdf.addPage();
-                    currentY = margin;
+            // Dibujar los Headers / Títulos asignados a esta página
+            for (let header of pageInfo.headers) {
+                const headerCanvas = await html2canvas(header, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
+                if (headerCanvas.width > 0 && headerCanvas.height > 0) {
+                    const imgData = headerCanvas.toDataURL('image/png');
+                    const pdfImgHeight = (headerCanvas.height * maxPdfWidth) / headerCanvas.width;
+                    pdf.addImage(imgData, 'PNG', margin, currentY, maxPdfWidth, pdfImgHeight);
+                    currentY += pdfImgHeight + 3; // Margen bajo el título
                 }
+                
+                // Forzar limpieza de memoria del canvas utilizado
+                headerCanvas.width = 0;
+                headerCanvas.height = 0;
             }
 
-            //  Dibujar
-            for (let imgObj of capturedImages) {
-                if (imgObj.pdfImgHeight > pageHeight - (margin * 2)) {
-                    // Solo aplica recorte ciego si el propio elemento único es más alto que una página A4 completa
-                    let heightLeft = imgObj.pdfImgHeight;
-                    let position = currentY;
+            // Dibujar el Contenedor/Gráfico principal de esta página
+            if (pageInfo.content) {
+                const contentCanvas = await html2canvas(pageInfo.content, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
+                if (contentCanvas.width > 0 && contentCanvas.height > 0) {
+                    const imgData = contentCanvas.toDataURL('image/png');
+                    const pdfImgHeight = (contentCanvas.height * maxPdfWidth) / contentCanvas.width;
+                    
+                    // Verificamos si, a pesar de estar en una página nueva, el elemento sobrepasa el límite vertical (Ej: una tabla gigante)
+                    if (currentY + pdfImgHeight > pageHeight - margin) {
+                        
+                        // Si el contenido POR SÍ SOLO es más grande que una página entera
+                        if (pdfImgHeight > pageHeight - (margin * 2)) {
+                            let heightLeft = pdfImgHeight;
+                            let position = currentY;
 
-                    pdf.addImage(imgObj.imgData, 'PNG', margin, position, imgObj.pdfImgWidth, imgObj.pdfImgHeight);
-                    heightLeft -= (pageHeight - currentY);
+                            pdf.addImage(imgData, 'PNG', margin, position, maxPdfWidth, pdfImgHeight);
+                            heightLeft -= (pageHeight - currentY);
 
-                    while (heightLeft > 0) {
-                        pdf.addPage();
-                        position -= pageHeight;
-                        pdf.addImage(imgObj.imgData, 'PNG', margin, position, imgObj.pdfImgWidth, imgObj.pdfImgHeight);
-                        heightLeft -= pageHeight;
+                            // Agregar las páginas extra necesarias para terminar de renderizar el elemento gigante
+                            while (heightLeft > 0) {
+                                pdf.addPage();
+                                position -= pageHeight; // offset negativo para desplazar la imagen hacia arriba
+                                pdf.addImage(imgData, 'PNG', margin, position, maxPdfWidth, pdfImgHeight);
+                                heightLeft -= pageHeight;
+                            }
+                        } else {
+                            // El contenido cabe en una página, pero debido al Header superior se desbordó un poco.
+                            // Solución: Lo encogemos de forma proporcional para que encaje perfecto en el espacio que queda.
+                            const availableHeight = pageHeight - currentY - margin;
+                            const ratio = availableHeight / pdfImgHeight;
+                            const newWidth = maxPdfWidth * ratio;
+                            const newHeight = pdfImgHeight * ratio;
+                            
+                            // Centramos horizontalmente el gráfico redimensionado
+                            const xOffset = margin + (maxPdfWidth - newWidth) / 2;
+                            pdf.addImage(imgData, 'PNG', xOffset, currentY, newWidth, newHeight);
+                        }
+                    } else {
+                        // El componente entra perfectamente en la hoja junto a su título
+                        pdf.addImage(imgData, 'PNG', margin, currentY, maxPdfWidth, pdfImgHeight);
                     }
-                    currentY = position + imgObj.pdfImgHeight + (margin / 2); 
-                } else {
-                    // Por si un grupo era más alto que la página
-                    if (currentY + imgObj.pdfImgHeight > pageHeight - margin) {
-                        pdf.addPage();
-                        currentY = margin;
-                    }
-                    pdf.addImage(imgObj.imgData, 'PNG', margin, currentY, imgObj.pdfImgWidth, imgObj.pdfImgHeight);
-                    currentY += imgObj.pdfImgHeight + 1; // Espacio entre elementos del mismo grupo
                 }
+                
+                // Forzar limpieza de memoria del canvas utilizado para evitar Out of Memory
+                contentCanvas.width = 0;
+                contentCanvas.height = 0;
             }
-            currentY += (margin / 1.5); // Espacio semántico entre diferentes grupos (Ej: un chart vs otro)
         }
 
+        // Devolvemos la UI a su estado normal
         wrapper.style.height = originalHeight;
         wrapper.style.overflowY = originalOverflow;
         buttonsToHide.forEach(btn => btn.style.display = '');
         if (btnExport) btnExport.innerHTML = originalBtnText;
 
-        // Descargar el archivo
-        pdf.save(`Reporte_${surveyName}.pdf`);
+        // Limpiar y formatear el título real para usarlo como nombre de archivo
+        const safeTitle = (surveyTitle || surveyName || 'Resultados').replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_');
+
+        // Iniciar descarga
+        pdf.save(`Reporte_${safeTitle}.pdf`);
 
     } catch (err) {
         console.error('Error exportando reporte completo:', err);
         
-        // Restaurar estado en caso de error
+        // Restaurar estado en caso de error crítico
         const wrapper = document.querySelector('.aiq-reports-wrapper');
         if (wrapper) {
             wrapper.style.height = 'calc(100vh - 80px)';
             wrapper.style.overflowY = 'auto';
         }
-        document.querySelectorAll('.chart-actions-group, #btn-export-full-pdf, .btn-outline-purple')
+        document.querySelectorAll('.chart-actions-group, #btn-export-full-pdf, .btn-outline-purple, .btn-export-section-pdf, .btn-export-section-img')
             .forEach(btn => btn.style.display = '');
             
         if (btnExport) btnExport.innerHTML = originalBtnText;

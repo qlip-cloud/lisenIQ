@@ -21,7 +21,13 @@ def get_context(context):
     
     survey_name = frappe.form_dict.get('survey_name', '')
     context.survey_name = survey_name
-    context.survey_title = frappe.form_dict.get('survey_title', _("Reporte de Resultados"))
+
+    # Obtener el título de la encuesta
+    if survey_name:
+        db_title = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name")
+        context.survey_title = db_title if db_title else survey_name
+    else:
+        context.survey_title = _("Reporte de Resultados")
 
     if survey_name:
         # Métricas Globales (Comunes para todas las categorías)

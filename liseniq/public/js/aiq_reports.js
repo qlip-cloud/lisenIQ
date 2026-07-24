@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const params = new URLSearchParams(window.location.search);
     const surveyName = params.get('survey_name');
     
-    // Obtenemos el título real directamente del DOM renderizado por el Backend
+    // Obtenemos el título real directamente del DOM
     const titleElement = document.getElementById('report-survey-title');
     const finalSurveyTitle = titleElement ? titleElement.innerText.trim() : 'Reporte';
 
@@ -17,9 +17,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    // Cargamos de forma asíncrona las librerías necesarias
+    // Cargamos dom-to-image-more
     try {
-        await Promise.all([loadApexCharts(), loadJsPDF(), loadHtml2Canvas()]);
+        await Promise.all([loadApexCharts(), loadJsPDF(), loadDomToImage()]);
     } catch (e) {
         console.error("Fallo al cargar librerías externas", e);
         return;
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     observeAndInjectButtons();
 
-    // Evento de Exportación del Reporte Completo (Motor jsPDF Avanzado)
+    // Evento Global de Exportación
     const btnExportFullPdf = document.getElementById('btn-export-full-pdf');
     if (btnExportFullPdf) {
         btnExportFullPdf.addEventListener('click', () => {
@@ -41,16 +41,21 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     if (mnemonic === 'template_culture') {
         try {
-            import('/assets/liseniq/js/reports/report_culture.js').then(m => m.initCultureReport(config.data, surveyName));
-        } catch (err) { console.error(err); }
+            const cultureModule = await import('/assets/liseniq/js/reports/report_culture.js');
+            cultureModule.initCultureReport(config.data, surveyName);
+        } catch (err) {
+            console.error("Error al cargar el módulo del reporte de Cultura", err);
+        }
     } else if (mnemonic === 'template_engagement') {
         try {
-            import('/assets/liseniq/js/reports/report_by_engagement.js').then(m => m.initEngagementReport(config.data, surveyName));
-        } catch (err) { console.error(err); }
+            const engagementModule = await import('/assets/liseniq/js/reports/report_by_engagement.js');
+            engagementModule.initEngagementReport(config.data, surveyName);
+        } catch (err) {
+            console.error("Error al cargar el módulo del reporte de Engagement", err);
+        }
     }
 });
 
-// Carga dinámica de librerías
 function loadJsPDF() {
     return new Promise((resolve, reject) => {
         if (window.jspdf) return resolve();
@@ -73,11 +78,11 @@ function loadApexCharts() {
     });
 }
 
-function loadHtml2Canvas() {
+function loadDomToImage() {
     return new Promise((resolve, reject) => {
-        if (window.html2canvas) return resolve();
+        if (window.domtoimage) return resolve();
         const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/dom-to-image-more/3.1.6/dom-to-image-more.min.js';
         script.onload = resolve;
         script.onerror = reject;
         document.head.appendChild(script);
@@ -87,6 +92,7 @@ function loadHtml2Canvas() {
 function observeAndInjectButtons() {
     const wrapper = document.querySelector('.aiq-reports-wrapper');
     if (!wrapper) return;
+
     injectSectionExportButtons();
     const observer = new MutationObserver(() => injectSectionExportButtons());
     observer.observe(wrapper, { childList: true, subtree: true });
@@ -106,11 +112,14 @@ function injectSectionExportButtons() {
             if (isExistingHeaderTag) {
                 const flexWrapper = document.createElement('div');
                 flexWrapper.className = 'chart-header-flex';
+                
                 const title = document.createElement(header.tagName);
                 title.className = 'chart-section-title';
                 title.innerHTML = header.innerHTML;
+                
                 flexWrapper.innerHTML = `<div class="chart-actions-group"></div>`;
                 flexWrapper.insertBefore(title, flexWrapper.firstChild);
+                
                 header.parentNode.replaceChild(flexWrapper, header);
                 header = flexWrapper;
             } else if (!hasHeader) {
@@ -119,7 +128,11 @@ function injectSectionExportButtons() {
                 let titleText = 'Sección';
                 if (selector === '.top-bottom-container') titleText = 'Top / Bottom 10';
                 else if (selector === '.topics-tables-container') titleText = 'Análisis por Temas';
-                header.innerHTML = `<h3 class="chart-section-title">${titleText}</h3><div class="chart-actions-group"></div>`;
+                
+                header.innerHTML = `
+                    <h3 class="chart-section-title">${titleText}</h3>
+                    <div class="chart-actions-group"></div>
+                `;
                 container.parentNode.insertBefore(header, container);
             }
             
@@ -145,65 +158,76 @@ function injectSectionExportButtons() {
     });
 }
 
+async function captureElement(element) {
+    if (!element) return null;
+    try {
+        const opts = { 
+            quality: 0.95, 
+            bgcolor: '#ffffff', 
+            scale: 2,
+            style: { margin: '0', transform: 'scale(1)', transformOrigin: 'top left' }
+        };
+        const dataUrl = await domtoimage.toJpeg(element, opts);
+        const rect = element.getBoundingClientRect();
+        return { imgData: dataUrl, width: rect.width, height: rect.height };
+    } catch (err) {
+        console.warn("Error capturando elemento", element, err);
+        return null;
+    }
+}
+
 async function exportSingleSection(container, header, type) {
     const actionsGroup = header.querySelector('.chart-actions-group');
     if (actionsGroup) actionsGroup.style.display = 'none';
     
     try {
-        const opts = { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' };
+        const headerData = await captureElement(header);
+        const containerData = await captureElement(container);
         
-        const headerCanvas = await html2canvas(header, opts);
-        const containerCanvas = await html2canvas(container, opts);
+        if (!headerData || !containerData) throw new Error("Fallo en captura de imagen");
         
-        const combinedCanvas = document.createElement('canvas');
-        combinedCanvas.width = Math.max(headerCanvas.width, containerCanvas.width);
-        combinedCanvas.height = headerCanvas.height + containerCanvas.height;
-        
-        const ctx = combinedCanvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
-        
-        ctx.drawImage(headerCanvas, 0, 0);
-        ctx.drawImage(containerCanvas, 0, headerCanvas.height);
-        
-        const titleEl = document.getElementById('report-survey-title');
-        const rawTitle = titleEl ? titleEl.innerText.trim() : 'Reporte';
-        const cleanTitle = rawTitle.replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_');
-        
+        // Obtener ID
+        const params = new URLSearchParams(window.location.search);
+        const surveyId = params.get('survey_name') || 'ID_Desconocido';
         let sectionTitle = header.querySelector('.chart-section-title')?.innerText || 'Seccion';
         sectionTitle = sectionTitle.trim().replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_');
-        const fileName = `Reporte_${sectionTitle}_${cleanTitle}`;
+        const fileName = `Reporte_${sectionTitle}_${surveyId}`;
         
-        if (type === 'img') {
-            const link = document.createElement('a');
-            link.download = `${fileName}.jpg`;
-            link.href = combinedCanvas.toDataURL('image/jpeg', 1.0);
-            link.click();
-        } else if (type === 'pdf') {
+        if (type === 'pdf') {
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const margin = 10;
-            const maxPdfWidth = pdfWidth - (margin * 2);
+            const maxW = pdf.internal.pageSize.getWidth() - 20;
+            const pageH = pdf.internal.pageSize.getHeight();
             
-            let pdfImgWidth = maxPdfWidth;
-            let pdfImgHeight = (combinedCanvas.height * pdfImgWidth) / combinedCanvas.width;
+            let currentY = 10;
             
-            if (pdfImgHeight > pdf.internal.pageSize.getHeight() - (margin * 2)) {
-                const ratio = (pdf.internal.pageSize.getHeight() - (margin * 2)) / pdfImgHeight;
-                pdfImgHeight = pdfImgHeight * ratio;
-                pdfImgWidth = pdfImgWidth * ratio;
+            // Draw Header
+            let hPdfH = (headerData.height * maxW) / headerData.width;
+            pdf.addImage(headerData.imgData, 'JPEG', 10, currentY, maxW, hPdfH);
+            currentY += hPdfH + 5;
+            
+            // Draw Container
+            let cPdfH = (containerData.height * maxW) / containerData.width;
+            let cPdfW = maxW;
+            
+            // Escalar si no cabe
+            if (cPdfH > pageH - currentY - 10) {
+                const ratio = (pageH - currentY - 10) / cPdfH;
+                cPdfH *= ratio;
+                cPdfW *= ratio;
             }
             
-            pdf.addImage(combinedCanvas.toDataURL('image/png'), 'PNG', margin, margin, pdfImgWidth, pdfImgHeight);
+            // Centrar si fue escalado
+            let xPos = 10 + (maxW - cPdfW) / 2;
+            pdf.addImage(containerData.imgData, 'JPEG', xPos, currentY, cPdfW, cPdfH);
             pdf.save(`${fileName}.pdf`);
+        } else {
+             const link = document.createElement('a');
+             link.download = `${fileName}.jpg`;
+             link.href = containerData.imgData; 
+             link.click();
         }
-        
-        // Limpiar memoria
-        headerCanvas.width = 0;
-        containerCanvas.width = 0;
-        combinedCanvas.width = 0;
-        
+
     } catch(e) {
         console.error('Error al exportar seccion:', e);
         if (window.frappe) frappe.msgprint('Error al exportar la sección.');
@@ -212,221 +236,163 @@ async function exportSingleSection(container, header, type) {
     }
 }
 
-function getExportBlocks(container) {
-    let blocks = [];
+function buildExportJobs(wrapper) {
+    let jobs = [];
     let currentHeader = null;
-    const nodes = Array.from(container.children);
-    
-    for (let node of nodes) {
-        if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || node.style.display === 'none') continue;
-        
-        // Mantener el encabezado principal intacto
-        if (node.classList.contains('aiq-reports-header')) {
-             blocks.push({ elements: [node], isIsolatedCard: false });
-             continue;
-        }
 
-        const isHeader = node.classList.contains('chart-header-flex') || node.tagName.match(/^H[1-6]$/);
-        
-        if (isHeader) {
-            // Si ya teníamos un header en memoria (ej. dos títulos seguidos), lo liberamos como bloque
-            if (currentHeader) blocks.push({ elements: [currentHeader], isIsolatedCard: false });
-            currentHeader = node;
-        } else {
-            // Si es el contenedor de Temas, separamos las tarjetas 1 a 1.
-            if (node.classList.contains('topics-tables-container')) {
-                const cards = Array.from(node.children);
-                for (let i = 0; i < cards.length; i++) {
-                    let group = [];
-                    if (currentHeader) group.push(currentHeader); // Le pegamos el título general a cada tarjeta individual
-                    group.push(cards[i]);
-                    // Marcamos "isIsolatedCard" para que el motor asigne 1 página forzosa
-                    blocks.push({ elements: group, isIsolatedCard: true }); 
-                }
-            } else {
-                // Comportamiento normal para otras secciones (gráficos, top/bottom)
-                let group = [];
-                if (currentHeader) group.push(currentHeader);
-                group.push(node);
-                blocks.push({ elements: group, isIsolatedCard: false });
+    function processNodes(nodes) {
+        Array.from(nodes).forEach(node => {
+            if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || node.style.display === 'none') return;
+
+            if (node.classList.contains('aiq-reports-header')) {
+                jobs.push({ type: 'header', el: node });
             }
-            currentHeader = null;
-        }
+            else if (node.classList.contains('chart-header-flex') || node.tagName.match(/^H[1-6]$/)) {
+                currentHeader = node; 
+            }
+            else if (node.classList.contains('top-bottom-container') || node.classList.contains('topics-tables-container')) {
+                const cards = Array.from(node.querySelectorAll('.tb-card'));
+                cards.forEach((card) => {
+                    jobs.push({ 
+                        type: 'isolated_card', 
+                        header: currentHeader, 
+                        el: card 
+                    });
+                });
+                currentHeader = null; 
+            }
+            else if (node.classList.contains('metrics-container') || node.classList.contains('chart-card') || node.classList.contains('contacts-charts-grid')) {
+                jobs.push({ type: 'block', header: currentHeader, el: node });
+                currentHeader = null;
+            }
+            else if (node.tagName === 'DIV' && node.children.length > 0 && !node.classList.contains('tb-row')) {
+                processNodes(node.children);
+            }
+        });
     }
-    
-    if (currentHeader) blocks.push({ elements: [currentHeader], isIsolatedCard: false });
-    return blocks;
+
+    processNodes(wrapper.children);
+    return jobs;
 }
 
 async function exportFullPageToPDF(surveyName, surveyTitle) {
     const btnExport = document.getElementById('btn-export-full-pdf');
     const originalBtnText = btnExport ? btnExport.innerHTML : '';
     
-    // Variables para guardar y restaurar el estilo original del Grid
-    const topicContainers = document.querySelectorAll('.topics-tables-container');
-    const originalGridStyles = [];
-    
+    // Guardamos la posición de scroll actual y subimos
+    const prevScrollY = window.scrollY;
+    window.scrollTo(0, 0);
+
     try {
-        if (btnExport) btnExport.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Procesando PDF...';
+        if (btnExport) btnExport.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Exportando...`;
 
         const wrapper = document.querySelector('.aiq-reports-wrapper');
         const originalHeight = wrapper.style.height;
         const originalOverflow = wrapper.style.overflowY;
         
-        // Liberar el scroll del contenedor principal
         wrapper.style.height = 'auto';
         wrapper.style.overflowY = 'visible';
-        
-        // Forzar 1 sola columna en el contenedor de Temas para que las tarjetas tomen el 100% del ancho (Mejor lectura en PDF)
-        topicContainers.forEach(c => {
-            originalGridStyles.push({ el: c, gridTemplateColumns: c.style.gridTemplateColumns });
-            c.style.gridTemplateColumns = '1fr'; 
-        });
         
         const buttonsToHide = document.querySelectorAll('.chart-actions-group, #btn-export-full-pdf, .btn-outline-purple');
         buttonsToHide.forEach(btn => btn.style.display = 'none');
 
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        
         const margin = 10;
-        const maxPdfWidth = pdfWidth - (margin * 2);
-        const maxPageHeight = pageHeight - (margin * 2);
-        
+        const maxW = pdf.internal.pageSize.getWidth() - (margin * 2);
+        const pageH = pdf.internal.pageSize.getHeight();
         let currentY = margin;
-        
-        // Obtenemos los bloques ya separados (Cada tabla de tema ahora es un bloque independiente)
-        const blocksInfo = getExportBlocks(wrapper);
 
-        const canvasOpts = { 
-            scale: 2, 
-            useCORS: true, 
-            logging: false, 
-            backgroundColor: '#ffffff',
-            onclone: (clonedDoc) => {
-                const svgs = clonedDoc.querySelectorAll('.apexcharts-svg');
-                svgs.forEach(svg => { svg.setAttribute('width', '100%'); });
-            }
-        };
+        const jobs = buildExportJobs(wrapper);
 
-        for (let i = 0; i < blocksInfo.length; i++) {
-            const blockInfo = blocksInfo[i];
-            const elements = blockInfo.elements;
-            let blockImages = [];
-            
-            // Si el bloque exige aislamiento (1 carta de Tema), forzamos salto de página ANTES de pintarla
-            if (blockInfo.isIsolatedCard && currentY > margin) {
-                pdf.addPage();
-                currentY = margin;
+        function addImg(data) {
+            if (!data) return;
+            let pdfW = maxW;
+            let pdfH = (data.height * maxW) / data.width;
+
+            if (pdfH > pageH - currentY - margin) {
+                const ratio = (pageH - currentY - margin) / pdfH;
+                pdfH *= ratio;
+                pdfW *= ratio;
             }
             
-            for (let el of elements) {
-                await new Promise(resolve => setTimeout(resolve, 50)); // Respiración del procesador
-                
-                const canvas = await html2canvas(el, canvasOpts);
-                if (canvas.width === 0 || canvas.height === 0) continue;
-                
-                const imgData = canvas.toDataURL('image/jpeg', 0.95);
-                const pdfImgHeight = (canvas.height * maxPdfWidth) / canvas.width;
-                
-                blockImages.push({ 
-                    imgData, 
-                    width: maxPdfWidth, 
-                    height: pdfImgHeight, 
-                    isHeader: el.classList.contains('chart-header-flex') || el.tagName.match(/^H[1-6]$/) 
-                });
-                
-                canvas.width = 0; // Garbage collection forzada
-            }
-            
-            if (blockImages.length === 0) continue;
+            let xPos = margin + (maxW - pdfW) / 2;
+            pdf.addImage(data.imgData, 'JPEG', xPos, currentY, pdfW, pdfH);
+            currentY += pdfH + 5;
+        }
 
-            let totalOriginalHeight = blockImages.reduce((sum, img) => sum + img.height, 0);
-            let totalGaps = blockImages.reduce((sum, img, idx) => sum + (idx < blockImages.length - 1 ? (img.isHeader ? 2 : 8) : 0), 0);
+        for (let i = 0; i < jobs.length; i++) {
+            const job = jobs[i];
             
-            // Si el bloque (Título + Gráfico) en su tamaño original no cabe, saltar hoja
-            if (currentY + totalOriginalHeight + totalGaps > maxPageHeight + margin) {
+            if (job.type === 'header') {
+                const data = await captureElement(job.el);
+                addImg(data);
+            } 
+            else if (job.type === 'block') {
+                let headerData = job.header ? await captureElement(job.header) : null;
+                const blockData = await captureElement(job.el);
+
+                let totalH = blockData ? (blockData.height * maxW) / blockData.width : 0;
+                if (headerData) totalH += (headerData.height * maxW) / headerData.width;
+
+                if (currentY + totalH > pageH - margin && currentY > margin) {
+                    pdf.addPage();
+                    currentY = margin;
+                }
+
+                if (headerData) addImg(headerData);
+                if (blockData) addImg(blockData);
+                currentY += 5; 
+            }
+            else if (job.type === 'isolated_card') {
                 if (currentY > margin) {
                     pdf.addPage();
                     currentY = margin;
                 }
-            }
 
-            // Calcular cuánto espacio queda realmente en la página activa
-            let availableSpace = (maxPageHeight + margin) - currentY;
-            
-            // Si incluso estando solos en una página la tabla gigante no cabe, la encogemos (Zoom Out)
-            let needsScaling = (totalOriginalHeight + totalGaps > availableSpace);
-            let scaleRatio = 1;
-            
-            if (needsScaling) {
-                let nonHeaderOriginalHeight = blockImages.filter(img => !img.isHeader).reduce((sum, img) => sum + img.height, 0);
-                let headerOriginalHeight = blockImages.filter(img => img.isHeader).reduce((sum, img) => sum + img.height, 0);
-                
-                let targetNonHeaderHeight = availableSpace - headerOriginalHeight - totalGaps;
-                if (targetNonHeaderHeight > 0 && nonHeaderOriginalHeight > 0) {
-                    scaleRatio = targetNonHeaderHeight / nonHeaderOriginalHeight;
-                }
-            }
+                const origGridCol = job.el.style.gridColumn;
+                job.el.style.gridColumn = '1 / -1'; 
 
-            for (let imgObj of blockImages) {
-                let renderWidth = imgObj.width;
-                let renderHeight = imgObj.height;
-                
-                // Solo escalar el contenido (gráficos/tablas gigantes), dejar el texto del título intacto
-                if (needsScaling && !imgObj.isHeader && scaleRatio < 1) {
-                    renderHeight = renderHeight * scaleRatio;
-                    renderWidth = renderWidth * scaleRatio;
+                let headerData = job.header ? await captureElement(job.header) : null;
+                const cardData = await captureElement(job.el);
+
+                job.el.style.gridColumn = origGridCol;
+
+                if (headerData) addImg(headerData);
+                if (cardData) addImg(cardData);
+
+                if (i < jobs.length - 1) {
+                    pdf.addPage();
+                    currentY = margin;
                 }
-                
-                let xOffset = margin;
-                if (renderWidth < maxPdfWidth) {
-                    xOffset = margin + ((maxPdfWidth - renderWidth) / 2); // Centrado horizontal
-                }
-                
-                pdf.addImage(imgObj.imgData, 'JPEG', xOffset, currentY, renderWidth, renderHeight);
-                currentY += renderHeight + (imgObj.isHeader ? 2 : 8); 
-            }
-            
-            // Si acabamos de procesar una carta aislada (Tema), obligamos a que lo próximo vaya en OTRA página.
-            if (blockInfo.isIsolatedCard) {
-                currentY = maxPageHeight + margin + 1; 
-            } else {
-                currentY += 8; 
             }
         }
 
-        // Restaurar estado visual original de la pantalla
-        topicContainers.forEach((c, idx) => {
-            c.style.gridTemplateColumns = originalGridStyles[idx].gridTemplateColumns;
-        });
         wrapper.style.height = originalHeight;
         wrapper.style.overflowY = originalOverflow;
         buttonsToHide.forEach(btn => btn.style.display = '');
         if (btnExport) btnExport.innerHTML = originalBtnText;
+        window.scrollTo(0, prevScrollY);
 
-        const cleanTitle = (surveyTitle || surveyName || 'Resultados').replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_');
-        pdf.save(`Reporte_${cleanTitle}.pdf`);
+        const cleanTitle = surveyTitle.replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_');
+        pdf.save(`${cleanTitle}.pdf`);
 
     } catch (err) {
-        console.error('Error construyendo PDF:', err);
+        console.error('Error exportando reporte completo:', err);
         
-        // Restauración segura en caso de fallo
         const wrapper = document.querySelector('.aiq-reports-wrapper');
         if (wrapper) {
             wrapper.style.height = 'calc(100vh - 80px)';
             wrapper.style.overflowY = 'auto';
         }
-        
-        const topicContainersErr = document.querySelectorAll('.topics-tables-container');
-        topicContainersErr.forEach(c => c.style.gridTemplateColumns = ''); 
-        
         document.querySelectorAll('.chart-actions-group, #btn-export-full-pdf, .btn-outline-purple')
             .forEach(btn => btn.style.display = '');
             
         if (btnExport) btnExport.innerHTML = originalBtnText;
-        if (window.frappe) frappe.msgprint('Ocurrió un error al construir el PDF.');
+        window.scrollTo(0, prevScrollY);
+
+        if (window.frappe) {
+            frappe.msgprint('Ocurrió un error al intentar exportar el reporte.');
+        }
     }
 }

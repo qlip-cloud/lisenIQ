@@ -99,7 +99,8 @@ function observeAndInjectButtons() {
 }
 
 function injectSectionExportButtons() {
-    const sections = ['.metrics-container', '.top-bottom-container', '.topics-tables-container'];
+    // Secciones detectables para inyectar botones de exportación
+    const sections = ['.metrics-container', '.top-bottom-container', '.topics-tables-container', '.contacts-charts-grid'];
     
     sections.forEach(selector => {
         document.querySelectorAll(selector).forEach(container => {
@@ -128,6 +129,7 @@ function injectSectionExportButtons() {
                 let titleText = 'Sección';
                 if (selector === '.top-bottom-container') titleText = 'Top / Bottom 10';
                 else if (selector === '.topics-tables-container') titleText = 'Análisis por Temas';
+                else if (selector === '.contacts-charts-grid') titleText = 'Análisis Demográfico';
                 
                 header.innerHTML = `
                     <h3 class="chart-section-title">${titleText}</h3>
@@ -162,9 +164,9 @@ async function captureElement(element) {
     if (!element) return null;
     try {
         const opts = { 
-            quality: 0.95, 
-            bgcolor: '#ffffff', 
-            scale: 2,
+            quality: 1.0, // Calidad máxima
+            bgcolor: '#ffffff', // Fondo blanco para evitar transparencias 
+            scale: 3, // Se aumenta para mejorar la resolución de la imagen capturada
             style: { margin: '0', transform: 'scale(1)', transformOrigin: 'top left' }
         };
         const dataUrl = await domtoimage.toJpeg(element, opts);
@@ -250,8 +252,10 @@ function buildExportJobs(wrapper) {
             else if (node.classList.contains('chart-header-flex') || node.tagName.match(/^H[1-6]$/)) {
                 currentHeader = node; 
             }
-            else if (node.classList.contains('top-bottom-container') || node.classList.contains('topics-tables-container')) {
-                const cards = Array.from(node.querySelectorAll('.tb-card'));
+            // Aislamiento de tarjetas
+            else if (node.classList.contains('top-bottom-container') || node.classList.contains('topics-tables-container') || node.classList.contains('contacts-charts-grid')) {
+                // Tomamos todos los hijos directos (tarjetas) del contenedor para separarlos
+                const cards = Array.from(node.children);
                 cards.forEach((card) => {
                     jobs.push({ 
                         type: 'isolated_card', 
@@ -261,7 +265,7 @@ function buildExportJobs(wrapper) {
                 });
                 currentHeader = null; 
             }
-            else if (node.classList.contains('metrics-container') || node.classList.contains('chart-card') || node.classList.contains('contacts-charts-grid')) {
+            else if (node.classList.contains('metrics-container') || node.classList.contains('chart-card')) {
                 jobs.push({ type: 'block', header: currentHeader, el: node });
                 currentHeader = null;
             }
@@ -344,19 +348,15 @@ async function exportFullPageToPDF(surveyName, surveyTitle) {
                 if (blockData) addImg(blockData);
                 currentY += 5; 
             }
+            
             else if (job.type === 'isolated_card') {
                 if (currentY > margin) {
                     pdf.addPage();
                     currentY = margin;
                 }
 
-                const origGridCol = job.el.style.gridColumn;
-                job.el.style.gridColumn = '1 / -1'; 
-
                 let headerData = job.header ? await captureElement(job.header) : null;
                 const cardData = await captureElement(job.el);
-
-                job.el.style.gridColumn = origGridCol;
 
                 if (headerData) addImg(headerData);
                 if (cardData) addImg(cardData);

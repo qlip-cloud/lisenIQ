@@ -8,7 +8,8 @@ def build_culture_context(context, survey_name):
 
     likert_types = frappe.get_all("qp_IQ_QuestionType", 
                                   filters={"qnt_type_name": ["like", "%Likert%"]}, 
-                                  pluck="name")
+                                  pluck="name",
+                                  ignore_permissions=True)
     
     global_score = 0.0
     culture_chart_data = []
@@ -19,7 +20,8 @@ def build_culture_context(context, survey_name):
     if likert_types:
         likert_questions_data = frappe.get_all("qp_IQ_Question", 
                                           filters={"qn_type": ["in", likert_types]}, 
-                                          fields=["name", "qn_demographic", "qn_statement", "qp_topic"])
+                                          fields=["name", "qn_demographic", "qn_statement", "qp_topic"],
+                                          ignore_permissions=True)
         
         likert_questions = [q.name for q in likert_questions_data]
         
@@ -30,7 +32,8 @@ def build_culture_context(context, survey_name):
         if likert_questions:
             demo_types = frappe.get_all("qp_IQ_DemographicType", 
                                         filters={"dt_object_type": "Pregunta"}, 
-                                        fields=["name", "dt_title", "dt_tag_color"])
+                                        fields=["name", "dt_title", "dt_tag_color"],
+                                        ignore_permissions=True)
             valid_demographics = [d.name for d in demo_types]
             demo_title_map = {d.name: (d.dt_title or d.name) for d in demo_types}
             demo_color_map = {d.name: d.dt_tag_color for d in demo_types if d.dt_tag_color}
@@ -43,7 +46,7 @@ def build_culture_context(context, survey_name):
                     t_doctype = topic_field.options
                     t_title_field = frappe.get_meta(t_doctype).title_field or "name"
                     
-                    td_list = frappe.get_all(t_doctype, fields=["name", t_title_field])
+                    td_list = frappe.get_all(t_doctype, fields=["name", t_title_field], ignore_permissions=True)
                     topic_title_map = {d["name"]: (d.get(t_title_field) or d["name"]) for d in td_list}
             except Exception as e:
                 frappe.log_error(f"Error extrayendo metadata de qp_topic: {e}", "AIQ Reports - Cultura")
@@ -51,14 +54,16 @@ def build_culture_context(context, survey_name):
             # Extraemos el color de los temas desde qp_IQ_DemographicType
             tema_types = frappe.get_all("qp_IQ_DemographicType", 
                                         filters={"dt_object_type": "Tema"}, 
-                                        fields=["name", "dt_tag_color"])
+                                        fields=["name", "dt_tag_color"],
+                                        ignore_permissions=True)
             topic_color_map = {d.name: d.dt_tag_color for d in tema_types if d.dt_tag_color}
 
             su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
             
             survey_responses = frappe.get_all("Survey Response", 
                                               filters={"survey": ["in", [survey_name, su_name]]}, 
-                                              pluck="response_json")
+                                              pluck="response_json",
+                                              ignore_permissions=True)
             
             total_score = 0.0
             total_answers = 0

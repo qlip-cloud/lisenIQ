@@ -15,14 +15,16 @@ def inject_contacts_demographics_data(context, survey_name):
     # Obtener tipo Likert y preguntas válidas
     likert_types = frappe.get_all("qp_IQ_QuestionType", 
                                   filters={"qnt_type_name": ["like", "%Likert%"]}, 
-                                  pluck="name")
+                                  pluck="name",
+                                  ignore_permissions=True)
     if not likert_types:
         context.contact_demographics_json = json.dumps(chart_data)
         return context
         
     likert_questions = frappe.get_all("qp_IQ_Question", 
                                       filters={"qn_type": ["in", likert_types]}, 
-                                      pluck="name")
+                                      pluck="name",
+                                      ignore_permissions=True)
     if not likert_questions:
         context.contact_demographics_json = json.dumps(chart_data)
         return context
@@ -32,7 +34,8 @@ def inject_contacts_demographics_data(context, survey_name):
     # Buscar respuestas para obtener los contactos
     responses = frappe.get_all("Survey Response",
         filters={"survey": ["in", [survey_name, su_name]]},
-        fields=["name", "response_json", "user"]
+        fields=["name", "response_json", "user"],
+        ignore_permissions=True
     )
 
     contact_scores = {}
@@ -78,7 +81,8 @@ def inject_contacts_demographics_data(context, survey_name):
     # Obtener data base de contactos para Edad, Antigüedad y Género
     contacts_info = frappe.get_all("Contact",
         filters={"name": ["in", contacts_with_responses]},
-        fields=["name", "custom_dob", "custom_entry_date", "gender"]
+        fields=["name", "custom_dob", "custom_entry_date", "gender"],
+        ignore_permissions=True
     )
 
     # Diccionarios pre-inicializados para mantener el orden exacto deseado
@@ -174,21 +178,40 @@ def inject_contacts_demographics_data(context, survey_name):
             "parenttype": "Contact",
             "parentfield": "custom_additional_details"
         },
-        fields=["parent", "cad_demographic_type", "cad_value"]
+        fields=["parent", "cad_demographic_type", "cad_value"],
+        ignore_permissions=True
     )
     
     # Extraer nombre y color de los tipos demográficos para mostrar en el reporte
     demo_links = list(set([d.cad_demographic_type for d in demographics if d.cad_demographic_type]))
     demo_info_map = {}
+    
     if demo_links:
-        try:
-            dt_types = frappe.get_all("qp_IQ_DemographicType", 
-                                      filters={"name": ["in", demo_links]}, 
-                                      fields=["name", "dt_title", "dt_tag_color"])
-            # Guardamos el título y el color asignado en el DocType
-            demo_info_map = {d.name: {"title": d.dt_title or d.name, "color": d.dt_tag_color} for d in dt_types}
-        except Exception:
-            pass 
+        for d_id in demo_links:
+            try:
+                title = frappe.db.get_value("qp_IQ_DemographicType", d_id, "dt_title")
+                color = frappe.db.get_value("qp_IQ_DemographicType", d_id, "dt_tag_color")
+                
+                if not title:
+                    meta = frappe.get_meta("qp_IQ_DemographicType")
+                    t_field = meta.title_field or "name"
+                    if t_field not in ["dt_title", "name"]:
+                        title = frappe.db.get_value("qp_IQ_DemographicType", d_id, t_field)
+                        
+                if not title:
+                    parent_type = frappe.db.get_value("qp_IQ_Demographic", d_id, "dm_demographic_type")
+                    if parent_type:
+                        title = frappe.db.get_value("qp_IQ_DemographicType", parent_type, "dt_title")
+                        if not color:
+                            color = frappe.db.get_value("qp_IQ_DemographicType", parent_type, "dt_tag_color")
+
+                demo_info_map[d_id] = {
+                    "title": title if title else d_id,
+                    "color": color if color else ""
+                }
+            except Exception:
+                # En caso de fallo absoluto, usamos el ID
+                demo_info_map[d_id] = {"title": d_id, "color": ""}
 
     # Agrupar la data por Demográfico y su Valor
     grouped_data = {}

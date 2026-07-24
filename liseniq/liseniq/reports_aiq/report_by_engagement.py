@@ -6,7 +6,7 @@ from .report_by_contacts import inject_contacts_demographics_data
 
 def build_engagement_context(context, survey_name):
 
-    all_q_types = frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_mnemonico"])
+    all_q_types = frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_mnemonico"], ignore_permissions=True)
     valid_types = []
     nps_types = []
     for qt in all_q_types:
@@ -27,7 +27,8 @@ def build_engagement_context(context, survey_name):
     if valid_types:
         valid_questions_data = frappe.get_all("qp_IQ_Question", 
                                           filters={"qn_type": ["in", valid_types]}, 
-                                          fields=["name", "qn_demographic", "qn_statement", "qp_topic", "qn_type"])
+                                          fields=["name", "qn_demographic", "qn_statement", "qp_topic", "qn_type"],
+                                          ignore_permissions=True)
         
         valid_questions = [q.name for q in valid_questions_data]
         nps_questions = [q.name for q in valid_questions_data if q.qn_type in nps_types]
@@ -39,7 +40,8 @@ def build_engagement_context(context, survey_name):
         if valid_questions:
             demo_types = frappe.get_all("qp_IQ_DemographicType", 
                                         filters={"dt_object_type": "Pregunta"}, 
-                                        fields=["name", "dt_title", "dt_tag_color", "dt_mnemonico"])
+                                        fields=["name", "dt_title", "dt_tag_color", "dt_mnemonico"],
+                                        ignore_permissions=True)
             valid_demographics = [d.name for d in demo_types]
             demo_title_map = {d.name: (d.dt_title or d.name) for d in demo_types}
             demo_color_map = {d.name: d.dt_tag_color for d in demo_types if d.dt_tag_color}
@@ -53,7 +55,7 @@ def build_engagement_context(context, survey_name):
                     t_doctype = topic_field.options
                     t_title_field = frappe.get_meta(t_doctype).title_field or "name"
                     
-                    td_list = frappe.get_all(t_doctype, fields=["name", t_title_field])
+                    td_list = frappe.get_all(t_doctype, fields=["name", t_title_field], ignore_permissions=True)
                     topic_title_map = {d["name"]: (d.get(t_title_field) or d["name"]) for d in td_list}
             except Exception as e:
                 frappe.log_error(f"Error extrayendo metadata de qp_topic: {e}", "AIQ Reports - Engagement")
@@ -61,14 +63,16 @@ def build_engagement_context(context, survey_name):
             # Extraemos el color de los temas desde qp_IQ_DemographicType
             tema_types = frappe.get_all("qp_IQ_DemographicType", 
                                         filters={"dt_object_type": "Tema"}, 
-                                        fields=["name", "dt_tag_color"])
+                                        fields=["name", "dt_tag_color"],
+                                        ignore_permissions=True)
             topic_color_map = {d.name: d.dt_tag_color for d in tema_types if d.dt_tag_color}
 
             su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
             
             survey_responses = frappe.get_all("Survey Response", 
                                               filters={"survey": ["in", [survey_name, su_name]]}, 
-                                              pluck="response_json")
+                                              pluck="response_json",
+                                              ignore_permissions=True)
             
             total_score = 0.0
             total_answers = 0

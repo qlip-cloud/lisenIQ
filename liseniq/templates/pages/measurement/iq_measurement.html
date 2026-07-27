@@ -272,15 +272,24 @@
 
             <div class="measurement-form-container">
                 <div class="internal-scroll-section">
-                    <p class="text-muted small mb-4">Personaliza el mensaje del correo de invitación o de recordatorio.</p>
+                    <!-- <p class="text-muted small mb-4">Personaliza los correos de invitación y recordatorio, o el mensaje de bienvenida de la medición.</p> -->
+                    <p class="text-muted small mb-4">Personaliza los correos de invitación y recordatorios de la medición.</p>
 
-                    <div class="form-check mb-3">
+                    <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox" id="email-use-default-template">
                         <span class="tooltip-wrapper">
-                            <label class="form-check-label" data-tooltip-bottom="Utiliza el mensaje estándar recomendado por la plataforma para invitaciones o recordatorios. Es una opción rápida si no deseas personalizar el texto." for="email-use-default-template">Usar plantilla por defecto</label>
+                            <label class="form-check-label" data-tooltip-bottom="Utiliza los mensajes estándar recomendados por la plataforma para correos de invitación y recordatorios." for="email-use-default-template">Usar correos por defecto (Invitación y Recordatorio)</label>
                             <span class="tooltip-icon"></span>
                         </span>
                     </div>
+                    
+                    <!-- <div class="form-check mb-4">
+                        <input class="form-check-input" type="hidden" id="welcome-use-default-template">
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" data-tooltip-bottom="Utiliza el mensaje estándar recomendado por la plataforma como mensaje inicial antes de contestar las preguntas." for="welcome-use-default-template">Usar mensaje de bienvenida por defecto</label>
+                            <span class="tooltip-icon"></span>
+                        </span>
+                    </div> -->
 
                     <div id="email-customization-fields">
                         <div class="email-type-toggle mb-3">
@@ -290,7 +299,6 @@
                                         <span data-tooltip-bottom="Mensaje que se enviará a los participantes al inicio de la medición para invitarlos a responder la encuesta.">Invitación a la encuesta</span>
                                         <span class="tooltip-icon"></span>
                                     </span>
-                                    
                                 </button>
                                 <button type="button" id="email-type-reminder-btn" class="btn btn-outline-purple">
                                     <span class="tooltip-wrapper">
@@ -298,20 +306,26 @@
                                         <span class="tooltip-icon"></span>
                                     </span>
                                 </button>
+                                <!-- <button type="button" id="email-type-welcome-btn" class="btn btn-outline-purple">
+                                    <span class="tooltip-wrapper">
+                                        <span data-tooltip-bottom="Mensaje que se mostrará al encuestado previo a contestar las preguntas.">Mensaje de bienvenida</span>
+                                        <span class="tooltip-icon"></span>
+                                    </span>
+                                </button> -->
                             </div>
                         </div>
 
                         <div class="form-group">
                             <span class="tooltip-wrapper">
-                                <label data-tooltip-right="Título del correo que verán los participantes en su bandeja de entrada. Debe ser claro y motivador para aumentar la apertura del mensaje." for="email-subject">Asunto</label>
+                                <label data-tooltip-right="Título del correo/mensaje que verán los participantes. Debe ser claro y motivador para aumentar el involucramiento." for="email-subject">Asunto</label>
                                 <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
                             </span>
-                            <input type="text" id="email-subject" class="form-control" maxlength="150" placeholder="Escribe el asunto del correo">
+                            <input type="text" id="email-subject" class="form-control" maxlength="150" placeholder="Escribe el asunto del mensaje">
                         </div>
 
                         <div class="form-group mt-3">
                             <span class="tooltip-wrapper">
-                                <label data-tooltip-right="Contenido del correo donde explicas el propósito de la medición, instrucciones y cualquier información relevante. Puedes personalizarlo según tu empresa o el tono deseado." for="email-body">Cuerpo del mensaje</label>
+                                <label data-tooltip-right="Contenido donde explicas el propósito de la medición, instrucciones y cualquier información relevante. Puedes personalizarlo según tu empresa o el tono deseado." for="email-body">Cuerpo del mensaje</label>
                                 <span class="tooltip-icon" style="margin-bottom: 0.5rem;"></span>
                             </span>
                             <textarea id="email-body" class="form-control email-body-textarea" rows="8" placeholder=""></textarea>

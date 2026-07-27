@@ -22,7 +22,7 @@ const DEFAULT_LIKERT_OPTIONS = [
 const getLikertIconUrl = (val) => LIKERT_ICON_MAP[Number(val)] || '';
 
 export class QuestionBuilder {
-    constructor(onQuestionsUpdate) {
+    constructor(onQuestionsUpdate, contextMode = 'measurement') {
         this.questions = [];
         this.editingIndex = null; // Para manejo de edición
         this.bankState = {
@@ -38,6 +38,9 @@ export class QuestionBuilder {
         this.onQuestionsUpdate = onQuestionsUpdate;
         this.isReadOnly = false;
         
+        // contextMode: 'measurement' o 'template' para determinar si se permite edición de preguntas existentes o solo clonarlas.
+        this.contextMode = contextMode; 
+
         // Estado para Liderazgo
         this.isLeadershipMode = false;
         this.currentCategoryName = '';
@@ -832,26 +835,42 @@ export class QuestionBuilder {
         // Manejo si es actualización vs creación
         if (this.editingIndex !== null) {
             const existingQ = this.questions[this.editingIndex];
-            Object.assign(existingQ, newQuestion, { id: existingQ.id }); // Mantiene el ID original
 
-            // Si es una pregunta real base de datos, actualizamos en backend de forma silenciosa
             if (!existingQ.id.startsWith('manual-')) {
-                frappe.call({
-                    method: 'liseniq.www.iq-templates.new_template.update_template_question',
-                    args: {
-                        question_name: existingQ.id,
-                        question_data: JSON.stringify({
-                            qn_statement: existingQ.text,
-                            qn_statement_others: existingQ.text_others,
-                            qn_type: existingQ.type,
-                            qn_demographic: existingQ.demographic,
-                            qp_topic: existingQ.culture
-                        })
-                    },
-                    error: function(err) {
-                        console.error("Error al actualizar la pregunta:", err);
-                    }
-                });
+                // - Si estamos editando una Plantilla (contextMode = 'template'): 
+                //   Mantenemos el ID original y actualizamos en BD.
+                // - Si estamos creando/editando una Medición (contextMode = 'measurement'): 
+                //   Cambiamos el ID para crear una nueva pregunta y NO sobreescribir la original de la plantilla.
+                
+                if (this.contextMode === 'template') {
+                    Object.assign(existingQ, newQuestion, { id: existingQ.id }); // Mantiene el ID original
+
+                    // Actualizar la pregunta en el backend de forma silenciosa
+                    frappe.call({
+                        method: 'liseniq.www.iq-templates.new_template.update_template_question',
+                        args: {
+                            question_name: existingQ.id,
+                            question_data: JSON.stringify({
+                                qn_statement: existingQ.text,
+                                qn_statement_others: existingQ.text_others,
+                                qn_type: existingQ.type,
+                                qn_demographic: existingQ.demographic,
+                                qp_topic: existingQ.culture
+                            })
+                        },
+                        error: function(err) {
+                            console.error("Error al actualizar la pregunta:", err);
+                        }
+                    });
+                } else {
+                    // Modo Measurement: Evita sobreescribir la pregunta original. 
+                    // Se crea un nuevo ID para que se guarde como una pregunta nueva.
+                    newQuestion.id = `manual-edited-${Date.now()}`;
+                    this.questions[this.editingIndex] = newQuestion;
+                }
+            } else {
+                // Si la pregunta ya era una pregunta manual recién creada en esta sesión, se actualiza normal
+                Object.assign(existingQ, newQuestion, { id: existingQ.id });
             }
 
         } else {

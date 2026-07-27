@@ -1,0 +1,70 @@
+.config-card {
+    background-color: #fff;
+    border: 1px solid var(--brand-border-color, #e9ecef);
+    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    height: 100%;
+}
+
+.config-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px rgba(123, 36, 255, 0.08);
+    border-color: var(--brand-primary, #7B24FF);
+}
+
+.config-card-icon {
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
+    background-color: var(--brand-primary-light, #f3e8ff);
+    color: var(--brand-primary, #7B24FF);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    margin-bottom: 1.25rem;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.config-card:hover .config-card-icon {
+    background-color: var(--brand-primary, #7B24FF);
+    color: #fff;
+}
+
+.config-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-color-primary, #212529);
+    margin-bottom: 0.5rem;
+}
+
+.config-card-desc {
+    font-size: 0.85rem;
+    color: var(--text-color-secondary, #6c757d);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Opción deshabilitada para Editar Compañía (Proximamente) */
+#btn-edit-company {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#btn-edit-company:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: #e9ecef;
+    color: inherit;
+}
+
+#btn-edit-company:hover i {
+    color: var(--brand-primary, #7B24FF);
+}

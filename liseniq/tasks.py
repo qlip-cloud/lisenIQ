@@ -7,8 +7,9 @@ import jwt
 from time import time
 from email.utils import formataddr
 from datetime import datetime, timezone
+from frappe.utils import add_days, now_datetime
 import pytz
-from liseniq.liseniq.uses_cases.iq360.report_builder import build_leaders_report
+from liseniq.liseniq.helpers.report_batch_integration import start_iq360_report_generation
 
 DEFAULT_SENDER_NAME = "Portal de Mediciones"
 BATCH_SIZE = 200  # Tamaño del lote/bloque para envío de correos y generación de links
@@ -908,7 +909,7 @@ def update_finished_surveys():
 					end_dt = get_datetime(survey.su_end_date)
 					if current_local >= end_dt:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
-						build_leaders_report(survey.name)
+						start_iq360_report_generation(survey.name)
 						frappe.db.commit()
 						frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys - Fecha")
 						continue
@@ -918,7 +919,7 @@ def update_finished_surveys():
 					responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
 					if total_recipients == responded_recipients:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
-						build_leaders_report(survey.name)
+						start_iq360_report_generation(survey.name)
 						frappe.db.commit()
 						frappe.log_error(f"Encuesta {survey.name} finalizada por completitud (100%).", "update_finished_surveys - Completitud")
 
@@ -1227,3 +1228,34 @@ def send_pending_links_for_survey(survey_name: str):
 		frappe.db.rollback()
 		frappe.log_error(f"Fallo general enviando enlaces pendientes: {e}\n{frappe.get_traceback()}", "send_pending_links_for_survey - Fallo Crítico")
 		return {"status": "error", "message": "Fallo al enviar enlaces pendientes."}
+
+
+def delete_zip_files_attached_to_survey():
+	try:
+		cutoff = add_days(now_datetime(), -1)
+		zip_attachments = frappe.get_all(
+    	"File",
+				filters={
+						"attached_to_doctype": "qp_IQ_Survey",
+						"file_name": ["like", "%_informes%.zip"],
+						"creation": ["<", cutoff],
+				},
+				fields=["name", "file_url"],
+		)
+
+		if not zip_attachments:
+			return
+
+		for attachment in zip_attachments:
+			try:
+				frappe.delete_doc("File", attachment.name, force=1, ignore_permissions=True)
+			except Exception as e:
+				frappe.log_error(f"Error eliminando archivo ZIP {attachment.file_url}: {e}", "delete_zip_files_attached_to_survey - Error Bucle")
+
+		frappe.db.commit()
+
+
+
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(f"Fallo general en tarea cron delete_zip_files_attached_to_survey: {e}\n{frappe.get_traceback()}", "delete_zip_files_attached_to_survey - Fallo Crítico")

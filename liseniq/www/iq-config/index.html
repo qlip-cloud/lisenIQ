@@ -1,0 +1,67 @@
+{% extends "templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Configuración") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="main-content-padding pt-4 form-scroll-container">
+    
+    <div class="row">
+        <!-- Tarjeta de Gestión de Compañías -->
+        <div class="col-md-4 col-sm-6 mb-4">
+            <div class="config-card" id="btn-manage-companies">
+                <div class="config-card-icon">
+                    <i class="fa fa-building-o"></i>
+                </div>
+                <div class="config-card-content">
+                    <h5 class="config-card-title">Gestión de Compañías</h5>
+                    <p class="config-card-desc">Administra las compañías, crea nuevas o edita la información existente.</p>
+                </div>
+            </div>
+        </div>
+        <!-- Aquí se podrán agregar nuevas opciones de configuración a futuro -->
+    </div>
+
+</div>
+
+<!-- Modal para Gestión de Compañías -->
+<div id="manage-company-modal" class="choice-modal-overlay d-none">
+    <div class="choice-modal-content">
+        <div class="choice-modal-header">
+            <h5 class="choice-modal-title">Gestión de Compañías</h5>
+            <button id="btn-close-company-modal" type="button" class="close" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="choice-modal-body">
+            
+            <div class="modal-choice-card" id="btn-create-company">
+                <i class="fa fa-plus-circle fa-2x mb-3"></i>
+                <span>Crear Compañía</span>
+                <p class="text-muted small mt-2 mb-0" style="font-size: 0.75rem; line-height: 1.3;">Registrar una nueva compañía en el sistema.</p>
+            </div>
+            
+            <div class="modal-choice-card" id="btn-edit-company">
+                <i class="fa fa-pencil-square-o fa-2x mb-3"></i>
+                <span>Editar Compañía</span>
+                <p class="text-muted small mt-2 mb-0" style="font-size: 0.75rem; line-height: 1.3;">Modificar los datos de una compañía existente (Próximamente).</p>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_config.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script src="/assets/liseniq/js/iq_config.js"></script>
+{% endblock %}

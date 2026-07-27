@@ -87,6 +87,105 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Company Switcher
+    const switchCompanyBtn = document.getElementById('iq-header-switch-company');
+    let userCompaniesList = [];
+
+    // Verificamos si hay más de una empresa para mostrar el botón
+    frappe.call({
+        method: 'liseniq.utils.login_util.get_user_companies',
+        callback: function(r) {
+            if (r.message && r.message.length > 1) {
+                userCompaniesList = r.message;
+                if (switchCompanyBtn) {
+                    switchCompanyBtn.classList.remove('d-none');
+                }
+            }
+        }
+    });
+
+    if (switchCompanyBtn) {
+        switchCompanyBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (userMenu) userMenu.classList.add('d-none');
+
+            // Renderizamos las opciones
+            let htmlContent = '';
+            
+            userCompaniesList.forEach(company => {
+                let logoHtml = '';
+                if (company.logo && company.logo !== '/assets/liseniq/images/default-company-logo.png') {
+                    logoHtml = `<img src="${company.logo}" alt="${company.company_name}" style="max-width:45px; max-height:45px; object-fit:contain; margin-bottom: 1rem;">`;
+                } else {
+                    logoHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7B24FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 1rem;"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>`;
+                }
+
+                htmlContent += `
+                    <div class="modal-choice-card" onclick="selectActiveCompany('${company.company_id}')" style="width: 100%; height: 180px; margin: 0; box-sizing: border-box;">
+                        ${logoHtml}
+                        <span style="font-weight: 600;">${company.company_name}</span>
+                    </div>
+                `;
+            });
+
+            // Eliminar modal anterior si existe
+            const existingModal = document.getElementById('company-switcher-modal');
+            if (existingModal) existingModal.remove();
+
+            let modalHtml = `
+            <style>
+                .company-switcher-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 180px);
+                    gap: 1.5rem;
+                    justify-content: center;
+                    margin: 0 auto;
+                }
+                @media (max-width: 576px) {
+                    .company-switcher-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    .company-switcher-grid .modal-choice-card {
+                        max-width: 280px;
+                        margin: 0 auto !important;
+                    }
+                }
+                #close-company-switcher:focus, #close-company-switcher:active {
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+            </style>
+            <div id="company-switcher-modal" class="choice-modal-overlay">
+                <div class="choice-modal-content" style="max-width: 500px;">
+                    <div class="choice-modal-header" style="border-bottom: none;">
+                        <h5 class="choice-modal-title">Cambiar de Empresa</h5>
+                        <button type="button" class="close" id="close-company-switcher">&times;</button>
+                    </div>
+                    <div class="choice-modal-body" style="max-height: 60vh; overflow-y: auto; display: block; padding: 2rem;">
+                        <div class="company-switcher-grid">
+                            ${htmlContent}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Eventos para cerrar el modal
+            document.getElementById('close-company-switcher').addEventListener('click', function() {
+                document.getElementById('company-switcher-modal').remove();
+            });
+            
+            document.getElementById('company-switcher-modal').addEventListener('click', function(e) {
+                if(e.target === this) {
+                    this.remove();
+                }
+            });
+        });
+    }
+    // Fin Lógica Company Switcher
+
     // Manejo seguro del logout (limpieza de sesión y redirección)
     const handleLogout = function(e) {
         if(e) e.preventDefault();
@@ -129,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar lógica de onboarding
     initOnboarding();
 });
+
 function initOnboarding() {
     // Modal de Bienvenida
     const modal = document.getElementById('welcomeModal');
@@ -241,11 +341,12 @@ function initOnboarding() {
             }
         });
     }
+    
     const route = window.location.pathname.split('/').filter(part => part); 
-            const routeString = route.join('/');
-            console.log('Ruta actual:', routeString);
+    const routeString = route.join('/');
     const firstLoginInput = document.getElementById('firstLogin');
     console.log('Valor de firstLogin:', firstLoginInput ? firstLoginInput.value : 'Elemento no encontrado');
+    
     if (firstLoginInput && firstLoginInput.value === true) {
         openModal();
     }
@@ -291,7 +392,6 @@ function initNotifications() {
 
 async function checkNewNotifications() {
     try {
-
         const countResponse = await fetch('/api/method/liseniq.utils.api_notification.get_unread_notification_count');
         const countData = await countResponse.json();
         const unreadCount = countData.message || 0;
@@ -431,3 +531,18 @@ function showGlobalNotification(message, type, duration = 5000) {
         notificationBar.classList.remove('show');
     }, duration);
 }
+
+// Lógica para Selección de Compañía
+window.selectActiveCompany = function(companyId) {
+    frappe.call({
+        method: "liseniq.utils.login_util.set_active_company",
+        args: { company_id: companyId },
+        freeze: true,
+        freeze_message: "Cargando entorno de trabajo...",
+        callback: function(r) {
+            if (r.message) {
+                window.location.href = r.message;
+            }
+        }
+    });
+};

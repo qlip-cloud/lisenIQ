@@ -7,7 +7,7 @@ import json
 import random
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.utils import get_column_letter
-from liseniq.utils.login_util import global_website_context
+from liseniq.utils.login_util import global_website_context, get_current_active_company
 
 # Definición de columnas base
 STANDARD_COLUMNS = [
@@ -41,12 +41,12 @@ def get_context(context):
 	# Validar si hay un proceso de carga masiva activo para la empresa
 	try:
 		user = frappe.session.user
-		contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
+		company = get_current_active_company(user)
 		
-		if contact_info and contact_info.custom_company:
+		if company:
 			# Verificar logs con estado Pendiente o Procesando
 			is_active = frappe.db.exists("qp_IQ_UploadLog", {
-				"ul_company": contact_info.custom_company,
+				"ul_company": company,
 				"ul_status": ["in", ["Pendiente", "Procesando"]]
 			})
 			
@@ -117,8 +117,7 @@ def get_grid_options():
 	"""
 	try:
 		user = frappe.session.user
-		contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
-		company = contact_info.custom_company if contact_info else None
+		company = get_current_active_company(user)
 
 		return {
 			"document_types": [d.dt_name for d in frappe.get_all("qp_IQ_DocumentType", fields=["dt_name"], order_by="dt_name asc")],
@@ -244,17 +243,12 @@ def _get_contacts_data_internal(company):
 def get_contacts_for_grid():
 	try:
 		user = frappe.session.user
-		contact_info = frappe.db.get_value(
-			"Contact", 
-			{"user": user, "custom_is_liseniq_contact": 0}, 
-			["name", "custom_company"], 
-			as_dict=True
-		)
+		company = get_current_active_company(user)
 		
-		if not contact_info or not contact_info.custom_company:
+		if not company:
 			return {"rows": [], "demographic_headers": []}
 
-		return _get_contacts_data_internal(contact_info.custom_company)
+		return _get_contacts_data_internal(company)
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: get_contacts_for_grid")
@@ -268,14 +262,7 @@ def download_template():
 		
 		# Obtener contexto del usuario y compañía primero
 		user = frappe.session.user
-		contact_info = frappe.db.get_value(
-			"Contact", 
-			{"user": user, "custom_is_liseniq_contact": 0}, 
-			["name", "custom_company"], 
-			as_dict=True
-		)
-
-		company = contact_info.custom_company if contact_info else None
+		company = get_current_active_company(user)
 		demographic_headers = []
 
 		if company:
@@ -494,15 +481,15 @@ def process_contacts_background(log_name, rows, user):
 		log_doc.save(ignore_permissions=True)
 		frappe.db.commit()
 
-		contact_info = frappe.db.get_value("Contact", {"user": user, "custom_is_liseniq_contact": 0}, ["name", "custom_company"], as_dict=True)
-		if not contact_info or not contact_info.custom_company:
+		# Se almacena la compañia del usuario en los logs para referencia futura
+		user_company = log_doc.ul_company
+
+		if not user_company:
 			log_doc.ul_status = "Fallido"
 			log_doc.ul_completed_at = frappe.utils.now()
-			log_doc.ul_error_log = json.dumps([{"fila": 0, "error": "No se pudo determinar la compañía del usuario"}])
+			log_doc.ul_error_log = json.dumps([{"fila": 0, "error": "No se pudo determinar la compañía en el proceso en segundo plano."}])
 			log_doc.save(ignore_permissions=True)
 			return
-
-		user_company = contact_info.custom_company
 
 		existing_contacts_map = {}
 		active_contacts = frappe.get_all("Contact", 
@@ -774,10 +761,9 @@ def upload_contacts():
 			row_dict[h] = get_val(r, h)
 		rows_dicts.append(row_dict)
 
-	# Obtener compañía del usuario para el log
+	# Obtener compañía activa en lugar de la asignada por defecto
 	user = frappe.session.user
-	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
-	company = contact_info.custom_company if contact_info else None
+	company = get_current_active_company(user)
 
 	if not company:
 		frappe.throw(_("No se pudo determinar la compañía del usuario"))
@@ -803,10 +789,9 @@ def validate_contacts():
 	fileobj = frappe.local.request.files.get('file')
 	if not fileobj: frappe.throw(_("Error de validación: No se detectó ningún archivo adjunto."))
 
-	# Obtener información del usuario para validaciones contra DB
+	# Obtener información de la compañía activa para validaciones contra DB
 	user = frappe.session.user
-	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
-	company = contact_info.custom_company if contact_info else None
+	company = get_current_active_company(user)
 	
 	existing_grid_rows = []
 	if company:
@@ -922,10 +907,9 @@ def upload_contacts_json(rows_json, file_name=None):
 	try: rows = _json.loads(rows_json)
 	except: frappe.throw(_("JSON inválido"))
 
-	# Obtener compañía
+	# Obtener compañía activa
 	user = frappe.session.user
-	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
-	company = contact_info.custom_company if contact_info else None
+	company = get_current_active_company(user)
 
 	if not company:
 		frappe.throw(_("No se pudo determinar la compañía del usuario"))
@@ -955,11 +939,10 @@ def check_upload_status():
 	sea activa o ya finalizada.
 	"""
 	user = frappe.session.user
-	contact_info = frappe.db.get_value("Contact", {"user": user}, ["custom_company"], as_dict=True)
-	if not contact_info or not contact_info.custom_company:
+	company = get_current_active_company(user)
+	
+	if not company:
 		return {"active": False}
-
-	company = contact_info.custom_company
 
 	# Obtener el último log de carga de esta compañía (por fecha de creación descendente)
 	last_log = frappe.get_all(

@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "creation": "2026-06-19 22:55:16.045276",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pr_role_name",
+  "pr_role_features",
+  "pr_mnemonico"
+ ],
+ "fields": [
+  {
+   "fieldname": "pr_role_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Nombre del Perfil",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pr_role_features",
+   "fieldtype": "Table",
+   "label": "Funcionalidades",
+   "options": "qp_IQ_PortalRoleFeature"
+  },
+  {
+   "fieldname": "pr_mnemonico",
+   "fieldtype": "Data",
+   "label": "Mnem\u00f3nico"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-02 22:47:37.651976",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_PortalRole",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "pr_role_name",
+ "track_changes": 1
+}

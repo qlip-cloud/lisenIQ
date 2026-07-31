@@ -141,7 +141,11 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
     rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
     
-    survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_status", "su_start_date", "su_end_date", "su_is_leadership", "su_owner"], as_dict=True)
+    # Extraemos los campos su_term_subject y su_term_body para personalizar la pantalla de bienvenida
+    survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, 
+        ["name", "su_status", "su_start_date", "su_end_date", "su_is_leadership", "su_owner", "su_term_subject", "su_term_body", "su_default_welcome"], 
+        as_dict=True)
+        
     if not survey_doc:
          return {"allow": False, "message": "Encuesta no encontrada."}
          
@@ -150,6 +154,17 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     su_end_date = survey_doc.su_end_date
     survey_name_id = survey_doc.name
     is_leadership = survey_doc.su_is_leadership
+    
+    # Determinar los valores de bienvenida
+    welcome_subject = survey_doc.get("su_term_subject") if not survey_doc.get("su_default_welcome") else None
+    welcome_message = survey_doc.get("su_term_body") if not survey_doc.get("su_default_welcome") else None
+
+    # Respuesta exitosa base incluyendo campos de bienvenida personalizados
+    success_response = {
+        "allow": True, 
+        "welcome_subject": welcome_subject, 
+        "welcome_message": welcome_message
+    }
 
     if status_finished and su_status == status_finished:
       return {"allow": False, "message": "La medición ha finalizado."}
@@ -183,8 +198,8 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
             {"sr_survey": survey_name_id, "sr_contact": frappe.db.get_value("Contact", {"custom_document_number": dni}, "name")}
           )
           if recipient_exists:
-            return {"allow": True}
-      return {"allow": True}
+            return success_response
+      return success_response
 
     secret = _get_jwt_secret()
     try:
@@ -231,13 +246,12 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
               {"sr_survey": survey_name_id, "sr_contact": contact_info.name}
           )
           if recipient_exists:
-              return {"allow": True}
+              return success_response
           else:
               return {"allow": False, "valid_dni": False, "message": "No está habilitado para responder esta encuesta."}
 
-        return {"allow": True}
+        return success_response
 
-      # Lógica para encuestas no públicas (con destinatarios)
       if not rid:
           public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
           if not dni:
@@ -326,7 +340,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
         if recipient.sr_status == rs_responded:
           return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
 
-      return {"allow": True}
+      return success_response
 
     except jwt.ExpiredSignatureError:
       return {"allow": False, "message": "El enlace ha expirado."}
@@ -337,7 +351,6 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     return {"allow": True}
   except jwt.InvalidTokenError:
     return {"allow": False, "message": "Enlace inválido o expirado."}
-
 
 @frappe.whitelist(allow_guest=True)
 def get_survey_route_for_public_link(token, dni=None):
@@ -456,7 +469,6 @@ def get_survey_route_for_public_link(token, dni=None):
         })
         
     return {"route": web_form_route, "is_leadership": True, "evaluations": evaluations}
-
 
 def generate_public_link_for_survey_hook(doc, method):
 

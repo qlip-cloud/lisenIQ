@@ -165,7 +165,9 @@ frappe.web_form.after_load = () => {
           }
     
           $('.web-form-actions button[type="submit"]').show();
-          load_survey(frappe.web_form.title, cachedResponses);
+          
+          // Mostrar pantalla de bienvenida antes de cargar el Webform (Survey)
+          show_welcome_screen(frappe.web_form.title, cachedResponses, res.welcome_subject, res.welcome_message);
         });
   });
 };
@@ -251,6 +253,59 @@ const show_completed_message = function (msg) {
   $('<div class="alert alert-info" role="alert"></div>')
     .text(msg || "Esta encuesta ya fue completada. Gracias por tu participación.")
     .appendTo($wrap);
+};
+
+const show_welcome_screen = function (survey_name, cachedResponses, customSubject, customMessage) {
+    $(".web-form-container").toggle(false);
+    const $wrap = $(".page_content");
+    $wrap.empty();
+    
+    // Asignación con prioridades basada en el formulario
+    // Si no hay subject personalizado, usa el nombre de la encuesta
+    const finalSubject = customSubject && customSubject.trim() !== '' ? customSubject : survey_name;
+    
+    // Si no hay mensaje personalizado, usa el texto por defecto
+    const finalMessage = customMessage && customMessage.trim() !== '' ? customMessage : "Bienvenido/a a la medición. Por favor, lee y acepta los términos y condiciones para poder iniciar. Tu participación es muy importante para nosotros.";
+    
+    const welcomeHTML = `
+        <div id="welcome-screen-container" class="iq-welcome-main">
+            <div class="iq-welcome-card">
+                <div class="iq-welcome-firstline">${survey_name}</div>
+                <div class="iq-welcome-title">${finalSubject}</div>
+                <div class="iq-welcome-desc">${finalMessage}</div>
+                
+                <div class="iq-welcome-terms-box">
+                    <label class="iq-welcome-terms-label">
+                        <input type="checkbox" id="accept-terms-checkbox" class="iq-welcome-checkbox">
+                        <span class="iq-welcome-terms-text">
+                            He leído y acepto los términos y condiciones (<a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Aviso de Privacidad</a> | <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Privacy Policy</a>), y consiento el tratamiento de mis datos y respuestas para los fines de esta medición.
+                        </span>
+                    </label>
+                </div>
+
+                <div style="width: 100%; display: flex; justify-content: center; margin-top: 8px;">
+                    <button id="btn-start-survey" class="iq-welcome-btn" disabled>Comenzar Medición</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $wrap.append(welcomeHTML);
+
+    $('#accept-terms-checkbox').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#btn-start-survey').prop('disabled', false);
+        } else {
+            $('#btn-start-survey').prop('disabled', true);
+        }
+    });
+
+    $('#btn-start-survey').on('click', function() {
+        $('#welcome-screen-container').fadeOut(250, function() {
+            $(this).remove();
+            load_survey(survey_name, cachedResponses);
+        });
+    });
 };
 
 const load_survey = function (survey_name, cachedResponses) {
@@ -419,7 +474,6 @@ const submit_response = function (data) {
 """
 
 WEB_FORM_CUSTOM_CSS = """
-
 /* Ocultar elementos innecesarios */
 nav, .navbar {
     display: none !important;
@@ -433,6 +487,100 @@ nav, .navbar {
 /* Ajustar padding superior */
 .web-form-container, .page-container {
     padding-top: 15px !important;
+}
+
+/* Estilos de pantalla de Bienvenida */
+.iq-welcome-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 15px;
+    min-height: calc(100vh - 100px);
+}
+.iq-welcome-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(44, 44, 44, 0.08);
+    max-width: 520px;
+    width: 100%;
+    margin: auto;
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    font-family: 'Rubik', sans-serif;
+    box-sizing: border-box;
+}
+.iq-welcome-firstline {
+    font-family: 'Rubik', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: #000000;
+    margin-bottom: 4px;
+}
+.iq-welcome-title {
+    font-family: 'Rubik', sans-serif;
+    font-weight: 500;
+    font-size: 20px;
+    color: #7B24FF;
+    margin-bottom: 12px;
+}
+.iq-welcome-desc {
+    font-family: 'Rubik', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+.iq-welcome-terms-box {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 28px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.iq-welcome-terms-label {
+    display: flex;
+    align-items: flex-start;
+    cursor: pointer;
+    margin: 0;
+}
+.iq-welcome-checkbox {
+    margin-top: 2px;
+    margin-right: 12px;
+    min-width: 18px;
+    width: 18px;
+    height: 18px;
+    accent-color: #7B24FF;
+    cursor: pointer;
+}
+.iq-welcome-terms-text {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.4;
+    font-family: 'Rubik', sans-serif;
+}
+.iq-welcome-btn {
+    background: #7B24FF !important;
+    color: #fff !important;
+    font-size: 16px !important;
+    font-family: 'Rubik', sans-serif !important;
+    font-weight: 500 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 14px 48px !important;
+    cursor: pointer !important;
+    transition: background 0.2s !important;
+    text-align: center !important;
+    display: block !important;
+    width: 100%;
+}
+.iq-welcome-btn:disabled {
+    background: #bcbcbc !important;
+    cursor: not-allowed !important;
 }
 
 /* Estilos para Likert Visual (SurveyJS imagepicker) */

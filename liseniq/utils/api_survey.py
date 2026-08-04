@@ -2,10 +2,42 @@ import frappe
 import json
 import jwt
 from time import time
-from frappe.utils import now
+from frappe.utils import now, md_to_html
 from frappe.utils.data import get_datetime, add_to_date
 from datetime import datetime, timezone
 import pytz
+
+def generate_default_welcome_markdown(payload: dict) -> str:
+    """
+    Genera el mensaje de bienvenida por defecto en formato Markdown estructurado.
+    Reemplaza las variables dinámicas de forma segura.
+    """
+    nombre_medicion = payload.get("nombre_medicion", "")
+    numero_preguntas = payload.get("numero_preguntas", 0)
+    
+    # Validación segura del número de preguntas
+    if not isinstance(numero_preguntas, int):
+        try:
+            numero_preguntas = int(numero_preguntas)
+        except (ValueError, TypeError):
+            numero_preguntas = 0
+
+    markdown_template = f"""Gracias por dedicar unos minutos para responder esta medición. 
+    
+Tu opinión es muy importante y nos ayudará a comprender mejor la experiencia de las personas, identificar oportunidades de mejora y tomar decisiones basadas en información confiable.
+
+Antes de comenzar, ten en cuenta lo siguiente:
+
+- Consta de {numero_preguntas} preguntas.
+- No existen respuestas correctas o incorrectas; responde con total sinceridad.
+- La información será utilizada únicamente para los fines definidos por la organización.
+- Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.
+
+[ ] He leído y acepto el [Aviso de Privacidad](https://qlip.cloud/aviso-de-privacidad/) y la [Política de Tratamiento de Datos](https://qlip.cloud/privacy-policy/) para participar en esta medición.
+
+Cuando estés listo, haz clic en "Comenzar" para iniciar la medición."""
+
+    return markdown_template
 
 def _now_utc_str():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -152,12 +184,23 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     su_status = survey_doc.su_status
     su_start_date = survey_doc.su_start_date
     su_end_date = survey_doc.su_end_date
-    survey_name_id = survey_doc.name
+    survey_name_id = survey_doc.get("name")
     is_leadership = survey_doc.su_is_leadership
     
     # Determinar los valores de bienvenida
-    welcome_subject = survey_doc.get("su_term_subject") if not survey_doc.get("su_default_welcome") else None
-    welcome_message = survey_doc.get("su_term_body") if not survey_doc.get("su_default_welcome") else None
+    welcome_subject = survey_doc.get("su_term_subject")
+    welcome_message = survey_doc.get("su_term_body")
+
+    if survey_doc.get("su_default_welcome"):
+        numero_preguntas = frappe.db.count("qp_IQ_SurveyQuestion", {"parent": survey_name_id}) if survey_name_id else 0
+        payload = {
+            "nombre_medicion": survey_name,
+            "numero_preguntas": numero_preguntas
+        }
+        # Inyectar Asunto y Cuerpo transformando Markdown a HTML Nativo
+        welcome_subject = f"¡Bienvenido/a a la medición {survey_name}!"
+        raw_markdown = generate_default_welcome_markdown(payload)
+        welcome_message = md_to_html(raw_markdown)
 
     # Respuesta exitosa base incluyendo campos de bienvenida personalizados
     success_response = {

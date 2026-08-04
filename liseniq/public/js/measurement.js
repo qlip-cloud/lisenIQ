@@ -444,8 +444,34 @@ class MeasurementCreator {
             this.updateStep4NextButton();
         });
 
-        personalizationStep.welcomeUseDefaultCheck?.addEventListener('change', () => {
-            this.state.wasUsingDefaultWelcome = personalizationStep.welcomeUseDefaultCheck.checked;
+        personalizationStep.welcomeUseDefaultCheck?.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            this.state.wasUsingDefaultWelcome = isChecked;
+
+            if (!isChecked) {
+                // Forzar el foco en la pestaña de bienvenida
+                this.setEmailType('welcome');
+                
+                const ec = this.state.measurementData.emailCustomization;
+                // Autocompletar solo si los campos están vacíos para no sobrescribir el trabajo del usuario
+                if (!ec.welcome_subject && !ec.welcome_body) {
+                    const mName = this.state.measurementData.name || 'esta medición';
+                    const qCount = this.state.measurementData.questions ? this.state.measurementData.questions.length : 0;
+                    
+                    ec.welcome_subject = `¡Bienvenido/a a la medición ${mName}!`;
+                    ec.welcome_body = `<p>Gracias por dedicar unos minutos para responder esta medición. Tu opinión es muy importante y nos ayudará a comprender mejor la experiencia de las personas, identificar oportunidades de mejora y tomar decisiones basadas en información confiable.</p>
+<p>Antes de comenzar, ten en cuenta lo siguiente:</p>
+<ul>
+<li>Consta de ${qCount} preguntas.</li>
+<li>No existen respuestas correctas o incorrectas; responde con total sinceridad.</li>
+<li>La información será utilizada únicamente para los fines definidos por la organización.</li>
+</ul>
+<p>Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.</p>
+<p>[ ] He leído y acepto el <a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener">Aviso de Privacidad</a> y la <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
+<p>Cuando estés listo, haz clic en "Comenzar" para iniciar la medición.</p>`;
+                }
+            }
+
             this.applyEmailCustomizationToggle();
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();

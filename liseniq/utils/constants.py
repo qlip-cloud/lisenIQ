@@ -267,21 +267,42 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
     // Si no hay mensaje personalizado, usa el texto por defecto
     const finalMessage = customMessage && customMessage.trim() !== '' ? customMessage : "Bienvenido/a a la medición. Por favor, lee y acepta los términos y condiciones para poder iniciar. Tu participación es muy importante para nosotros.";
     
+    // Validación dinámica para incrustar el campo de verificación de Markdown de ser encontrado.
+    let parsedMessage = finalMessage;
+    let hasNativeCheckbox = parsedMessage.includes('[ ]');
+    let termsBoxHTML = "";
+
+    if (hasNativeCheckbox) {
+        parsedMessage = parsedMessage.replace(
+            /\\[\\s*\\]\\s*([\\s\\S]*?)(?=<\\/p>|<br>|<\\/div>|$)/i,
+            `<div class="iq-welcome-terms-box">
+                <label class="iq-welcome-terms-label">
+                    <input type="checkbox" id="accept-terms-checkbox" class="iq-welcome-checkbox">
+                    <span class="iq-welcome-terms-text">$1</span>
+                </label>
+            </div>`
+        );
+    } else {
+        termsBoxHTML = `
+            <div class="iq-welcome-terms-box">
+                <label class="iq-welcome-terms-label">
+                    <input type="checkbox" id="accept-terms-checkbox" class="iq-welcome-checkbox">
+                    <span class="iq-welcome-terms-text">
+                        He leído y acepto los términos y condiciones (<a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Aviso de Privacidad</a> | <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Privacy Policy</a>), y consiento el tratamiento de mis datos y respuestas para los fines de esta medición.
+                    </span>
+                </label>
+            </div>
+        `;
+    }
+
     const welcomeHTML = `
         <div id="welcome-screen-container" class="iq-welcome-main">
             <div class="iq-welcome-card">
                 <div class="iq-welcome-firstline">${survey_name}</div>
                 <div class="iq-welcome-title">${finalSubject}</div>
-                <div class="iq-welcome-desc">${finalMessage}</div>
+                <div class="iq-welcome-desc">${parsedMessage}</div>
                 
-                <div class="iq-welcome-terms-box">
-                    <label class="iq-welcome-terms-label">
-                        <input type="checkbox" id="accept-terms-checkbox" class="iq-welcome-checkbox">
-                        <span class="iq-welcome-terms-text">
-                            He leído y acepto los términos y condiciones (<a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Aviso de Privacidad</a> | <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Privacy Policy</a>), y consiento el tratamiento de mis datos y respuestas para los fines de esta medición.
-                        </span>
-                    </label>
-                </div>
+                ${termsBoxHTML}
 
                 <div style="width: 100%; display: flex; justify-content: center; margin-top: 8px;">
                     <button id="btn-start-survey" class="iq-welcome-btn" disabled>Comenzar Medición</button>
@@ -365,7 +386,7 @@ const load_survey = function (survey_name, cachedResponses) {
 };
 
 const build_survey = function (data) {
-  frappe.survey_json = JSON.parse(data.survey_json.replaceAll("\\n", ""));
+  frappe.survey_json = JSON.parse(data.survey_json.replaceAll("\\\\n", ""));
   frappe.theme_json = data.theme_json
     ? JSON.parse(data.theme_json)
     : {
@@ -533,6 +554,18 @@ nav, .navbar {
     margin-bottom: 24px;
     line-height: 1.5;
 }
+
+.iq-welcome-desc ul {
+    padding-left: 20px !important;
+    margin-top: 8px !important;
+    margin-bottom: 16px !important;
+}
+.iq-welcome-desc ul li {
+    list-style-type: disc !important;
+    margin-bottom: 4px !important;
+    display: list-item !important;
+}
+
 .iq-welcome-terms-box {
     background: #f8f9fa;
     border: 1px solid #e9ecef;
@@ -551,9 +584,9 @@ nav, .navbar {
 .iq-welcome-checkbox {
     margin-top: 2px;
     margin-right: 12px;
-    min-width: 18px;
-    width: 18px;
-    height: 18px;
+    min-width: 18px !important;
+    width: 18px !important;
+    height: 18px !important;
     accent-color: #7B24FF;
     cursor: pointer;
 }

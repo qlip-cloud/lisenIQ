@@ -413,16 +413,19 @@ class MeasurementCreator {
 
         // Eventos de Personalización
         personalizationStep.typeButtons.invitation?.addEventListener('click', () => {
+            this.syncEmailStateFromFields();
             this.setEmailType('invitation');
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
         });
         personalizationStep.typeButtons.reminder?.addEventListener('click', () => {
+            this.syncEmailStateFromFields();
             this.setEmailType('reminder');
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
         });
         personalizationStep.typeButtons.welcome?.addEventListener('click', () => {
+            this.syncEmailStateFromFields();
             this.setEmailType('welcome');
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
@@ -439,6 +442,23 @@ class MeasurementCreator {
         // Eventos de los Checks de Personalización
         personalizationStep.useDefaultCheck?.addEventListener('change', () => {
             this.state.wasUsingDefaultEmail = personalizationStep.useDefaultCheck.checked;
+            
+            // Auto-rellenar con predeterminados si se desmarca y está vacío para ayudar al usuario
+            if (!personalizationStep.useDefaultCheck.checked) {
+                const ec = this.state.measurementData.emailCustomization;
+                const invDefaults = this.getDefaultTexts('invitation');
+                const remDefaults = this.getDefaultTexts('reminder');
+                
+                if (!ec.invitation_subject && !ec.invitation_body) {
+                    ec.invitation_subject = invDefaults.subject;
+                    ec.invitation_body = invDefaults.body;
+                }
+                if (!ec.reminder_subject && !ec.reminder_body) {
+                    ec.reminder_subject = remDefaults.subject;
+                    ec.reminder_body = remDefaults.body;
+                }
+            }
+
             this.applyEmailCustomizationToggle();
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
@@ -449,26 +469,13 @@ class MeasurementCreator {
             this.state.wasUsingDefaultWelcome = isChecked;
 
             if (!isChecked) {
-                // Forzar el foco en la pestaña de bienvenida
                 this.setEmailType('welcome');
-                
                 const ec = this.state.measurementData.emailCustomization;
-                // Autocompletar solo si los campos están vacíos para no sobrescribir el trabajo del usuario
+                
                 if (!ec.welcome_subject && !ec.welcome_body) {
-                    const mName = this.state.measurementData.name || 'esta medición';
-                    const qCount = this.state.measurementData.questions ? this.state.measurementData.questions.length : 0;
-                    
-                    ec.welcome_subject = `¡Bienvenido/a a la medición ${mName}!`;
-                    ec.welcome_body = `<p>Gracias por dedicar unos minutos para responder esta medición. Tu opinión es muy importante y nos ayudará a comprender mejor la experiencia de las personas, identificar oportunidades de mejora y tomar decisiones basadas en información confiable.</p>
-<p>Antes de comenzar, ten en cuenta lo siguiente:</p>
-<ul>
-<li>Consta de ${qCount} preguntas.</li>
-<li>No existen respuestas correctas o incorrectas; responde con total sinceridad.</li>
-<li>La información será utilizada únicamente para los fines definidos por la organización.</li>
-</ul>
-<p>Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.</p>
-<p>[ ] He leído y acepto el <a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener">Aviso de Privacidad</a> y la <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
-<p>Cuando estés listo, haz clic en "Comenzar" para iniciar la medición.</p>`;
+                    const defaults = this.getDefaultTexts('welcome');
+                    ec.welcome_subject = defaults.subject;
+                    ec.welcome_body = defaults.body;
                 }
             }
 
@@ -587,6 +594,195 @@ class MeasurementCreator {
         Object.values(step1Form).forEach(field => {
             field?.addEventListener('input', () => this.clearValidationError(field));
         });
+    }
+
+    getDefaultTexts(type) {
+        const mName = this.state.measurementData.name || 'esta medición';
+        const qCount = this.state.measurementData.questions ? this.state.measurementData.questions.length : 0;
+
+        if (type === 'invitation') {
+            return {
+                subject: `Bienvenido(a) al proceso de Medición - ${mName}`,
+                body: `<p>Hola,</p>
+<p>Te damos la bienvenida a <strong>${mName}</strong>, una iniciativa clave que nos permitirá obtener información valiosa acerca de nuestra compañía y avanzar en nuestro propósito de mejora continua.</p>
+<div class="info" style="margin: 20px 0; padding: 15px; background-color: #f0f4ff; border-left: 4px solid #004aad;">
+  <p><strong>Información importante sobre la encuesta:</strong></p>
+  <ul>
+    <li>Completarla tomará menos de 20 minutos.</li>
+    <li>Tus respuestas serán manejadas de forma confidencial y se utilizarán únicamente con fines estadísticos.</li>
+    <li>Para una mejor experiencia, te recomendamos usar Google Chrome y asegurarte de estar conectado a internet.</li>
+    <li>Si tienes alguna duda o presentas inconvenientes, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>.</li>
+    <li>Este enlace es personal e intransferible, por lo que no debe compartirse.</li>
+  </ul>
+</div>
+<p>Agradecemos de antemano tu tiempo y tus valiosos aportes en este importante proceso.</p>`
+            };
+        } else if (type === 'reminder') {
+            return {
+                subject: `Recordatorio: Encuesta de Medición - ${mName}`,
+                body: `<p>Hola,</p>
+<p>Queremos recordarte que aún tienes pendiente completar la encuesta – <strong>${mName}</strong>, la cual nos ayudará a obtener información valiosa acerca de nuestra compañía y continuar fortaleciendo nuestra cultura organizacional.</p>
+<div class="info" style="margin: 20px 0; padding: 15px; background-color: #f0f4ff; border-left: 4px solid #004aad;">
+  <p><strong>Información importante sobre la encuesta:</strong></p>
+  <ul>
+    <li>Completarla tomará menos de 20 minutos.</li>
+    <li>Tus respuestas serán manejadas de forma confidencial y se utilizarán únicamente con fines estadísticos.</li>
+    <li>Para una mejor experiencia, te recomendamos usar Google Chrome y asegurarte de estar conectado a internet.</li>
+    <li>Si tienes alguna duda o presentas inconvenientes, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>.</li>
+    <li>Este enlace es personal e intransferible, por lo que no debe compartirse.</li>
+  </ul>
+</div>
+<p>Tu voz es fundamental para este proceso. Gracias por tu participación y compromiso.</p>`
+            };
+        } else if (type === 'welcome') {
+            return {
+                subject: `¡Bienvenido/a a la medición ${mName}!`,
+                body: `<p>Gracias por dedicar unos minutos para responder esta medición. Tu opinión es muy importante y nos ayudará a comprender mejor la experiencia de las personas, identificar oportunidades de mejora y tomar decisiones basadas en información confiable.</p>
+<p>Antes de comenzar, ten en cuenta lo siguiente:</p>
+<ul>
+<li>Consta de ${qCount} preguntas.</li>
+<li>No existen respuestas correctas o incorrectas; responde con total sinceridad.</li>
+<li>La información será utilizada únicamente para los fines definidos por la organización.</li>
+</ul>
+<p>Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.</p>
+<p>[ ] He leído y acepto el <a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener">Aviso de Privacidad</a> y la <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
+<p>Cuando estés listo, haz clic en "Comenzar" para iniciar la medición.</p>`
+            };
+        }
+        return { subject: '', body: '' };
+    }
+
+    updateEditorReadonlyState() {
+        const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked;
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
+        const currentType = this.state.currentEmailType;
+
+        const isDefaultCurrent = (currentType === 'welcome') ? useDefaultWelcome : useDefaultEmail;
+
+        const subjectInput = this.ui.personalizationStep.subject;
+        const editor = window.tinymce?.get('email-body');
+        const bodyInput = this.ui.personalizationStep.body;
+
+        if (subjectInput) {
+            subjectInput.disabled = isDefaultCurrent;
+        }
+
+        if (editor) {
+            try {
+                editor.mode.set(isDefaultCurrent ? 'readonly' : 'design');
+            } catch (e) {
+                // Fallback de compatibilidad
+                if (isDefaultCurrent) {
+                    editor.setMode('readonly');
+                } else {
+                    editor.setMode('design');
+                }
+            }
+        } else if (bodyInput) {
+            bodyInput.disabled = isDefaultCurrent;
+        }
+    }
+
+    applyEmailCustomizationToggle() {
+        const { customizationFields, typeButtons } = this.ui.personalizationStep;
+        if (!customizationFields) return;
+
+        const surveyType = this.ui.contactsStep.surveyTypeSelect?.value;
+        const isAnonymousLink = surveyType === 'anonymous_link';
+
+        // Mantener visible el bloque del editor para permitir previsualizar
+        customizationFields.style.display = '';
+        
+        if (isAnonymousLink) {
+            // Si es enlace abierto anónimo no se envían correos, ocultar tabs para no confundir
+            if (typeButtons.invitation) typeButtons.invitation.style.display = 'none';
+            if (typeButtons.reminder) typeButtons.reminder.style.display = 'none';
+            if (typeButtons.welcome) typeButtons.welcome.style.display = '';
+            
+            if (this.state.currentEmailType !== 'welcome') {
+                this.setEmailType('welcome');
+            }
+        } else {
+            // En encuestas normales, siempre se ven las 3 pestañas
+            if (typeButtons.invitation) typeButtons.invitation.style.display = '';
+            if (typeButtons.reminder) typeButtons.reminder.style.display = '';
+            if (typeButtons.welcome) typeButtons.welcome.style.display = '';
+        }
+
+        this.updateEditorReadonlyState();
+    }
+
+    syncEmailFieldsFromState() {
+        const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked; 
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
+        const currentType = this.state.currentEmailType;
+
+        const isDefaultCurrent = (currentType === 'welcome') ? useDefaultWelcome : useDefaultEmail;
+
+        const ec = this.state.measurementData.emailCustomization;
+        const { subject, body } = this.ui.personalizationStep;
+        
+        const applyContent = () => {
+            const editor = window.tinymce?.get('email-body');
+            let subjText = '';
+            let bodyText = '';
+
+            if (isDefaultCurrent) {
+                const defaults = this.getDefaultTexts(currentType);
+                subjText = defaults.subject;
+                bodyText = defaults.body;
+            } else {
+                if (currentType === 'invitation') {
+                    subjText = ec.invitation_subject || '';
+                    bodyText = ec.invitation_body || '';
+                } else if (currentType === 'reminder') {
+                    subjText = ec.reminder_subject || '';
+                    bodyText = ec.reminder_body || '';
+                } else if (currentType === 'welcome') {
+                    subjText = ec.welcome_subject || '';
+                    bodyText = ec.welcome_body || '';
+                }
+            }
+
+            subject.value = subjText;
+            editor ? editor.setContent(bodyText) : (body.value = bodyText);
+            
+            // Reforzar el estado visual (editable vs readonly)
+            this.updateEditorReadonlyState();
+        };
+        
+        if (!this.editorReady) {
+            setTimeout(() => applyContent(), 120);
+        } else {
+            applyContent();
+        }
+    }
+
+    syncEmailStateFromFields() {
+        const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked;
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
+        const currentType = this.state.currentEmailType;
+
+        const isDefaultCurrent = (currentType === 'welcome') ? useDefaultWelcome : useDefaultEmail;
+
+        // No guardar el texto por defecto en el estado del usuario como si fuera propio
+        if (isDefaultCurrent) return;
+
+        const { subject, body } = this.ui.personalizationStep;
+        const ec = this.state.measurementData.emailCustomization;
+        const editor = window.tinymce?.get('email-body');
+        const content = editor ? editor.getContent() : (body?.value || '');
+
+        if (currentType === 'invitation') {
+            ec.invitation_subject = subject.value || '';
+            ec.invitation_body = content || '';
+        } else if (currentType === 'reminder') {
+            ec.reminder_subject = subject.value || '';
+            ec.reminder_body = content || '';
+        } else if (currentType === 'welcome') {
+            ec.welcome_subject = subject.value || '';
+            ec.welcome_body = content || '';
+        }
     }
 
     async downloadLeadershipTemplate() {
@@ -1253,90 +1449,6 @@ class MeasurementCreator {
             reminder.classList.add('email-type-active');
         } else if (this.state.currentEmailType === 'welcome') {
             welcome.classList.add('email-type-active');
-        }
-    }
-
-    // Función para ocultar/mostrar los campos de personalización
-    applyEmailCustomizationToggle() {
-        const { customizationFields, useDefaultCheck, welcomeUseDefaultCheck, typeButtons } = this.ui.personalizationStep;
-        if (!customizationFields) return;
-        
-        const useDefaultEmail = !!useDefaultCheck?.checked;
-        const useDefaultWelcome = !!welcomeUseDefaultCheck?.checked;
-
-        // Si ambos están marcados como "por defecto", ocultamos completamente el panel.
-        if (useDefaultEmail && useDefaultWelcome) {
-            customizationFields.style.display = 'none';
-        } else {
-            customizationFields.style.display = '';
-            
-            // Ocultar/Mostrar pestañas según la elección del usuario
-            if (typeButtons.invitation) typeButtons.invitation.style.display = useDefaultEmail ? 'none' : '';
-            if (typeButtons.reminder) typeButtons.reminder.style.display = useDefaultEmail ? 'none' : '';
-            if (typeButtons.welcome) typeButtons.welcome.style.display = useDefaultWelcome ? 'none' : '';
-
-            // Si el usuario oculta la pestaña donde está parado, lo movemos a la primera disponible.
-            if (useDefaultEmail && (this.state.currentEmailType === 'invitation' || this.state.currentEmailType === 'reminder')) {
-                this.setEmailType('welcome');
-            } else if (useDefaultWelcome && this.state.currentEmailType === 'welcome') {
-                this.setEmailType('invitation');
-            }
-        }
-    }
-
-    syncEmailFieldsFromState() {
-        const useDefaultEmail = this.ui.personalizationStep.useDefaultCheck?.checked; 
-        const useDefaultWelcome = this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
-
-        // No actualizar campos visualmente si la sección correspondiente está inactiva
-        if (this.state.currentEmailType === 'welcome' && useDefaultWelcome) return;
-        if (this.state.currentEmailType !== 'welcome' && useDefaultEmail) return;
-
-        const ec = this.state.measurementData.emailCustomization;
-        const { subject, body } = this.ui.personalizationStep;
-        
-        const applyContent = () => {
-            const editor = window.tinymce?.get('email-body');
-            if (this.state.currentEmailType === 'invitation') {
-                subject.value = ec.invitation_subject || '';
-                editor ? editor.setContent(ec.invitation_body || '') : (body.value = ec.invitation_body || '');
-            } else if (this.state.currentEmailType === 'reminder') {
-                subject.value = ec.reminder_subject || '';
-                editor ? editor.setContent(ec.reminder_body || '') : (body.value = ec.reminder_body || '');
-            } else if (this.state.currentEmailType === 'welcome') {
-                subject.value = ec.welcome_subject || '';
-                editor ? editor.setContent(ec.welcome_body || '') : (body.value = ec.welcome_body || '');
-            }
-        };
-        
-        if (!this.editorReady) {
-            setTimeout(() => applyContent(), 120);
-        } else {
-            applyContent();
-        }
-    }
-
-    syncEmailStateFromFields() {
-        const useDefaultEmail = this.ui.personalizationStep.useDefaultCheck?.checked;
-        const useDefaultWelcome = this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
-
-        if (this.state.currentEmailType === 'welcome' && useDefaultWelcome) return;
-        if (this.state.currentEmailType !== 'welcome' && useDefaultEmail) return;
-
-        const { subject, body } = this.ui.personalizationStep;
-        const ec = this.state.measurementData.emailCustomization;
-        const editor = window.tinymce?.get('email-body');
-        const content = editor ? editor.getContent() : (body?.value || '');
-
-        if (this.state.currentEmailType === 'invitation') {
-            ec.invitation_subject = subject.value || '';
-            ec.invitation_body = content || '';
-        } else if (this.state.currentEmailType === 'reminder') {
-            ec.reminder_subject = subject.value || '';
-            ec.reminder_body = content || '';
-        } else if (this.state.currentEmailType === 'welcome') {
-            ec.welcome_subject = subject.value || '';
-            ec.welcome_body = content || '';
         }
     }
 

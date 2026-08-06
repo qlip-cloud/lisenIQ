@@ -367,6 +367,8 @@ export class QuestionBuilder {
                 </div>
             `;
         }
+
+        const topicText = question.qp_topic_title || question.culture;
         
         questionCard.innerHTML = `
             <div class="question-item-header">
@@ -387,7 +389,7 @@ export class QuestionBuilder {
                     </div>
                     <div class="question-item-tags">
                         <span>Dimensión: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
-                        ${question.culture ? `<span style="margin-top:2px;">Tema: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
+                        ${topicText ? `<span style="margin-top:2px;">Tema: ${frappe.utils.escape_html(topicText)}</span>` : ''}
                     </div>
                 </div>
             </div>
@@ -845,6 +847,23 @@ export class QuestionBuilder {
                 if (this.contextMode === 'template') {
                     Object.assign(existingQ, newQuestion, { id: existingQ.id }); // Mantiene el ID original
 
+                    // Construimos la lista de opciones para enviar al backend
+                    let optionsForBackend = [];
+                    if (existingQ.options && existingQ.options.length > 0) {
+                        if (existingQ.typeName === LIKERT_TYPE_NAME || existingQ.typeName === LIKERT_VISUAL_TYPE_NAME) {
+                             optionsForBackend = existingQ.options.map(opt => ({
+                                qo_option_text: opt.text,
+                                qo_option_value: opt.value,
+                                qo_url: opt.url
+                            }));
+                        } else {
+                            optionsForBackend = existingQ.options.map(opt => ({
+                                qo_option_text: opt,
+                                qo_option_value: opt
+                            }));
+                        }
+                    }
+
                     // Actualizar la pregunta en el backend de forma silenciosa
                     frappe.call({
                         method: 'liseniq.www.iq-templates.new_template.update_template_question',
@@ -855,7 +874,10 @@ export class QuestionBuilder {
                                 qn_statement_others: existingQ.text_others,
                                 qn_type: existingQ.type,
                                 qn_demographic: existingQ.demographic,
-                                qp_topic: existingQ.culture
+                                qp_topic: existingQ.culture,
+                                qp_others: existingQ.qp_others,
+                                qp_none_above: existingQ.qp_none_above,
+                                qn_response_options: optionsForBackend
                             })
                         },
                         error: function(err) {

@@ -1747,6 +1747,9 @@ class MeasurementCreator {
             optionsHtml = `<div class="review-question-options">${optionsInnerHtml}</div>`;
         }
 
+        const topicText = question.culture;
+        const topicHtml = topicText ? `<span class="review-question-tag" style="margin-top: 5px;">Tema: ${frappe.utils.escape_html(topicText)}</span>` : '';
+
         item.innerHTML = `
             <div class="review-question-header">
                 <span class="review-question-number">${index + 1}</span>
@@ -1754,7 +1757,10 @@ class MeasurementCreator {
             </div>
             <div class="review-question-details">
                 <span>Tipo: ${frappe.utils.escape_html(displayName)}</span>
-                <div><span class="review-question-tag">Tag: ${frappe.utils.escape_html(question.demographic || 'General')}</span></div>
+                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                    <span class="review-question-tag">Dimensión: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                    ${topicHtml}
+                </div>
             </div>
             ${optionsHtml}`;
         return item;

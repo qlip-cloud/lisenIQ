@@ -59,6 +59,8 @@ def get_context(context):
                 type_name = t_data.qnt_type_name if t_data else "No definido"
 
                 demo_title = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else None
+                topic_title = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qp_topic, "dt_title") if q_doc.get("qp_topic") else None
+                
                 options = [opt.qo_option_text for opt in (q_doc.qn_response_options or [])]
                 questions.append({
                     "id": q_doc.name,
@@ -66,6 +68,8 @@ def get_context(context):
                     "type": q_doc.qn_type,
                     "typeName": type_name,
                     "demographic": demo_title,
+                    "qp_topic": q_doc.get("qp_topic"),
+                    "qp_topic_title": topic_title,
                     "options": options,
                     "nps_min": q_doc.qn_nps_min,
                     "nps_max": q_doc.qn_nps_max,
@@ -718,6 +722,27 @@ def save_measurement(data):
 
                             if q.get("qp_others"): new_question.qp_others = 1
                             if q.get("qp_none_above"): new_question.qp_none_above = 1
+
+                            # Guardar el tema (qp_topic) de la pregunta
+                            if q.get("qp_topic"):
+                                topic_val = q.get("qp_topic")
+                                if frappe.db.exists("qp_IQ_DemographicType", topic_val):
+                                    new_question.qp_topic = topic_val
+                                else:
+                                    topic_filters = {"dt_title": topic_val, "dt_object_type": "Pregunta"}
+                                    if user_company:
+                                        topic_filters["dt_creator_company"] = user_company
+                                    
+                                    topic_name = frappe.db.exists("qp_IQ_DemographicType", topic_filters)
+                                    if not topic_name:
+                                        topic_doc = frappe.new_doc("qp_IQ_DemographicType")
+                                        topic_doc.dt_title = topic_val
+                                        topic_doc.dt_object_type = "Pregunta"
+                                        if user_company:
+                                            topic_doc.dt_creator_company = user_company
+                                        topic_doc.insert(ignore_permissions=True)
+                                        topic_name = topic_doc.name
+                                    new_question.qp_topic = topic_name
                                 
                             new_question.insert(ignore_permissions=True)
                             manual_question_map[q["id"]] = new_question.name

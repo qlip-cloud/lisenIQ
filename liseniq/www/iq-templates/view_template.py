@@ -37,7 +37,10 @@ def get_context(context):
                 
                 type_name = frappe.db.get_value("qp_IQ_QuestionType", q_doc.qn_type, "qnt_type_name") if q_doc.qn_type else "No definido"
                 q_category_name = frappe.db.get_value("qp_IQ_TemplateCategory", q_doc.qn_category, "qnc_category") if q_doc.qn_category else "General"
+                
+                # Dimensión (Demographic) y Tema (Topic)
                 demographic_name = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qn_demographic, "dt_title") if q_doc.qn_demographic else "General"
+                topic_title = frappe.db.get_value("qp_IQ_DemographicType", q_doc.qp_topic, "dt_title") if q_doc.get("qp_topic") else None
 
                 question_data = {
                     "text": q_doc.qn_statement,
@@ -46,6 +49,7 @@ def get_context(context):
                     "category_name": q_category_name,
                     "demographic_name": demographic_name,
                     "demographic": demographic_name,
+                    "qp_topic_title": topic_title,
                     "options": []
                 }
 

@@ -106,6 +106,8 @@ def update_template_question(question_name, question_data):
         doc.qn_nps_min = data.get("qn_nps_min")
     if "qn_nps_max" in data:
         doc.qn_nps_max = data.get("qn_nps_max")
+    if "qn_optional" in data:
+        doc.qn_optional = data.get("qn_optional")
 
     # Actualizar opciones de respuesta si vienen
     if "qn_response_options" in data:

@@ -136,6 +136,7 @@ def get_questions_from_template(template_name):
             "nps_max": q_doc.qn_nps_max,
             "qp_others": q_doc.get("qp_others", 0),
             "qp_none_above": q_doc.get("qp_none_above", 0),
+            "qn_optional": q_doc.get("qn_optional", 0),
             "options": []
         }
 
@@ -207,6 +208,7 @@ def create_question_from_template_wizard(question_data):
         question_doc.qn_owner = user_company
         question_doc.qp_others = data.get("qp_others", 0)
         question_doc.qp_none_above = data.get("qp_none_above", 0)
+        question_doc.qn_optional = data.get("qn_optional", 0)
         
         demographic_title = data.get("qn_demographic")
         if demographic_title:
@@ -343,7 +345,7 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
             "qn_category", "qn_type", "qn_nps_min",
             "qn_nps_max", "qn_positive_statement", "qn_negative_statement", "qn_demographic",
             "qp_topic",
-            "qp_others", "qp_none_above"
+            "qp_others", "qp_none_above", "qn_optional"
         ],
         ignore_permissions=True
     )

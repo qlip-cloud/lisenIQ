@@ -724,8 +724,8 @@ def save_measurement(data):
                             if q.get("qp_none_above"): new_question.qp_none_above = 1
 
                             # Guardar el tema (qp_topic) de la pregunta
-                            if q.get("qp_topic"):
-                                topic_val = q.get("qp_topic")
+                            topic_val = q.get("qp_topic") or q.get("culture")
+                            if topic_val:
                                 if frappe.db.exists("qp_IQ_DemographicType", topic_val):
                                     new_question.qp_topic = topic_val
                                 else:

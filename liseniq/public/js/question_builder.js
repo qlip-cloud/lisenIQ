@@ -922,7 +922,7 @@ export class QuestionBuilder {
         this.handleQuestionTypeChange();
 
         qf.demographic.value = q.demographic || '';
-        if (qf.culture) qf.culture.value = q.culture || '';
+        if (qf.culture) qf.culture.value = q.culture || q.qp_topic_title || '';
         
         if (qf.negativeStatement) qf.negativeStatement.value = q.negative_statement || '';
         if (qf.positiveStatement) qf.positiveStatement.value = q.positive_statement || '';

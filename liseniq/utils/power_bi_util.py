@@ -306,7 +306,7 @@ def get_embed_config(report_id: Optional[str] = None,
         filtros_pbi.append({
             "$schema": "http://powerbi.com/product/schema#basicFilter",
             "target": {
-                "table": "report",          
+                "table": "usuarios",          
                 "column": "company_name"    
             },
             "operator": "In",

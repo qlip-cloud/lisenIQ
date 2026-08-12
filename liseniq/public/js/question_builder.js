@@ -130,6 +130,7 @@ export class QuestionBuilder {
                 demographicResults: document.querySelector('#new_question_demographic + .autocomplete-results'),
                 culture: document.getElementById('new_question_culture'),
                 cultureResults: document.querySelector('#new_question_culture + .autocomplete-results'),
+                mandatory: document.getElementById('new_question_mandatory'),
                 optionsSection: document.getElementById('options-based-section'),
                 optionsContainer: document.getElementById('options-container'),
                 visualOptionsSection: document.getElementById('visual-options-section'),
@@ -367,6 +368,8 @@ export class QuestionBuilder {
                 </div>
             `;
         }
+
+        const topicText = question.qp_topic_title || question.culture;
         
         questionCard.innerHTML = `
             <div class="question-item-header">
@@ -387,7 +390,8 @@ export class QuestionBuilder {
                     </div>
                     <div class="question-item-tags">
                         <span>Dimensión: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
-                        ${question.culture ? `<span style="margin-top:2px;">Tema: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
+                        ${topicText ? `<span style="margin-top:2px;">Tema: ${frappe.utils.escape_html(topicText)}</span>` : ''}
+                        ${question.qn_optional ? `<span style="margin-top:2px; color: #dc3545;">Opcional</span>` : `<span style="margin-top:2px; color: #28a745;">Obligatoria</span>`}
                     </div>
                 </div>
             </div>
@@ -625,6 +629,7 @@ export class QuestionBuilder {
                         category_name: questionToAdd.category_name,
                         demographic: questionToAdd.demographic_name,
                         culture: questionToAdd.culture_name,
+                        qn_optional: questionToAdd.qn_optional || 0,
                         options: options,
                         qp_others: questionToAdd.qp_others || 0,
                         qp_none_above: questionToAdd.qp_none_above || 0
@@ -658,6 +663,7 @@ export class QuestionBuilder {
         if (qf.positiveStatement) qf.positiveStatement.value = '';
         if (qf.npsMin) qf.npsMin.value = '';
         if (qf.npsMax) qf.npsMax.value = '';
+        if (qf.mandatory) qf.mandatory.checked = true;
 
         if (qf.optionsSection) qf.optionsSection.classList.add('d-none');
         if (qf.visualOptionsSection) {
@@ -803,7 +809,8 @@ export class QuestionBuilder {
             typeName: questionTypeName, 
             demographic: qf.demographic.value.trim(),
             culture: qf.culture ? qf.culture.value.trim() : null,
-            category_name: this.isLeadershipMode ? 'Liderazgo' : 'Manual' 
+            category_name: this.isLeadershipMode ? 'Liderazgo' : 'Manual',
+            qn_optional: qf.mandatory && !qf.mandatory.checked ? 1 : 0
         };
 
         if (questionTypeName === LIKERT_TYPE_NAME) {
@@ -845,6 +852,23 @@ export class QuestionBuilder {
                 if (this.contextMode === 'template') {
                     Object.assign(existingQ, newQuestion, { id: existingQ.id }); // Mantiene el ID original
 
+                    // Construimos la lista de opciones para enviar al backend
+                    let optionsForBackend = [];
+                    if (existingQ.options && existingQ.options.length > 0) {
+                        if (existingQ.typeName === LIKERT_TYPE_NAME || existingQ.typeName === LIKERT_VISUAL_TYPE_NAME) {
+                             optionsForBackend = existingQ.options.map(opt => ({
+                                qo_option_text: opt.text,
+                                qo_option_value: opt.value,
+                                qo_url: opt.url
+                            }));
+                        } else {
+                            optionsForBackend = existingQ.options.map(opt => ({
+                                qo_option_text: opt,
+                                qo_option_value: opt
+                            }));
+                        }
+                    }
+
                     // Actualizar la pregunta en el backend de forma silenciosa
                     frappe.call({
                         method: 'liseniq.www.iq-templates.new_template.update_template_question',
@@ -855,7 +879,11 @@ export class QuestionBuilder {
                                 qn_statement_others: existingQ.text_others,
                                 qn_type: existingQ.type,
                                 qn_demographic: existingQ.demographic,
-                                qp_topic: existingQ.culture
+                                qp_topic: existingQ.culture,
+                                qp_others: existingQ.qp_others,
+                                qp_none_above: existingQ.qp_none_above,
+                                qn_optional: existingQ.qn_optional,
+                                qn_response_options: optionsForBackend
                             })
                         },
                         error: function(err) {
@@ -894,12 +922,13 @@ export class QuestionBuilder {
         this.handleQuestionTypeChange();
 
         qf.demographic.value = q.demographic || '';
-        if (qf.culture) qf.culture.value = q.culture || '';
+        if (qf.culture) qf.culture.value = q.culture || q.qp_topic_title || '';
         
         if (qf.negativeStatement) qf.negativeStatement.value = q.negative_statement || '';
         if (qf.positiveStatement) qf.positiveStatement.value = q.positive_statement || '';
         if (qf.npsMin) qf.npsMin.value = q.nps_min || q.npsMin || '';
         if (qf.npsMax) qf.npsMax.value = q.nps_max || q.npsMax || '';
+        if (qf.mandatory) qf.mandatory.checked = !q.qn_optional;
 
         const selectedOption = qf.type.options[qf.type.selectedIndex];
         const questionTypeName = selectedOption ? selectedOption.text.trim() : '';

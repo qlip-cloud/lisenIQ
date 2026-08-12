@@ -216,7 +216,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     qn_demographic: q.demographic,
                     qp_topic: q.culture,
                     qp_others: q.qp_others ? 1 : 0,
-                    qp_none_above: q.qp_none_above ? 1 : 0
+                    qp_none_above: q.qp_none_above ? 1 : 0,
+                    qn_optional: q.qn_optional ? 1 : 0
                 };
                 if (q.options) {
                     if (q.typeName === 'Likert' || q.typeName === 'Likert Visual') {

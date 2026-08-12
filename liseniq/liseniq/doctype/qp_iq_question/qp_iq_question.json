@@ -41,10 +41,12 @@
    "reqd": 1
   },
   {
+   "allow_in_quick_entry": 1,
    "fieldname": "qn_statement",
    "fieldtype": "Small Text",
    "in_list_view": 1,
    "in_preview": 1,
+   "in_standard_filter": 1,
    "label": "Texto de la Pregunta / Enunciado Principal",
    "reqd": 1
   },
@@ -193,7 +195,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-08 19:18:29.750490",
+ "modified": "2026-08-05 11:40:48.968689",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

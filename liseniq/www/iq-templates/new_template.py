@@ -98,6 +98,27 @@ def update_template_question(question_name, question_data):
         doc.qn_type = data.get("qn_type")
     if "qn_statement_others" in data:
         doc.qn_statement_others = data.get("qn_statement_others")
+    if "qp_others" in data:
+        doc.qp_others = data.get("qp_others")
+    if "qp_none_above" in data:
+        doc.qp_none_above = data.get("qp_none_above")
+    if "qn_nps_min" in data:
+        doc.qn_nps_min = data.get("qn_nps_min")
+    if "qn_nps_max" in data:
+        doc.qn_nps_max = data.get("qn_nps_max")
+    if "qn_optional" in data:
+        doc.qn_optional = data.get("qn_optional")
+
+    # Actualizar opciones de respuesta si vienen
+    if "qn_response_options" in data:
+        doc.set("qn_response_options", [])
+        options = data.get("qn_response_options", [])
+        for opt in options:
+            doc.append("qn_response_options", {
+                "qo_option_text": opt.get("qo_option_text"),
+                "qo_option_value": opt.get("qo_option_value"),
+                "qo_url": opt.get("qo_url")
+            })
         
     # Validar o crear el demográfico dinámicamente
     demographic_title = data.get("qn_demographic")

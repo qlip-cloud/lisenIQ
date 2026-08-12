@@ -46,20 +46,24 @@
                                             <div class="mb-2">
                                                  <p class="review-question-text mb-1"><strong class="text-muted small">Yo:</strong> {{ question.text }}</p>
                                                  <p class="review-question-text"><strong class="text-muted small">Otros:</strong> {{ question.text_others }}</p>
-                                            </div>
-                                         {% else %}
-                                            <p class="review-question-text">{{ question.text }}</p>
-                                         {% endif %}
-                                    </div>
+                                        </div>
+                                     {% else %}
+                                        <p class="review-question-text">{{ question.text }}</p>
+                                     {% endif %}
                                 </div>
-                                <div class="review-question-details">
-                                    <span>Tipo: {{ question.type_name }}</span>
-                                    <span class="review-question-tag">Tag: {{ question.demographic_name or 'General' }}</span>
-                                    <!-- <span class="review-question-category">Categoría: {{ question.category_name }}</span> -->
+                            </div>
+                            <div class="review-question-details">
+                                <span>Tipo: {{ question.type_name }}</span>
+                                <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                                    <span class="review-question-tag">Dimensión: {{ question.demographic_name or 'General' }}</span>
+                                    {% if question.qp_topic_title %}
+                                        <span class="review-question-tag" style="margin-top: 2px;">Tema: {{ question.qp_topic_title }}</span>
+                                    {% endif %}
                                 </div>
-                                {% if question.options %}
-                                <div class="review-question-options">
-                                    {% for option in question.options %}
+                            </div>
+                            {% if question.options %}
+                            <div class="review-question-options">
+                                {% for option in question.options %}
                                         {% if option.url %}
                                             <div class="review-question-option">
                                                 <img src="{{ option.url }}" alt="" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">

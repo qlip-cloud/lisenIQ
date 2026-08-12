@@ -127,8 +127,8 @@ class MeasurementCreator {
                     welcome_body: ''
                 }
             },
-            wasUsingDefaultEmail: false,
-            wasUsingDefaultWelcome: true // Forzado a true por inhabilitación temporal
+            wasUsingDefaultEmail: true,
+            wasUsingDefaultWelcome: true
         };
         
         if (this.ui.stepperContainer) {
@@ -152,6 +152,14 @@ class MeasurementCreator {
     initializeDefaults() {
         this.initWysiwygEditor();
         this.setEmailType('invitation');
+        
+        // Inicializar checks de la vista
+        if (this.ui.personalizationStep.useDefaultCheck) {
+            this.ui.personalizationStep.useDefaultCheck.checked = true;
+        }
+        if (this.ui.personalizationStep.welcomeUseDefaultCheck) {
+            this.ui.personalizationStep.welcomeUseDefaultCheck.checked = true;
+        }
     }
 
     loadPreloadedQuestions() {
@@ -263,32 +271,40 @@ class MeasurementCreator {
             }
 
             // Personalización de correo y bienvenida
-            if (data.su_invitation_subject || data.su_invitation_body || data.su_reminder_subject || data.su_reminder_body || data.su_term_subject || data.su_term_body) {
-                this.state.measurementData.emailCustomization = {
-                    invitation_subject: data.su_invitation_subject || '',
-                    invitation_body: data.su_invitation_body || '',
-                    reminder_subject: data.su_reminder_subject || '',
-                    reminder_body: data.su_reminder_body || '',
-                    welcome_subject: data.su_term_subject || '',
-                    welcome_body: data.su_term_body || ''
-                };
-                
-                const useDefaultEmail = !!data.su_default_notif && String(data.su_default_notif) !== '0';
-                const useDefaultWelcome = true; // Inhabilitado temporalmente
-                
-                if (this.ui.personalizationStep.useDefaultCheck) {
-                    this.ui.personalizationStep.useDefaultCheck.checked = useDefaultEmail;
-                }
-                
-                this.state.wasUsingDefaultEmail = useDefaultEmail;
-                this.state.wasUsingDefaultWelcome = useDefaultWelcome;
-                
-                this.setEmailType('invitation');
-                this.applyEmailCustomizationToggle();
-                this.initWysiwygEditor(true, () => {
-                    this.syncEmailFieldsFromState();
-                });
+            this.state.measurementData.emailCustomization = {
+                invitation_subject: data.su_invitation_subject || '',
+                invitation_body: data.su_invitation_body || '',
+                reminder_subject: data.su_reminder_subject || '',
+                reminder_body: data.su_reminder_body || '',
+                welcome_subject: data.su_term_subject || '',
+                welcome_body: data.su_term_body || ''
+            };
+            
+            const useDefaultEmail = !!data.su_default_notif && String(data.su_default_notif) !== '0';
+            
+            // Lógica para saber si usamos bienvenida por defecto
+            let useDefaultWelcome = true;
+            if (data.hasOwnProperty('su_default_welcome')) {
+                useDefaultWelcome = !!data.su_default_welcome && String(data.su_default_welcome) !== '0';
+            } else if (data.su_term_subject || data.su_term_body) {
+                useDefaultWelcome = false;
             }
+            
+            if (this.ui.personalizationStep.useDefaultCheck) {
+                this.ui.personalizationStep.useDefaultCheck.checked = useDefaultEmail;
+            }
+            if (this.ui.personalizationStep.welcomeUseDefaultCheck) {
+                this.ui.personalizationStep.welcomeUseDefaultCheck.checked = useDefaultWelcome;
+            }
+            
+            this.state.wasUsingDefaultEmail = useDefaultEmail;
+            this.state.wasUsingDefaultWelcome = useDefaultWelcome;
+            
+            this.setEmailType('invitation');
+            this.applyEmailCustomizationToggle();
+            this.initWysiwygEditor(true, () => {
+                this.syncEmailFieldsFromState();
+            });
 
             // Bloquear campos no editables
             this.disableNonEditableFields();
@@ -352,7 +368,6 @@ class MeasurementCreator {
         
         if (stepNumber === 4) {
             this.initWysiwygEditor(true, () => {
-                if (this.state.isEditMode) this.setEmailType('invitation');
                 this.applyEmailCustomizationToggle();
                 this.syncEmailFieldsFromState();
                 this.updateStep4NextButton();
@@ -398,16 +413,19 @@ class MeasurementCreator {
 
         // Eventos de Personalización
         personalizationStep.typeButtons.invitation?.addEventListener('click', () => {
+            this.syncEmailStateFromFields();
             this.setEmailType('invitation');
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
         });
         personalizationStep.typeButtons.reminder?.addEventListener('click', () => {
+            this.syncEmailStateFromFields();
             this.setEmailType('reminder');
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
         });
         personalizationStep.typeButtons.welcome?.addEventListener('click', () => {
+            this.syncEmailStateFromFields();
             this.setEmailType('welcome');
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
@@ -424,6 +442,43 @@ class MeasurementCreator {
         // Eventos de los Checks de Personalización
         personalizationStep.useDefaultCheck?.addEventListener('change', () => {
             this.state.wasUsingDefaultEmail = personalizationStep.useDefaultCheck.checked;
+            
+            // Auto-rellenar con predeterminados si se desmarca y está vacío para ayudar al usuario
+            if (!personalizationStep.useDefaultCheck.checked) {
+                const ec = this.state.measurementData.emailCustomization;
+                const invDefaults = this.getDefaultTexts('invitation');
+                const remDefaults = this.getDefaultTexts('reminder');
+                
+                if (!ec.invitation_subject && !ec.invitation_body) {
+                    ec.invitation_subject = invDefaults.subject;
+                    ec.invitation_body = invDefaults.body;
+                }
+                if (!ec.reminder_subject && !ec.reminder_body) {
+                    ec.reminder_subject = remDefaults.subject;
+                    ec.reminder_body = remDefaults.body;
+                }
+            }
+
+            this.applyEmailCustomizationToggle();
+            this.syncEmailFieldsFromState();
+            this.updateStep4NextButton();
+        });
+
+        personalizationStep.welcomeUseDefaultCheck?.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            this.state.wasUsingDefaultWelcome = isChecked;
+
+            if (!isChecked) {
+                this.setEmailType('welcome');
+                const ec = this.state.measurementData.emailCustomization;
+                
+                if (!ec.welcome_subject && !ec.welcome_body) {
+                    const defaults = this.getDefaultTexts('welcome');
+                    ec.welcome_subject = defaults.subject;
+                    ec.welcome_body = defaults.body;
+                }
+            }
+
             this.applyEmailCustomizationToggle();
             this.syncEmailFieldsFromState();
             this.updateStep4NextButton();
@@ -539,6 +594,195 @@ class MeasurementCreator {
         Object.values(step1Form).forEach(field => {
             field?.addEventListener('input', () => this.clearValidationError(field));
         });
+    }
+
+    getDefaultTexts(type) {
+        const mName = this.state.measurementData.name || 'esta medición';
+        const qCount = this.state.measurementData.questions ? this.state.measurementData.questions.length : 0;
+
+        if (type === 'invitation') {
+            return {
+                subject: `Bienvenido(a) al proceso de Medición - ${mName}`,
+                body: `<p>Hola,</p>
+<p>Te damos la bienvenida a <strong>${mName}</strong>, una iniciativa clave que nos permitirá obtener información valiosa acerca de nuestra compañía y avanzar en nuestro propósito de mejora continua.</p>
+<div class="info" style="margin: 20px 0; padding: 15px; background-color: #f0f4ff; border-left: 4px solid #004aad;">
+  <p><strong>Información importante sobre la encuesta:</strong></p>
+  <ul>
+    <li>Completarla tomará menos de 20 minutos.</li>
+    <li>Tus respuestas serán manejadas de forma confidencial y se utilizarán únicamente con fines estadísticos.</li>
+    <li>Para una mejor experiencia, te recomendamos usar Google Chrome y asegurarte de estar conectado a internet.</li>
+    <li>Si tienes alguna duda o presentas inconvenientes, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>.</li>
+    <li>Este enlace es personal e intransferible, por lo que no debe compartirse.</li>
+  </ul>
+</div>
+<p>Agradecemos de antemano tu tiempo y tus valiosos aportes en este importante proceso.</p>`
+            };
+        } else if (type === 'reminder') {
+            return {
+                subject: `Recordatorio: Encuesta de Medición - ${mName}`,
+                body: `<p>Hola,</p>
+<p>Queremos recordarte que aún tienes pendiente completar la encuesta – <strong>${mName}</strong>, la cual nos ayudará a obtener información valiosa acerca de nuestra compañía y continuar fortaleciendo nuestra cultura organizacional.</p>
+<div class="info" style="margin: 20px 0; padding: 15px; background-color: #f0f4ff; border-left: 4px solid #004aad;">
+  <p><strong>Información importante sobre la encuesta:</strong></p>
+  <ul>
+    <li>Completarla tomará menos de 20 minutos.</li>
+    <li>Tus respuestas serán manejadas de forma confidencial y se utilizarán únicamente con fines estadísticos.</li>
+    <li>Para una mejor experiencia, te recomendamos usar Google Chrome y asegurarte de estar conectado a internet.</li>
+    <li>Si tienes alguna duda o presentas inconvenientes, escríbenos a <a href="mailto:info@occsolutions.org">info@occsolutions.org</a>.</li>
+    <li>Este enlace es personal e intransferible, por lo que no debe compartirse.</li>
+  </ul>
+</div>
+<p>Tu voz es fundamental para este proceso. Gracias por tu participación y compromiso.</p>`
+            };
+        } else if (type === 'welcome') {
+            return {
+                subject: `¡Bienvenido/a a la medición ${mName}!`,
+                body: `<p>Gracias por dedicar unos minutos para responder esta medición. Tu opinión es muy importante y nos ayudará a comprender mejor la experiencia de las personas, identificar oportunidades de mejora y tomar decisiones basadas en información confiable.</p>
+<p>Antes de comenzar, ten en cuenta lo siguiente:</p>
+<ul>
+<li>Consta de ${qCount} preguntas.</li>
+<li>No existen respuestas correctas o incorrectas; responde con total sinceridad.</li>
+<li>La información será utilizada únicamente para los fines definidos por la organización.</li>
+</ul>
+<p>Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.</p>
+<p>[ ] He leído y acepto el <a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener">Aviso de Privacidad</a> y la <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
+<p>Cuando estés listo, haz clic en "Comenzar" para iniciar la medición.</p>`
+            };
+        }
+        return { subject: '', body: '' };
+    }
+
+    updateEditorReadonlyState() {
+        const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked;
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
+        const currentType = this.state.currentEmailType;
+
+        const isDefaultCurrent = (currentType === 'welcome') ? useDefaultWelcome : useDefaultEmail;
+
+        const subjectInput = this.ui.personalizationStep.subject;
+        const editor = window.tinymce?.get('email-body');
+        const bodyInput = this.ui.personalizationStep.body;
+
+        if (subjectInput) {
+            subjectInput.disabled = isDefaultCurrent;
+        }
+
+        if (editor) {
+            try {
+                editor.mode.set(isDefaultCurrent ? 'readonly' : 'design');
+            } catch (e) {
+                // Fallback de compatibilidad
+                if (isDefaultCurrent) {
+                    editor.setMode('readonly');
+                } else {
+                    editor.setMode('design');
+                }
+            }
+        } else if (bodyInput) {
+            bodyInput.disabled = isDefaultCurrent;
+        }
+    }
+
+    applyEmailCustomizationToggle() {
+        const { customizationFields, typeButtons } = this.ui.personalizationStep;
+        if (!customizationFields) return;
+
+        const surveyType = this.ui.contactsStep.surveyTypeSelect?.value;
+        const isAnonymousLink = surveyType === 'anonymous_link';
+
+        // Mantener visible el bloque del editor para permitir previsualizar
+        customizationFields.style.display = '';
+        
+        if (isAnonymousLink) {
+            // Si es enlace abierto anónimo no se envían correos, ocultar tabs para no confundir
+            if (typeButtons.invitation) typeButtons.invitation.style.display = 'none';
+            if (typeButtons.reminder) typeButtons.reminder.style.display = 'none';
+            if (typeButtons.welcome) typeButtons.welcome.style.display = '';
+            
+            if (this.state.currentEmailType !== 'welcome') {
+                this.setEmailType('welcome');
+            }
+        } else {
+            // En encuestas normales, siempre se ven las 3 pestañas
+            if (typeButtons.invitation) typeButtons.invitation.style.display = '';
+            if (typeButtons.reminder) typeButtons.reminder.style.display = '';
+            if (typeButtons.welcome) typeButtons.welcome.style.display = '';
+        }
+
+        this.updateEditorReadonlyState();
+    }
+
+    syncEmailFieldsFromState() {
+        const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked; 
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
+        const currentType = this.state.currentEmailType;
+
+        const isDefaultCurrent = (currentType === 'welcome') ? useDefaultWelcome : useDefaultEmail;
+
+        const ec = this.state.measurementData.emailCustomization;
+        const { subject, body } = this.ui.personalizationStep;
+        
+        const applyContent = () => {
+            const editor = window.tinymce?.get('email-body');
+            let subjText = '';
+            let bodyText = '';
+
+            if (isDefaultCurrent) {
+                const defaults = this.getDefaultTexts(currentType);
+                subjText = defaults.subject;
+                bodyText = defaults.body;
+            } else {
+                if (currentType === 'invitation') {
+                    subjText = ec.invitation_subject || '';
+                    bodyText = ec.invitation_body || '';
+                } else if (currentType === 'reminder') {
+                    subjText = ec.reminder_subject || '';
+                    bodyText = ec.reminder_body || '';
+                } else if (currentType === 'welcome') {
+                    subjText = ec.welcome_subject || '';
+                    bodyText = ec.welcome_body || '';
+                }
+            }
+
+            subject.value = subjText;
+            editor ? editor.setContent(bodyText) : (body.value = bodyText);
+            
+            // Reforzar el estado visual (editable vs readonly)
+            this.updateEditorReadonlyState();
+        };
+        
+        if (!this.editorReady) {
+            setTimeout(() => applyContent(), 120);
+        } else {
+            applyContent();
+        }
+    }
+
+    syncEmailStateFromFields() {
+        const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked;
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
+        const currentType = this.state.currentEmailType;
+
+        const isDefaultCurrent = (currentType === 'welcome') ? useDefaultWelcome : useDefaultEmail;
+
+        // No guardar el texto por defecto en el estado del usuario como si fuera propio
+        if (isDefaultCurrent) return;
+
+        const { subject, body } = this.ui.personalizationStep;
+        const ec = this.state.measurementData.emailCustomization;
+        const editor = window.tinymce?.get('email-body');
+        const content = editor ? editor.getContent() : (body?.value || '');
+
+        if (currentType === 'invitation') {
+            ec.invitation_subject = subject.value || '';
+            ec.invitation_body = content || '';
+        } else if (currentType === 'reminder') {
+            ec.reminder_subject = subject.value || '';
+            ec.reminder_body = content || '';
+        } else if (currentType === 'welcome') {
+            ec.welcome_subject = subject.value || '';
+            ec.welcome_body = content || '';
+        }
     }
 
     async downloadLeadershipTemplate() {
@@ -1000,8 +1244,6 @@ class MeasurementCreator {
         if(btn) btn.disabled = !(evaluator && select.value);
     }
 
-    // Resto de funciones (Convencionales) ----------------------------
-
     handleSurveyTypeChange() {
         const { surveyTypeSelect, selectedContactsSection, responseTypeSelect } = this.ui.contactsStep;
         const { useDefaultCheck } = this.ui.personalizationStep;
@@ -1156,7 +1398,6 @@ class MeasurementCreator {
         }
     }
 
-    // Inicializa el editor WYSIWYG (TinyMCE) para el cuerpo del correo
     initWysiwygEditor(force = false, onReady = null) {
         const textareaId = 'email-body';
         const el = document.getElementById(textareaId);
@@ -1196,85 +1437,18 @@ class MeasurementCreator {
     setEmailType(type) {
         this.state.currentEmailType = type;
         const { invitation, reminder, welcome } = this.ui.personalizationStep.typeButtons;
-        if (!invitation || !reminder) return;
+        if (!invitation || !reminder || !welcome) return;
 
         invitation.classList.remove('email-type-active');
         reminder.classList.remove('email-type-active');
-        if (welcome) welcome.classList.remove('email-type-active');
+        welcome.classList.remove('email-type-active');
 
         if (this.state.currentEmailType === 'invitation') {
             invitation.classList.add('email-type-active');
         } else if (this.state.currentEmailType === 'reminder') {
             reminder.classList.add('email-type-active');
-        }
-    }
-
-    // Función para ocultar/mostrar los campos de personalización
-    applyEmailCustomizationToggle() {
-        const { customizationFields, useDefaultCheck, typeButtons } = this.ui.personalizationStep;
-        if (!customizationFields) return;
-        
-        const useDefaultEmail = !!useDefaultCheck?.checked;
-
-        if (useDefaultEmail) {
-            customizationFields.style.display = 'none';
-        } else {
-            customizationFields.style.display = '';
-            
-            if (typeButtons.invitation) typeButtons.invitation.style.display = useDefaultEmail ? 'none' : '';
-            if (typeButtons.reminder) typeButtons.reminder.style.display = useDefaultEmail ? 'none' : '';
-            if (typeButtons.welcome) typeButtons.welcome.style.display = 'none'; // Siempre oculto por inhabilitación temporal
-        }
-    }
-
-    syncEmailFieldsFromState() {
-        const isWelcome = this.state.currentEmailType === 'welcome';
-        // Forzamos uso por defecto en bienvenida para obviar este bloque si de alguna forma llega aquí
-        const useDefault = isWelcome ? true : this.ui.personalizationStep.useDefaultCheck?.checked; 
-
-        if (useDefault) {
-            return;
-        }
-
-        const ec = this.state.measurementData.emailCustomization;
-        const { subject, body } = this.ui.personalizationStep;
-        
-        const applyContent = () => {
-            const editor = window.tinymce?.get('email-body');
-            if (this.state.currentEmailType === 'invitation') {
-                subject.value = ec.invitation_subject || '';
-                editor ? editor.setContent(ec.invitation_body || '') : (body.value = ec.invitation_body || '');
-            } else if (this.state.currentEmailType === 'reminder') {
-                subject.value = ec.reminder_subject || '';
-                editor ? editor.setContent(ec.reminder_body || '') : (body.value = ec.reminder_body || '');
-            }
-        };
-        
-        if (!this.editorReady) {
-            setTimeout(() => applyContent(), 120);
-        } else {
-            applyContent();
-        }
-    }
-
-    syncEmailStateFromFields() {
-        const isWelcome = this.state.currentEmailType === 'welcome';
-        const useDefault = isWelcome ? true : this.ui.personalizationStep.useDefaultCheck?.checked;
-
-        // No sobreescribir el estado interno si el usuario está viendo actualmente el bloqueo por defecto
-        if (useDefault) return; 
-
-        const { subject, body } = this.ui.personalizationStep;
-        const ec = this.state.measurementData.emailCustomization;
-        const editor = window.tinymce?.get('email-body');
-        const content = editor ? editor.getContent() : (body?.value || '');
-
-        if (this.state.currentEmailType === 'invitation') {
-            ec.invitation_subject = subject.value || '';
-            ec.invitation_body = content || '';
-        } else if (this.state.currentEmailType === 'reminder') {
-            ec.reminder_subject = subject.value || '';
-            ec.reminder_body = content || '';
+        } else if (this.state.currentEmailType === 'welcome') {
+            welcome.classList.add('email-type-active');
         }
     }
 
@@ -1286,6 +1460,7 @@ class MeasurementCreator {
         const isAnonymousLink = surveyType === 'anonymous_link';
         
         const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked || isAnonymousLink;
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
 
         const ec = this.state.measurementData.emailCustomization;
 
@@ -1296,8 +1471,10 @@ class MeasurementCreator {
             (ec.reminder_body || '').trim()
         );
 
-        // Se inhabilita la validación de mensaje de bienvenida
-        const validWelcome = true;
+        const validWelcome = useDefaultWelcome || (
+            (ec.welcome_subject || '').trim() &&
+            (ec.welcome_body || '').trim()
+        );
 
         btn.disabled = !(validEmail && validWelcome);
     }
@@ -1307,6 +1484,7 @@ class MeasurementCreator {
         const isAnonymousLink = surveyType === 'anonymous_link';
 
         const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked || isAnonymousLink;
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
 
         const ec = this.state.measurementData.emailCustomization;
 
@@ -1314,6 +1492,8 @@ class MeasurementCreator {
         const invBody = (ec.invitation_body || '').trim();
         const remSubject = (ec.reminder_subject || '').trim();
         const remBody = (ec.reminder_body || '').trim();
+        const welSubject = (ec.welcome_subject || '').trim();
+        const welBody = (ec.welcome_body || '').trim();
 
         const showFieldError = (inputEl, msgIdSuffix, message) => {
             if (!inputEl) return;
@@ -1348,7 +1528,7 @@ class MeasurementCreator {
         let isValid = true;
         let tabToFocus = null;
 
-        // Comprobamos en qué pestaña enfocarnos si hay fallos (en orden)
+        // Comprobamos en qué pestaña enfocarnos si hay fallos
         if (!useDefaultEmail) {
             if (!invSubject || !invBody) {
                 tabToFocus = 'invitation';
@@ -1358,15 +1538,23 @@ class MeasurementCreator {
                 isValid = false;
             }
         }
+        
+        if (isValid && !useDefaultWelcome) {
+            if (!welSubject || !welBody) {
+                tabToFocus = 'welcome';
+                isValid = false;
+            }
+        }
 
         // Mostrar tab que falló y sus errores respectivos
         if (tabToFocus) {
             this.setEmailType(tabToFocus);
             this.syncEmailFieldsFromState();
             
-            const currentSubj = tabToFocus === 'invitation' ? invSubject : remSubject;
-            const currentBody = tabToFocus === 'invitation' ? invBody : remBody;
-            const typeNames = { invitation: 'invitación', reminder: 'recordatorio' };
+            let currentSubj = tabToFocus === 'invitation' ? invSubject : (tabToFocus === 'reminder' ? remSubject : welSubject);
+            let currentBody = tabToFocus === 'invitation' ? invBody : (tabToFocus === 'reminder' ? remBody : welBody);
+            
+            const typeNames = { invitation: 'invitación', reminder: 'recordatorio', welcome: 'bienvenida' };
             const typeName = typeNames[tabToFocus] || '';
 
             if (!currentSubj) {
@@ -1380,7 +1568,7 @@ class MeasurementCreator {
                     bodyEl && showFieldError(bodyEl, 'email-body-error', `El cuerpo de ${typeName} es obligatorio.`);
                 }
             }
-            showGlobalNotification('Completa los campos de asunto y cuerpo para los mensajes.', 'error');
+            showGlobalNotification('Completa los campos obligatorios.', 'error');
         }
 
         if (isValid && editor) {
@@ -1404,7 +1592,7 @@ class MeasurementCreator {
         const isAnonymousLink = surveyType === 'anonymous_link';
 
         const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked || isAnonymousLink;
-        const useDefaultWelcome = true; // Inhabilitado temporalmente
+        const useDefaultWelcome = !!this.ui.personalizationStep.welcomeUseDefaultCheck?.checked;
 
         const emailCustomization = {
             invitation_subject: useDefaultEmail ? '' : this.state.measurementData.emailCustomization.invitation_subject,
@@ -1559,6 +1747,9 @@ class MeasurementCreator {
             optionsHtml = `<div class="review-question-options">${optionsInnerHtml}</div>`;
         }
 
+        const topicText = question.culture;
+        const topicHtml = topicText ? `<span class="review-question-tag" style="margin-top: 5px;">Tema: ${frappe.utils.escape_html(topicText)}</span>` : '';
+
         item.innerHTML = `
             <div class="review-question-header">
                 <span class="review-question-number">${index + 1}</span>
@@ -1566,7 +1757,10 @@ class MeasurementCreator {
             </div>
             <div class="review-question-details">
                 <span>Tipo: ${frappe.utils.escape_html(displayName)}</span>
-                <div><span class="review-question-tag">Tag: ${frappe.utils.escape_html(question.demographic || 'General')}</span></div>
+                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                    <span class="review-question-tag">Dimensión: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
+                    ${topicHtml}
+                </div>
             </div>
             ${optionsHtml}`;
         return item;

@@ -2,10 +2,42 @@ import frappe
 import json
 import jwt
 from time import time
-from frappe.utils import now
+from frappe.utils import now, md_to_html
 from frappe.utils.data import get_datetime, add_to_date
 from datetime import datetime, timezone
 import pytz
+
+def generate_default_welcome_markdown(payload: dict) -> str:
+    """
+    Genera el mensaje de bienvenida por defecto en formato Markdown estructurado.
+    Reemplaza las variables dinámicas de forma segura.
+    """
+    nombre_medicion = payload.get("nombre_medicion", "")
+    numero_preguntas = payload.get("numero_preguntas", 0)
+    
+    # Validación segura del número de preguntas
+    if not isinstance(numero_preguntas, int):
+        try:
+            numero_preguntas = int(numero_preguntas)
+        except (ValueError, TypeError):
+            numero_preguntas = 0
+
+    markdown_template = f"""Gracias por dedicar unos minutos para responder esta medición. 
+    
+Tu opinión es muy importante y nos ayudará a comprender mejor la experiencia de las personas, identificar oportunidades de mejora y tomar decisiones basadas en información confiable.
+
+Antes de comenzar, ten en cuenta lo siguiente:
+
+- Consta de {numero_preguntas} preguntas.
+- No existen respuestas correctas o incorrectas; responde con total sinceridad.
+- La información será utilizada únicamente para los fines definidos por la organización.
+- Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.
+
+[ ] He leído y acepto el [Aviso de Privacidad](https://qlip.cloud/aviso-de-privacidad/) y la [Política de Tratamiento de Datos](https://qlip.cloud/privacy-policy/) para participar en esta medición.
+
+Cuando estés listo, haz clic en "Comenzar" para iniciar la medición."""
+
+    return markdown_template
 
 def _now_utc_str():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -141,15 +173,41 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
     rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
     
-    survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, ["name", "su_status", "su_start_date", "su_end_date", "su_is_leadership", "su_owner"], as_dict=True)
+    # Extraemos los campos su_term_subject y su_term_body para personalizar la pantalla de bienvenida
+    survey_doc = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, 
+        ["name", "su_status", "su_start_date", "su_end_date", "su_is_leadership", "su_owner", "su_term_subject", "su_term_body", "su_default_welcome"], 
+        as_dict=True)
+        
     if not survey_doc:
          return {"allow": False, "message": "Encuesta no encontrada."}
          
     su_status = survey_doc.su_status
     su_start_date = survey_doc.su_start_date
     su_end_date = survey_doc.su_end_date
-    survey_name_id = survey_doc.name
+    survey_name_id = survey_doc.get("name")
     is_leadership = survey_doc.su_is_leadership
+    
+    # Determinar los valores de bienvenida
+    welcome_subject = survey_doc.get("su_term_subject")
+    welcome_message = survey_doc.get("su_term_body")
+
+    if survey_doc.get("su_default_welcome"):
+        numero_preguntas = frappe.db.count("qp_IQ_SurveyQuestion", {"parent": survey_name_id}) if survey_name_id else 0
+        payload = {
+            "nombre_medicion": survey_name,
+            "numero_preguntas": numero_preguntas
+        }
+        # Inyectar Asunto y Cuerpo transformando Markdown a HTML Nativo
+        welcome_subject = f"¡Bienvenido/a a la medición {survey_name}!"
+        raw_markdown = generate_default_welcome_markdown(payload)
+        welcome_message = md_to_html(raw_markdown)
+
+    # Respuesta exitosa base incluyendo campos de bienvenida personalizados
+    success_response = {
+        "allow": True, 
+        "welcome_subject": welcome_subject, 
+        "welcome_message": welcome_message
+    }
 
     if status_finished and su_status == status_finished:
       return {"allow": False, "message": "La medición ha finalizado."}
@@ -183,8 +241,8 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
             {"sr_survey": survey_name_id, "sr_contact": frappe.db.get_value("Contact", {"custom_document_number": dni}, "name")}
           )
           if recipient_exists:
-            return {"allow": True}
-      return {"allow": True}
+            return success_response
+      return success_response
 
     secret = _get_jwt_secret()
     try:
@@ -231,13 +289,12 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
               {"sr_survey": survey_name_id, "sr_contact": contact_info.name}
           )
           if recipient_exists:
-              return {"allow": True}
+              return success_response
           else:
               return {"allow": False, "valid_dni": False, "message": "No está habilitado para responder esta encuesta."}
 
-        return {"allow": True}
+        return success_response
 
-      # Lógica para encuestas no públicas (con destinatarios)
       if not rid:
           public_token = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_public_token")
           if not dni:
@@ -326,7 +383,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
         if recipient.sr_status == rs_responded:
           return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
 
-      return {"allow": True}
+      return success_response
 
     except jwt.ExpiredSignatureError:
       return {"allow": False, "message": "El enlace ha expirado."}
@@ -337,7 +394,6 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     return {"allow": True}
   except jwt.InvalidTokenError:
     return {"allow": False, "message": "Enlace inválido o expirado."}
-
 
 @frappe.whitelist(allow_guest=True)
 def get_survey_route_for_public_link(token, dni=None):
@@ -456,7 +512,6 @@ def get_survey_route_for_public_link(token, dni=None):
         })
         
     return {"route": web_form_route, "is_leadership": True, "evaluations": evaluations}
-
 
 def generate_public_link_for_survey_hook(doc, method):
 

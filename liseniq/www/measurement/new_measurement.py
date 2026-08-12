@@ -74,7 +74,8 @@ def get_context(context):
                     "nps_min": q_doc.qn_nps_min,
                     "nps_max": q_doc.qn_nps_max,
                     "qp_others": q_doc.get("qp_others", 0),
-                    "qp_none_above": q_doc.get("qp_none_above", 0)
+                    "qp_none_above": q_doc.get("qp_none_above", 0),
+                    "qn_optional": q_doc.get("qn_optional", 0)
                 })
 
             # Datos de participantes
@@ -722,6 +723,8 @@ def save_measurement(data):
 
                             if q.get("qp_others"): new_question.qp_others = 1
                             if q.get("qp_none_above"): new_question.qp_none_above = 1
+                            
+                            new_question.qn_optional = q.get("qn_optional", 0)
 
                             # Guardar el tema (qp_topic) de la pregunta
                             topic_val = q.get("qp_topic") or q.get("culture")
@@ -775,7 +778,7 @@ def save_measurement(data):
                         "type": surveyjs_type,
                         "name": question_name,
                         "title": q["text"],
-                        "isRequired": "true"
+                        "isRequired": False if q.get("qn_optional") else True
                     }
 
                     if question_type_mnemonic == "scale_likert":

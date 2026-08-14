@@ -775,6 +775,11 @@ def save_measurement(data):
                     survey.su_name = new_name
                     name_changed = True
 
+                    # Al cambiar el nombre, forzamos la regeneración del token y el link público
+                    survey.su_public_link = None
+                    survey.su_public_token = None
+                    survey.su_custom_generate_public_link = 1
+
             survey.su_end_date = data.get("endDate")
             if data.get("startDate"):
                 survey.su_start_date = data.get("startDate")
@@ -877,9 +882,6 @@ def save_measurement(data):
                                 "description": field.description,
                             })
                     web_form.insert(ignore_permissions=True)
-                            
-                    if survey.su_is_anonymous and survey.su_public_link:
-                        survey.su_public_link = f"{frappe.utils.get_url(web_form_route)}?new=1"
 
                 else:
                     if surveyjs_doc_name:

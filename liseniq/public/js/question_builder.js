@@ -98,9 +98,25 @@ export class QuestionBuilder {
     _applyReadOnlyUI() {
         const { buttons, questionForm, bankModal } = this.ui;
 
-        [buttons.openQuestionBank, buttons.addQuestion, buttons.addOption].forEach(btn => {
+        [buttons.openQuestionBank, buttons.addQuestion, buttons.addOption, buttons.addVisualOption].forEach(btn => {
             if (btn) btn.disabled = this.isReadOnly;
         });
+
+        // Ocultar contenedores de agregar pregunta y banco si es solo lectura
+        const openBankContainer = buttons.openQuestionBank?.closest('.mt-4.mb-5');
+        if (openBankContainer) {
+            openBankContainer.style.display = this.isReadOnly ? 'none' : 'block';
+        }
+
+        const addForm = document.querySelector('.add-question-form');
+        if (addForm) {
+            addForm.style.display = this.isReadOnly ? 'none' : 'block';
+        }
+
+        const addBtnContainer = buttons.addQuestion?.closest('.text-center.mt-5');
+        if (addBtnContainer) {
+            addBtnContainer.style.display = this.isReadOnly ? 'none' : 'block';
+        }
 
         if (this.isReadOnly) {
             if (questionForm.demographicResults) questionForm.demographicResults.style.display = 'none';

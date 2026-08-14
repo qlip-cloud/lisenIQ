@@ -104,6 +104,7 @@ class MeasurementCreator {
             currentEmailType: 'invitation',
             measurementData: {
                 name: '',
+                status: '',
                 isLeadership: false,
                 startDate: '',
                 endDate: '',
@@ -200,7 +201,15 @@ class MeasurementCreator {
             this.state.isEditMode = true;
             this.state.docName = urlParams.get('name');
 
+            // Leer estado de la medición restaurado desde el backend
+            this.state.measurementData.status = data.status || '';
+            const isProgramada = this.state.measurementData.status === 'Programada';
+
             this.ui.step1Form.name.value = data.name || '';
+            if (this.ui.step1Form.name) {
+                this.ui.step1Form.name.disabled = !isProgramada;
+            }
+
             if (data.startDate) this.ui.step1Form.startDate.value = String(data.startDate).slice(0, 16);
             if (data.endDate) this.ui.step1Form.endDate.value = String(data.endDate).slice(0, 16);
             if (data.timezone) this.ui.step1Form.timezone.value = data.timezone;
@@ -228,10 +237,13 @@ class MeasurementCreator {
             if (data.questions) {
                 this.questionBuilder.setQuestions(data.questions);
             }
+            
+            // Activar modo edición/lectura de preguntas dinámicamente
+            const shouldBeReadOnly = !isProgramada;
             if (this.questionBuilder.setEditMode) {
-                this.questionBuilder.setEditMode(true);
+                this.questionBuilder.setEditMode(shouldBeReadOnly);
             } else if (this.questionBuilder.setReadOnly) {
-                this.questionBuilder.setReadOnly(true);
+                this.questionBuilder.setReadOnly(shouldBeReadOnly);
             }
 
             // Participantes Convencional
@@ -318,13 +330,17 @@ class MeasurementCreator {
     }
 
     disableNonEditableFields() {
-        const step2 = this.ui.steps.step2;
-        if (step2) {
-            step2.querySelectorAll('input, textarea, select, button').forEach(el => {
-                if (!['btn-back-step-2', 'btn-next-step-2'].includes(el.id)) {
-                    el.disabled = true;
-                }
-            });
+        const isProgramada = this.state.measurementData.status === 'Programada';
+
+        if (!isProgramada) {
+            const step2 = this.ui.steps.step2;
+            if (step2) {
+                step2.querySelectorAll('input, textarea, select, button').forEach(el => {
+                    if (!['btn-back-step-2', 'btn-next-step-2'].includes(el.id)) {
+                        el.disabled = true;
+                    }
+                });
+            }
         }
 
         const { surveyTypeSelect, responseTypeSelect, sendAllContactsCheck, fieldTypeSelect, availableCategories, selectedCategories, leadershipSection } = this.ui.contactsStep;
@@ -1629,7 +1645,8 @@ class MeasurementCreator {
                     surveyType: surveyType || 'selected',
                     responseType: this.ui.contactsStep.responseTypeSelect?.value || 'identified',
                     list: this.state.measurementData.contacts.list
-                }
+                },
+                questions: this.state.measurementData.status === 'Programada' ? this.state.measurementData.questions : undefined
             }
             : {
                 ...basePayload,

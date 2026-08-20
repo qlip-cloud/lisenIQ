@@ -143,8 +143,16 @@ def get_dashboard_data(survey):
         frappe.throw(f"Encuesta no encontrada: {survey}")
 
     from frappe.desk.query_report import run
-
-    report = run(REPORT_NAME, filters={"survey": survey})
+    
+    current_user = frappe.session.user
+    frappe.session.user = "Administrator" 
+    try:
+        report = run(REPORT_NAME, filters={"survey": survey})
+    except Exception as e:
+        frappe.session.user = current_user
+        raise e
+    finally:
+        frappe.session.user = current_user
     rows = report.get("result") or []
 
     if not rows:

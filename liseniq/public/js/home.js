@@ -60,6 +60,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.location.href = url;
     });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.survey-dashboard-btn');
+        if (!btn) return;
+
+        const surveyName = btn.getAttribute('data-survey');
+        if (!surveyName) return;
+
+        const category = btn.getAttribute('data-category');
+        console.log('Survey category:', category);
+        if (category === 'Cultura') {
+            window.open('/cultura-dashboard?survey=' + encodeURIComponent(surveyName), '_blank');
+            return;
+        }
+
+        if (category === 'Engagement') {
+            window.open('/engagement-dashboard?survey=' + encodeURIComponent(surveyName), '_blank');
+            return;
+        }
+        
+        // Default behavior for other categories
+        window.open('/engagement-dashboard?survey=' + encodeURIComponent(surveyName), '_blank');
+    });
     
     // Descargar reporte de seguimiento mediciones 360
      document.addEventListener('click', function(e) {

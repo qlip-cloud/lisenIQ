@@ -69,7 +69,7 @@ def get_context(context):
         surveys = frappe.get_all(
             "qp_IQ_Survey",
             filters=query_filters,
-            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link", "su_is_anonymous", "su_is_leadership", "su_report_generated", "modified", "creation"],
+            fields=["name", "su_name", "su_status", "su_start_date", "su_end_date", "su_public_link", "su_is_anonymous", "su_is_leadership", "su_report_generated", "modified", "creation", "su_template"],
             order_by="modified desc"
         )
     except frappe.DoesNotExistError:
@@ -99,6 +99,9 @@ def get_context(context):
         start_date_formatted = formatdate(survey.su_start_date, "dd MMM yyyy") if survey.su_start_date else ""
         end_date_formatted = formatdate(survey.su_end_date, "dd MMM yyyy") if survey.su_end_date else ""
 
+        template_doc = frappe.get_doc("qp_IQ_Template", survey.su_template) if survey.su_template else None
+        survey_category = frappe.db.get_value("qp_IQ_TemplateCategory", template_doc.tp_category, "qnc_category") if template_doc else "Desconocida"
+
         measurements_data.append({
             "name": survey.name,
             "title": survey.su_name,
@@ -111,6 +114,7 @@ def get_context(context):
             "public_link": survey.su_public_link,
             "is_anonymous": is_anonymous,
             "is_leadership": bool(survey.su_is_leadership),
+            "survey_category": survey_category,
             "has_generated_reports": bool(getattr(survey, "su_report_generated", 0))
         })
 

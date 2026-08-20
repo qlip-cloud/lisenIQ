@@ -1,0 +1,1983 @@
+{%- extends "templates/web.html" -%}
+
+{%- block title -%}{{ title }}{%- endblock -%}
+
+{%- block header -%}{%- endblock -%}
+
+{%- block content -%}
+<style>
+
+:root{
+  --blue:#0889D6; --blue-dark:#066AA8; --red:#EB493C; --red-dark:#C2352A; --teal:#48BBA1; --teal-dark:#2F9880;
+  --gray:#BFBFBF; --ink:#26313d; --ink-2:#68727e; --bg:#f4f6f8; --card:#ffffff; --border:#e3e8ec; --radius:14px; --gap:16px;
+  --crit:#D6362B; --low:#F07A3C; --modlow:#F3C13B; --modhigh:#C6D96A; --good:#7FC17E; --top:#3E9E52;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+.wrap{max-width:1440px;margin:0 auto;padding:18px 22px 70px;}
+.topbar{background:linear-gradient(120deg,var(--blue),var(--blue-dark));border-radius:var(--radius);padding:22px 26px;color:#fff;margin-bottom:var(--gap);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 4px 14px rgba(8,137,214,.25);}
+.topbar h1{margin:0;font-size:21px;font-weight:800;}
+.topbar p{margin:4px 0 0;font-size:12.5px;opacity:.9;}
+.topbar .badge-scale{display:inline-block;background:rgba(255,255,255,.18);border-radius:20px;padding:3px 11px;font-size:11px;font-weight:700;margin-left:8px;}
+
+.filterbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:var(--gap);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+.filterbar-label{font-size:11px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em;margin-right:2px;}
+.msel{position:relative;}
+.msel-btn{padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:#fafbfc;font-size:12.5px;cursor:pointer;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink);}
+.msel-caret{font-size:9px;color:var(--ink-2);}
+.msel.open .msel-btn{border-color:var(--blue);color:var(--blue-dark);background:#eef7fd;}
+.msel-panel{display:none;position:absolute;top:calc(100% + 5px);left:0;z-index:30;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 26px rgba(20,30,60,.16);min-width:230px;max-width:290px;padding:9px;}
+.msel.open .msel-panel{display:block;}
+.msel-actions{display:flex;gap:6px;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+.msel-actions button{flex:1;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:#f7f8fa;font-size:11px;cursor:pointer;color:var(--ink);}
+.msel-actions button:hover{background:#eef2f5;}
+.msel-options{max-height:230px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;}
+.msel-options label{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:5px 5px;border-radius:6px;cursor:pointer;}
+.msel-options label:hover{background:#f2f6fa;}
+.msel-options input{accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;}
+.msel-options .n-tag{margin-left:auto;font-size:10.5px;color:var(--ink-2);}
+#filter-summary{font-size:12px;color:var(--ink-2);margin-left:auto;font-weight:600;}
+#btn-clear-filters{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer;font-weight:700;color:var(--red-dark);}
+#btn-clear-filters:hover{background:#fff0ef;}
+.filter-chips-row{display:none;flex-wrap:wrap;gap:8px;align-items:center;margin:-6px 0 var(--gap);padding:9px 14px;background:#eef7fd;border:1px solid #cfe4fb;border-radius:10px;}
+.filter-chips-row .chips-label{font-size:11px;font-weight:800;color:var(--blue-dark);text-transform:uppercase;letter-spacing:.03em;}
+.filter-chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #bfe0f7;border-radius:20px;padding:4px 6px 4px 12px;font-size:12px;color:var(--ink);}
+.filter-chip b{font-weight:700;color:var(--blue-dark);}
+.chip-x{cursor:pointer;width:18px;height:18px;border-radius:50%;background:#eef2f5;display:inline-flex;align-items:center;justify-content:center;font-size:13px;color:var(--ink-2);line-height:1;}
+.chip-x:hover{background:#fde9e8;color:var(--red-dark);}
+#chip-clear-all{margin-left:4px;padding:5px 12px;border-radius:20px;border:1px solid #bfe0f7;background:#fff;font-size:11.5px;font-weight:700;color:var(--blue-dark);cursor:pointer;}
+#chip-clear-all:hover{background:#fff0ef;border-color:#ffc9c5;color:var(--red-dark);}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--gap);position:sticky;top:0;background:var(--bg);z-index:10;padding:8px 0;}
+.tab-btn{padding:9px 15px;border-radius:10px;border:1px solid var(--border);background:#fff;font-weight:700;font-size:12.5px;color:var(--ink-2);cursor:pointer;transition:.15s;}
+.tab-btn:hover{border-color:var(--blue);color:var(--blue-dark);}
+.tab-btn.active{background:var(--blue-dark);color:#fff;border-color:var(--blue-dark);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;animation:fadein .18s ease;}
+@keyframes fadein{from{opacity:0;}to{opacity:1;}}
+
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:var(--gap);margin-bottom:var(--gap);}
+.card{position:relative;background:var(--card);border-radius:var(--radius);padding:18px 20px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(20,30,60,.06);margin-bottom:var(--gap);}
+.kpi-card{padding:15px 17px;}
+.kpi-label{font-size:10.5px;text-transform:uppercase;color:var(--ink-2);font-weight:800;margin-bottom:7px;letter-spacing:.03em;display:flex;align-items:center;gap:5px;}
+.help-ico{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#e3e6ea;color:var(--ink-2);font-size:9.5px;font-weight:800;cursor:help;flex-shrink:0;text-transform:none;}
+.kpi-value{font-size:26px;font-weight:800;color:var(--blue-dark);line-height:1.1;}
+.kpi-sub{font-size:11px;color:var(--ink-2);margin-top:5px;}
+.kpi-tag{display:inline-block;margin-top:7px;padding:2px 10px;border-radius:20px;color:#fff;font-size:10.5px;font-weight:800;}
+
+.grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:var(--gap);}
+.grid-2b{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap);}
+@media(max-width:980px){.grid-2,.grid-2b,.grid-3{grid-template-columns:1fr;}}
+.chart-box{position:relative;height:340px;}
+.chart-box.tall{height:440px;}
+.chart-box.short{height:230px;}
+
+.card h3{margin:0 0 4px;font-size:15px;font-weight:800;color:var(--ink);}
+.card .card-sub{font-size:12px;color:var(--ink-2);margin:0 0 14px;}
+
+table.dtable{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.dtable th{text-align:left;padding:9px 8px;background:#f3f5f7;color:var(--ink-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.02em;}
+table.dtable th[data-key]{cursor:pointer;user-select:none;}
+table.dtable th[data-key]:hover{color:var(--blue-dark);}
+table.dtable th.sorted{color:var(--blue-dark);}
+table.dtable td{padding:8px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
+table.dtable tr:hover td{background:#fafcfe;}
+.pill{padding:3px 11px;border-radius:20px;font-weight:800;color:#fff;font-size:12px;display:inline-block;min-width:44px;text-align:center;}
+.dist-bar{display:flex;height:16px;width:130px;border-radius:5px;overflow:hidden;background:#eee;}
+.dist-bar div{height:100%;}
+.rank-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.rank-list li{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;background:#f7f8fa;font-size:12.5px;}
+.rank-num{width:22px;height:22px;border-radius:50%;background:var(--blue-dark);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rank-list.opp .rank-num{background:var(--red-dark);}
+.alert-item,.finding-item{display:flex;gap:10px;align-items:flex-start;padding:10px 13px;border-radius:9px;background:#f7f8fa;margin-bottom:8px;font-size:12.5px;line-height:1.45;}
+.alert-item{background:#FFEDEC;border:1px solid #ffc9c5;}
+.finding-item{background:#EFF6FF;border:1px solid #cfe4fb;}
+.finding-item.warn{background:#FFF7E5;border:1px solid #ffe2a0;}
+.wc-box{display:flex;flex-wrap:wrap;gap:7px 11px;padding:16px;justify-content:center;align-items:center;min-height:200px;}
+.wc-word{font-weight:800;cursor:default;}
+.loading{padding:70px;text-align:center;color:var(--ink-2);font-size:13px;}
+.section-intro{font-size:12.5px;color:var(--ink-2);margin-bottom:14px;max-width:960px;line-height:1.55;}
+dl.glossary dt{font-weight:800;color:var(--blue-dark);margin-top:15px;font-size:13.5px;}
+dl.glossary dd{margin:4px 0 0;font-size:12.5px;color:var(--ink-2);line-height:1.55;}
+.glossary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:var(--gap);margin-bottom:var(--gap);}
+.glossary-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:0 1px 3px rgba(20,30,60,.06);border-top:4px solid var(--blue);}
+.glossary-card.competitiva{border-top-color:var(--red);}
+.glossary-card.humanista{border-top-color:var(--teal);}
+.glossary-badge{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:var(--blue);color:#fff;font-weight:800;font-size:13px;margin-bottom:12px;}
+.glossary-card.competitiva .glossary-badge{background:var(--red);}
+.glossary-card.humanista .glossary-badge{background:var(--teal);}
+.glossary-card h4{margin:0 0 8px;font-size:14px;color:var(--ink);font-weight:800;}
+.glossary-card p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.6;}
+.glossary-card .dims-tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+.glossary-card .dims-tag{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:#f2f4f6;color:var(--ink-2);}
+.glossary-toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:var(--gap);}
+.glossary-toc button{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:700;color:var(--blue-dark);cursor:pointer;}
+.glossary-toc button:hover{background:#eef7fd;border-color:var(--blue);}
+.dim-mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media(max-width:820px){.dim-mini-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:560px){.dim-mini-grid{grid-template-columns:1fr;}}
+.dim-mini-card{border:1px solid var(--border);border-radius:11px;padding:13px 15px;border-left:4px solid var(--blue);background:#fafbfc;}
+.dim-mini-card .dim-mini-title{font-size:12.5px;font-weight:800;color:var(--ink);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;}
+.dim-mini-card .dim-mini-tipo{font-size:9.5px;font-weight:700;color:#fff;padding:2px 8px;border-radius:20px;}
+.dim-mini-card p{margin:0;font-size:11.5px;color:var(--ink-2);line-height:1.5;}
+.concept-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;}
+.concept-item{border-left:3px solid var(--border);padding:2px 0 2px 14px;}
+.concept-item dt{font-weight:800;color:var(--ink);font-size:12.5px;margin-bottom:3px;}
+.concept-item dd{margin:0;font-size:12px;color:var(--ink-2);line-height:1.55;}
+.heat-legend-full{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--ink-2);}
+.heat-legend-full i{display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:5px;vertical-align:middle;}
+.heatgrid-33{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media(max-width:640px){.heatgrid-33{grid-template-columns:repeat(1,1fr);}}
+.dl-btn{position:absolute;top:14px;right:14px;background:#f3f5f7;border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;color:var(--ink-2);z-index:2;}
+.dl-btn:hover{background:#e9edf1;color:var(--blue-dark);}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:800;}
+.badge.ok{background:#e6f4ea;color:#3E9E52;}
+.badge.warn{background:#fff3d6;color:#a8710a;}
+.badge.bad{background:#fde9e8;color:#C2352A;}
+select.small{padding:6px 9px;font-size:12px;border-radius:7px;border:1px solid var(--border);}
+.tag-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.subtab-row{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.subtab-btn{padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:#fff;font-size:11.5px;font-weight:700;color:var(--ink-2);cursor:pointer;}
+.subtab-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.two-col-attr{display:grid;grid-template-columns:1fr 1fr;}
+.attr-neg{color:var(--ink-2);font-size:12px;padding:8px 12px;border-right:1px dashed var(--border);}
+.attr-pos{color:var(--ink);font-size:12px;padding:8px 12px;font-weight:600;}
+.search-box{padding:7px 11px;border-radius:8px;border:1px solid var(--border);font-size:12.5px;min-width:220px;}
+footer.credits{text-align:center;color:var(--ink-2);font-size:11px;margin-top:26px;}
+.scroll-x{overflow-x:auto;}
+
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>Cultura Organizacional <span class="badge-scale">Escala 1–5</span></h1>
+      <p id="org-title">Cargando medición…</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div id="header-kpi" style="text-align:right;font-size:12px;opacity:.92;"></div>
+      <button id="exportPdfBtn" style="padding:8px 14px;border-radius:9px;border:none;background:rgba(255,255,255,.18);color:#fff;font-weight:700;font-size:12px;cursor:pointer;">⬇ Exportar Todo (PDF)</button>
+    </div>
+  </div>
+
+  <div class="filterbar" id="filterbar"></div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="resumen">Resumen Ejecutivo</button>
+    <button class="tab-btn" data-tab="tipos">Tipos de Cultura</button>
+    <button class="tab-btn" data-tab="dimensiones">Dimensiones</button>
+    <button class="tab-btn" data-tab="atributos">Atributos y Preguntas</button>
+    <button class="tab-btn" data-tab="ranking">Ranking</button>
+    <button class="tab-btn" data-tab="dispersion">Dispersión</button>
+    <button class="tab-btn" data-tab="tendencias">Tendencias</button>
+    <button class="tab-btn" data-tab="compvar">Comparar por Variable</button>
+    <button class="tab-btn" data-tab="abiertas">Preguntas Abiertas</button>
+    <button class="tab-btn" data-tab="insights">Insights Automáticos</button>
+    <button class="tab-btn" data-tab="glosario">Glosario</button>
+  </div>
+
+  <div id="app-root"><div class="loading">Cargando datos de la medición…</div></div>
+
+  <footer class="credits">Dashboard de Cultura Organizacional · Metodología OCC · Datos en vivo desde ERPNext</footer>
+</div>
+
+<!-- Librerías vía CDN (no se incrusta el ~1MB de la versión standalone offline;
+     esta es una Website Page normal servida por Frappe, con conexión). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
+
+<script>
+</script>
+<script>
+// ============================================================================
+// app_core.js — ERPNext / Frappe variant
+//
+// Reemplaza la carga desde JSON embebido (versión standalone) por un
+// fetch() al endpoint whitelisted del backend. Todo lo que sigue después de
+// este archivo (app_ui.js, app_tabs*.js, app_boot.js) NO CAMBIÓ de forma
+// estructural — siguen esperando encontrar `window.__CD` ya poblado con la
+// MISMA forma interna que la versión standalone. Este archivo es el único
+// que sabe que los datos vienen de Frappe en vez de un <script type=
+// "application/json">.
+//
+// Como el fetch es asíncrono, TODO el resto de la app (app_ui.js en
+// adelante) se ejecuta DESPUÉS de que awaitDashboardData() resuelve —
+// ver el bootstrap al final de este archivo.
+// ============================================================================
+window.__ERPNEXT_APP_MAIN__ = async function () {
+'use strict';
+
+const root = document.getElementById('app-root');
+const params = new URLSearchParams(window.location.search);
+
+if (!SURVEY) {
+  root.innerHTML = `<div class="loading">Falta el parámetro <code>?survey=</code> en la URL.</div>`;
+  throw new Error('Missing survey param');
+}
+
+root.innerHTML = `<div class="loading">Cargando datos de la medición…</div>`;
+
+let apiResponse;
+try {
+  const url = '/api/method/liseniq.api.cultura_dashboard.get_dashboard_data?survey=' + encodeURIComponent(SURVEY);
+  const res = await fetch(url, { credentials: 'same-origin' });
+  const body = await res.json();
+  if (!res.ok) {
+    const msg = (body && body._server_messages) ? JSON.parse(body._server_messages).map(m => JSON.parse(m).message).join(' ') : (body.exc_type || res.statusText);
+    throw new Error(msg || ('HTTP ' + res.status));
+  }
+  apiResponse = body.message; // frappe.whitelist() responses are wrapped in {"message": ...}
+} catch (e) {
+  root.innerHTML = `<div class="loading">No se pudo cargar el dashboard: ${String(e.message || e).replace(/</g, '&lt;')}<br><br>Verifica que tienes sesión iniciada y que la medición existe.</div>`;
+  throw e;
+}
+
+// ============================================================================
+// ADAPTADOR: transforma el payload de la API (records en arreglos posicionales,
+// catálogo de 2 niveles tipo/dimensión, wordclouds ya agregadas server-side)
+// en la MISMA forma interna que usaba la versión standalone:
+//   DATA = { meta, catalogs, atributos, respondents, roster, wordclouds_raw }
+// ============================================================================
+const api = apiResponse;
+const demoFieldsMeta = api.demographic_fields || []; // [{key,label}, ...] en el mismo orden que los valores demo de records/universe
+
+function buildRespondentId(i) { return 'resp-' + i; }
+
+const openTextLabels = api.open_text_labels_order || [];
+
+const respondents = (api.records || []).map((row, i) => {
+  const nDemo = demoFieldsMeta.length;
+  const demoVals = row.slice(0, nDemo);
+  const answers = row[nDemo] || [];
+  const openTextArr = row[nDemo + 1] || [];
+  const obj = { id: buildRespondentId(i) };
+  demoFieldsMeta.forEach((f, idx) => { obj[f.key] = demoVals[idx] || 'Sin dato'; });
+  const r = {};
+  answers.forEach((v, code) => { if (v != null) r[code] = v; });
+  obj.r = r;
+  // tokens por pregunta abierta, indexados por posición en openTextLabels
+  obj.openText = {};
+  openTextLabels.forEach((label, idx) => { obj.openText[label] = openTextArr[idx] || []; });
+  return obj;
+});
+
+const roster = (api.universe || []).map(row => {
+  const obj = {};
+  demoFieldsMeta.forEach((f, idx) => { obj[f.key] = row[idx] || 'Sin dato'; });
+  return obj;
+});
+
+const atributos = (api.attributes || []).map(a => ({
+  id: a.code, positivo: a.text, negativo: null, dimension: a.dimension, tipo: a.tipo, orden: a.code,
+}));
+
+const catalogs = {};
+demoFieldsMeta.forEach(f => {
+  const vals = new Set();
+  respondents.forEach(r => vals.add(r[f.key]));
+  roster.forEach(r => vals.add(r[f.key]));
+  catalogs[f.key] = [...vals].sort();
+});
+
+const tipoColors = api.tipo_colors || {};
+const META = {
+  organizacion: api.meta.survey || 'Medición',
+  medicion: 'Cultura Organizacional',
+  escala_min: 1, escala_max: 5,
+  min_n: api.meta.min_n || 5,
+  total_esperadas: api.meta.n_universo || api.meta.n_respondentes || 0,
+  total_respondidas: api.meta.n_respondentes || 0,
+  colores: { ...tipoColors, neutro: '#BFBFBF' },
+  heat_bands: [
+    { label: 'Crítico', min: 1.00, max: 1.67, color: '#D6362B' },
+    { label: 'Bajo', min: 1.67, max: 2.33, color: '#F07A3C' },
+    { label: 'Moderado-bajo', min: 2.33, max: 3.00, color: '#F3C13B' },
+    { label: 'Moderado-alto', min: 3.00, max: 3.67, color: '#C6D96A' },
+    { label: 'Bueno', min: 3.67, max: 4.33, color: '#7FC17E' },
+    { label: 'Sobresaliente', min: 4.33, max: 5.001, color: '#3E9E52' },
+  ],
+  dimensiones_orden: api.dimensions_order || [],
+  tipos_orden: api.tipos_order || [],
+  preguntas_abiertas: Object.keys(api.wordclouds || {}),
+  preguntas_abiertas_labels: Object.fromEntries(Object.keys(api.wordclouds || {}).map(k => [k, k])),
+};
+
+const DATA = { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels };
+
+document.getElementById('org-title').textContent = META.organizacion + ' · ' + META.medicion;
+
+// ============================================================================
+// A partir de aquí: MISMO motor de agregación que la versión standalone
+// (sin cambios de lógica, solo que ahora opera sobre `respondents`/`roster`
+// construidos arriba en vez de venir ya armados en el JSON embebido).
+// ============================================================================
+const ATTRS = DATA.atributos;
+const ATTR_BY_ID = {}; ATTRS.forEach(a => ATTR_BY_ID[a.id] = a);
+const MIN_N = META.min_n;
+const COLORS = META.colores;
+const HEAT_BANDS = META.heat_bands;
+const DIM_ORDEN = META.dimensiones_orden;
+const TIPO_ORDEN = META.tipos_orden;
+
+function mean(arr) { const v = arr.filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; }
+function stddev(arr) {
+  const v = arr.filter(x => x != null && !isNaN(x));
+  if (v.length < 2) return 0;
+  const m = mean(v);
+  return Math.sqrt(v.reduce((a, b) => a + (b - m) * (b - m), 0) / (v.length - 1));
+}
+function fmt1(v) { return v == null || isNaN(v) ? '—' : v.toFixed(2); }
+function fmtPct(v) { return v == null || isNaN(v) ? '—' : v.toFixed(1) + '%'; }
+function fmtDelta(v) { if (v == null || isNaN(v)) return '—'; return (v > 0 ? '+' : '') + v.toFixed(2); }
+function deltaColor(v) { if (v == null || isNaN(v)) return 'var(--ink-2)'; return v > 0.02 ? '#3E9E52' : (v < -0.02 ? '#C2352A' : 'var(--ink-2)'); }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function normalizeSearch(s) { return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
+function heatTier(avg) {
+  if (avg == null || isNaN(avg)) return { label: '—', color: '#ccc' };
+  for (const b of HEAT_BANDS) { if (avg >= b.min && avg < b.max) return b; }
+  return HEAT_BANDS[HEAT_BANDS.length - 1];
+}
+function favDesfav(vals) {
+  const v = vals.filter(x => x != null);
+  const n = v.length;
+  if (!n) return { fav: null, desfav: null, neutral: null, dist: [0,0,0,0,0] };
+  const dist = [0,0,0,0,0];
+  v.forEach(x => { if (x>=1 && x<=5) dist[Math.round(x)-1]++; });
+  const fav = 100 * (dist[3] + dist[4]) / n;
+  const desfav = 100 * (dist[0] + dist[1]) / n;
+  const neutral = 100 * dist[2] / n;
+  return { fav, desfav, neutral, dist, n };
+}
+function suppress(n) { return n != null && n < MIN_N; }
+
+// ---------- Chart.js plugins (unchanged) ----------
+const barDataLabelsPlugin = {
+  id: 'barDataLabels',
+  afterDatasetsDraw(chart) {
+    const opts = chart.config.options.plugins.barDataLabels;
+    if (!opts || opts.enabled === false) return;
+    const { ctx } = chart;
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden) return;
+      meta.data.forEach((el, i) => {
+        const raw = ds.data[i];
+        if (raw == null) return;
+        const label = opts.format ? opts.format(raw) : Number(raw).toFixed(2);
+        ctx.save();
+        ctx.font = '700 11px -apple-system,Arial';
+        ctx.fillStyle = opts.color || '#26313d';
+        const pos = el.tooltipPosition ? el.tooltipPosition() : el.getProps(['x','y'],true);
+        if (chart.config.options.indexAxis === 'y') {
+          ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+          ctx.fillText(label, pos.x + 6, pos.y);
+        } else {
+          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+          ctx.fillText(label, pos.x, pos.y - 4);
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+const refLinePlugin = {
+  id: 'refLine',
+  afterDraw(chart) {
+    const opts = chart.config.options.plugins.refLine;
+    if (!opts || opts.value == null) return;
+    const { ctx, chartArea, scales } = chart;
+    const xScale = scales.x, yScale = scales.y;
+    ctx.save();
+    ctx.strokeStyle = '#26313d'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.5;
+    if (chart.config.options.indexAxis === 'y') {
+      const xPix = xScale.getPixelForValue(opts.value);
+      ctx.beginPath(); ctx.moveTo(xPix, chartArea.top); ctx.lineTo(xPix, chartArea.bottom); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#26313d'; ctx.font = '700 10px -apple-system,Arial'; ctx.textAlign = 'center';
+      ctx.fillText(opts.label || '', xPix, chartArea.top - 4);
+    } else {
+      const yPix = yScale.getPixelForValue(opts.value);
+      ctx.beginPath(); ctx.moveTo(chartArea.left, yPix); ctx.lineTo(chartArea.right, yPix); ctx.stroke();
+    }
+    ctx.restore();
+  }
+};
+const centerTextPlugin = {
+  id: 'centerText',
+  afterDraw(chart) {
+    const opts = chart.config.options.plugins.centerText;
+    if (!opts) return;
+    const { ctx, chartArea } = chart;
+    const cx = (chartArea.left + chartArea.right) / 2;
+    const cy = (chartArea.top + chartArea.bottom) / 2;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '800 22px -apple-system,Arial'; ctx.fillStyle = '#26313d';
+    ctx.fillText(opts.text || '', cx, cy - 6);
+    ctx.font = '700 11px -apple-system,Arial'; ctx.fillStyle = '#68727e';
+    ctx.fillText(opts.sub || '', cx, cy + 14);
+    ctx.restore();
+  }
+};
+const radarPointLabelsPlugin = {
+  id: 'radarPointLabels',
+  afterDatasetsDraw(chart) {
+    const opts = chart.config.options.plugins.radarPointLabels;
+    if (!opts || opts.enabled === false || chart.config.type !== 'radar') return;
+    const { ctx } = chart;
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden) return;
+      meta.data.forEach((el, i) => {
+        const raw = ds.data[i];
+        if (raw == null) return;
+        const pos = el.getProps ? el.getProps(['x', 'y'], true) : el;
+        ctx.save();
+        ctx.font = '800 10.5px -apple-system,Arial';
+        ctx.fillStyle = ds.borderColor || '#26313d';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const dy = di === 0 ? -8 : 14;
+        ctx.fillText(Number(raw).toFixed(2), pos.x, pos.y + dy);
+        ctx.restore();
+      });
+    });
+  }
+};
+Chart.register(barDataLabelsPlugin, refLinePlugin, centerTextPlugin, radarPointLabelsPlugin);
+Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif";
+Chart.defaults.animation = false;
+Chart.defaults.transitions.active.animation.duration = 0;
+
+// ---------- filter state (ahora dinámico, según demographic_fields de la API) ----------
+const FILTER_FIELDS = demoFieldsMeta.map(f => ({ key: f.key, label: f.label, cat: f.key }));
+const activeFilters = {};
+FILTER_FIELDS.forEach(f => activeFilters[f.key] = new Set(DATA.catalogs[f.cat] || []));
+
+function isFilterActive() {
+  return FILTER_FIELDS.some(f => activeFilters[f.key].size < (DATA.catalogs[f.cat] || []).length);
+}
+function filteredRespondents() {
+  return DATA.respondents.filter(r => FILTER_FIELDS.every(f => activeFilters[f.key].has(r[f.key])));
+}
+function filteredRoster() {
+  return DATA.roster.filter(r => FILTER_FIELDS.every(f => activeFilters[f.key].has(r[f.key])));
+}
+function filteredRespondentIds() {
+  return new Set(filteredRespondents().map(r => r.id));
+}
+
+// ---------- aggregation engine (unchanged logic) ----------
+function flatVals(respondents, attrFilter) {
+  const out = [];
+  respondents.forEach(r => {
+    Object.keys(r.r).forEach(aidStr => {
+      const aid = Number(aidStr);
+      if (attrFilter && !attrFilter(ATTR_BY_ID[aid])) return;
+      out.push(r.r[aidStr]);
+    });
+  });
+  return out;
+}
+function kpisGeneral(respondents) {
+  const vals = flatVals(respondents);
+  const fd = favDesfav(vals);
+  return { n: respondents.length, avg: mean(vals), disp: stddev(vals), fav: fd.fav, desfav: fd.desfav, neutral: fd.neutral, totalResp: vals.length };
+}
+function byTipo(respondents) {
+  return TIPO_ORDEN.map(tipo => {
+    const vals = flatVals(respondents, a => a.tipo === tipo);
+    const fd = favDesfav(vals);
+    return { tipo, avg: mean(vals), disp: stddev(vals), fav: fd.fav, desfav: fd.desfav, n: respondents.length, nResp: vals.length };
+  });
+}
+function byDimension(respondents) {
+  return DIM_ORDEN.map(dim => {
+    const attrsInDim = ATTRS.filter(a => a.dimension === dim);
+    const vals = flatVals(respondents, a => a.dimension === dim);
+    const fd = favDesfav(vals);
+    return { dimension: dim, tipo: attrsInDim.length ? attrsInDim[0].tipo : 'Sin tipo', avg: mean(vals), disp: stddev(vals), fav: fd.fav, desfav: fd.desfav, n: respondents.length, nResp: vals.length };
+  });
+}
+function byAtributo(respondents) {
+  return ATTRS.map(a => {
+    const vals = [];
+    respondents.forEach(r => { if (r.r[a.id] != null) vals.push(r.r[a.id]); });
+    const fd = favDesfav(vals);
+    return { attr: a, avg: mean(vals), disp: stddev(vals), fav: fd.fav, desfav: fd.desfav, dist: fd.dist, n: respondents.length, nResp: vals.length };
+  });
+}
+function byDemografico(respondents, fieldKey) {
+  const groups = {};
+  respondents.forEach(r => {
+    const g = r[fieldKey] || 'Sin dato';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(r);
+  });
+  return Object.keys(groups).map(g => {
+    const vals = flatVals(groups[g]);
+    const fd = favDesfav(vals);
+    return { group: g, avg: mean(vals), disp: stddev(vals), fav: fd.fav, n: groups[g].length };
+  });
+}
+// Participación: a diferencia de la versión standalone (que necesitaba un
+// heurístico de cruce por combinación de campos, porque la sábana no traía
+// un ID compartido con el roster), aquí 'roster' (universe) y 'respondents'
+// (records) vienen de la MISMA fuente de verdad en Frappe (Contact +
+// qp_IQ_ContactAdditionalDetail), así que el conteo por segmento es directo:
+// no hace falta "matched", basta contar respondents vs. roster por valor.
+// Recalcula la nube de palabras de UNA pregunta abierta a partir de los
+// respondentes ya filtrados (usa los tokens por persona guardados en
+// DATA.open_text_labels / respondent.openText), en vez de depender solo
+// del agregado fijo que manda la API. Así la pestaña de Preguntas Abiertas
+// SÍ responde a los filtros demográficos, igual que el resto del dashboard.
+function wordCloudForLabel(label, respondents) {
+  const counts = {};
+  let nValid = 0;
+  respondents.forEach(r => {
+    const tokens = (r.openText && r.openText[label]) || [];
+    if (tokens.length) nValid++;
+    tokens.forEach(w => { counts[w] = (counts[w] || 0) + 1; });
+  });
+  const words = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 60);
+  return { words: words.map(([word, count]) => ({ word, count })), n_valid: nValid, n_blank: Math.max(respondents.length - nValid, 0), total_unique_words: Object.keys(counts).length };
+}
+
+function participacionPorGrupo(fieldKey) {
+  const roster = filteredRoster();
+  const resp = filteredRespondents();
+  const expected = {}, obtained = {};
+  roster.forEach(r => {
+    const g = r[fieldKey] || 'Sin dato';
+    expected[g] = (expected[g] || 0) + 1;
+  });
+  resp.forEach(r => {
+    const g = r[fieldKey] || 'Sin dato';
+    obtained[g] = (obtained[g] || 0) + 1;
+  });
+  const allGroups = new Set([...Object.keys(expected), ...Object.keys(obtained)]);
+  const rows = [...allGroups].map(g => ({
+    group: g, expected: expected[g] || 0, obtained: obtained[g] || 0,
+    rate: expected[g] ? 100 * (obtained[g] || 0) / expected[g] : 0
+  }));
+  const visible = rows.filter(r => r.expected >= MIN_N);
+  const hidden = rows.filter(r => r.expected < MIN_N);
+  if (hidden.length) {
+    const agg = hidden.reduce((acc, r) => ({ expected: acc.expected + r.expected, obtained: acc.obtained + r.obtained }), { expected: 0, obtained: 0 });
+    visible.push({ group: `Otros (agrupados, n<${MIN_N} c/u)`, expected: agg.expected, obtained: agg.obtained, rate: agg.expected ? 100 * agg.obtained / agg.expected : 0, isAgg: true });
+  }
+  return visible;
+}
+
+window.__CD = {
+  DATA, META, ATTRS, ATTR_BY_ID, MIN_N, COLORS, HEAT_BANDS, DIM_ORDEN, TIPO_ORDEN,
+  mean, stddev, fmt1, fmtPct, fmtDelta, deltaColor, heatTier, favDesfav, suppress, escapeHtml, normalizeSearch,
+  activeFilters, FILTER_FIELDS, isFilterActive, filteredRespondents, filteredRoster, filteredRespondentIds,
+  flatVals, kpisGeneral, byTipo, byDimension, byAtributo, byDemografico, participacionPorGrupo,
+  wordcloudsRaw: DATA.wordclouds_raw, wordCloudForLabel, openTextLabels: DATA.open_text_labels,
+};
+
+// ============================================================================
+// A partir de aquí sigue, concatenado, el resto de la app (app_ui.js,
+// app_tabs*.js, app_boot.js) SIN CAMBIOS estructurales — ver bootstrap.
+// ============================================================================
+window.__ERPNEXT_RUN_REST__();
+};
+
+
+window.__ERPNEXT_RUN_REST__ = function () {
+(function () {
+'use strict';
+const CD = window.__CD;
+const { DATA, META, ATTRS, ATTR_BY_ID, MIN_N, COLORS, HEAT_BANDS, DIM_ORDEN, TIPO_ORDEN,
+  mean, stddev, fmt1, fmtPct, fmtDelta, deltaColor, heatTier, favDesfav, suppress, escapeHtml, normalizeSearch,
+  activeFilters, FILTER_FIELDS, isFilterActive, filteredRespondents, filteredRoster,
+  flatVals, kpisGeneral, byTipo, byDimension, byAtributo, byDemografico, participacionPorGrupo } = CD;
+
+const root = document.getElementById('app-root');
+const charts = {}; // id -> Chart instance
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function help(text) { return `<span class="help-ico" tabindex="0" title="${escapeHtml(text)}">?</span>`; }
+function dlBtn(targetId, name, type) { return `<button class="dl-btn" data-dl-type="${type || 'chart'}" data-dl-target="${targetId}" data-dl-name="${name}" title="Descargar PNG">⬇</button>`; }
+
+function heatLegendHTML() {
+  return `<div class="heat-legend-full">` + HEAT_BANDS.map(b => `<span><i style="background:${b.color}"></i>${b.label} (${b.min.toFixed(2)}–${b.max > 5 ? '5.00' : b.max.toFixed(2)})</span>`).join('') + `</div>`;
+}
+
+// ================= FILTER BAR =================
+function closeAllMsel() { document.querySelectorAll('.msel.open').forEach(m => m.classList.remove('open')); }
+function mselLabel(f) {
+  const total = DATA.catalogs[f.cat].length;
+  const sel = activeFilters[f.key].size;
+  if (sel === total) return f.label;
+  if (sel === 0) return f.label + ': ninguno';
+  return f.label + ` (${sel})`;
+}
+function renderFilterbar() {
+  const bar = document.getElementById('filterbar');
+  bar.innerHTML = `<span class="filterbar-label">Filtros</span>` + FILTER_FIELDS.map(f => {
+    const opts = DATA.catalogs[f.cat];
+    return `<div class="msel" data-key="${f.key}">
+      <button class="msel-btn" type="button">${escapeHtml(mselLabel(f))} <span class="msel-caret">▾</span></button>
+      <div class="msel-panel">
+        <div class="msel-actions">
+          <button data-act="all" type="button">Todos</button>
+          <button data-act="none" type="button">Ninguno</button>
+        </div>
+        <div class="msel-options">
+          ${opts.map(o => `<label><input type="checkbox" value="${escapeHtml(o)}" ${activeFilters[f.key].has(o) ? 'checked' : ''}> ${escapeHtml(o)}</label>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('') + `<span id="filter-summary"></span><button id="btn-clear-filters" type="button">Limpiar filtros</button>`;
+
+  if (!document.getElementById('active-filter-chips')) {
+    const chipsRow = document.createElement('div');
+    chipsRow.id = 'active-filter-chips';
+    chipsRow.className = 'filter-chips-row';
+    bar.insertAdjacentElement('afterend', chipsRow);
+  }
+
+  bar.querySelectorAll('.msel-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const msel = btn.closest('.msel');
+      const wasOpen = msel.classList.contains('open');
+      closeAllMsel();
+      if (!wasOpen) msel.classList.add('open');
+    });
+  });
+  bar.querySelectorAll('.msel').forEach(msel => {
+    const key = msel.dataset.key;
+    const f = FILTER_FIELDS.find(x => x.key === key);
+    msel.querySelector('[data-act="all"]').addEventListener('click', e => {
+      e.stopPropagation();
+      activeFilters[key] = new Set(DATA.catalogs[f.cat]);
+      msel.querySelectorAll('.msel-options input').forEach(c => c.checked = true);
+      onFilterChange();
+    });
+    msel.querySelector('[data-act="none"]').addEventListener('click', e => {
+      e.stopPropagation();
+      activeFilters[key] = new Set();
+      msel.querySelectorAll('.msel-options input').forEach(c => c.checked = false);
+      onFilterChange();
+    });
+    msel.querySelectorAll('.msel-options input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) activeFilters[key].add(cb.value); else activeFilters[key].delete(cb.value);
+        onFilterChange();
+      });
+    });
+  });
+  document.getElementById('btn-clear-filters').addEventListener('click', () => {
+    FILTER_FIELDS.forEach(f => activeFilters[f.key] = new Set(DATA.catalogs[f.cat]));
+    renderFilterbar();
+    onFilterChange();
+  });
+  updateFilterSummary();
+}
+function updateFilterSummary() {
+  const bar = document.getElementById('filterbar');
+  bar.querySelectorAll('.msel').forEach(msel => {
+    const key = msel.dataset.key;
+    const f = FILTER_FIELDS.find(x => x.key === key);
+    msel.querySelector('.msel-btn').innerHTML = `${escapeHtml(mselLabel(f))} <span class="msel-caret">▾</span>`;
+  });
+  const n = filteredRespondents().length;
+  const summary = document.getElementById('filter-summary');
+  if (summary) summary.textContent = isFilterActive() ? `Mostrando ${n} de ${DATA.respondents.length} respondentes` : `${n} respondentes (sin filtros)`;
+  const hk = document.getElementById('header-kpi');
+  hk.innerHTML = `Participación: <b>${META.total_respondidas}/${META.total_esperadas}</b> (${(100*META.total_respondidas/META.total_esperadas).toFixed(1)}%)`;
+  renderActiveChips();
+}
+
+function renderActiveChips() {
+  const chipsRow = document.getElementById('active-filter-chips');
+  if (!chipsRow) return;
+  const active = FILTER_FIELDS.filter(f => activeFilters[f.key].size < DATA.catalogs[f.cat].length);
+  if (!active.length) { chipsRow.innerHTML = ''; chipsRow.style.display = 'none'; return; }
+  chipsRow.style.display = 'flex';
+  chipsRow.innerHTML = `<span class="chips-label">Filtro activo:</span>` + active.map(f => {
+    const total = DATA.catalogs[f.cat].length;
+    const vals = [...activeFilters[f.key]];
+    let valueText;
+    if (vals.length === 0) valueText = 'ninguno seleccionado';
+    else if (vals.length <= 2) valueText = vals.map(escapeHtml).join(', ');
+    else valueText = `${vals.length} de ${total} seleccionados`;
+    return `<span class="filter-chip" data-key="${f.key}" title="${escapeHtml(vals.join(', '))}"><b>${escapeHtml(f.label)}:</b> ${valueText} <span class="chip-x" data-key="${f.key}">×</span></span>`;
+  }).join('') + `<button id="chip-clear-all" type="button">Limpiar todo</button>`;
+
+  chipsRow.querySelectorAll('.chip-x').forEach(x => {
+    x.addEventListener('click', () => {
+      const key = x.dataset.key;
+      const f = FILTER_FIELDS.find(ff => ff.key === key);
+      activeFilters[key] = new Set(DATA.catalogs[f.cat]);
+      renderFilterbar();
+      onFilterChange();
+    });
+  });
+  const clearAllBtn = document.getElementById('chip-clear-all');
+  if (clearAllBtn) clearAllBtn.addEventListener('click', () => {
+    FILTER_FIELDS.forEach(f => activeFilters[f.key] = new Set(DATA.catalogs[f.cat]));
+    renderFilterbar();
+    onFilterChange();
+  });
+}
+document.addEventListener('click', closeAllMsel);
+
+function onFilterChange() {
+  updateFilterSummary();
+  renderActiveTab();
+}
+
+// ================= TABS =================
+const RENDERERS = {};
+let activeTab = 'resumen';
+function renderActiveTab() {
+  Object.values(charts).forEach((_, id) => {});
+  Object.keys(charts).forEach(id => destroyChart(id));
+  if (RENDERERS[activeTab]) RENDERERS[activeTab]();
+}
+document.getElementById('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeTab = btn.dataset.tab;
+  renderActiveTab();
+});
+
+// ================= PNG DOWNLOAD =================
+function downloadDataUrl(dataUrl, filename) {
+  const a = document.createElement('a'); a.href = dataUrl; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.dl-btn');
+  if (!btn) return;
+  const type = btn.dataset.dlType;
+  const targetId = btn.dataset.dlTarget;
+  const name = btn.dataset.dlName || 'grafico';
+  if (type === 'chart') {
+    const chart = charts[targetId];
+    if (chart) downloadDataUrl(chart.toBase64Image('image/png', 1), name + '.png');
+  } else {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    btn.style.display = 'none';
+    html2canvas(el, { backgroundColor: '#ffffff', scale: 2 }).then(canvas => {
+      downloadDataUrl(canvas.toDataURL('image/png'), name + '.png');
+      btn.style.display = '';
+    });
+  }
+});
+
+// ================= EXPORT ALL TABS TO PDF (landscape, flowed per-card so nothing is cut) =================
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [136, 136, 136];
+}
+function buildFilterSummaryText() {
+  const active = FILTER_FIELDS.filter(f => activeFilters[f.key].size < DATA.catalogs[f.cat].length);
+  if (!active.length) return 'Sin filtros — vista de toda la organización';
+  return active.map(f => {
+    const vals = [...activeFilters[f.key]];
+    const valueText = vals.length <= 2 ? vals.join(', ') : `${vals.length} de ${DATA.catalogs[f.cat].length} seleccionados`;
+    return `${f.label}: ${valueText}`;
+  }).join('  ·  ');
+}
+
+// Collect "flow units": top-level cards / grid rows to capture as atomic images.
+// Recurses ONLY into specific script-populated wrapper divs (so their .card children
+// become individual units); everything else (including text blocks with inline <b>/<span>
+// markup, button rows, finding-items, etc.) is captured whole to avoid shattering it.
+const RECURSE_CONTAINER_IDS = new Set(['attr-dim-blocks', 'compvar-body', 'compvar-attr-blocks', 'wc-container']);
+function collectFlowUnits(root) {
+  const units = [];
+  function isAtomic(el) {
+    return el.classList.contains('card') || el.classList.contains('kpi-row') ||
+      el.classList.contains('grid-2') || el.classList.contains('grid-2b') || el.classList.contains('grid-3');
+  }
+  function walk(el) {
+    [...el.children].forEach(child => {
+      if (!(child instanceof HTMLElement)) return;
+      if (isAtomic(child)) {
+        units.push(child);
+      } else if (RECURSE_CONTAINER_IDS.has(child.id)) {
+        walk(child);
+      } else {
+        units.push(child); // whole element as one atomic unit
+      }
+    });
+  }
+  walk(root);
+  return units;
+}
+
+async function captureUnit(unit) {
+  const dlButtonsHidden = [...unit.querySelectorAll('.dl-btn')];
+  dlButtonsHidden.forEach(b => b.style.visibility = 'hidden');
+  const canvas = await html2canvas(unit, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+  dlButtonsHidden.forEach(b => b.style.visibility = '');
+  return canvas;
+}
+
+async function exportAllPDF() {
+  const btn = document.getElementById('exportPdfBtn');
+  if (!btn) return;
+  const tabButtons = [...document.querySelectorAll('.tab-btn')];
+  const originalActiveBtn = document.querySelector('.tab-btn.active');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('l', 'pt', 'a4'); // landscape
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 34;
+    const contentWidth = pageWidth - margin * 2;
+    const gap = 12;
+    const titleBandH = 40;
+
+    // ---- Cover page ----
+    const kCover = kpisGeneral(filteredRespondents());
+    const tierCover = heatTier(kCover.avg);
+    const [br, bg, bb] = [8, 137, 214];
+    const [rr, rg, rb] = [235, 73, 60];
+    const [tr, tg, tb] = [72, 187, 161];
+    const [inkR, inkG, inkB] = [38, 49, 61];
+
+    // Full dark header band with a thin 3-color accent strip on top (echoes the 3 Tipos de Cultura)
+    const stripH = 7;
+    pdf.setFillColor(br, bg, bb); pdf.rect(0, 0, pageWidth / 3, stripH, 'F');
+    pdf.setFillColor(rr, rg, rb); pdf.rect(pageWidth / 3, 0, pageWidth / 3, stripH, 'F');
+    pdf.setFillColor(tr, tg, tb); pdf.rect(pageWidth * 2 / 3, 0, pageWidth / 3, stripH, 'F');
+    pdf.setFillColor(inkR, inkG, inkB);
+    pdf.rect(0, stripH, pageWidth, 152, 'F');
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(27);
+    pdf.text('Cultura Organizacional 2026', margin, 68);
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(13);
+    pdf.setTextColor(210, 220, 230);
+    pdf.text(DATA_META_ORG(), margin, 92);
+    pdf.setFontSize(10.5); pdf.setTextColor(160, 175, 190);
+    pdf.text(`Generado el ${new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}`, margin, 112);
+
+    // KPI strip: 4 stat cards echoing the on-screen Resumen Ejecutivo
+    const kpiY = stripH + 152 + 26;
+    const kpiCardW = (contentWidth - gap * 3) / 4;
+    const kpis = [
+      { label: 'PUNTAJE GENERAL', value: fmt1(kCover.avg), sub: tierCover.label, accent: tierCover.color },
+      { label: 'PARTICIPACIÓN', value: `${(100 * META.total_respondidas / META.total_esperadas).toFixed(1)}%`, sub: `${META.total_respondidas} de ${META.total_esperadas} personas`, accent: '#0889D6' },
+      { label: 'RESPONDENTES EN ESTE REPORTE', value: String(kCover.n), sub: isFilterActive() ? 'según filtro aplicado' : 'toda la organización', accent: '#48BBA1' },
+      { label: 'PREGUNTAS EVALUADAS', value: String(ATTRS.length), sub: '9 dimensiones · 3 tipos de cultura', accent: '#EB493C' },
+    ];
+    kpis.forEach((k, i) => {
+      const x = margin + i * (kpiCardW + gap);
+      pdf.setDrawColor(226, 230, 235); pdf.setLineWidth(1);
+      pdf.roundedRect(x, kpiY, kpiCardW, 74, 5, 5, 'S');
+      const [ar, ag, ab] = hexToRgb(k.accent);
+      pdf.setFillColor(ar, ag, ab); pdf.rect(x, kpiY, 4, 74, 'F');
+      pdf.setTextColor(120, 130, 140); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8);
+      pdf.text(k.label, x + 14, kpiY + 18, { maxWidth: kpiCardW - 20 });
+      pdf.setTextColor(inkR, inkG, inkB); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(20);
+      pdf.text(k.value, x + 14, kpiY + 42);
+      pdf.setTextColor(130, 140, 150); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5);
+      pdf.text(k.sub, x + 14, kpiY + 58, { maxWidth: kpiCardW - 20 });
+    });
+
+    // Filtro aplicado
+    let coverY = kpiY + 74 + 30;
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor(inkR, inkG, inkB);
+    pdf.text('FILTRO APLICADO EN ESTE REPORTE', margin, coverY);
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10.5); pdf.setTextColor(90, 100, 110);
+    const filterText = buildFilterSummaryText();
+    const filterLines = pdf.splitTextToSize(filterText, contentWidth);
+    pdf.text(filterLines, margin, coverY + 16);
+    coverY += 16 + filterLines.length * 13 + 22;
+
+    // Contenido — two-column indexed list with colored dots by tipo-group
+    pdf.setDrawColor(226, 230, 235); pdf.setLineWidth(0.75);
+    pdf.line(margin, coverY - 12, pageWidth - margin, coverY - 12);
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11); pdf.setTextColor(inkR, inkG, inkB);
+    pdf.text('CONTENIDO DE ESTE REPORTE', margin, coverY);
+    coverY += 18;
+    const colW = contentWidth / 2;
+    const rowH = 17;
+    const tabDots = { resumen: '#0889D6', tipos: '#0889D6', dimensiones: '#0889D6', atributos: '#0889D6', ranking: '#EB493C', dispersion: '#EB493C', tendencias: '#EB493C', compvar: '#EB493C', abiertas: '#48BBA1', insights: '#48BBA1', glosario: '#48BBA1' };
+    tabButtons.forEach((b, i) => {
+      const col = i < 6 ? 0 : 1;
+      const row = i < 6 ? i : i - 6;
+      const x = margin + col * colW;
+      const y = coverY + row * rowH;
+      const [dr, dg, db] = hexToRgb(tabDots[b.dataset.tab] || '#888888');
+      pdf.setFillColor(dr, dg, db); pdf.circle(x + 3, y - 3, 3, 'F');
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10.5); pdf.setTextColor(60, 68, 76);
+      pdf.text(`${i + 1}.  ${b.textContent.trim()}`, x + 14, y);
+    });
+
+    pdf.setDrawColor(226, 230, 235); pdf.setLineWidth(0.75);
+    pdf.line(margin, pageHeight - 30, pageWidth - margin, pageHeight - 30);
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(150, 158, 166);
+    pdf.text('Dashboard de Cultura Organizacional · Metodología OCC · Generado a partir de la sábana de datos 2026', margin, pageHeight - 16);
+
+    // Decorative brand circles in the empty lower-right area (echoes the original OCC report cover)
+    const dots = [
+      { x: pageWidth - 150, y: pageHeight - 130, r: 34, c: '#0889D6' },
+      { x: pageWidth - 90, y: pageHeight - 155, r: 20, c: '#EB493C' },
+      { x: pageWidth - 80, y: pageHeight - 95, r: 26, c: '#48BBA1' },
+      { x: pageWidth - 175, y: pageHeight - 80, r: 12, c: '#BFBFBF' },
+      { x: pageWidth - 45, y: pageHeight - 145, r: 7, c: '#EB493C' },
+    ];
+    dots.forEach(d => { const [r, g, b] = hexToRgb(d.c); pdf.setFillColor(r, g, b); pdf.setGState(new pdf.GState({ opacity: 0.85 })); pdf.circle(d.x, d.y, d.r, 'F'); });
+    pdf.setGState(new pdf.GState({ opacity: 1 }));
+
+
+    // ---- One section per tab, flowed by card/unit so nothing gets cut mid-content ----
+    for (let i = 0; i < tabButtons.length; i++) {
+      const tb = tabButtons[i];
+      btn.innerHTML = `Generando PDF… (pestaña ${i + 1}/${tabButtons.length})`;
+      tb.click();
+      await new Promise(r => setTimeout(r, 220));
+
+      const root = document.getElementById('app-root');
+      const units = collectFlowUnits(root);
+
+      pdf.addPage();
+      pdf.setFillColor(38, 49, 61);
+      pdf.rect(0, 0, pageWidth, titleBandH, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15);
+      pdf.text(tb.textContent.trim(), margin, 26);
+
+      let cursorY = titleBandH + gap;
+
+      const fullPageAvail = pageHeight - margin * 2;
+      let isFirstUnit = true;
+      for (const unit of units) {
+        const canvas = await captureUnit(unit);
+        if (canvas.width === 0 || canvas.height === 0) continue;
+        const imgW = contentWidth;
+        const imgH = canvas.height * imgW / canvas.width;
+        const imgData = canvas.toDataURL('image/png');
+        const fitsRemaining = cursorY + imgH <= pageHeight - margin;
+
+        if (imgH <= fullPageAvail && (fitsRemaining || !isFirstUnit)) {
+          // Fits on a single page as a whole unit — break to a fresh page if it doesn't fit in remaining space.
+          // (For the very first unit right after a title band, we never skip to a blank fresh page here —
+          // see the slicing fallback below, which guarantees the title page always gets real content.)
+          if (!fitsRemaining) {
+            pdf.addPage();
+            cursorY = margin;
+          }
+          pdf.addImage(imgData, 'PNG', margin, cursorY, imgW, imgH);
+          cursorY += imgH + gap;
+        } else {
+          // Either taller than any single page, OR it's the first unit on a title page that doesn't fit —
+          // slice it, but ALWAYS start filling from wherever we already are so that page never sits empty.
+          let consumed = pageHeight - margin - cursorY;
+          if (consumed < 60) { // too little room left to bother starting here
+            pdf.addPage();
+            cursorY = margin;
+            consumed = pageHeight - margin - cursorY;
+          }
+          pdf.addImage(imgData, 'PNG', margin, cursorY, imgW, imgH);
+          while (consumed < imgH) {
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', margin, margin - consumed, imgW, imgH);
+            consumed += fullPageAvail;
+          }
+          cursorY = pageHeight; // sentinel: force next unit onto a fresh page, no stray blank page
+        }
+        isFirstUnit = false;
+      }
+    }
+
+    const suffix = isFilterActive() ? '_filtrado' : '_organizacion';
+    pdf.save(`Cultura_Organizacional_2026_Completo${suffix}.pdf`);
+  } catch (e) {
+    alert('No se pudo generar el PDF: ' + e.message);
+  } finally {
+    btn.innerHTML = orig; btn.disabled = false;
+    if (originalActiveBtn) originalActiveBtn.click();
+  }
+}
+function DATA_META_ORG() { return META.organizacion + ' · ' + META.medicion; }
+const exportBtnEl = document.getElementById('exportPdfBtn');
+if (exportBtnEl) exportBtnEl.addEventListener('click', exportAllPDF);
+
+
+// ================= common chart option builders =================
+function barOpts({ indexAxis = 'y', min = 1, max = 5, showLegend = false, refLineVal = null, refLineLabel = 'Organización', fmt = v => v.toFixed(2), tooltipExtra = null } = {}) {
+  const axisKey = indexAxis === 'y' ? 'x' : 'y';
+  const scales = {};
+  scales[axisKey] = { min, max };
+  return {
+    indexAxis, responsive: true, maintainAspectRatio: false,
+    scales,
+    plugins: {
+      legend: { display: showLegend, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: tooltipExtra ? { callbacks: { label: tooltipExtra } } : {},
+      barDataLabels: { enabled: true, format: fmt },
+      refLine: refLineVal != null ? { value: refLineVal, label: refLineLabel } : {}
+    }
+  };
+}
+
+window.__UI = { root, charts, destroyChart, help, dlBtn, heatLegendHTML, barOpts, downloadDataUrl, RENDERERS, renderFilterbar, renderActiveTab };
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, META, ATTRS, MIN_N, COLORS, HEAT_BANDS, DIM_ORDEN, TIPO_ORDEN,
+  fmt1, fmtPct, fmtDelta, deltaColor, heatTier, favDesfav, escapeHtml,
+  filteredRespondents, filteredRoster, kpisGeneral, byTipo, byDimension, byAtributo, participacionPorGrupo, isFilterActive } = CD;
+const { charts, destroyChart, help, dlBtn, heatLegendHTML, barOpts } = UI;
+
+function tipoColor(tipo) { return COLORS[tipo] || '#888'; }
+
+// ============================================================
+// TAB: RESUMEN EJECUTIVO
+// ============================================================
+window.renderResumen = function renderResumen() {
+  const records = filteredRespondents();
+  const orgRecords = DATA.respondents;
+  const k = kpisGeneral(records);
+  const kOrg = kpisGeneral(orgRecords);
+  const tipos = byTipo(records);
+  const dims = byDimension(records);
+  const tier = heatTier(k.avg);
+  const filterActive = isFilterActive();
+
+  UI.root.innerHTML = `
+  <div class="section-intro">Vista consolidada de la medición de Cultura Organizacional 2026. El puntaje general es el promedio simple de las ${ATTRS.length} preguntas (escala 1–5) respondidas por ${META.total_respondidas} de ${META.total_esperadas} personas convocadas.</div>
+  <div class="kpi-row">
+    <div class="card kpi-card">
+      <div class="kpi-label">Puntaje General ${help('Promedio simple de las 4.680 respuestas individuales (72 atributos × respondentes filtrados).')}</div>
+      <div class="kpi-value">${fmt1(k.avg)}</div>
+      <div class="kpi-sub">n=${k.n} respondentes · ${k.totalResp} respuestas</div>
+      <span class="kpi-tag" style="background:${tier.color}">${tier.label}</span>
+    </div>
+    <div class="card kpi-card">
+      <div class="kpi-label">Participación ${help('Respondentes obtenidos vs. esperados según el roster (base cargada).')}</div>
+      <div class="kpi-value">${(100*META.total_respondidas/META.total_esperadas).toFixed(1)}%</div>
+      <div class="kpi-sub">${META.total_respondidas} de ${META.total_esperadas} personas</div>
+    </div>
+    ${filterActive ? `<div class="card kpi-card">
+      <div class="kpi-label">Brecha vs. Organización ${help('Diferencia entre el puntaje del filtro aplicado y el puntaje de toda la organización.')}</div>
+      <div class="kpi-value" style="color:${deltaColor(k.avg-kOrg.avg)}">${fmtDelta(k.avg-kOrg.avg)}</div>
+      <div class="kpi-sub">Organización: ${fmt1(kOrg.avg)}</div>
+    </div>` : ''}
+    <div class="card kpi-card">
+      <div class="kpi-label">Tendencia vs. Medición Anterior ${help('Compara el puntaje general de esta medición contra la medición previa. Se muestra vacío hasta que exista una medición anterior verificada a nivel individual.')}</div>
+      <div class="kpi-value" style="color:var(--ink-2)">—</div>
+      <div class="kpi-sub">Sin datos de una medición anterior verificada. Se completará automáticamente cuando se incorpore una nueva ola.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="position:relative">
+      ${dlBtn('chart-tipos-resumen','tipos_cultura','chart')}
+      <h3>Puntaje por Tipo de Cultura</h3>
+      <p class="card-sub">Responsable (Principios, Sostenibilidad, Clientes) · Competitiva (Innovación, Logro, Liderazgo) · Humanista (Talento, Relaciones, Comunicación)</p>
+      <div class="chart-box"><canvas id="chart-tipos-resumen"></canvas></div>
+      ${filterActive ? `<div class="scroll-x" style="margin-top:14px" id="tipos-resumen-table"></div>` : ''}
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="position:relative" id="heatmap-dim-card">
+      ${dlBtn('heatmap-dim-card','mapa_calor_dimensiones','table')}
+      <h3>Mapa de Calor — Dimensiones</h3>
+      <p class="card-sub">Puntaje general de las 9 dimensiones sobre la escala 1–5.${filterActive ? ' La brecha (Δ) frente a la organización se muestra bajo cada puntaje.' : ''}</p>
+      <div id="heatmap-dim-grid" class="heatgrid-33"></div>
+      <div style="margin-top:14px">${heatLegendHTML()}</div>
+    </div>
+  </div>
+
+  <div class="grid-2b">
+    <div class="card">
+      <h3>Top 5 Fortalezas <span style="font-weight:400;color:var(--ink-2);font-size:11.5px">(preguntas individuales)</span></h3>
+      <ul class="rank-list" id="resumen-top-fortalezas"></ul>
+    </div>
+    <div class="card">
+      <h3>Top 5 Oportunidades <span style="font-weight:400;color:var(--ink-2);font-size:11.5px">(preguntas individuales)</span></h3>
+      <ul class="rank-list opp" id="resumen-top-oportunidades"></ul>
+    </div>
+  </div>
+  `;
+
+  // Chart: tipos de cultura bar — con comparativa vs organización cuando hay filtro
+  const tiposOrg = filterActive ? byTipo(orgRecords) : null;
+  const ctx1 = document.getElementById('chart-tipos-resumen').getContext('2d');
+  charts['chart-tipos-resumen'] = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: tipos.map(t => t.tipo),
+      datasets: filterActive ? [
+        { label: 'Filtro', data: tipos.map(t => t.avg), backgroundColor: tipos.map(t => tipoColor(t.tipo)), borderRadius: 6 },
+        { label: 'Organización', data: tiposOrg.map(t => t.avg), backgroundColor: tiposOrg.map(t => tipoColor(t.tipo) + '55'), borderRadius: 6 }
+      ] : [{ data: tipos.map(t => t.avg), backgroundColor: tipos.map(t => tipoColor(t.tipo)), borderRadius: 6, barThickness: 46 }]
+    },
+    options: barOpts({ indexAxis: 'x', min: 1, max: 5, showLegend: filterActive })
+  });
+  if (filterActive) {
+    const rows = tipos.map((t, i) => {
+      const org = tiposOrg[i];
+      const gap = t.avg - org.avg;
+      return `<tr>
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(t.tipo)};margin-right:6px"></span>${t.tipo}</td>
+        <td><span class="pill" style="background:${heatTier(t.avg).color}">${fmt1(t.avg)}</span></td>
+        <td><span class="pill" style="background:${heatTier(org.avg).color}">${fmt1(org.avg)}</span></td>
+        <td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('tipos-resumen-table').innerHTML = `
+      <table class="dtable"><thead><tr><th>Tipo de Cultura</th><th>Puntaje (Filtro)</th><th>Organización</th><th>Brecha</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  }
+
+  // Heat map grid — 9 dimensions
+  const dimsOrg = filterActive ? byDimension(orgRecords) : null;
+  const heatGrid = document.getElementById('heatmap-dim-grid');
+  heatGrid.innerHTML = dims.map(d => {
+    const t = heatTier(d.avg);
+    let deltaHTML = '';
+    if (filterActive) {
+      const org = dimsOrg.find(x => x.dimension === d.dimension);
+      const gap = d.avg - org.avg;
+      deltaHTML = `<div style="font-size:10.5px;margin-top:3px;opacity:.9">Δ ${fmtDelta(gap)} vs. org.</div>`;
+    }
+    return `<div style="background:${t.color};border-radius:10px;padding:12px 10px;color:#fff;text-align:center">
+      <div style="font-size:11px;font-weight:700;opacity:.95;margin-bottom:4px">${escapeHtml(d.dimension)}</div>
+      <div style="font-size:20px;font-weight:800">${fmt1(d.avg)}</div>
+      <div style="font-size:10px;opacity:.9">${t.label}</div>
+      ${deltaHTML}
+    </div>`;
+  }).join('');
+
+  // Top fortalezas / oportunidades (by individual question, i.e. attribute-level)
+  const attrAgg = byAtributo(records);
+  const sorted = [...attrAgg].sort((a,b) => b.avg - a.avg);
+  const topF = sorted.slice(0,5);
+  const topO = [...sorted].sort((a,b) => a.avg - b.avg).slice(0,5);
+  document.getElementById('resumen-top-fortalezas').innerHTML = topF.map((a,i) => `<li><span class="rank-num">${i+1}</span><span style="flex:1">${escapeHtml(a.attr.positivo)} <span style="color:var(--ink-2);font-size:11px">(${a.attr.dimension})</span></span><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></li>`).join('');
+  document.getElementById('resumen-top-oportunidades').innerHTML = topO.map((a,i) => `<li><span class="rank-num">${i+1}</span><span style="flex:1">${escapeHtml(a.attr.positivo)} <span style="color:var(--ink-2);font-size:11px">(${a.attr.dimension})</span></span><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></li>`).join('');
+};
+
+// ============================================================
+// TAB: TIPOS DE CULTURA
+// ============================================================
+window.renderTipos = function renderTipos() {
+  const records = filteredRespondents();
+  const orgRecords = DATA.respondents;
+  const tipos = byTipo(records);
+  const tiposOrg = byTipo(orgRecords);
+  const filterActive = isFilterActive();
+
+  UI.root.innerHTML = `
+  <div class="section-intro">Los 3 Tipos de Cultura agrupan las 9 dimensiones del modelo OCC. <b>Responsable</b>: organización orientada a grupos de interés con gestión ética. <b>Competitiva</b>: organización de resultados que equilibra innovación y efectividad. <b>Humanista</b>: organización centrada en talento, relaciones y comunicación.</div>
+  <div class="card">
+    <div style="position:relative">
+      ${dlBtn('chart-tipos-main','puntaje_tipos_cultura','chart')}
+      <h3>Puntaje por Tipo de Cultura</h3>
+      <div class="chart-box tall"><canvas id="chart-tipos-main"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="position:relative">
+      ${dlBtn('table-tipos','tabla_tipos_cultura','table')}
+      <h3>Detalle por Tipo</h3>
+      <div id="table-tipos" class="scroll-x"></div>
+    </div>
+  </div>
+  <div class="card">
+    ${heatLegendHTML()}
+  </div>
+  `;
+
+  const ctx = document.getElementById('chart-tipos-main').getContext('2d');
+  charts['chart-tipos-main'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: tipos.map(t => t.tipo),
+      datasets: filterActive ? [
+        { label: 'Filtro', data: tipos.map(t => t.avg), backgroundColor: tipos.map(t => tipoColor(t.tipo)), borderRadius: 6 },
+        { label: 'Organización', data: tiposOrg.map(t => t.avg), backgroundColor: tiposOrg.map(t => tipoColor(t.tipo) + '55'), borderRadius: 6 }
+      ] : [{ label: 'Puntaje', data: tipos.map(t => t.avg), backgroundColor: tipos.map(t => tipoColor(t.tipo)), borderRadius: 6, barThickness: 60 }]
+    },
+    options: barOpts({ indexAxis: 'x', min: 1, max: 5, showLegend: filterActive })
+  });
+
+  const rows = tipos.map((t, i) => {
+    const org = tiposOrg[i];
+    const gap = filterActive ? t.avg - org.avg : null;
+    return `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(t.tipo)};margin-right:6px"></span>${t.tipo}</td>
+      <td><span class="pill" style="background:${heatTier(t.avg).color}">${fmt1(t.avg)}</span></td>
+      ${filterActive ? `<td><span class="pill" style="background:${heatTier(org.avg).color}">${fmt1(org.avg)}</span></td><td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td>` : ''}
+    </tr>`;
+  }).join('');
+  document.getElementById('table-tipos').innerHTML = `
+    <table class="dtable"><thead><tr>
+      <th>Tipo de Cultura</th><th>Puntaje</th>
+      ${filterActive ? '<th>Organización</th><th>Brecha</th>' : ''}
+    </tr></thead><tbody>${rows}</tbody></table>`;
+};
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, META, ATTRS, MIN_N, COLORS, HEAT_BANDS, DIM_ORDEN, TIPO_ORDEN,
+  fmt1, fmtPct, fmtDelta, deltaColor, heatTier, favDesfav, escapeHtml, normalizeSearch,
+  filteredRespondents, byTipo, byDimension, byAtributo, isFilterActive } = CD;
+const { charts, destroyChart, help, dlBtn, heatLegendHTML, barOpts } = UI;
+
+function tipoColor(tipo) { return COLORS[tipo] || '#888'; }
+
+// ============================================================
+// TAB: DIMENSIONES
+// ============================================================
+window.renderDimensiones = function renderDimensiones() {
+  const records = filteredRespondents();
+  const orgRecords = DATA.respondents;
+  const dims = byDimension(records);
+  const dimsOrg = byDimension(orgRecords);
+  const filterActive = isFilterActive();
+
+  UI.root.innerHTML = `
+  <div class="section-intro">Cada uno de los 3 Tipos de Cultura comprende 3 dimensiones (9 en total), cada una compuesta por 8 atributos/preguntas.</div>
+  <div class="grid-2">
+    <div class="card">
+      <div style="position:relative">
+        ${dlBtn('chart-dim-bar','puntaje_dimensiones','chart')}
+        <h3>Puntaje por Dimensión</h3>
+        <div class="chart-box tall"><canvas id="chart-dim-bar"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="position:relative">
+        ${dlBtn('chart-dim-radar','radar_dimensiones','chart')}
+        <h3>Mapa Radar de Dimensiones</h3>
+        <div class="chart-box tall"><canvas id="chart-dim-radar"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="position:relative">
+      ${dlBtn('table-dim','tabla_dimensiones','table')}
+      <h3>Detalle por Dimensión</h3>
+      <div id="table-dim" class="scroll-x"></div>
+    </div>
+  </div>
+  <div class="card">${heatLegendHTML()}</div>
+  `;
+
+  const ctx1 = document.getElementById('chart-dim-bar').getContext('2d');
+  charts['chart-dim-bar'] = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: dims.map(d => d.dimension),
+      datasets: filterActive ? [
+        { label: 'Filtro', data: dims.map(d => d.avg), backgroundColor: dims.map(d => tipoColor(d.tipo)), borderRadius: 5 },
+        { label: 'Organización', data: dimsOrg.map(d => d.avg), backgroundColor: dimsOrg.map(d => tipoColor(d.tipo) + '55'), borderRadius: 5 }
+      ] : [{ data: dims.map(d => d.avg), backgroundColor: dims.map(d => tipoColor(d.tipo)), borderRadius: 5 }]
+    },
+    options: barOpts({ indexAxis: 'y', min: 1, max: 5, showLegend: filterActive })
+  });
+
+  const ctx2 = document.getElementById('chart-dim-radar').getContext('2d');
+  charts['chart-dim-radar'] = new Chart(ctx2, {
+    type: 'radar',
+    data: {
+      labels: dims.map(d => d.dimension),
+      datasets: filterActive ? [
+        { label: 'Filtro', data: dims.map(d => d.avg), borderColor: '#0889D6', backgroundColor: 'rgba(8,137,214,.18)', pointBackgroundColor: '#0889D6' },
+        { label: 'Organización', data: dimsOrg.map(d => d.avg), borderColor: '#BFBFBF', backgroundColor: 'rgba(191,191,191,.15)', pointBackgroundColor: '#BFBFBF' }
+      ] : [
+        { label: 'Cultura Actual', data: dims.map(d => d.avg), borderColor: '#0889D6', backgroundColor: 'rgba(8,137,214,.2)', pointBackgroundColor: '#0889D6' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { r: { min: 1, max: 5, ticks: { stepSize: 1 }, pointLabels: { font: { size: 10.5 } } } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, barDataLabels: { enabled: false }, radarPointLabels: { enabled: true } }
+    }
+  });
+
+  const rows = dims.map((d, i) => {
+    const org = dimsOrg[i];
+    const gap = filterActive ? d.avg - org.avg : null;
+    return `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(d.tipo)};margin-right:6px"></span>${d.dimension}</td>
+      <td style="color:var(--ink-2);font-size:11.5px">${d.tipo}</td>
+      <td><span class="pill" style="background:${heatTier(d.avg).color}">${fmt1(d.avg)}</span></td>
+      ${filterActive ? `<td><span class="pill" style="background:${heatTier(org.avg).color}">${fmt1(org.avg)}</span></td><td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td>` : ''}
+    </tr>`;
+  }).join('');
+  document.getElementById('table-dim').innerHTML = `
+    <table class="dtable"><thead><tr>
+      <th>Dimensión</th><th>Tipo</th><th>Puntaje</th>
+      ${filterActive ? '<th>Organización</th><th>Brecha</th>' : ''}
+    </tr></thead><tbody>${rows}</tbody></table>`;
+};
+
+// ============================================================
+// TAB: ATRIBUTOS Y PREGUNTAS — agrupado por dimensión, solo atributo positivo
+// ============================================================
+let attrSearch = '';
+
+window.renderAtributos = function renderAtributos() {
+  UI.root.innerHTML = `
+  <div class="section-intro">Puntaje y distribución de respuestas para cada una de las ${ATTRS.length} preguntas individuales, agrupadas por dimensión.</div>
+  <div class="card">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input class="search-box" id="attr-search" type="text" placeholder="Buscar pregunta…" style="flex:1;min-width:220px" value="${escapeHtml(attrSearch)}">
+    </div>
+  </div>
+  <div id="attr-dim-blocks"></div>
+  `;
+  document.getElementById('attr-search').addEventListener('input', e => { attrSearch = e.target.value; renderAttrBlocks(); });
+  renderAttrBlocks();
+};
+
+function renderAttrBlocks() {
+  const records = filteredRespondents();
+  const orgRecords = DATA.respondents;
+  const filterActive = isFilterActive();
+  const attrs = byAtributo(records);
+  const attrsOrg = filterActive ? byAtributo(orgRecords) : null;
+
+  const q = attrSearch.trim() ? normalizeSearch(attrSearch) : null;
+  const distColors = ['#D6362B','#F07A3C','#F3C13B','#7FC17E','#3E9E52'];
+
+  const container = document.getElementById('attr-dim-blocks');
+  let anyMatch = false;
+  container.innerHTML = DIM_ORDEN.map(dim => {
+    let rows = attrs.filter(r => r.attr.dimension === dim);
+    if (q) rows = rows.filter(r => normalizeSearch(r.attr.positivo).includes(q));
+    if (!rows.length) return '';
+    anyMatch = true;
+    const blockId = 'attr-block-' + dim.replace(/[^a-zA-Z]/g, '');
+    const body = rows.map(r => {
+      const dist = r.dist;
+      const n = r.nResp || 1;
+      const distBar = dist.map((c, i) => `<div style="width:${100*c/n}%;background:${distColors[i]}" title="${i+1}: ${c} (${(100*c/n).toFixed(0)}%)"></div>`).join('');
+      let orgCells = '';
+      if (filterActive) {
+        const orgRow = attrsOrg.find(x => x.attr.id === r.attr.id);
+        const gap = r.avg - orgRow.avg;
+        orgCells = `<td><span class="pill" style="background:${heatTier(orgRow.avg).color}">${fmt1(orgRow.avg)}</span></td><td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td>`;
+      }
+      return `<tr>
+        <td style="font-weight:600">${escapeHtml(r.attr.positivo)}</td>
+        <td><span class="pill" style="background:${heatTier(r.avg).color}">${fmt1(r.avg)}</span></td>
+        ${orgCells}
+        <td><div class="dist-bar">${distBar}</div></td>
+      </tr>`;
+    }).join('');
+    return `<div class="card" id="${blockId}">
+      <div style="position:relative">
+        ${UI.dlBtn(blockId, 'atributos_'+dim, 'table')}
+        <h3><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(rows[0].attr.tipo)};margin-right:7px"></span>${dim}</h3>
+        <div class="scroll-x"><table class="dtable"><thead><tr>
+          <th>Atributo</th><th>Puntaje</th>
+          ${filterActive ? '<th>Organización</th><th>Brecha</th>' : ''}
+          <th>Distribución 1–5</th>
+        </tr></thead><tbody>${body}</tbody></table></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (!anyMatch) container.innerHTML = `<div class="card"><div class="loading">No se encontraron preguntas para "${escapeHtml(attrSearch)}".</div></div>`;
+}
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, META, escapeHtml, filteredRespondents, isFilterActive } = CD;
+const { dlBtn } = UI;
+
+const WC_COLORS = ['#0889D6','#EB493C','#48BBA1','#F3C13B','#7B24FF','#F07A3C','#2F9880','#066AA8'];
+
+window.renderAbiertas = function renderAbiertas() {
+  const qs = CD.openTextLabels || [];
+  const introText = `Nubes de palabras generadas a partir de las preguntas abiertas de esta medición. ${isFilterActive() ? 'Reflejan el filtro demográfico activo.' : 'Se muestra el total de la medición (sin filtro).'}`;
+
+  if (!qs.length) {
+    UI.root.innerHTML = `<div class="section-intro">${introText}</div><div class="card"><p class="card-sub">Esta medición no tiene preguntas abiertas marcadas con el tag configurado.</p></div>`;
+    return;
+  }
+
+  UI.root.innerHTML = `<div id="wc-container"></div>`;
+  const container = document.getElementById('wc-container');
+  container.innerHTML = qs.map((q, qi) => `
+    <div class="card" id="wc-card-${qi}">
+      <div style="position:relative">
+        ${dlBtn('wc-card-'+qi, 'nube_'+qi, 'table')}
+        ${qi === 0 ? `<p class="section-intro" style="margin-top:0">${introText}</p>` : ''}
+        <h3>${escapeHtml(q)}</h3>
+        <p class="card-sub" id="wc-sub-${qi}"></p>
+        <div class="wordcloud-wrap" style="min-height:220px"><canvas id="wc-canvas-${qi}" width="900" height="260" style="width:100%;height:220px"></canvas></div>
+        <div id="wc-table-${qi}" style="margin-top:12px"></div>
+      </div>
+    </div>`).join('');
+
+  const records = filteredRespondents();
+
+  qs.forEach((q, qi) => {
+    const d = CD.wordCloudForLabel(q, records);
+    document.getElementById('wc-sub-'+qi).textContent = `${d.n_valid} respuestas válidas · ${d.n_blank} en blanco · ${d.total_unique_words} palabras únicas`;
+    const entries = (d.words || []).map(w => [w.word, w.count]);
+    const canvas = document.getElementById('wc-canvas-'+qi);
+    if (entries.length && window.WordCloud) {
+      const maxCount = entries[0][1];
+      WordCloud(canvas, {
+        list: entries.slice(0, 60),
+        gridSize: 8,
+        weightFactor: (size) => 8 + (size / maxCount) * 24,
+        fontFamily: "-apple-system,'Segoe UI',Arial,sans-serif",
+        fontWeight: '800',
+        color: () => WC_COLORS[qi % WC_COLORS.length],
+        rotateRatio: 0.15,
+        rotationSteps: 2,
+        backgroundColor: '#ffffff',
+        shrinkToFit: true
+      });
+    } else {
+      canvas.parentElement.innerHTML = `<div class="loading">Sin datos para los filtros seleccionados.</div>`;
+    }
+    document.getElementById('wc-table-'+qi).innerHTML = entries.length ? `
+      <table class="dtable"><thead><tr><th>Palabra</th><th>Menciones</th></tr></thead>
+      <tbody>${entries.slice(0,15).map(([w,c]) => `<tr><td>${escapeHtml(w)}</td><td>${c}</td></tr>`).join('')}</tbody></table>` : '';
+  });
+};
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, META, ATTRS, MIN_N, COLORS, DIM_ORDEN, FILTER_FIELDS,
+  fmt1, fmtPct, fmtDelta, deltaColor, heatTier, escapeHtml,
+  filteredRespondents, byAtributo, byDemografico, kpisGeneral, isFilterActive } = CD;
+const { dlBtn } = UI;
+
+// A diferencia de la versión standalone (7 campos fijos conocidos de
+// antemano), aquí tomamos los primeros demográficos que trajo la API —
+// pueden variar de una medición a otra.
+const PART_FIELDS = FILTER_FIELDS.slice(0, 4);
+
+// ============================================================
+// TAB: INSIGHTS AUTOMÁTICOS
+// ============================================================
+window.renderInsights = function renderInsights() {
+  const records = filteredRespondents();
+  const attrs = byAtributo(records);
+  const kOrg = kpisGeneral(DATA.respondents);
+
+  const sortedByAvg = [...attrs].sort((a,b) => b.avg - a.avg);
+  const fortalezas = sortedByAvg.slice(0,8);
+  const oportunidades = [...sortedByAvg].sort((a,b) => a.avg - b.avg).slice(0,8);
+  const criticos = attrs.filter(a => a.avg < 2.33).sort((a,b) => a.avg - b.avg);
+  const altaDispersion = [...attrs].sort((a,b) => b.disp - a.disp).slice(0,6);
+
+  let segFindings = [];
+  PART_FIELDS.forEach(f => {
+    const data = byDemografico(records, f.key).filter(d => d.n >= MIN_N);
+    if (data.length < 2) return;
+    data.sort((a,b) => b.avg - a.avg);
+    const best = data[0], worst = data[data.length-1];
+    if (best.avg - worst.avg >= 0.4) {
+      segFindings.push({ field: f.label, best, worst, gap: best.avg - worst.avg });
+    }
+  });
+
+  UI.root.innerHTML = `
+  <div class="section-intro">Hallazgos generados automáticamente a partir de las ${ATTRS.length} preguntas individuales de la medición (no de promedios de dimensión), para priorizar acciones concretas.</div>
+
+  ${criticos.length ? `<div class="card">
+    <h3>⚠ Alertas de Resultados Críticos</h3>
+    <p class="card-sub">Preguntas con promedio por debajo de 2.33 (bandas Crítico/Bajo).</p>
+    ${criticos.map(a => `<div class="alert-item"><span>🔴</span><span><b>${escapeHtml(a.attr.positivo)}</b> — ${a.attr.dimension} · Puntaje: <b>${fmt1(a.avg)}</b> (n=${a.nResp})</span></div>`).join('')}
+  </div>` : `<div class="card"><h3>✅ Sin alertas críticas</h3><p class="card-sub">Ninguna pregunta individual cayó por debajo de 2.33 con los filtros actuales.</p></div>`}
+
+  <div class="grid-2b">
+    <div class="card">
+      <h3>Top 8 Fortalezas</h3>
+      <ul class="rank-list">${fortalezas.map((a,i) => `<li><span class="rank-num">${i+1}</span><span style="flex:1">${escapeHtml(a.attr.positivo)} <span style="color:var(--ink-2);font-size:11px">(${a.attr.dimension})</span></span><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></li>`).join('')}</ul>
+    </div>
+    <div class="card">
+      <h3>Top 8 Oportunidades de Mejora</h3>
+      <ul class="rank-list opp">${oportunidades.map((a,i) => `<li><span class="rank-num">${i+1}</span><span style="flex:1">${escapeHtml(a.attr.positivo)} <span style="color:var(--ink-2);font-size:11px">(${a.attr.dimension})</span></span><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></li>`).join('')}</ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Preguntas con Mayor Dispersión (menor consenso)</h3>
+    <p class="card-sub">Alta dispersión indica opiniones divididas entre respondentes; conviene profundizar cualitativamente.</p>
+    ${altaDispersion.map(a => `<div class="finding-item warn"><span>📊</span><span><b>${escapeHtml(a.attr.positivo)}</b> — ${a.attr.dimension} · Desv. estándar: <b>${fmt1(a.disp)}</b> (promedio ${fmt1(a.avg)})</span></div>`).join('')}
+  </div>
+
+  <div class="card">
+    <h3>Hallazgos Demográficos</h3>
+    ${segFindings.length ? segFindings.map(s => `<div class="finding-item"><span>🔎</span><span>En <b>${s.field}</b>, el segmento <b>${escapeHtml(s.best.group)}</b> (${fmt1(s.best.avg)}) supera a <b>${escapeHtml(s.worst.group)}</b> (${fmt1(s.worst.avg)}) por <b>${s.gap.toFixed(2)} puntos</b>.</span></div>`).join('') : `<p class="card-sub">No se detectaron brechas demográficas relevantes (≥0.4 puntos) entre segmentos con n≥${MIN_N}.</p>`}
+  </div>
+
+  <div class="card">
+    <h3>Estado de esta Medición</h3>
+    <p class="card-sub">Datos obtenidos en vivo desde ERPNext (Report "${escapeHtml(META.medicion === 'Cultura Organizacional' ? 'Survey Response Custom Report Front' : '')}"), medición <b>${escapeHtml(META.organizacion)}</b>.</p>
+    <div class="tag-row" style="margin-bottom:12px">
+      <span class="badge ok">${ATTRS.length} atributos en el catálogo</span>
+      <span class="badge ok">${DATA.respondents.length} respondentes cargados</span>
+      <span class="badge ${META.total_esperadas ? (META.total_respondidas/META.total_esperadas>=0.85?'ok':'warn') : 'warn'}">${META.total_esperadas ? (100*META.total_respondidas/META.total_esperadas).toFixed(1)+'% participación' : 'sin roster para calcular % participación'}</span>
+    </div>
+    <div class="finding-item"><span>ℹ</span><span>La participación por segmento (pestaña de comparación) se calcula contando respuestas reales vs. personas convocadas (<code>qp_IQ_SurveyRecipient</code>) para cada valor demográfico — ambas fuentes vienen del mismo Contact en Frappe, por lo que no hace falta ningún cruce/heurística de coincidencia.</span></div>
+    <div class="finding-item warn"><span>⚠</span><span><b>Grupos pequeños:</b> cualquier segmento con menos de ${MIN_N} personas esperadas se agrupa automáticamente como "Otros" en las tablas y gráficos desagregados, para proteger el anonimato.</span></div>
+    <div class="finding-item"><span>ℹ</span><span><b>Preguntas abiertas:</b> las nubes de palabras sí responden a los filtros demográficos activos (se recalculan en el navegador a partir de los tokens por persona que entrega la API).</span></div>
+  </div>
+  `;
+};
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { HEAT_BANDS, MIN_N, COLORS } = CD;
+const { heatLegendHTML } = UI;
+
+const DIM_DESC = {
+  'Principios': { tipo: 'Responsable', text: 'Pautas de conducta humana (valores) que actúan como brújula moral de la organización.' },
+  'Sostenibilidad': { tipo: 'Responsable', text: 'Uso eficiente de recursos para asegurar la sostenibilidad futura, con igual importancia a todos los grupos de interés.' },
+  'Clientes': { tipo: 'Responsable', text: 'Esfuerzo por entender, satisfacer y superar las necesidades y expectativas de los clientes.' },
+  'Innovación': { tipo: 'Competitiva', text: 'Capacidad de crear nuevas realidades: creatividad, iniciativa, apertura al cambio y aprendizaje del error.' },
+  'Logro': { tipo: 'Competitiva', text: 'Efectividad y obtención de resultados positivos, con disciplina de ejecución y mejora continua.' },
+  'Liderazgo': { tipo: 'Competitiva', text: 'Capacidad de los líderes para movilizar y orientar personas, generar confianza y empoderar equipos.' },
+  'Talento': { tipo: 'Humanista', text: 'Atracción, desarrollo y retención del mejor talento; compromiso y desempeño de las personas.' },
+  'Relaciones': { tipo: 'Humanista', text: 'Calidad del trabajo en equipo, la confianza y la colaboración entre personas y áreas.' },
+  'Comunicación': { tipo: 'Humanista', text: 'Transparencia, escucha activa y claridad en cómo fluye la información en la organización.' },
+};
+
+function tipoColor(tipo) { return COLORS[tipo] || '#888'; }
+
+window.renderGlosario = function renderGlosario() {
+  UI.root.innerHTML = `
+  <div class="section-intro">Marco conceptual de la metodología Organizational Culture Compass (OCC), explicado en lenguaje simple.</div>
+
+  <div class="glossary-toc">
+    <button data-target="g-tipos">Tipos de Cultura</button>
+    <button data-target="g-dims">Las 9 Dimensiones</button>
+    <button data-target="g-heat">Mapa de Calor</button>
+    <button data-target="g-concepts">Conceptos Clave</button>
+  </div>
+
+  <div class="card">
+    <h3>¿Qué es la Cultura Organizacional?</h3>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.6">Es la forma de pensar, sentir y actuar que distingue a los miembros de una organización: sus creencias, valores, normas y tradiciones. No existen culturas "buenas" o "malas" — solo más o menos adecuadas para lo que la organización necesita lograr.</p>
+  </div>
+
+  <div class="card" id="g-tipos">
+    <h3>Los 3 Tipos de Cultura</h3>
+    <p class="card-sub">Cada tipo agrupa 3 de las 9 dimensiones del modelo.</p>
+    <div class="glossary-grid">
+      <div class="glossary-card">
+        <div class="glossary-badge">R</div>
+        <h4 style="color:#0889D6">Cultura Responsable</h4>
+        <p>Una organización admirada por la sociedad y sus clientes, con una gestión ética e impecable.</p>
+        <div class="dims-tag-row"><span class="dims-tag">Principios</span><span class="dims-tag">Sostenibilidad</span><span class="dims-tag">Clientes</span></div>
+      </div>
+      <div class="glossary-card competitiva">
+        <div class="glossary-badge">C</div>
+        <h4 style="color:#EB493C">Cultura Competitiva</h4>
+        <p>Una organización de resultados, eficiente y vibrante, que equilibra innovación y efectividad.</p>
+        <div class="dims-tag-row"><span class="dims-tag">Innovación</span><span class="dims-tag">Logro</span><span class="dims-tag">Liderazgo</span></div>
+      </div>
+      <div class="glossary-card humanista">
+        <div class="glossary-badge">H</div>
+        <h4 style="color:#48BBA1">Cultura Humanista</h4>
+        <p>Una organización que atrae, desarrolla y mantiene el mejor talento, con relaciones y comunicación efectivas.</p>
+        <div class="dims-tag-row"><span class="dims-tag">Talento</span><span class="dims-tag">Relaciones</span><span class="dims-tag">Comunicación</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="g-dims">
+    <h3>Las 9 Dimensiones</h3>
+    <div class="dim-mini-grid">
+      ${Object.entries(DIM_DESC).map(([dim, d]) => `
+        <div class="dim-mini-card" style="border-left-color:${tipoColor(d.tipo)}">
+          <div class="dim-mini-title">${dim}<span class="dim-mini-tipo" style="background:${tipoColor(d.tipo)}">${d.tipo}</span></div>
+          <p>${d.text}</p>
+        </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="card" id="g-heat">
+    <h3>¿Cómo leer el Mapa de Calor?</h3>
+    <p style="font-size:12.5px;color:var(--ink-2);line-height:1.6;margin-bottom:14px">Cada puntaje (de atributo, pregunta, dimensión o tipo de cultura) se ubica en una de 6 bandas de color, sobre la escala de respuesta 1 a 5 usada en esta medición:</p>
+    ${heatLegendHTML()}
+    <p style="font-size:12px;color:var(--ink-2);margin-top:14px">Las bandas se definieron en partes iguales sobre el rango 1–5 (cada banda ≈0.67 puntos), de "Crítico" (resultado muy desfavorable, requiere acción inmediata) a "Sobresaliente" (resultado altamente favorable, fortaleza a mantener).</p>
+  </div>
+
+  <div class="card" id="g-concepts">
+    <h3>Conceptos Clave</h3>
+    <dl class="concept-grid">
+      <div class="concept-item"><dt>Atributo / Pregunta individual</dt><dd>Cada una de las 72 conductas observables evaluadas (8 por dimensión), formuladas como par limitante/positivo.</dd></div>
+      <div class="concept-item"><dt>Favorabilidad / Desfavorabilidad</dt><dd>% de personas que respondieron 4–5 (favorable) o 1–2 (desfavorable) a una pregunta o grupo de preguntas.</dd></div>
+      <div class="concept-item"><dt>Dispersión (desviación estándar)</dt><dd>Qué tan de acuerdo están las personas entre sí. Alta dispersión = opiniones divididas, requiere mirar con más detalle.</dd></div>
+      <div class="concept-item"><dt>Brecha (filtro − organización)</dt><dd>Diferencia entre el puntaje del segmento filtrado actualmente y el puntaje de toda la organización. Positivo = el segmento está por encima del promedio general.</dd></div>
+      <div class="concept-item"><dt>Umbral mínimo de anonimato (n≥${MIN_N})</dt><dd>Ningún resultado se desagrega para grupos con menos de ${MIN_N} personas esperadas, para proteger la confidencialidad de las respuestas individuales.</dd></div>
+      <div class="concept-item"><dt>Participación</dt><dd>Personas que respondieron la encuesta sobre el total de personas convocadas (roster), calculado por cruce de datos demográficos entre la sábana de respuestas y la base cargada de participantes.</dd></div>
+    </dl>
+  </div>
+  `;
+
+  UI.root.querySelectorAll('.glossary-toc button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = document.getElementById(btn.dataset.target);
+      if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+};
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, ATTRS, COLORS, DIM_ORDEN,
+  fmt1, fmtPct, fmtDelta, deltaColor, heatTier, escapeHtml,
+  filteredRespondents, byDimension, byAtributo, isFilterActive } = CD;
+const { dlBtn } = UI;
+
+function tipoColor(tipo) { return COLORS[tipo] || '#888'; }
+
+function miniDimTable(rows, orgByDim, filterActive) {
+  return `<table class="dtable"><thead><tr><th>Dimensión</th><th>Puntaje</th>${filterActive ? '<th>Organización</th><th>Brecha</th>' : ''}</tr></thead><tbody>${rows.map(d => {
+    const org = filterActive ? orgByDim.find(x => x.dimension === d.dimension) : null;
+    const gap = org ? d.avg - org.avg : null;
+    return `<tr>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${tipoColor(d.tipo)};margin-right:6px"></span>${d.dimension}</td>
+      <td><span class="pill" style="background:${heatTier(d.avg).color}">${fmt1(d.avg)}</span></td>
+      ${filterActive ? `<td><span class="pill" style="background:${heatTier(org.avg).color}">${fmt1(org.avg)}</span></td><td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td>` : ''}
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+function miniAttrTable(rows, orgByAttr, filterActive, showDisp) {
+  return `<table class="dtable"><thead><tr><th>Atributo</th><th>${showDisp ? 'Dispersión' : 'Puntaje'}</th>${filterActive ? `<th>Organización</th><th>Brecha</th>` : ''}</tr></thead><tbody>${rows.map(a => {
+    const org = filterActive ? orgByAttr.find(x => x.attr.id === a.attr.id) : null;
+    const val = showDisp ? a.disp : a.avg;
+    const orgVal = org ? (showDisp ? org.disp : org.avg) : null;
+    const gap = org ? val - orgVal : null;
+    return `<tr>
+      <td style="max-width:280px">${escapeHtml(a.attr.positivo)} <span style="color:var(--ink-2);font-size:11px">(${a.attr.dimension})</span></td>
+      <td><span class="pill" style="background:${showDisp ? '#F3C13B' : heatTier(a.avg).color}${showDisp?';color:#5c4400':''}">${fmt1(val)}</span></td>
+      ${filterActive ? `<td><span class="pill" style="background:${showDisp ? '#F3C13B' : heatTier(orgVal).color}${showDisp?';color:#5c4400':''}">${fmt1(orgVal)}</span></td><td style="color:${deltaColor(showDisp ? -gap : gap)}">${fmtDelta(gap)}</td>` : ''}
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+window.renderRanking = function renderRanking() {
+  const records = filteredRespondents();
+  const orgRecords = DATA.respondents;
+  const filterActive = isFilterActive();
+  const dims = byDimension(records);
+  const attrs = byAtributo(records);
+  const dimsOrg = filterActive ? byDimension(orgRecords) : null;
+  const attrsOrg = filterActive ? byAtributo(orgRecords) : null;
+
+  const dimsSorted = [...dims].sort((a,b) => b.avg - a.avg);
+  const attrsSorted = [...attrs].sort((a,b) => b.avg - a.avg);
+
+  UI.root.innerHTML = `
+  <div class="section-intro">Dimensiones y atributos (preguntas individuales) con mejor y menor desempeño.${filterActive ? ' Se incluye el puntaje de la organización completa y la brecha frente al filtro activo.' : ''}</div>
+  <div class="grid-2b">
+    <div class="card" id="cardDimTop">
+      <div style="position:relative">${dlBtn('cardDimTop','ranking_dim_alto','table')}<h3>Dimensiones — Puntaje más alto</h3>${miniDimTable(dimsSorted.slice(0,3), dimsOrg, filterActive)}</div>
+    </div>
+    <div class="card" id="cardDimBot">
+      <div style="position:relative">${dlBtn('cardDimBot','ranking_dim_bajo','table')}<h3>Dimensiones — Puntaje más bajo</h3>${miniDimTable(dimsSorted.slice(-3).reverse(), dimsOrg, filterActive)}</div>
+    </div>
+  </div>
+  <div class="grid-2b">
+    <div class="card" id="cardAttrTop">
+      <div style="position:relative">${dlBtn('cardAttrTop','ranking_atributos_alto','table')}<h3>Atributos — Puntaje más alto (Top 8)</h3>${miniAttrTable(attrsSorted.slice(0,8), attrsOrg, filterActive)}</div>
+    </div>
+    <div class="card" id="cardAttrBot">
+      <div style="position:relative">${dlBtn('cardAttrBot','ranking_atributos_bajo','table')}<h3>Atributos — Puntaje más bajo (Top 8)</h3>${miniAttrTable(attrsSorted.slice(-8).reverse(), attrsOrg, filterActive)}</div>
+    </div>
+  </div>
+  `;
+};
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, ATTRS, fmt1, heatTier, escapeHtml, filteredRespondents, byAtributo } = CD;
+const { charts, dlBtn, heatLegendHTML, barOpts } = UI;
+
+window.renderDispersion = function renderDispersion() {
+  const records = filteredRespondents();
+  const attrs = byAtributo(records);
+  const sorted = [...attrs].sort((a,b) => b.disp - a.disp);
+
+  UI.root.innerHTML = `
+  <div class="section-intro">La dispersión (desviación estándar) mide qué tan de acuerdo están las personas entre sí sobre cada pregunta. Mayor dispersión = opiniones más divididas = menor consenso, y suele indicar un tema que vale la pena explorar cualitativamente.</div>
+  <div class="grid-2b">
+    <div class="card" id="disp-top-card">
+      <div style="position:relative">${dlBtn('disp-top-card','dispersion_alta','table')}<h3>Mayor Dispersión (menor consenso)</h3><ul class="rank-list opp" id="disp-top-list"></ul></div>
+    </div>
+    <div class="card" id="disp-bot-card">
+      <div style="position:relative">${dlBtn('disp-bot-card','dispersion_baja','table')}<h3>Menor Dispersión (mayor consenso)</h3><ul class="rank-list" id="disp-bot-list"></ul></div>
+    </div>
+  </div>
+  `;
+
+  const topD = sorted.slice(0,8), botD = [...sorted].reverse().slice(0,8);
+  document.getElementById('disp-top-list').innerHTML = topD.map((a,i) => `<li><span class="rank-num">${i+1}</span><span style="flex:1">${escapeHtml(a.attr.positivo)} <span style="color:var(--ink-2);font-size:11px">(${a.attr.dimension})</span></span><span class="pill" style="background:#F3C13B;color:#5c4400">${fmt1(a.disp)}</span></li>`).join('');
+  document.getElementById('disp-bot-list').innerHTML = botD.map((a,i) => `<li><span class="rank-num">${i+1}</span><span style="flex:1">${escapeHtml(a.attr.positivo)} <span style="color:var(--ink-2);font-size:11px">(${a.attr.dimension})</span></span><span class="pill" style="background:#7FC17E">${fmt1(a.disp)}</span></li>`).join('');
+};
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, META, ATTRS, MIN_N, COLORS, DIM_ORDEN, TIPO_ORDEN,
+  fmt1, heatTier, escapeHtml, normalizeSearch,
+  activeFilters, FILTER_FIELDS, filteredRespondents, isFilterActive, kpisGeneral, byTipo, byDimension, byAtributo } = CD;
+const { charts, destroyChart, dlBtn, barOpts } = UI;
+
+const COMPARE_PALETTE = ['#0889D6','#EB493C','#48BBA1','#F3C13B','#7B24FF','#F07A3C','#2F9880','#066AA8','#C2669A','#8C97A8'];
+let compVarField = null; // se inicializa al primer campo disponible en renderCompVar()
+let compVarSearch = '';
+
+function tipoColor(tipo) { return COLORS[tipo] || '#888'; }
+
+window.renderCompVar = function renderCompVar() {
+  if (!compVarField && FILTER_FIELDS.length) compVarField = FILTER_FIELDS[0].key;
+  if (!FILTER_FIELDS.length) { UI.root.innerHTML = `<div class="card"><p class="card-sub">Esta medición no tiene campos demográficos configurados.</p></div>`; return; }
+  const fieldLabel = FILTER_FIELDS.find(f => f.key === compVarField).label;
+  UI.root.innerHTML = `
+  <div class="section-intro">Elige una variable demográfica/organizacional y compara automáticamente todas sus categorías (con n≥${MIN_N}) entre sí: Puntaje General, Tipos de Cultura, Dimensiones y las ${ATTRS.length} preguntas individuales. ${isFilterActive() ? 'Los filtros globales activos se respetan dentro de cada categoría.' : 'Sin filtros globales activos — se compara sobre el 100% de la organización.'}</div>
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <select class="small" id="compvar-field-select">
+        ${FILTER_FIELDS.map(f => `<option value="${f.key}" ${f.key===compVarField?'selected':''}>${f.label}</option>`).join('')}
+      </select>
+    </div>
+  </div>
+  <div id="compvar-body"></div>
+  `;
+  document.getElementById('compvar-field-select').addEventListener('change', e => { compVarField = e.target.value; renderCompVarBody(); });
+  renderCompVarBody();
+};
+
+function segmentsForField(fieldKey) {
+  const cats = DATA.catalogs[FILTER_FIELDS.find(f => f.key === fieldKey).cat];
+  const baseRecords = filteredRespondents();
+  const segs = [];
+  let hidden = 0;
+  cats.forEach(cat => {
+    const recs = baseRecords.filter(r => r[fieldKey] === cat);
+    if (recs.length >= MIN_N) segs.push({ value: cat, records: recs, n: recs.length });
+    else if (recs.length > 0) hidden++;
+  });
+  return { segs, hidden, totalCats: cats.length };
+}
+
+function renderCompVarBody() {
+  const body = document.getElementById('compvar-body');
+  const { segs, hidden } = segmentsForField(compVarField);
+  const fieldLabel = FILTER_FIELDS.find(f => f.key === compVarField).label;
+
+  if (segs.length < 2) {
+    body.innerHTML = `<div class="card"><div class="alert-item">⚠ No hay suficientes categorías de "${escapeHtml(fieldLabel)}" con n≥${MIN_N} bajo el filtro actual para comparar (categorías válidas: ${segs.length}). Prueba con otra variable o quita algún filtro global.</div></div>`;
+    return;
+  }
+  segs.forEach((s,i) => s.color = COMPARE_PALETTE[i % COMPARE_PALETTE.length]);
+  segs.forEach(s => { s.k = kpisGeneral(s.records); s.tipos = byTipo(s.records); s.dims = byDimension(s.records); s.attrs = byAtributo(s.records); });
+
+  body.innerHTML = `
+    <div class="card">
+      <div style="position:relative">
+        ${dlBtn('chart-compvar','comparativa_'+compVarField,'chart')}
+        <h3>Puntaje General por ${escapeHtml(fieldLabel)}</h3>
+        <p class="card-sub">${hidden>0 ? hidden+' categoría(s) ocultas por n<'+MIN_N : 'Todas las categorías cumplen el mínimo de anonimato'}</p>
+        <div class="chart-box" style="height:${Math.max(220, segs.length*42)}px"><canvas id="chart-compvar"></canvas></div>
+      </div>
+    </div>
+    <div class="card" id="cv-general-tipos">
+      <div style="position:relative">
+        ${dlBtn('cv-general-tipos','comparativa_general_tipos','table')}
+        <h3>General y Tipos de Cultura</h3>
+        <div class="scroll-x"><table class="dtable"><thead><tr><th>Métrica</th>${segs.map(s => `<th>${escapeHtml(s.value)} <span style="color:var(--ink-2);font-weight:400">(n=${s.n})</span></th>`).join('')}</tr></thead>
+        <tbody>
+          <tr><td><b>Puntaje General</b></td>${segs.map(s => `<td><span class="pill" style="background:${heatTier(s.k.avg).color}">${fmt1(s.k.avg)}</span></td>`).join('')}</tr>
+          ${TIPO_ORDEN.map(t => `<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${tipoColor(t)};margin-right:6px"></span>${t}</td>${segs.map(s => { const tv = s.tipos.find(x=>x.tipo===t); return `<td><span class="pill" style="background:${heatTier(tv.avg).color}">${fmt1(tv.avg)}</span></td>`; }).join('')}</tr>`).join('')}
+        </tbody></table></div>
+      </div>
+    </div>
+    <div class="card" id="cv-dims">
+      <div style="position:relative">
+        ${dlBtn('cv-dims','comparativa_dimensiones','table')}
+        <h3>Dimensiones</h3>
+        <div class="scroll-x"><table class="dtable"><thead><tr><th>Dimensión</th>${segs.map(s => `<th>${escapeHtml(s.value)}</th>`).join('')}</tr></thead>
+        <tbody>${DIM_ORDEN.map(dim => `<tr><td><b>${dim}</b></td>${segs.map(s => { const dv = s.dims.find(x=>x.dimension===dim); return `<td><span class="pill" style="background:${heatTier(dv.avg).color}">${fmt1(dv.avg)}</span></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+      </div>
+    </div>
+    <div class="card" id="cv-attrs-intro">
+      <div style="position:relative">
+        <h3>${ATTRS.length} Atributos, agrupados por Dimensión</h3>
+        <p class="card-sub">8 atributos por cada una de las 9 dimensiones.</p>
+        <input class="search-box" id="compvar-attr-search" type="text" placeholder="Buscar pregunta/atributo…" value="${escapeHtml(compVarSearch)}">
+      </div>
+    </div>
+    <div id="compvar-attr-blocks"></div>
+  `;
+
+  destroyChart('chart-compvar');
+  const ctx = document.getElementById('chart-compvar').getContext('2d');
+  charts['chart-compvar'] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: segs.map(s => `${s.value} (n=${s.n})`), datasets: [{ data: segs.map(s => s.k.avg), backgroundColor: segs.map(s => s.color), borderRadius: 5 }] },
+    options: barOpts({ indexAxis: 'y', min: 1, max: 5 })
+  });
+
+  document.getElementById('compvar-attr-search').addEventListener('input', e => { compVarSearch = e.target.value; renderCompVarAttrBlocks(segs); });
+  renderCompVarAttrBlocks(segs);
+}
+
+function renderCompVarAttrBlocks(segs) {
+  const container = document.getElementById('compvar-attr-blocks');
+  const q = compVarSearch.trim() ? normalizeSearch(compVarSearch) : '';
+  container.innerHTML = DIM_ORDEN.map(dim => {
+    let rows = ATTRS.filter(a => a.dimension === dim);
+    if (q) rows = rows.filter(a => normalizeSearch(a.positivo).includes(q) || normalizeSearch(dim).includes(q));
+    if (!rows.length) return '';
+    const tipo = rows[0].tipo;
+    const body = rows.map(a => {
+      const cells = segs.map(s => {
+        const av = s.attrs.find(x => x.attr.id === a.id);
+        return `<td><span class="pill" style="background:${heatTier(av.avg).color}">${fmt1(av.avg)}</span></td>`;
+      }).join('');
+      return `<tr><td style="max-width:260px">${escapeHtml(a.positivo)}</td>${cells}</tr>`;
+    }).join('');
+    return `<div class="card" id="cv-attrs-${dim.replace(/\s+/g,'')}">
+      <div style="position:relative">
+        ${dlBtn('cv-attrs-'+dim.replace(/\s+/g,''), 'comparativa_'+dim, 'table')}
+        <h3><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(tipo)};margin-right:7px"></span>${dim}</h3>
+        <div class="scroll-x"><table class="dtable"><thead><tr><th>Atributo</th>${segs.map(s => `<th>${escapeHtml(s.value)}</th>`).join('')}</tr></thead>
+        <tbody>${body}</tbody></table></div>
+      </div>
+    </div>`;
+  }).join('');
+  if (!container.innerHTML.trim()) container.innerHTML = `<div class="card"><p class="card-sub">Sin resultados para "${escapeHtml(compVarSearch)}".</p></div>`;
+}
+})();
+
+(function () {
+'use strict';
+const CD = window.__CD, UI = window.__UI;
+const { DATA, META, COLORS, DIM_ORDEN, TIPO_ORDEN, fmt1, filteredRespondents, byTipo, byDimension, kpisGeneral } = CD;
+const { charts, destroyChart, dlBtn, heatLegendHTML } = UI;
+
+function tipoColor(tipo) { return COLORS[tipo] || '#888'; }
+const DIM_PALETTE = ['#0889D6','#EB493C','#48BBA1','#F3C13B','#7B24FF','#F07A3C','#2F9880','#C2669A','#8C97A8'];
+
+window.renderTendencias = function renderTendencias() {
+  const records = filteredRespondents();
+  const k = kpisGeneral(records);
+  const tipos = byTipo(records);
+  const dims = byDimension(records);
+
+  UI.root.innerHTML = `
+  <div class="section-intro">Esta pestaña muestra la evolución de la Cultura Organizacional a través de las mediciones disponibles. <b>Actualmente solo se dispone de una medición verificada a nivel individual: 2026.</b> La estructura queda lista para incorporar automáticamente futuras olas (o mediciones históricas previas, si se aportan con su sábana de datos original y se valida la escala) sin rediseñar el dashboard.</div>
+
+  <div class="finding-item warn"><span>ℹ</span><span>No se incluyeron los datos de 2021/2023/2024 de referencias externas en este dashboard: no fue posible verificar su procedencia a nivel de respuesta individual dentro de esta conversación. Si cuentas con la sábana original de esas mediciones, puedo incorporarlas con la misma trazabilidad que se aplicó a 2026.</span></div>
+
+  <div class="card">
+    <div style="position:relative">
+      ${dlBtn('chart-trend-general','tendencia_puntaje_general','chart')}
+      <h3>Puntaje General — Línea de Tiempo</h3>
+      <div class="chart-box"><canvas id="chart-trend-general"></canvas></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div style="position:relative">
+        ${dlBtn('chart-trend-tipo','tendencia_tipos_cultura','chart')}
+        <h3>Tipos de Cultura — Línea de Tiempo</h3>
+        <div class="chart-box"><canvas id="chart-trend-tipo"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="position:relative">
+        ${dlBtn('chart-trend-dim','tendencia_dimensiones','chart')}
+        <h3>Dimensiones — Línea de Tiempo</h3>
+        <div class="chart-box"><canvas id="chart-trend-dim"></canvas></div>
+      </div>
+    </div>
+  </div>
+  `;
+
+  const years = ['2026']; // extensible: agregar más años cuando existan datos verificados
+
+  destroyChart('chart-trend-general');
+  const ctx1 = document.getElementById('chart-trend-general').getContext('2d');
+  charts['chart-trend-general'] = new Chart(ctx1, {
+    type: 'line',
+    data: { labels: years, datasets: [{ label: 'Puntaje General', data: [k.avg], borderColor: '#0889D6', backgroundColor: '#0889D6', pointRadius: 6, pointHoverRadius: 8, tension: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { display: false }, barDataLabels: { enabled: false } } }
+  });
+
+  destroyChart('chart-trend-tipo');
+  const ctx2 = document.getElementById('chart-trend-tipo').getContext('2d');
+  charts['chart-trend-tipo'] = new Chart(ctx2, {
+    type: 'line',
+    data: { labels: years, datasets: tipos.map(t => ({ label: t.tipo, data: [t.avg], borderColor: tipoColor(t.tipo), backgroundColor: tipoColor(t.tipo), pointRadius: 6, tension: 0 })) },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, barDataLabels: { enabled: false } } }
+  });
+
+  destroyChart('chart-trend-dim');
+  const ctx3 = document.getElementById('chart-trend-dim').getContext('2d');
+  charts['chart-trend-dim'] = new Chart(ctx3, {
+    type: 'line',
+    data: { labels: years, datasets: dims.map((d,i) => ({ label: d.dimension, data: [d.avg], borderColor: DIM_PALETTE[i], backgroundColor: DIM_PALETTE[i], pointRadius: 5, tension: 0 })) },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9.5 } } }, barDataLabels: { enabled: false } } }
+  });
+};
+})();
+
+(function () {
+'use strict';
+const UI = window.__UI;
+UI.renderFilterbar();
+UI.RENDERERS.resumen = window.renderResumen;
+UI.RENDERERS.tipos = window.renderTipos;
+UI.RENDERERS.dimensiones = window.renderDimensiones;
+UI.RENDERERS.atributos = window.renderAtributos;
+UI.RENDERERS.ranking = window.renderRanking;
+UI.RENDERERS.dispersion = window.renderDispersion;
+UI.RENDERERS.tendencias = window.renderTendencias;
+UI.RENDERERS.compvar = window.renderCompVar;
+UI.RENDERERS.abiertas = window.renderAbiertas;
+UI.RENDERERS.insights = window.renderInsights;
+UI.RENDERERS.glosario = window.renderGlosario;
+UI.renderActiveTab();
+})();
+
+};
+
+window.__ERPNEXT_APP_MAIN__();
+
+</script>
+{%- endblock -%}

@@ -230,7 +230,7 @@ root.innerHTML = `<div class="loading">Cargando datos de la medición…</div>`;
 
 let apiResponse;
 try {
-  const url = '/api/method/listenaiq.api.cultura_dashboard.get_dashboard_data?survey=' + encodeURIComponent(SURVEY);
+  const url = '/api/method/liseniq.api.cultura_dashboard.get_dashboard_data?survey=' + encodeURIComponent(SURVEY);
   const res = await fetch(url, { credentials: 'same-origin' });
   const body = await res.json();
   if (!res.ok) {

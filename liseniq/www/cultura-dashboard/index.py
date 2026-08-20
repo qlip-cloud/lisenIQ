@@ -42,6 +42,11 @@ def get_context(context):
 
     context.survey = survey
     context.title = f"Cultura Organizacional — {survey}"
+    context.no_cache = 1
+    context.no_breadcrumbs = True
+    context.is_navbar_custom = True
+    context.show_summary_section = False
+        
     # No pasamos los datos aquí: el HTML los pide vía fetch() al cargar,
     # para no incrustar un payload pesado (y potencialmente ya obsoleto
     # si el usuario deja la pestaña abierta) directamente en el HTML.

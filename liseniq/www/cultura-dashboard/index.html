@@ -190,6 +190,10 @@ footer.credits{text-align:center;color:var(--ink-2);font-size:11px;margin-top:26
 <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
 
 <script>
+// El parámetro 'survey' se lee de la URL (?survey=...) del lado del cliente
+// como fuente de verdad (ver Gotcha #4 del skill); {{ survey|tojson }}
+// queda solo como respaldo por si el controlador ya lo validó.
+window.__SURVEY_FROM_CONTEXT__ = {{ survey|tojson }};
 </script>
 <script>
 // ============================================================================
@@ -212,6 +216,10 @@ window.__ERPNEXT_APP_MAIN__ = async function () {
 
 const root = document.getElementById('app-root');
 const params = new URLSearchParams(window.location.search);
+// Fuente de verdad para el parámetro de la URL: no confiar solo en
+// {{ survey|tojson }} de Jinja (ver Gotcha #4 del skill) — se lee también
+// aquí del lado del cliente.
+const SURVEY = params.get('survey') || (window.__SURVEY_FROM_CONTEXT__ || null);
 
 if (!SURVEY) {
   root.innerHTML = `<div class="loading">Falta el parámetro <code>?survey=</code> en la URL.</div>`;
@@ -222,7 +230,7 @@ root.innerHTML = `<div class="loading">Cargando datos de la medición…</div>`;
 
 let apiResponse;
 try {
-  const url = '/api/method/liseniq.api.cultura_dashboard.get_dashboard_data?survey=' + encodeURIComponent(SURVEY);
+  const url = '/api/method/listenaiq.api.cultura_dashboard.get_dashboard_data?survey=' + encodeURIComponent(SURVEY);
   const res = await fetch(url, { credentials: 'same-origin' });
   const body = await res.json();
   if (!res.ok) {

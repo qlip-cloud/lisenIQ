@@ -182,17 +182,12 @@ footer.credits{text-align:center;color:var(--ink-2);font-size:11px;margin-top:26
   <footer class="credits">Dashboard de Cultura Organizacional · Metodología OCC · Datos en vivo desde ERPNext</footer>
 </div>
 
-<!-- Librerías vía CDN (no se incrusta el ~1MB de la versión standalone offline;
-     esta es una Website Page normal servida por Frappe, con conexión). -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.2.2/wordcloud2.min.js"></script>
 
 <script>
-// El parámetro 'survey' se lee de la URL (?survey=...) del lado del cliente
-// como fuente de verdad (ver Gotcha #4 del skill); {{ survey|tojson }}
-// queda solo como respaldo por si el controlador ya lo validó.
 window.__SURVEY_FROM_CONTEXT__ = {{ survey|tojson }};
 </script>
 <script>
@@ -211,6 +206,86 @@ window.__SURVEY_FROM_CONTEXT__ = {{ survey|tojson }};
 // adelante) se ejecuta DESPUÉS de que awaitDashboardData() resuelve —
 // ver el bootstrap al final de este archivo.
 // ============================================================================
+// ============================================================================
+// Helpers reutilizables: fetch crudo + adaptador al formato interno.
+// Se definen en el scope del módulo (no dentro de __ERPNEXT_APP_MAIN__) para
+// que la pestaña de Tendencias pueda cargar UNA SEGUNDA medición completa
+// (para comparar) usando exactamente la misma lógica que la carga inicial.
+// ============================================================================
+async function fetchSurveyApi(surveyName) {
+  const url = '/api/method/liseniq.api.cultura_dashboard.get_dashboard_data?survey=' + encodeURIComponent(surveyName);
+  const res = await fetch(url, { credentials: 'same-origin' });
+  const body = await res.json();
+  if (!res.ok) {
+    const msg = (body && body._server_messages) ? JSON.parse(body._server_messages).map(m => JSON.parse(m).message).join(' ') : (body.exc_type || res.statusText);
+    throw new Error(msg || ('HTTP ' + res.status));
+  }
+  return body.message;
+}
+
+function adaptApiPayload(api) {
+  const demoFieldsMeta = api.demographic_fields || [];
+  const openTextLabels = api.open_text_labels_order || [];
+
+  const respondents = (api.records || []).map((row, i) => {
+    const nDemo = demoFieldsMeta.length;
+    const demoVals = row.slice(0, nDemo);
+    const answers = row[nDemo] || [];
+    const openTextArr = row[nDemo + 1] || [];
+    const obj = { id: 'resp-' + i };
+    demoFieldsMeta.forEach((f, idx) => { obj[f.key] = demoVals[idx] || 'Sin dato'; });
+    const r = {};
+    answers.forEach((v, code) => { if (v != null) r[code] = v; });
+    obj.r = r;
+    obj.openText = {};
+    openTextLabels.forEach((label, idx) => { obj.openText[label] = openTextArr[idx] || []; });
+    return obj;
+  });
+
+  const roster = (api.universe || []).map(row => {
+    const obj = {};
+    demoFieldsMeta.forEach((f, idx) => { obj[f.key] = row[idx] || 'Sin dato'; });
+    return obj;
+  });
+
+  const atributos = (api.attributes || []).map(a => ({
+    id: a.code, positivo: a.text, negativo: null, dimension: a.dimension, tipo: a.tipo, orden: a.code,
+  }));
+
+  const catalogs = {};
+  demoFieldsMeta.forEach(f => {
+    const vals = new Set();
+    respondents.forEach(r => vals.add(r[f.key]));
+    roster.forEach(r => vals.add(r[f.key]));
+    catalogs[f.key] = [...vals].sort();
+  });
+
+  const tipoColors = api.tipo_colors || {};
+  const META = {
+    organizacion: api.meta.survey || 'Medición',
+    medicion: 'Cultura Organizacional',
+    escala_min: 1, escala_max: 5,
+    min_n: api.meta.min_n || 5,
+    total_esperadas: api.meta.n_universo || api.meta.n_respondentes || 0,
+    total_respondidas: api.meta.n_respondentes || 0,
+    colores: { ...tipoColors, neutro: '#BFBFBF' },
+    heat_bands: [
+      { label: 'Crítico', min: 1.00, max: 1.67, color: '#D6362B' },
+      { label: 'Bajo', min: 1.67, max: 2.33, color: '#F07A3C' },
+      { label: 'Moderado-bajo', min: 2.33, max: 3.00, color: '#F3C13B' },
+      { label: 'Moderado-alto', min: 3.00, max: 3.67, color: '#C6D96A' },
+      { label: 'Bueno', min: 3.67, max: 4.33, color: '#7FC17E' },
+      { label: 'Sobresaliente', min: 4.33, max: 5.001, color: '#3E9E52' },
+    ],
+    dimensiones_orden: api.dimensions_order || [],
+    tipos_orden: api.tipos_order || [],
+    preguntas_abiertas: openTextLabels,
+    preguntas_abiertas_labels: Object.fromEntries(openTextLabels.map(k => [k, k])),
+  };
+
+  return { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels };
+}
+
 window.__ERPNEXT_APP_MAIN__ = async function () {
 'use strict';
 
@@ -230,14 +305,7 @@ root.innerHTML = `<div class="loading">Cargando datos de la medición…</div>`;
 
 let apiResponse;
 try {
-  const url = '/api/method/liseniq.api.cultura_dashboard.get_dashboard_data?survey=' + encodeURIComponent(SURVEY);
-  const res = await fetch(url, { credentials: 'same-origin' });
-  const body = await res.json();
-  if (!res.ok) {
-    const msg = (body && body._server_messages) ? JSON.parse(body._server_messages).map(m => JSON.parse(m).message).join(' ') : (body.exc_type || res.statusText);
-    throw new Error(msg || ('HTTP ' + res.status));
-  }
-  apiResponse = body.message; // frappe.whitelist() responses are wrapped in {"message": ...}
+  apiResponse = await fetchSurveyApi(SURVEY);
 } catch (e) {
   root.innerHTML = `<div class="loading">No se pudo cargar el dashboard: ${String(e.message || e).replace(/</g, '&lt;')}<br><br>Verifica que tienes sesión iniciada y que la medición existe.</div>`;
   throw e;
@@ -250,70 +318,8 @@ try {
 //   DATA = { meta, catalogs, atributos, respondents, roster, wordclouds_raw }
 // ============================================================================
 const api = apiResponse;
-const demoFieldsMeta = api.demographic_fields || []; // [{key,label}, ...] en el mismo orden que los valores demo de records/universe
-
-function buildRespondentId(i) { return 'resp-' + i; }
-
-const openTextLabels = api.open_text_labels_order || [];
-
-const respondents = (api.records || []).map((row, i) => {
-  const nDemo = demoFieldsMeta.length;
-  const demoVals = row.slice(0, nDemo);
-  const answers = row[nDemo] || [];
-  const openTextArr = row[nDemo + 1] || [];
-  const obj = { id: buildRespondentId(i) };
-  demoFieldsMeta.forEach((f, idx) => { obj[f.key] = demoVals[idx] || 'Sin dato'; });
-  const r = {};
-  answers.forEach((v, code) => { if (v != null) r[code] = v; });
-  obj.r = r;
-  // tokens por pregunta abierta, indexados por posición en openTextLabels
-  obj.openText = {};
-  openTextLabels.forEach((label, idx) => { obj.openText[label] = openTextArr[idx] || []; });
-  return obj;
-});
-
-const roster = (api.universe || []).map(row => {
-  const obj = {};
-  demoFieldsMeta.forEach((f, idx) => { obj[f.key] = row[idx] || 'Sin dato'; });
-  return obj;
-});
-
-const atributos = (api.attributes || []).map(a => ({
-  id: a.code, positivo: a.text, negativo: null, dimension: a.dimension, tipo: a.tipo, orden: a.code,
-}));
-
-const catalogs = {};
-demoFieldsMeta.forEach(f => {
-  const vals = new Set();
-  respondents.forEach(r => vals.add(r[f.key]));
-  roster.forEach(r => vals.add(r[f.key]));
-  catalogs[f.key] = [...vals].sort();
-});
-
-const tipoColors = api.tipo_colors || {};
-const META = {
-  organizacion: api.meta.survey || 'Medición',
-  medicion: 'Cultura Organizacional',
-  escala_min: 1, escala_max: 5,
-  min_n: api.meta.min_n || 5,
-  total_esperadas: api.meta.n_universo || api.meta.n_respondentes || 0,
-  total_respondidas: api.meta.n_respondentes || 0,
-  colores: { ...tipoColors, neutro: '#BFBFBF' },
-  heat_bands: [
-    { label: 'Crítico', min: 1.00, max: 1.67, color: '#D6362B' },
-    { label: 'Bajo', min: 1.67, max: 2.33, color: '#F07A3C' },
-    { label: 'Moderado-bajo', min: 2.33, max: 3.00, color: '#F3C13B' },
-    { label: 'Moderado-alto', min: 3.00, max: 3.67, color: '#C6D96A' },
-    { label: 'Bueno', min: 3.67, max: 4.33, color: '#7FC17E' },
-    { label: 'Sobresaliente', min: 4.33, max: 5.001, color: '#3E9E52' },
-  ],
-  dimensiones_orden: api.dimensions_order || [],
-  tipos_orden: api.tipos_order || [],
-  preguntas_abiertas: Object.keys(api.wordclouds || {}),
-  preguntas_abiertas_labels: Object.fromEntries(Object.keys(api.wordclouds || {}).map(k => [k, k])),
-};
-
-const DATA = { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels };
+const DATA = adaptApiPayload(api);
+const META = DATA.meta;
 
 document.getElementById('org-title').textContent = META.organizacion + ' · ' + META.medicion;
 
@@ -462,7 +468,7 @@ Chart.defaults.animation = false;
 Chart.defaults.transitions.active.animation.duration = 0;
 
 // ---------- filter state (ahora dinámico, según demographic_fields de la API) ----------
-const FILTER_FIELDS = demoFieldsMeta.map(f => ({ key: f.key, label: f.label, cat: f.key }));
+const FILTER_FIELDS = (api.demographic_fields || []).map(f => ({ key: f.key, label: f.label, cat: f.key }));
 const activeFilters = {};
 FILTER_FIELDS.forEach(f => activeFilters[f.key] = new Set(DATA.catalogs[f.cat] || []));
 
@@ -587,6 +593,7 @@ window.__CD = {
   activeFilters, FILTER_FIELDS, isFilterActive, filteredRespondents, filteredRoster, filteredRespondentIds,
   flatVals, kpisGeneral, byTipo, byDimension, byAtributo, byDemografico, participacionPorGrupo,
   wordcloudsRaw: DATA.wordclouds_raw, wordCloudForLabel, openTextLabels: DATA.open_text_labels,
+  CURRENT_SURVEY: SURVEY, fetchSurveyApi, adaptApiPayload,
 };
 
 // ============================================================================
@@ -700,7 +707,13 @@ function updateFilterSummary() {
   const summary = document.getElementById('filter-summary');
   if (summary) summary.textContent = isFilterActive() ? `Mostrando ${n} de ${DATA.respondents.length} respondentes` : `${n} respondentes (sin filtros)`;
   const hk = document.getElementById('header-kpi');
-  hk.innerHTML = `Participación: <b>${META.total_respondidas}/${META.total_esperadas}</b> (${(100*META.total_respondidas/META.total_esperadas).toFixed(1)}%)`;
+  if (isFilterActive()) {
+    const rN = filteredRoster().length;
+    const pct = rN ? (100 * n / rN).toFixed(1) + '%' : '—';
+    hk.innerHTML = `Participación (filtro): <b>${n}/${rN}</b> (${pct})`;
+  } else {
+    hk.innerHTML = `Participación: <b>${META.total_respondidas}/${META.total_esperadas}</b> (${(100*META.total_respondidas/META.total_esperadas).toFixed(1)}%)`;
+  }
   renderActiveChips();
 }
 
@@ -746,9 +759,26 @@ function onFilterChange() {
 // ================= TABS =================
 const RENDERERS = {};
 let activeTab = 'resumen';
+// Pestañas que NO dependen de los puntajes del filtro activo (contenido de
+// referencia estático) y por lo tanto no necesitan el candado de anonimato.
+const TABS_EXEMPT_FROM_MIN_N = new Set(['glosario']);
+
+function renderSuppressedForAnonymity(n) {
+  return `<div class="card">
+    <div class="alert-item">🔒 Este filtro deja solo <b>${n}</b> respondente${n === 1 ? '' : 's'} — por debajo del umbral mínimo de anonimato (n≥${MIN_N}). Para proteger la confidencialidad de las respuestas individuales, no se muestran puntajes para grupos tan pequeños en ninguna pestaña. Amplía el filtro (arriba) para incluir más personas, o revisa el detalle solo a nivel agregado en "Comparar por Variable".</div>
+  </div>`;
+}
+function renderNoRespondents() {
+  return `<div class="card"><p class="card-sub">Ningún respondente coincide con el filtro seleccionado.</p></div>`;
+}
+
 function renderActiveTab() {
-  Object.values(charts).forEach((_, id) => {});
   Object.keys(charts).forEach(id => destroyChart(id));
+  if (!TABS_EXEMPT_FROM_MIN_N.has(activeTab)) {
+    const n = filteredRespondents().length;
+    if (isFilterActive() && n === 0) { root.innerHTML = renderNoRespondents(); return; }
+    if (isFilterActive() && n > 0 && n < MIN_N) { root.innerHTML = renderSuppressedForAnonymity(n); return; }
+  }
   if (RENDERERS[activeTab]) RENDERERS[activeTab]();
 }
 document.getElementById('tabs').addEventListener('click', e => {
@@ -804,7 +834,7 @@ function buildFilterSummaryText() {
 // Recurses ONLY into specific script-populated wrapper divs (so their .card children
 // become individual units); everything else (including text blocks with inline <b>/<span>
 // markup, button rows, finding-items, etc.) is captured whole to avoid shattering it.
-const RECURSE_CONTAINER_IDS = new Set(['attr-dim-blocks', 'compvar-body', 'compvar-attr-blocks', 'wc-container']);
+const RECURSE_CONTAINER_IDS = new Set(['attr-dim-blocks', 'compvar-body', 'compvar-attr-blocks', 'wc-container', 'tendencias-body', 'trend-attr-blocks']);
 function collectFlowUnits(root) {
   const units = [];
   function isAtomic(el) {
@@ -1075,9 +1105,15 @@ window.renderResumen = function renderResumen() {
       <span class="kpi-tag" style="background:${tier.color}">${tier.label}</span>
     </div>
     <div class="card kpi-card">
-      <div class="kpi-label">Participación ${help('Respondentes obtenidos vs. esperados según el roster (base cargada).')}</div>
-      <div class="kpi-value">${(100*META.total_respondidas/META.total_esperadas).toFixed(1)}%</div>
-      <div class="kpi-sub">${META.total_respondidas} de ${META.total_esperadas} personas</div>
+      <div class="kpi-label">Participación ${help('Respondentes obtenidos vs. esperados según el roster. Si hay un filtro activo, se recalcula solo para ese segmento.')}</div>
+      <div class="kpi-value">${(() => {
+        if (filterActive) {
+          const rN = filteredRoster().length;
+          return rN ? (100 * k.n / rN).toFixed(1) + '%' : '—';
+        }
+        return (100*META.total_respondidas/META.total_esperadas).toFixed(1) + '%';
+      })()}</div>
+      <div class="kpi-sub">${filterActive ? `${k.n} de ${filteredRoster().length} personas (filtro)` : `${META.total_respondidas} de ${META.total_esperadas} personas`}</div>
     </div>
     ${filterActive ? `<div class="card kpi-card">
       <div class="kpi-label">Brecha vs. Organización ${help('Diferencia entre el puntaje del filtro aplicado y el puntaje de toda la organización.')}</div>
@@ -1547,7 +1583,7 @@ window.renderInsights = function renderInsights() {
     <div class="tag-row" style="margin-bottom:12px">
       <span class="badge ok">${ATTRS.length} atributos en el catálogo</span>
       <span class="badge ok">${DATA.respondents.length} respondentes cargados</span>
-      <span class="badge ${META.total_esperadas ? (META.total_respondidas/META.total_esperadas>=0.85?'ok':'warn') : 'warn'}">${META.total_esperadas ? (100*META.total_respondidas/META.total_esperadas).toFixed(1)+'% participación' : 'sin roster para calcular % participación'}</span>
+      <span class="badge ${META.total_esperadas ? (META.total_respondidas/META.total_esperadas>=0.85?'ok':'warn') : 'warn'}">${META.total_esperadas ? (100*META.total_respondidas/META.total_esperadas).toFixed(1)+'% participación (toda la organización)' : 'sin roster para calcular % participación'}</span>
     </div>
     <div class="finding-item"><span>ℹ</span><span>La participación por segmento (pestaña de comparación) se calcula contando respuestas reales vs. personas convocadas (<code>qp_IQ_SurveyRecipient</code>) para cada valor demográfico — ambas fuentes vienen del mismo Contact en Frappe, por lo que no hace falta ningún cruce/heurística de coincidencia.</span></div>
     <div class="finding-item warn"><span>⚠</span><span><b>Grupos pequeños:</b> cualquier segmento con menos de ${MIN_N} personas esperadas se agrupa automáticamente como "Otros" en las tablas y gráficos desagregados, para proteger el anonimato.</span></div>
@@ -1895,74 +1931,332 @@ function renderCompVarAttrBlocks(segs) {
 (function () {
 'use strict';
 const CD = window.__CD, UI = window.__UI;
-const { DATA, META, COLORS, DIM_ORDEN, TIPO_ORDEN, fmt1, filteredRespondents, byTipo, byDimension, kpisGeneral } = CD;
+const { DATA, META, ATTRS, COLORS, DIM_ORDEN, TIPO_ORDEN, MIN_N,
+  fmt1, fmtDelta, deltaColor, heatTier, escapeHtml, normalizeSearch,
+  filteredRespondents, activeFilters, FILTER_FIELDS, isFilterActive } = CD;
 const { charts, destroyChart, dlBtn, heatLegendHTML } = UI;
 
 function tipoColor(tipo) { return COLORS[tipo] || '#888'; }
-const DIM_PALETTE = ['#0889D6','#EB493C','#48BBA1','#F3C13B','#7B24FF','#F07A3C','#2F9880','#C2669A','#8C97A8'];
+
+// ---- estado local de esta pestaña ----
+let availableSurveys = null;   // null = aún no cargado
+let surveysError = null;
+let compareSurveyName = null;
+let compareData = null;        // resultado de CD.adaptApiPayload() para la medición elegida
+let compareLoading = false;
+let compareError = null;
+let trendSearch = '';
+
+function localMean(arr) {
+  const v = arr.filter(x => x != null && !isNaN(x));
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+function avgForAttrIds(respondents, ids) {
+  const vals = [];
+  respondents.forEach(r => { ids.forEach(id => { if (r.r[id] != null) vals.push(r.r[id]); }); });
+  return { avg: localMean(vals), n: vals.length };
+}
+function groupIdsBy(atributos, keyFn) {
+  const map = {};
+  atributos.forEach(a => { const k = keyFn(a); (map[k] = map[k] || []).push(a.id); });
+  return map;
+}
+function attrKey(a) { return a.tipo + '|' + a.dimension + '|' + a.positivo; }
+
+// Filtros globales activos (selección parcial) que tengan sentido aplicar,
+// y de esos, cuáles existen también en el catálogo demográfico de la
+// medición de comparación (puede variar de una medición a otra).
+function activeFilterFields() {
+  return FILTER_FIELDS.filter(f => activeFilters[f.key].size < (DATA.catalogs[f.key] || []).length);
+}
+function compareFilterSplit() {
+  if (!compareData) return { applicable: [], notApplicable: [] };
+  const cmpFieldKeys = new Set(Object.keys(compareData.catalogs || {}));
+  const active = activeFilterFields();
+  return {
+    applicable: active.filter(f => cmpFieldKeys.has(f.key)),
+    notApplicable: active.filter(f => !cmpFieldKeys.has(f.key)),
+  };
+}
+function filteredCompareRespondents() {
+  if (!compareData) return [];
+  const { applicable } = compareFilterSplit();
+  if (!applicable.length) return compareData.respondents;
+  return compareData.respondents.filter(r => applicable.every(f => activeFilters[f.key].has(r[f.key])));
+}
+
+async function ensureSurveyList() {
+  if (availableSurveys !== null || surveysError) return;
+  try {
+    const url = '/api/method/liseniq.api.cultura_dashboard.list_surveys?exclude=' + encodeURIComponent(CD.CURRENT_SURVEY || '');
+    const res = await fetch(url, { credentials: 'same-origin' });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.exc_type || res.statusText);
+    availableSurveys = body.message || [];
+  } catch (e) {
+    surveysError = String(e.message || e);
+  }
+  if (window.__UI && document.querySelector('.tab-btn[data-tab="tendencias"].active')) renderTendenciasBody();
+}
+
+async function loadCompareSurvey(name) {
+  compareSurveyName = name;
+  compareData = null;
+  compareError = null;
+  if (!name) { renderTendenciasBody(); return; }
+  compareLoading = true;
+  renderTendenciasBody();
+  try {
+    const api = await CD.fetchSurveyApi(name);
+    compareData = CD.adaptApiPayload(api);
+  } catch (e) {
+    compareError = String(e.message || e);
+  }
+  compareLoading = false;
+  renderTendenciasBody();
+}
 
 window.renderTendencias = function renderTendencias() {
-  const records = filteredRespondents();
-  const k = kpisGeneral(records);
-  const tipos = byTipo(records);
-  const dims = byDimension(records);
-
   UI.root.innerHTML = `
-  <div class="section-intro">Esta pestaña muestra la evolución de la Cultura Organizacional a través de las mediciones disponibles. <b>Actualmente solo se dispone de una medición verificada a nivel individual: 2026.</b> La estructura queda lista para incorporar automáticamente futuras olas (o mediciones históricas previas, si se aportan con su sábana de datos original y se valida la escala) sin rediseñar el dashboard.</div>
-
-  <div class="finding-item warn"><span>ℹ</span><span>No se incluyeron los datos de 2021/2023/2024 de referencias externas en este dashboard: no fue posible verificar su procedencia a nivel de respuesta individual dentro de esta conversación. Si cuentas con la sábana original de esas mediciones, puedo incorporarlas con la misma trazabilidad que se aplicó a 2026.</span></div>
-
+  <div class="section-intro">Compara esta medición contra otra ya cargada en el sistema: puntaje general, tipos de cultura, dimensiones y preguntas individuales. ${isFilterActive() ? 'Se aplica el filtro demográfico activo arriba en ambas mediciones, cuando el campo existe en las dos.' : 'Sin filtro activo — se compara el 100% de cada medición.'}</div>
   <div class="card">
-    <div style="position:relative">
-      ${dlBtn('chart-trend-general','tendencia_puntaje_general','chart')}
-      <h3>Puntaje General — Línea de Tiempo</h3>
-      <div class="chart-box"><canvas id="chart-trend-general"></canvas></div>
-    </div>
+    <div id="tendencias-selector"></div>
   </div>
-  <div class="grid-2">
+  <div id="tendencias-body"></div>
+  `;
+  ensureSurveyList();
+  renderSelector();
+  renderTendenciasBody();
+};
+
+function renderSelector() {
+  const el = document.getElementById('tendencias-selector');
+  if (!el) return;
+  if (surveysError) {
+    el.innerHTML = `<div class="alert-item">⚠ No se pudo cargar la lista de mediciones: ${escapeHtml(surveysError)}</div>`;
+    return;
+  }
+  if (availableSurveys === null) {
+    el.innerHTML = `<p class="card-sub">Cargando mediciones disponibles…</p>`;
+    return;
+  }
+  if (!availableSurveys.length) {
+    el.innerHTML = `<p class="card-sub">No hay otras mediciones (Survey) registradas en el sistema para comparar.</p>`;
+    return;
+  }
+  el.innerHTML = `
+    <label style="font-size:12px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:8px">Comparar esta medición con:</label>
+    <select class="small" id="trend-compare-select" style="min-width:260px">
+      <option value="">— Selecciona una medición —</option>
+      ${availableSurveys.map(s => `<option value="${escapeHtml(s)}" ${s === compareSurveyName ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+    </select>
+  `;
+  document.getElementById('trend-compare-select').addEventListener('change', e => loadCompareSurvey(e.target.value || null));
+}
+
+function renderTendenciasBody() {
+  renderSelector();
+  const body = document.getElementById('tendencias-body');
+  if (!body) return;
+
+  if (!compareSurveyName) {
+    body.innerHTML = `<div class="card"><p class="card-sub">Elige una medición arriba para ver la tendencia.</p></div>`;
+    return;
+  }
+  if (compareLoading) {
+    body.innerHTML = `<div class="loading">Cargando "${escapeHtml(compareSurveyName)}"…</div>`;
+    return;
+  }
+  if (compareError) {
+    body.innerHTML = `<div class="card"><div class="alert-item">⚠ No se pudo cargar "${escapeHtml(compareSurveyName)}": ${escapeHtml(compareError)}</div></div>`;
+    return;
+  }
+
+  const curAttrs = ATTRS;
+  const cmpAttrs = compareData.atributos;
+  const curRespondents = filteredRespondents();
+  const cmpRespondents = filteredCompareRespondents();
+  const { applicable: cmpApplicableFilters, notApplicable: cmpNotApplicableFilters } = compareFilterSplit();
+
+  // --- Puntaje general ---
+  const curGeneral = avgForAttrIds(curRespondents, curAttrs.map(a => a.id));
+  const cmpGeneral = avgForAttrIds(cmpRespondents, cmpAttrs.map(a => a.id));
+  const gapGeneral = (curGeneral.avg != null && cmpGeneral.avg != null) ? curGeneral.avg - cmpGeneral.avg : null;
+
+  // --- Emparejar tipos/dimensiones/atributos por texto exacto (tipo|dimension|texto) ---
+  const cmpIndex = {}; cmpAttrs.forEach(a => { cmpIndex[attrKey(a)] = a; });
+  const matchedAttrPairs = [];
+  curAttrs.forEach(a => { const m = cmpIndex[attrKey(a)]; if (m) matchedAttrPairs.push({ cur: a, cmp: m }); });
+  const unmatchedCount = curAttrs.length - matchedAttrPairs.length;
+
+  // Tipos: solo los tipos presentes en AMBAS mediciones
+  const curTiposSet = new Set(curAttrs.map(a => a.tipo));
+  const cmpTiposSet = new Set(cmpAttrs.map(a => a.tipo));
+  const sharedTipos = TIPO_ORDEN.filter(t => curTiposSet.has(t) && cmpTiposSet.has(t));
+  const curIdsByTipo = groupIdsBy(curAttrs, a => a.tipo);
+  const cmpIdsByTipo = groupIdsBy(cmpAttrs, a => a.tipo);
+  const tipoRows = sharedTipos.map(t => {
+    const cur = avgForAttrIds(curRespondents, curIdsByTipo[t] || []);
+    const cmp = avgForAttrIds(cmpRespondents, cmpIdsByTipo[t] || []);
+    return { tipo: t, curAvg: cur.avg, cmpAvg: cmp.avg };
+  });
+
+  // Dimensiones: solo las presentes en ambas
+  const curDimSet = new Set(curAttrs.map(a => a.dimension));
+  const cmpDimSet = new Set(cmpAttrs.map(a => a.dimension));
+  const sharedDims = DIM_ORDEN.filter(d => curDimSet.has(d) && cmpDimSet.has(d));
+  const curIdsByDim = groupIdsBy(curAttrs, a => a.dimension);
+  const cmpIdsByDim = groupIdsBy(cmpAttrs, a => a.dimension);
+  const dimTipo = {}; curAttrs.forEach(a => { dimTipo[a.dimension] = a.tipo; });
+  const dimRows = sharedDims.map(d => {
+    const cur = avgForAttrIds(curRespondents, curIdsByDim[d] || []);
+    const cmp = avgForAttrIds(cmpRespondents, cmpIdsByDim[d] || []);
+    return { dimension: d, tipo: dimTipo[d], curAvg: cur.avg, cmpAvg: cmp.avg };
+  });
+
+  if (!matchedAttrPairs.length) {
+    body.innerHTML = `<div class="card"><div class="alert-item">⚠ Esta medición y "${escapeHtml(compareSurveyName)}" no comparten ningún atributo con el mismo texto exacto — probablemente no son catálogos comparables (¿es del mismo tipo de encuesta?). No hay tendencia que mostrar.</div></div>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="kpi-row">
+      <div class="card kpi-card">
+        <div class="kpi-label">Puntaje General — esta medición</div>
+        <div class="kpi-value">${fmt1(curGeneral.avg)}</div>
+        <div class="kpi-sub">n=${curRespondents.length}</div>
+      </div>
+      <div class="card kpi-card">
+        <div class="kpi-label">Puntaje General — ${escapeHtml(compareSurveyName)}</div>
+        <div class="kpi-value">${fmt1(cmpGeneral.avg)}</div>
+        <div class="kpi-sub">n=${cmpRespondents.length}</div>
+      </div>
+      <div class="card kpi-card">
+        <div class="kpi-label">Brecha (esta − comparación)</div>
+        <div class="kpi-value" style="color:${deltaColor(gapGeneral)}">${fmtDelta(gapGeneral)}</div>
+        <div class="kpi-sub">${unmatchedCount ? unmatchedCount + ' pregunta(s) sin equivalente exacto (excluidas)' : 'catálogos totalmente equivalentes'}</div>
+      </div>
+    </div>
+    ${cmpNotApplicableFilters.length ? `<div class="finding-item warn"><span>⚠</span><span>"${escapeHtml(compareSurveyName)}" no tiene el campo ${cmpNotApplicableFilters.map(f=>'<b>'+escapeHtml(f.label)+'</b>').join(', ')} — ese filtro no se pudo aplicar del lado de la comparación (se usó el 100% de esa medición para esos campos).</span></div>` : ''}
+
     <div class="card">
       <div style="position:relative">
         ${dlBtn('chart-trend-tipo','tendencia_tipos_cultura','chart')}
-        <h3>Tipos de Cultura — Línea de Tiempo</h3>
+        <h3>Tendencia por Tipo de Cultura</h3>
         <div class="chart-box"><canvas id="chart-trend-tipo"></canvas></div>
       </div>
     </div>
     <div class="card">
       <div style="position:relative">
-        ${dlBtn('chart-trend-dim','tendencia_dimensiones','chart')}
-        <h3>Dimensiones — Línea de Tiempo</h3>
-        <div class="chart-box"><canvas id="chart-trend-dim"></canvas></div>
+        ${dlBtn('table-trend-tipo','tabla_tendencia_tipos','table')}
+        <div id="table-trend-tipo" class="scroll-x"></div>
       </div>
     </div>
-  </div>
+
+    <div class="card">
+      <div style="position:relative">
+        ${dlBtn('chart-trend-dim','tendencia_dimensiones','chart')}
+        <h3>Tendencia por Dimensión</h3>
+        <div class="chart-box tall"><canvas id="chart-trend-dim"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="position:relative">
+        ${dlBtn('table-trend-dim','tabla_tendencia_dimensiones','table')}
+        <div id="table-trend-dim" class="scroll-x"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Tendencia por Pregunta</h3>
+      <p class="card-sub">${matchedAttrPairs.length} de ${curAttrs.length} preguntas tienen equivalente exacto en "${escapeHtml(compareSurveyName)}".${unmatchedCount ? ' Las ' + unmatchedCount + ' restantes no se muestran (no existen en ambas mediciones).' : ''}</p>
+      <input class="search-box" id="trend-attr-search" type="text" placeholder="Buscar pregunta…" value="${escapeHtml(trendSearch)}">
+    </div>
+    <div id="trend-attr-blocks"></div>
   `;
 
-  const years = ['2026']; // extensible: agregar más años cuando existan datos verificados
-
-  destroyChart('chart-trend-general');
-  const ctx1 = document.getElementById('chart-trend-general').getContext('2d');
-  charts['chart-trend-general'] = new Chart(ctx1, {
-    type: 'line',
-    data: { labels: years, datasets: [{ label: 'Puntaje General', data: [k.avg], borderColor: '#0889D6', backgroundColor: '#0889D6', pointRadius: 6, pointHoverRadius: 8, tension: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { display: false }, barDataLabels: { enabled: false } } }
-  });
-
+  // ---- Chart: tipos ----
   destroyChart('chart-trend-tipo');
-  const ctx2 = document.getElementById('chart-trend-tipo').getContext('2d');
-  charts['chart-trend-tipo'] = new Chart(ctx2, {
-    type: 'line',
-    data: { labels: years, datasets: tipos.map(t => ({ label: t.tipo, data: [t.avg], borderColor: tipoColor(t.tipo), backgroundColor: tipoColor(t.tipo), pointRadius: 6, tension: 0 })) },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, barDataLabels: { enabled: false } } }
+  const ctxT = document.getElementById('chart-trend-tipo').getContext('2d');
+  charts['chart-trend-tipo'] = new Chart(ctxT, {
+    type: 'bar',
+    data: {
+      labels: tipoRows.map(t => t.tipo),
+      datasets: [
+        { label: 'Esta medición', data: tipoRows.map(t => t.curAvg), backgroundColor: tipoRows.map(t => tipoColor(t.tipo)), borderRadius: 5 },
+        { label: compareSurveyName, data: tipoRows.map(t => t.cmpAvg), backgroundColor: tipoRows.map(t => tipoColor(t.tipo) + '55'), borderRadius: 5 },
+      ]
+    },
+    options: { indexAxis: 'x', responsive: true, maintainAspectRatio: false, scales: { y: { min: 1, max: 5 } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, barDataLabels: { enabled: true, format: v => v.toFixed(2) } } }
   });
+  document.getElementById('table-trend-tipo').innerHTML = `
+    <table class="dtable"><thead><tr><th>Tipo de Cultura</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Brecha</th></tr></thead>
+    <tbody>${tipoRows.map(t => {
+      const gap = (t.curAvg != null && t.cmpAvg != null) ? t.curAvg - t.cmpAvg : null;
+      return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(t.tipo)};margin-right:6px"></span>${t.tipo}</td>
+        <td><span class="pill" style="background:${heatTier(t.curAvg).color}">${fmt1(t.curAvg)}</span></td>
+        <td><span class="pill" style="background:${heatTier(t.cmpAvg).color}">${fmt1(t.cmpAvg)}</span></td>
+        <td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td></tr>`;
+    }).join('')}</tbody></table>`;
 
+  // ---- Chart: dimensiones ----
   destroyChart('chart-trend-dim');
-  const ctx3 = document.getElementById('chart-trend-dim').getContext('2d');
-  charts['chart-trend-dim'] = new Chart(ctx3, {
-    type: 'line',
-    data: { labels: years, datasets: dims.map((d,i) => ({ label: d.dimension, data: [d.avg], borderColor: DIM_PALETTE[i], backgroundColor: DIM_PALETTE[i], pointRadius: 5, tension: 0 })) },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1, max: 5 } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9.5 } } }, barDataLabels: { enabled: false } } }
+  const ctxD = document.getElementById('chart-trend-dim').getContext('2d');
+  charts['chart-trend-dim'] = new Chart(ctxD, {
+    type: 'bar',
+    data: {
+      labels: dimRows.map(d => d.dimension),
+      datasets: [
+        { label: 'Esta medición', data: dimRows.map(d => d.curAvg), backgroundColor: dimRows.map(d => tipoColor(d.tipo)), borderRadius: 5 },
+        { label: compareSurveyName, data: dimRows.map(d => d.cmpAvg), backgroundColor: dimRows.map(d => tipoColor(d.tipo) + '55'), borderRadius: 5 },
+      ]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { min: 1, max: 5 } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, barDataLabels: { enabled: true, format: v => v.toFixed(2) } } }
   });
-};
+  document.getElementById('table-trend-dim').innerHTML = `
+    <table class="dtable"><thead><tr><th>Dimensión</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Brecha</th></tr></thead>
+    <tbody>${dimRows.map(d => {
+      const gap = (d.curAvg != null && d.cmpAvg != null) ? d.curAvg - d.cmpAvg : null;
+      return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(d.tipo)};margin-right:6px"></span>${d.dimension}</td>
+        <td><span class="pill" style="background:${heatTier(d.curAvg).color}">${fmt1(d.curAvg)}</span></td>
+        <td><span class="pill" style="background:${heatTier(d.cmpAvg).color}">${fmt1(d.cmpAvg)}</span></td>
+        <td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+
+  document.getElementById('trend-attr-search').addEventListener('input', e => { trendSearch = e.target.value; renderTrendAttrBlocks(matchedAttrPairs, curRespondents, cmpRespondents); });
+  renderTrendAttrBlocks(matchedAttrPairs, curRespondents, cmpRespondents);
+}
+
+function renderTrendAttrBlocks(pairs, curRespondents, cmpRespondents) {
+  const container = document.getElementById('trend-attr-blocks');
+  if (!container) return;
+  const q = trendSearch.trim() ? normalizeSearch(trendSearch) : '';
+  container.innerHTML = DIM_ORDEN.map(dim => {
+    let rows = pairs.filter(p => p.cur.dimension === dim);
+    if (q) rows = rows.filter(p => normalizeSearch(p.cur.positivo).includes(q));
+    if (!rows.length) return '';
+    const tipo = rows[0].cur.tipo;
+    const body = rows.map(p => {
+      const cur = avgForAttrIds(curRespondents, [p.cur.id]);
+      const cmp = avgForAttrIds(cmpRespondents, [p.cmp.id]);
+      const gap = (cur.avg != null && cmp.avg != null) ? cur.avg - cmp.avg : null;
+      return `<tr><td style="max-width:280px">${escapeHtml(p.cur.positivo)}</td>
+        <td><span class="pill" style="background:${heatTier(cur.avg).color}">${fmt1(cur.avg)}</span></td>
+        <td><span class="pill" style="background:${heatTier(cmp.avg).color}">${fmt1(cmp.avg)}</span></td>
+        <td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td></tr>`;
+    }).join('');
+    return `<div class="card" id="trend-dim-${dim.replace(/\s+/g,'')}">
+      <div style="position:relative">
+        ${dlBtn('trend-dim-'+dim.replace(/\s+/g,''), 'tendencia_'+dim, 'table')}
+        <h3><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(tipo)};margin-right:7px"></span>${dim}</h3>
+        <div class="scroll-x"><table class="dtable"><thead><tr><th>Atributo</th><th>Esta medición</th><th>Comparación</th><th>Brecha</th></tr></thead>
+        <tbody>${body}</tbody></table></div>
+      </div>
+    </div>`;
+  }).join('') || `<div class="card"><p class="card-sub">Sin resultados para "${escapeHtml(trendSearch)}".</p></div>`;
+}
 })();
 
 (function () {

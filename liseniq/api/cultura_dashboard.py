@@ -38,7 +38,7 @@ REPORT_NAME = "Survey Response Custom Report Front"
 
 # Tag/variable que marca las preguntas de texto libre (mismo patrón que
 # Engagement). Ajusta si en el catálogo de Cultura el tag se llama distinto.
-OPEN_TEXT_TAG = "Abierta"
+OPEN_TEXT_TAG = "Abiertas"
 
 # Umbral mínimo de anonimato: ningún resultado se desagrega para grupos
 # con menos personas que esto (mismo valor que el HTML original).
@@ -85,8 +85,9 @@ def _get_universe(survey, demo_fields):
     por segmento demográfico se puede calcular por conteo directo
     (sin necesidad de heurísticas de cruce/matching).
     """
+    sr_survey = frappe.db.get_value("qp_IQ_Survey", filters={"su_name": survey}, fieldname="name")
     contacts = frappe.get_all(
-        "qp_IQ_SurveyRecipient", filters={"sr_survey": survey}, pluck="sr_contact"
+        "qp_IQ_SurveyRecipient", filters={"sr_survey": sr_survey}, pluck="sr_contact"
     )
     contacts = [c for c in contacts if c]
     if not contacts:
@@ -120,6 +121,24 @@ def _get_universe(survey, demo_fields):
 
 
 @frappe.whitelist()
+def list_surveys(exclude=None):
+    """
+    Lista de mediciones (Survey) disponibles, para el selector de la
+    pestaña Tendencias ("comparar con..."). No se filtra por tipo de
+    encuesta (Cultura vs. otra) porque el Doctype Survey no distingue eso
+    en este esquema — si comparas contra una medición de otro tipo,
+    simplemente no habrá atributos en común y el dashboard lo indica.
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw("Debes iniciar sesión para ver este dashboard.", frappe.PermissionError)
+
+    surveys = frappe.get_all("Survey", fields=["name", "creation"], order_by="creation desc", pluck="name")
+    if exclude:
+        surveys = [s for s in surveys if s != exclude]
+    return surveys
+
+
+@frappe.whitelist()
 def get_dashboard_data(survey):
     """
     Devuelve el payload consumido por la Website Page del dashboard de
@@ -143,7 +162,7 @@ def get_dashboard_data(survey):
         frappe.throw(f"Encuesta no encontrada: {survey}")
 
     from frappe.desk.query_report import run
-    
+
     current_user = frappe.session.user
     frappe.session.user = "Administrator" 
     try:
@@ -153,6 +172,7 @@ def get_dashboard_data(survey):
         raise e
     finally:
         frappe.session.user = current_user
+        
     rows = report.get("result") or []
 
     if not rows:

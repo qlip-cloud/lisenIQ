@@ -38,7 +38,7 @@ ENPS_QUESTION_TEXT = "Le recomendaría a un amigo o familiar que trabaje en esta
 # TAG/VARIABLE (columna 'variable' del reporte, viene de
 # qn_demographic -> dt_title), no por el tema (columna 'theme').
 # Ajusta el valor si en tu catálogo el tag se llama distinto.
-OPEN_TEXT_TAG = "Abierta"
+OPEN_TEXT_TAG = "Abiertas"
 
 
 def _norm(text):
@@ -66,6 +66,14 @@ STOPWORDS = set(
     "suyo suya suyos suyas nuestro nuestra nuestros nuestras vuestro vuestra "
     "vuestros vuestras esos esas".split()
 )
+
+
+def _norm_demo_value(v):
+    """Limpia un valor demográfico: recorta espacios y colapsa vacíos a None."""
+    if v is None:
+        return None
+    v = str(v).strip()
+    return v or None
 
 
 def _to_float(value):
@@ -96,14 +104,21 @@ def _get_nps_question_texts():
     return texts or {_ENPS_QUESTION_NORM}
 
 
-def _get_universe(survey, demo_fields):
+def _get_universe(survey, demo_fields, field_titles):
     """
     Todas las personas esperadas para esta medición, vía qp_IQ_SurveyRecipient
     (filtrado por sr_survey) -> Contact (sr_contact).
     Devuelve filas en el MISMO orden de campos que 'records' (sin enps/answers),
     para poder filtrarlas con los mismos controles demográficos del front.
+
+    IMPORTANTE: qp_IQ_DemographicType puede tener VARIOS registros distintos
+    con el mismo dt_title (ej. "Sede" repetido 14 veces con IDs distintos —
+    probablemente uno por medición/versión). El contacto puede tener su valor
+    guardado bajo un ID "hermano" distinto al que usa esta medición en
+    particular. Por eso el emparejamiento se hace por NOMBRE (dt_title),
+    no por el ID exacto de demo_fields.
     """
-    sr_survey = frappe.get_value("qp_IQ_Survey", {"su_name":survey}, "name")
+    sr_survey = frappe.db.get_value("qp_IQ_Survey", filters={"su_name": survey}, fieldname="name")
     contacts = frappe.get_all(
         "qp_IQ_SurveyRecipient", filters={"sr_survey": sr_survey}, pluck="sr_contact"
     )
@@ -115,27 +130,56 @@ def _get_universe(survey, demo_fields):
     for row in frappe.get_all("Contact", filters={"name": ["in", contacts]}, fields=["name", "gender"]):
         gender_map[row.name] = row.gender
 
-    demo_data = {}
+    # demo_data_by_title[contact][dt_title] = value (más reciente primero)
+    demo_data_by_title = {}
     if demo_fields:
         placeholders = ", ".join(["%s"] * len(contacts))
         rows = frappe.db.sql(
             f"""
-            SELECT cad.parent as contact, cad.cad_demographic_type as demo_id, cad.cad_value as value
+            SELECT cad.parent as contact, dt.dt_title as title, cad.cad_value as value
             FROM `tabqp_IQ_ContactAdditionalDetail` cad
+            LEFT JOIN `tabqp_IQ_DemographicType` dt ON cad.cad_demographic_type = dt.name
             WHERE cad.parent IN ({placeholders})
+            ORDER BY cad.modified DESC
             """,
             contacts,
             as_dict=True,
         )
         for r in rows:
-            demo_data.setdefault(r.contact, {})[r.demo_id] = r.value
+            if not r.title:
+                continue
+            bucket = demo_data_by_title.setdefault(r.contact, {})
+            bucket.setdefault(r.title, r.value)  # conserva el más reciente (ya viene ordenado)
 
     universe = []
     for c in contacts:
-        row = [gender_map.get(c) or "Sin dato"]
-        row += [demo_data.get(c, {}).get(f) or "Sin dato" for f in demo_fields]
+        row = [_norm_demo_value(gender_map.get(c)) or "Sin dato"]
+        row += [
+            _norm_demo_value(demo_data_by_title.get(c, {}).get(field_titles.get(f))) or "Sin dato"
+            for f in demo_fields
+        ]
         universe.append(row)
     return universe
+
+
+@frappe.whitelist(methods=["GET"])
+def get_available_surveys(exclude=None):
+    """
+    Lista de mediciones (Survey) disponibles para comparar en la pestaña de
+    Tendencias. Se usa tanto para el selector de "medición a comparar" como
+    para excluir la medición actualmente abierta de esa lista.
+    """
+    filters = {}
+    if exclude:
+        filters["name"] = ["!=", exclude]
+    rows = frappe.get_all(
+        "Survey",
+        filters=filters,
+        fields=["name", "title", "creation"],
+        order_by="creation desc",
+        limit_page_length=200,
+    )
+    return [{"name": r.name, "title": r.title or r.name} for r in rows]
 
 
 @frappe.whitelist(methods=["GET"])
@@ -160,7 +204,7 @@ def get_dashboard_data(survey):
     from frappe.desk.query_report import run
 
     current_user = frappe.session.user
-    frappe.session.user = "Administrator"  # para que el reporte ignore permisos de usuario
+    frappe.session.user = "Administrator" 
     try:
         report = run(REPORT_NAME, filters={"survey": survey})
     except Exception as e:
@@ -171,7 +215,7 @@ def get_dashboard_data(survey):
     rows = report.get("result") or []
 
     if not rows:
-        universe = _get_universe(survey, [])
+        universe = _get_universe(survey, [], {})
         return {
             "questions": [],
             "records": [],
@@ -221,8 +265,8 @@ def get_dashboard_data(survey):
     for r in rows:
         resp_id = r.get("name")
         if resp_id not in respondents:
-            demo_values = [r.get("gender") or "Sin dato"]
-            demo_values += [r.get(f) or "Sin dato" for f in demo_fields]
+            demo_values = [_norm_demo_value(r.get("gender")) or "Sin dato"]
+            demo_values += [_norm_demo_value(r.get(f)) or "Sin dato" for f in demo_fields]
             respondents[resp_id] = {"demo": demo_values, "answers": {}, "enps": None}
 
         theme = r.get("theme") or "Sin tema"
@@ -311,7 +355,7 @@ def get_dashboard_data(survey):
             "total_unique_words": len(counts),
         }
 
-    universe = _get_universe(survey, demo_fields)
+    universe = _get_universe(survey, demo_fields, col_labels)
 
     enps_question_avg = None
     if enps_code is not None:

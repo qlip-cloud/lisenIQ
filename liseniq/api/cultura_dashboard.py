@@ -123,19 +123,40 @@ def _get_universe(survey, demo_fields):
 @frappe.whitelist()
 def list_surveys(exclude=None):
     """
-    Lista de mediciones (Survey) disponibles, para el selector de la
-    pestaña Tendencias ("comparar con..."). No se filtra por tipo de
-    encuesta (Cultura vs. otra) porque el Doctype Survey no distingue eso
-    en este esquema — si comparas contra una medición de otro tipo,
-    simplemente no habrá atributos en común y el dashboard lo indica.
+    Lista de mediciones disponibles para el selector de la pestaña
+    Tendencias ("comparar con..."), ahora tomadas de qp_IQ_Survey (no del
+    Doctype Survey directamente):
+      - El nombre a mostrar/usar es qp_IQ_Survey.su_name (que coincide con
+        el `name` del Survey correspondiente — es lo que get_dashboard_data
+        espera recibir como parámetro 'survey').
+      - Solo se listan mediciones cuyo su_owner y su_template coincidan con
+        los de la medición actual (parámetro 'exclude', que además se usa
+        como referencia Y se excluye del resultado) — así solo aparecen
+        mediciones del mismo dueño/plantilla, comparables entre sí.
+    Si no se puede resolver el registro de referencia en qp_IQ_Survey
+    (p. ej. la medición actual no está registrada ahí todavía), se
+    devuelve una lista vacía en vez de listar todo sin filtrar.
     """
     if frappe.session.user == "Guest":
         frappe.throw("Debes iniciar sesión para ver este dashboard.", frappe.PermissionError)
 
-    surveys = frappe.get_all("Survey", fields=["name", "creation"], order_by="creation desc", pluck="name")
-    if exclude:
-        surveys = [s for s in surveys if s != exclude]
-    return surveys
+    if not exclude:
+        return []
+
+    current = frappe.db.get_value(
+        "qp_IQ_Survey", {"su_name": exclude}, ["su_owner", "su_template"], as_dict=True
+    )
+    if not current:
+        return []
+
+    rows = frappe.get_all(
+        "qp_IQ_Survey",
+        filters={"su_owner": current.su_owner, "su_template": current.su_template},
+        fields=["su_name", "creation"],
+        order_by="creation desc",
+    )
+    names = [r.su_name for r in rows if r.su_name and r.su_name != exclude]
+    return names
 
 
 @frappe.whitelist()

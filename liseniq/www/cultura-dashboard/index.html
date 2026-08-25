@@ -270,12 +270,12 @@ function adaptApiPayload(api) {
     total_respondidas: api.meta.n_respondentes || 0,
     colores: { ...tipoColors, neutro: '#BFBFBF' },
     heat_bands: [
-      { label: 'Crítico', min: 1.00, max: 1.67, color: '#D6362B' },
-      { label: 'Bajo', min: 1.67, max: 2.33, color: '#F07A3C' },
-      { label: 'Moderado-bajo', min: 2.33, max: 3.00, color: '#F3C13B' },
-      { label: 'Moderado-alto', min: 3.00, max: 3.67, color: '#C6D96A' },
-      { label: 'Bueno', min: 3.67, max: 4.33, color: '#7FC17E' },
-      { label: 'Sobresaliente', min: 4.33, max: 5.001, color: '#3E9E52' },
+      { label: 'Crítico', min: 1.00, max: 2.005, color: '#D6362B', displayMin: '1.00', displayMax: '2.00' },
+      { label: 'Limitante', min: 2.005, max: 3.005, color: '#F07A3C', displayMin: '2.01', displayMax: '3.00' },
+      { label: 'En desarrollo', min: 3.005, max: 3.505, color: '#F3C13B', displayMin: '3.01', displayMax: '3.50' },
+      { label: 'Moderado', min: 3.505, max: 4.005, color: '#C6D96A', displayMin: '3.51', displayMax: '4.00' },
+      { label: 'Positivo', min: 4.005, max: 4.505, color: '#7FC17E', displayMin: '4.01', displayMax: '4.50' },
+      { label: 'Sobresaliente', min: 4.505, max: 5.001, color: '#3E9E52', displayMin: '4.51', displayMax: '5.00' },
     ],
     dimensiones_orden: api.dimensions_order || [],
     tipos_orden: api.tipos_order || [],
@@ -621,7 +621,7 @@ function help(text) { return `<span class="help-ico" tabindex="0" title="${escap
 function dlBtn(targetId, name, type) { return `<button class="dl-btn" data-dl-type="${type || 'chart'}" data-dl-target="${targetId}" data-dl-name="${name}" title="Descargar PNG">⬇</button>`; }
 
 function heatLegendHTML() {
-  return `<div class="heat-legend-full">` + HEAT_BANDS.map(b => `<span><i style="background:${b.color}"></i>${b.label} (${b.min.toFixed(2)}–${b.max > 5 ? '5.00' : b.max.toFixed(2)})</span>`).join('') + `</div>`;
+  return `<div class="heat-legend-full">` + HEAT_BANDS.map(b => `<span><i style="background:${b.color}"></i>${b.label} (${b.displayMin || b.min.toFixed(2)}–${b.displayMax || (b.max > 5 ? '5.00' : b.max.toFixed(2))})</span>`).join('') + `</div>`;
 }
 
 // ================= FILTER BAR =================
@@ -1511,7 +1511,7 @@ window.renderAbiertas = function renderAbiertas() {
 (function () {
 'use strict';
 const CD = window.__CD, UI = window.__UI;
-const { DATA, META, ATTRS, MIN_N, COLORS, DIM_ORDEN, FILTER_FIELDS,
+const { DATA, META, ATTRS, MIN_N, COLORS, DIM_ORDEN, FILTER_FIELDS, HEAT_BANDS,
   fmt1, fmtPct, fmtDelta, deltaColor, heatTier, escapeHtml,
   filteredRespondents, byAtributo, byDemografico, kpisGeneral, isFilterActive } = CD;
 const { dlBtn } = UI;
@@ -1532,7 +1532,10 @@ window.renderInsights = function renderInsights() {
   const sortedByAvg = [...attrs].sort((a,b) => b.avg - a.avg);
   const fortalezas = sortedByAvg.slice(0,8);
   const oportunidades = [...sortedByAvg].sort((a,b) => a.avg - b.avg).slice(0,8);
-  const criticos = attrs.filter(a => a.avg < 2.33).sort((a,b) => a.avg - b.avg);
+  // "Crítico" o "Limitante": las 2 bandas más bajas del mapa de calor.
+  const alertThreshold = HEAT_BANDS[1].max;
+  const alertBandsLabel = HEAT_BANDS[0].label + '/' + HEAT_BANDS[1].label;
+  const criticos = attrs.filter(a => a.avg != null && a.avg < alertThreshold).sort((a,b) => a.avg - b.avg);
   const altaDispersion = [...attrs].sort((a,b) => b.disp - a.disp).slice(0,6);
 
   let segFindings = [];
@@ -1551,9 +1554,9 @@ window.renderInsights = function renderInsights() {
 
   ${criticos.length ? `<div class="card">
     <h3>⚠ Alertas de Resultados Críticos</h3>
-    <p class="card-sub">Preguntas con promedio por debajo de 2.33 (bandas Crítico/Bajo).</p>
+    <p class="card-sub">Preguntas con promedio por debajo de ${fmt1(alertThreshold)} (bandas ${alertBandsLabel}).</p>
     ${criticos.map(a => `<div class="alert-item"><span>🔴</span><span><b>${escapeHtml(a.attr.positivo)}</b> — ${a.attr.dimension} · Puntaje: <b>${fmt1(a.avg)}</b> (n=${a.nResp})</span></div>`).join('')}
-  </div>` : `<div class="card"><h3>✅ Sin alertas críticas</h3><p class="card-sub">Ninguna pregunta individual cayó por debajo de 2.33 con los filtros actuales.</p></div>`}
+  </div>` : `<div class="card"><h3>✅ Sin alertas críticas</h3><p class="card-sub">Ninguna pregunta individual cayó por debajo de ${fmt1(alertThreshold)} con los filtros actuales.</p></div>`}
 
   <div class="grid-2b">
     <div class="card">
@@ -1669,7 +1672,7 @@ window.renderGlosario = function renderGlosario() {
     <h3>¿Cómo leer el Mapa de Calor?</h3>
     <p style="font-size:12.5px;color:var(--ink-2);line-height:1.6;margin-bottom:14px">Cada puntaje (de atributo, pregunta, dimensión o tipo de cultura) se ubica en una de 6 bandas de color, sobre la escala de respuesta 1 a 5 usada en esta medición:</p>
     ${heatLegendHTML()}
-    <p style="font-size:12px;color:var(--ink-2);margin-top:14px">Las bandas se definieron en partes iguales sobre el rango 1–5 (cada banda ≈0.67 puntos), de "Crítico" (resultado muy desfavorable, requiere acción inmediata) a "Sobresaliente" (resultado altamente favorable, fortaleza a mantener).</p>
+    <p style="font-size:12px;color:var(--ink-2);margin-top:14px">Las bandas van de "Crítico" (resultado muy desfavorable, requiere acción inmediata) a "Sobresaliente" (resultado altamente favorable, fortaleza a mantener). No son de ancho parejo: las bandas centrales (Limitante, En desarrollo, Moderado) son más angostas para distinguir con más detalle los resultados intermedios, que es donde suele concentrarse la mayoría de los puntajes.</p>
   </div>
 
   <div class="card" id="g-concepts">
@@ -2191,7 +2194,7 @@ function renderTendenciasBody() {
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, barDataLabels: { enabled: true, format: v => v.toFixed(2) } } }
   });
   document.getElementById('table-trend-tipo').innerHTML = `
-    <table class="dtable"><thead><tr><th>Tipo de Cultura</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Brecha</th></tr></thead>
+    <table class="dtable"><thead><tr><th>Tipo de Cultura</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Tendencia</th></tr></thead>
     <tbody>${tipoRows.map(t => {
       const gap = (t.curAvg != null && t.cmpAvg != null) ? t.curAvg - t.cmpAvg : null;
       return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(t.tipo)};margin-right:6px"></span>${t.tipo}</td>
@@ -2216,7 +2219,7 @@ function renderTendenciasBody() {
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, barDataLabels: { enabled: true, format: v => v.toFixed(2) } } }
   });
   document.getElementById('table-trend-dim').innerHTML = `
-    <table class="dtable"><thead><tr><th>Dimensión</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Brecha</th></tr></thead>
+    <table class="dtable"><thead><tr><th>Dimensión</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Tendencia</th></tr></thead>
     <tbody>${dimRows.map(d => {
       const gap = (d.curAvg != null && d.cmpAvg != null) ? d.curAvg - d.cmpAvg : null;
       return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(d.tipo)};margin-right:6px"></span>${d.dimension}</td>
@@ -2251,7 +2254,7 @@ function renderTrendAttrBlocks(pairs, curRespondents, cmpRespondents) {
       <div style="position:relative">
         ${dlBtn('trend-dim-'+dim.replace(/\s+/g,''), 'tendencia_'+dim, 'table')}
         <h3><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tipoColor(tipo)};margin-right:7px"></span>${dim}</h3>
-        <div class="scroll-x"><table class="dtable"><thead><tr><th>Atributo</th><th>Esta medición</th><th>Comparación</th><th>Brecha</th></tr></thead>
+        <div class="scroll-x"><table class="dtable"><thead><tr><th>Atributo</th><th>Esta medición</th><th>Comparación</th><th>Tendencia</th></tr></thead>
         <tbody>${body}</tbody></table></div>
       </div>
     </div>`;

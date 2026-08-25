@@ -38,7 +38,7 @@ ENPS_QUESTION_TEXT = "Le recomendaría a un amigo o familiar que trabaje en esta
 # TAG/VARIABLE (columna 'variable' del reporte, viene de
 # qn_demographic -> dt_title), no por el tema (columna 'theme').
 # Ajusta el valor si en tu catálogo el tag se llama distinto.
-OPEN_TEXT_TAG = "Abiertas"
+OPEN_TEXT_TAG = "Abierta"
 
 
 def _norm(text):
@@ -165,21 +165,34 @@ def _get_universe(survey, demo_fields, field_titles):
 @frappe.whitelist(methods=["GET"])
 def get_available_surveys(exclude=None):
     """
-    Lista de mediciones (Survey) disponibles para comparar en la pestaña de
-    Tendencias. Se usa tanto para el selector de "medición a comparar" como
-    para excluir la medición actualmente abierta de esa lista.
+    Lista de mediciones disponibles para comparar en la pestaña de
+    Tendencias, tomadas de qp_IQ_Survey (no de Survey directamente).
+
+    - El nombre a mostrar/usar es qp_IQ_Survey.su_name, que es un Link cuyo
+      valor coincide con el Survey.name real (el mismo parámetro 'survey'
+      que espera get_dashboard_data).
+    - Se filtra para que solo aparezcan mediciones con el mismo su_owner y
+      su_template que la medición actual, así son comparables entre sí
+      (mismas dimensiones/preguntas).
     """
     filters = {}
     if exclude:
-        filters["name"] = ["!=", exclude]
+        current = frappe.db.get_value(
+            "qp_IQ_Survey", {"su_name": exclude}, ["su_owner", "su_template"], as_dict=True
+        )
+        if current:
+            filters["su_owner"] = current.su_owner
+            filters["su_template"] = current.su_template
+        filters["su_name"] = ["!=", exclude]
+
     rows = frappe.get_all(
-        "Survey",
+        "qp_IQ_Survey",
         filters=filters,
-        fields=["name", "title", "creation"],
+        fields=["su_name", "creation"],
         order_by="creation desc",
         limit_page_length=200,
     )
-    return [{"name": r.name, "title": r.title or r.name} for r in rows]
+    return [{"name": r.su_name, "title": r.su_name} for r in rows if r.su_name]
 
 
 @frappe.whitelist(methods=["GET"])
@@ -189,7 +202,7 @@ def get_dashboard_data(survey):
     filtrado a una sola medición (Survey).
 
     Uso desde el front: frappe.call({
-        method: "your_app.api.survey_dashboard.get_dashboard_data",
+        method: "liseniq.api.cultura_dashboard.get_dashboard_data",
         args: { survey: "<nombre_de_la_medicion>" }
     })
     """

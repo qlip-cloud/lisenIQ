@@ -104,7 +104,9 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (function () {
-  const SURVEY = new URLSearchParams(window.location.search).get('survey');
+  const params = new URLSearchParams(window.location.search);
+  const SURVEY = params.get('survey') || params.get('survey_name');
+  const SURVEY_TITLE = params.get('survey_title') || SURVEY;
   const root = document.getElementById('app-root');
   const MIN_N = 5;
   const HEAT_COLORS = { 1: '#FF0000', 2: '#FF6900', 3: '#FFAC00', 4: '#FFD616', 5: '#C7D64F', 6: '#438D42' };
@@ -112,7 +114,7 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
   const PALETTE = ['#FF0000', '#002D62', '#FF6900', '#438D42', '#05C3DD', '#772583', '#FFAC00', '#5c6270'];
 
   if (!SURVEY) { root.innerHTML = '<div class="loading">Falta el parámetro "survey" en la URL.</div>'; return; }
-  document.getElementById('survey-title').textContent = 'Medición: ' + SURVEY;
+  document.getElementById('survey-title').textContent = 'Medición: ' + SURVEY_TITLE;
 
   // ---------- utilidades ----------
   function mean(arr) { const v = arr.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; }

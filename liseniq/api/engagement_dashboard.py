@@ -17,7 +17,7 @@
 import math
 import re
 from collections import defaultdict, OrderedDict
-
+from frappe import _
 import frappe
 
 REPORT_NAME = "Survey Response Custom Report Front"
@@ -175,6 +175,7 @@ def get_available_surveys(exclude=None):
       su_template que la medición actual, así son comparables entre sí
       (mismas dimensiones/preguntas).
     """
+    exclude = frappe.db.get_value("qp_IQ_Survey", {"name": exclude}, "su_name") if exclude else None
     filters = {}
     if exclude:
         current = frappe.db.get_value(
@@ -202,15 +203,20 @@ def get_dashboard_data(survey):
     filtrado a una sola medición (Survey).
 
     Uso desde el front: frappe.call({
-        method: "liseniq.api.cultura_dashboard.get_dashboard_data",
+        method: "your_app.api.survey_dashboard.get_dashboard_data",
         args: { survey: "<nombre_de_la_medicion>" }
     })
     """
+    survey = frappe.get_value("qp_IQ_Survey", {"name": survey}, "su_name")
     if not survey:
         frappe.throw("Falta el parámetro 'survey'")
 
     if not frappe.db.exists("Survey", survey):
         frappe.throw(f"Encuesta no encontrada: {survey}")
+
+    # Verifica que el usuario actual tenga permisos para acceder a la medición
+
+    verify_permissions_user_company(survey)
 
     # Reutiliza el reporte existente en vez de reimplementar las
     # consultas (respeta permisos, histórico vs. en vivo, etc.)
@@ -392,3 +398,22 @@ def get_dashboard_data(survey):
             "enps_question_avg": enps_question_avg,
         },
     }
+
+
+def verify_permissions_user_company(survey):
+    """
+    Verifica que el usuario actual tenga permisos para acceder a la medición
+    (Survey) dada, comparando su compañía con el su_owner de la medición.
+    Lanza PermissionError si no tiene acceso.
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw(_("No autorizado"), frappe.PermissionError)
+
+    user_contact = frappe.get_doc("Contact", {"email_id": frappe.session.user})
+    company = user_contact.custom_company if user_contact else None
+    associated_companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": user_contact.name}, pluck="cc_company") if user_contact else []
+
+    companies = set(filter(None, [company] + associated_companies))
+    survey_owner = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey}, "su_owner")
+    if survey_owner not in companies:
+        frappe.throw(_("No autorizado para acceder a esta medición"), frappe.PermissionError)

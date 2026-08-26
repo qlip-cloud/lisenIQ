@@ -108,15 +108,6 @@
                                         style="cursor: pointer;">
                                         <i class="fa fa-download"></i>
                                     </span>
-                                    <span 
-                                        data-survey="{{ m.name }}" 
-                                        data-category="{{ m.survey_category }}"
-                                        class="results-link-icon survey-dashboard-btn" 
-                                        title="Ir al dashboard" 
-                                        aria-label="Ir al dashboard de {{ m.title }}"
-                                        style="cursor: pointer;">
-                                        <i class="fa fa-tachometer"></i>
-                                    </span>
                                     <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
                                         <i class="fa fa-bar-chart"></i>
                                     </a>
@@ -150,15 +141,6 @@
                                         aria-label="Descargar sábana de datos de {{ m.title }}"
                                         style="cursor: pointer;">
                                         <i class="fa fa-download"></i>
-                                    </span>
-                                    <span 
-                                        data-survey="{{ m.title }}" 
-                                        data-category="{{ m.survey_category }}"
-                                        class="results-link-icon survey-dashboard-btn" 
-                                        title="Ir al dashboard" 
-                                        aria-label="Ir al dashboard de {{ m.title }}"
-                                        style="cursor: pointer;">
-                                        <i class="fa fa-tachometer"></i>
                                     </span>
                                     <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
                                         <i class="fa fa-bar-chart"></i>

@@ -41,10 +41,12 @@ SELECT
   s.su_status,
   s.su_template,
   t.tp_name,
+    c.qnc_category,
   s.su_start_date,
   s.su_end_date
 FROM `tabqp_IQ_Survey` s
 LEFT JOIN `tabqp_IQ_Template` t ON t.name = s.su_template
+LEFT JOIN `tabqp_IQ_TemplateCategory` c ON c.name = t.tp_category
 LEFT JOIN `tabqp_IQ_SurveyStatus` st ON st.name = s.su_status
 WHERE st.name = %s
 """
@@ -103,6 +105,7 @@ def _get_finalized_surveys(name_filtro: Optional[str] = None,
             "docname": r.get("name"),
             "name": r.get("su_name") or r.get("name"),
             "template": r.get("tp_name") or "",
+            "category": r.get("qnc_category") or "",
             "status": "Finalizada",
             "start_date": r.get("su_start_date"),
             "end_date": r.get("su_end_date"),

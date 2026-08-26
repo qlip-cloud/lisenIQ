@@ -281,6 +281,7 @@ function adaptApiPayload(api) {
     tipos_orden: api.tipos_order || [],
     preguntas_abiertas: openTextLabels,
     preguntas_abiertas_labels: Object.fromEntries(openTextLabels.map(k => [k, k])),
+    variable_values_seen: api.meta.variable_values_seen || [],
   };
 
   return { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels };
@@ -860,7 +861,10 @@ function collectFlowUnits(root) {
 async function captureUnit(unit) {
   const dlButtonsHidden = [...unit.querySelectorAll('.dl-btn')];
   dlButtonsHidden.forEach(b => b.style.visibility = 'hidden');
-  const canvas = await html2canvas(unit, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+  // scale 1.5 (en vez de 2) para el PDF: suficiente nitidez para lectura/impresión
+  // normal, pero con ~44% menos píxeles que capturar a 2x — el mayor factor de
+  // peso del archivo. La descarga individual de PNG (dl-btn) sigue en 2x.
+  const canvas = await html2canvas(unit, { backgroundColor: '#ffffff', scale: 1.5, useCORS: true });
   dlButtonsHidden.forEach(b => b.style.visibility = '');
   return canvas;
 }
@@ -875,7 +879,9 @@ async function exportAllPDF() {
 
   try {
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('l', 'pt', 'a4'); // landscape
+    // compress:true activa compresión Flate de los streams internos del PDF
+    // (además de la compresión JPEG de cada imagen individual, ver más abajo).
+    const pdf = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4', compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 34;
@@ -1004,7 +1010,11 @@ async function exportAllPDF() {
         if (canvas.width === 0 || canvas.height === 0) continue;
         const imgW = contentWidth;
         const imgH = canvas.height * imgW / canvas.width;
-        const imgData = canvas.toDataURL('image/png');
+        // JPEG en vez de PNG: para tablas/gráficos con fondo blanco sólido esto
+        // reduce bastante el peso frente a un PNG sin pérdida, con una pérdida
+        // de nitidez mínima a 0.85 de calidad — el otro factor grande de peso
+        // del archivo junto con la escala de captura (ver captureUnit arriba).
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         const fitsRemaining = cursorY + imgH <= pageHeight - margin;
 
         if (imgH <= fullPageAvail && (fitsRemaining || !isFirstUnit)) {
@@ -1015,7 +1025,7 @@ async function exportAllPDF() {
             pdf.addPage();
             cursorY = margin;
           }
-          pdf.addImage(imgData, 'PNG', margin, cursorY, imgW, imgH);
+          pdf.addImage(imgData, 'JPEG', margin, cursorY, imgW, imgH);
           cursorY += imgH + gap;
         } else {
           // Either taller than any single page, OR it's the first unit on a title page that doesn't fit —
@@ -1026,10 +1036,10 @@ async function exportAllPDF() {
             cursorY = margin;
             consumed = pageHeight - margin - cursorY;
           }
-          pdf.addImage(imgData, 'PNG', margin, cursorY, imgW, imgH);
+          pdf.addImage(imgData, 'JPEG', margin, cursorY, imgW, imgH);
           while (consumed < imgH) {
             pdf.addPage();
-            pdf.addImage(imgData, 'PNG', margin, margin - consumed, imgW, imgH);
+            pdf.addImage(imgData, 'JPEG', margin, margin - consumed, imgW, imgH);
             consumed += fullPageAvail;
           }
           cursorY = pageHeight; // sentinel: force next unit onto a fresh page, no stray blank page
@@ -1459,7 +1469,13 @@ window.renderAbiertas = function renderAbiertas() {
   const introText = `Nubes de palabras generadas a partir de las preguntas abiertas de esta medición. ${isFilterActive() ? 'Reflejan el filtro demográfico activo.' : 'Se muestra el total de la medición (sin filtro).'}`;
 
   if (!qs.length) {
-    UI.root.innerHTML = `<div class="section-intro">${introText}</div><div class="card"><p class="card-sub">Esta medición no tiene preguntas abiertas marcadas con el tag configurado.</p></div>`;
+    const seen = META.variable_values_seen || [];
+    UI.root.innerHTML = `<div class="section-intro">${introText}</div><div class="card">
+      <p class="card-sub">Esta medición no tiene preguntas abiertas marcadas con el tag configurado (se buscó "Abiertas" y "Abierta" en la columna <code>variable</code> del reporte).</p>
+      ${seen.length ? `<p class="card-sub" style="margin-top:10px"><b>Valores encontrados en la columna "variable" de esta medición:</b></p>
+      <div class="tag-row">${seen.map(v => `<span class="badge warn">${escapeHtml(v)}</span>`).join('')}</div>
+      <p class="card-sub" style="margin-top:10px">Si tu tag de preguntas abiertas es alguno de los de arriba (y no "Abiertas"/"Abierta"), avísame para agregarlo al backend.</p>` : ''}
+    </div>`;
     return;
   }
 

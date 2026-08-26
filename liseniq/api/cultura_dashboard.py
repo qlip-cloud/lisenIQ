@@ -31,14 +31,17 @@
 
 import re
 from collections import defaultdict, OrderedDict
-
+from frappe import _ 
 import frappe
 
 REPORT_NAME = "Survey Response Custom Report Front"
 
-# Tag/variable que marca las preguntas de texto libre (mismo patrón que
-# Engagement). Ajusta si en el catálogo de Cultura el tag se llama distinto.
-OPEN_TEXT_TAG = "Abiertas"
+# Tag/variable que marca las preguntas de texto libre. Confirmado como
+# "Abiertas" (plural) para Cultura, pero se acepta también "Abierta"
+# (singular) — es el valor usado en el dashboard hermano de Engagement, y
+# es la causa más probable si aquí no aparecen preguntas abiertas. Si tu
+# catálogo usa un tercer valor distinto, agrégalo a esta lista.
+OPEN_TEXT_TAG_VARIANTS = ["Abiertas", "Abierta"]
 
 # Umbral mínimo de anonimato: ningún resultado se desagrega para grupos
 # con menos personas que esto (mismo valor que el HTML original).
@@ -66,7 +69,11 @@ def _norm(text):
     return text.rstrip("?¿.!¡ ")
 
 
-_OPEN_TEXT_TAG_NORM = _norm(OPEN_TEXT_TAG)
+def _is_open_text_tag(variable):
+    return _norm(variable) in _OPEN_TEXT_TAG_NORMS
+
+
+_OPEN_TEXT_TAG_NORMS = {_norm(t) for t in OPEN_TEXT_TAG_VARIANTS}
 
 
 def _to_float(value):
@@ -143,6 +150,7 @@ def list_surveys(exclude=None):
     if not exclude:
         return []
 
+    exclude = frappe.db.get_value("qp_IQ_Survey", {"name": exclude}, "su_name") if exclude else None
     current = frappe.db.get_value(
         "qp_IQ_Survey", {"su_name": exclude}, ["su_owner", "su_template"], as_dict=True
     )
@@ -173,6 +181,8 @@ def get_dashboard_data(survey):
     Requiere sesión iniciada (no se marca allow_guest=True a propósito,
     confirmado con el usuario).
     """
+    survey = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_name") if survey else None
+    verify_permissions_user_company(survey)
     if frappe.session.user == "Guest":
         frappe.throw("Debes iniciar sesión para ver este dashboard.", frappe.PermissionError)
 
@@ -224,11 +234,13 @@ def get_dashboard_data(survey):
     tipos_seen = OrderedDict()   # tipo -> None (preserva orden de aparición)
     dim_to_tipo = OrderedDict()  # dimension -> tipo (primera vez que se ve)
     dims_by_tipo = OrderedDict()  # tipo -> OrderedDict(dimension -> None)
+    variable_values_seen = OrderedDict()  # diagnóstico: todo lo que trae la columna 'variable', tal cual
 
     for r in rows:
         tipo = r.get("theme")
         dimension = r.get("variable")
-        if not tipo or _norm(dimension) == _OPEN_TEXT_TAG_NORM:
+        variable_values_seen.setdefault(dimension or "(vacío)", None)
+        if not tipo or _is_open_text_tag(dimension):
             continue
         key = (tipo, dimension or "Sin dimensión", r.get("question") or "")
         if key not in question_order:
@@ -276,7 +288,7 @@ def get_dashboard_data(survey):
         question_text = r.get("question") or ""
         raw_answer = r.get("answer")
 
-        if _norm(dimension) == _OPEN_TEXT_TAG_NORM:
+        if _is_open_text_tag(dimension):
             group_label = question_text or tipo
             if group_label not in open_text_theme:
                 open_text_labels_order.append(group_label)
@@ -352,6 +364,12 @@ def get_dashboard_data(survey):
             "n_universo": len(universe) or None,
             "survey": survey,
             "min_n": MIN_N,
+            # Diagnóstico: valores distintos vistos en la columna 'variable'
+            # de este reporte. Útil para confirmar el tag exacto de las
+            # preguntas abiertas si "Preguntas Abiertas" sale vacío — ábrelo
+            # en la pestaña Red del navegador (o el JSON de la respuesta) y
+            # compáralo contra OPEN_TEXT_TAG_VARIANTS en este archivo.
+            "variable_values_seen": list(variable_values_seen.keys()),
         },
     }
 
@@ -406,3 +424,21 @@ def _tokenize_es(text):
             continue
         out.append(_singularize(w))
     return out
+
+def verify_permissions_user_company(survey):
+    """
+    Verifica que el usuario actual tenga permisos para acceder a la medición
+    (Survey) dada, comparando su compañía con el su_owner de la medición.
+    Lanza PermissionError si no tiene acceso.
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw(_("No autorizado"), frappe.PermissionError)
+
+    user_contact = frappe.get_doc("Contact", {"email_id": frappe.session.user})
+    company = user_contact.custom_company if user_contact else None
+    associated_companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": user_contact.name}, pluck="cc_company") if user_contact else []
+
+    companies = set(filter(None, [company] + associated_companies))
+    survey_owner = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey}, "su_owner")
+    if survey_owner not in companies:
+        frappe.throw(_("No autorizado para acceder a esta medición"), frappe.PermissionError)

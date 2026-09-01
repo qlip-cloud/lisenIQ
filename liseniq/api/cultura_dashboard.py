@@ -160,10 +160,10 @@ def list_surveys(exclude=None):
     rows = frappe.get_all(
         "qp_IQ_Survey",
         filters={"su_owner": current.su_owner, "su_template": current.su_template},
-        fields=["su_name", "creation"],
+        fields=["name","su_name", "creation"],
         order_by="creation desc",
     )
-    names = [r.su_name for r in rows if r.su_name and r.su_name != exclude]
+    names = [r.name for r in rows if r.su_name and r.su_name != exclude]
     return names
 
 

@@ -2067,7 +2067,7 @@ function renderSelector() {
     <label style="font-size:12px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:8px">Comparar esta medición con:</label>
     <select class="small" id="trend-compare-select" style="min-width:260px">
       <option value="">— Selecciona una medición —</option>
-      ${availableSurveys.map(s => `<option value="${escapeHtml(s)}" ${s === compareSurveyName ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+      ${availableSurveys.map(s => `<option value="${escapeHtml(s.name)}" ${s === compareSurveyName ? 'selected' : ''}>${escapeHtml(s.title)}</option>`).join('')}
     </select>
   `;
   document.getElementById('trend-compare-select').addEventListener('change', e => loadCompareSurvey(e.target.value || null));

@@ -163,8 +163,8 @@ def list_surveys(exclude=None):
         fields=["name","su_name", "creation"],
         order_by="creation desc",
     )
-    names = [r.name for r in rows if r.su_name and r.su_name != exclude]
-    return names
+    surveys = [{"name": r.name, "title": r.su_name} for r in rows if r.su_name != exclude]
+    return surveys
 
 
 @frappe.whitelist()

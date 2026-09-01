@@ -103,14 +103,15 @@
                                         data-survey="{{ m.name }}" 
                                         data-url="/api/method/liseniq.utils.export.export_survey_results?survey_name={{ m.name }}" 
                                         class="results-link-icon download-results-btn" 
-                                        title="Descargar resultados" 
-                                        aria-label="Descargar resultados de {{ m.title }}"
+                                        title="Descargar sábana de datos" 
+                                        aria-label="Descargar sábana de datos de {{ m.title }}"
                                         style="cursor: pointer;">
                                         <i class="fa fa-download"></i>
                                     </span>
                                     <a href="/iq-results?name={{ m.title | urlencode }}" class="results-link-icon" title="Ver resultados" aria-label="Ver resultados de {{ m.title }}">
                                         <i class="fa fa-bar-chart"></i>
                                     </a>
+                                
                                 </div>
                                 {% endif %}
                             </div>
@@ -136,8 +137,8 @@
                                         data-survey="{{ m.name }}" 
                                         data-url="/api/method/liseniq.utils.export.export_survey_results?survey_name={{ m.name }}" 
                                         class="results-link-icon download-results-btn" 
-                                        title="Descargar resultados" 
-                                        aria-label="Descargar resultados de {{ m.title }}"
+                                        title="Descargar sábana de datos" 
+                                        aria-label="Descargar sábana de datos de {{ m.title }}"
                                         style="cursor: pointer;">
                                         <i class="fa fa-download"></i>
                                     </span>

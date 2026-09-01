@@ -49,7 +49,7 @@ def get_context(context):
         "Argentina", "Bolivia", "Brazil", "Chile", "Colombia", "Costa Rica",
         "Cuba", "Dominican Republic", "Ecuador", "El Salvador", "Guatemala",
         "Honduras", "Mexico", "Nicaragua", "Panama", "Paraguay", "Peru",
-        "Puerto Rico", "Uruguay", "Venezuela, Bolivarian Republic of"
+        "Puerto Rico", "Uruguay", "Venezuela, Bolivarian Republic of", "United States"
     ]
 
     context.education_levels = frappe.get_all('qp_IQ_AcademicLevel', fields=['name', 'al_title'], order_by='al_title asc')

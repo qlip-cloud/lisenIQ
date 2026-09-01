@@ -34,7 +34,7 @@ LATAM_COUNTRIES = [
 	"Argentina", "Bolivia", "Brazil", "Chile", "Colombia", "Costa Rica",
 	"Cuba", "Dominican Republic", "Ecuador", "El Salvador", "Guatemala",
 	"Honduras", "Mexico", "Nicaragua", "Panama", "Paraguay", "Peru",
-	"Puerto Rico", "Uruguay", "Venezuela, Bolivarian Republic of"
+	"Puerto Rico", "Uruguay", "Venezuela, Bolivarian Republic of", "United States"
 ]
 
 def get_context(context):

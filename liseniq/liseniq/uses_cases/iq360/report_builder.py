@@ -314,7 +314,7 @@ def generate_leadership_report_on_status_change(doc, method=None):
     logger.info('generate_leadership_report_on_status_change skipped | survey_id=%s reason=already_generated', doc.name)
     return
 
-  build_leaders_report(doc.name)
+  #build_leaders_report(doc.name)
 
 
 from collections import defaultdict
@@ -773,7 +773,7 @@ def build_leaders_report_batched(survey_id, batch_size=None, async_mode=True):
             survey_name,
             len(responses),
             len(leaders_responses),
-            batch_size or 500
+            batch_size or 10000
         )
         
         # Create progress tracking document
@@ -1050,7 +1050,7 @@ def _update_leader_reports_from_batch(batch_responses, questions_data, evaluator
                 question_text = question_info.get('text') or question
                 dimension = question_info.get('dimension') or 'Sin Categoría'
                 theme = question_info.get('theme') or 'Sin Tema'
-                
+                max_option_value = question_info.get('max_option_value') or 5
                 if dimension == 'Abierta':
                     text_val = resp.get('answer')
                     logger.info('Processing open question | leader=%s question=%s text_val=%s', leader_name, question_text, text_val)
@@ -1090,7 +1090,7 @@ def _update_leader_reports_from_batch(batch_responses, questions_data, evaluator
                 q_row = next((r for r in report_doc.question_summary if r.question_text == question_text), None)
                 if not q_row:
                     q_row = report_doc.append('question_summary', {
-                        'question_text': question_text, 'question_dimension': dimension, 'theme_name': theme,
+                        'question_text': question_text, 'question_dimension': dimension, 'theme_name': theme, 'max_option_value': max_option_value,
                         'total_score': 0.0, 'response_count': 0, 'total_squares': 0.0, 'self_score_accum': 0.0, 'self_count': 0,
                         'manager_score_accum': 0.0, 'manager_count': 0, 'peers_score_accum': 0.0, 'peers_count': 0,
                         'team_score_accum': 0.0, 'team_count': 0
@@ -1258,7 +1258,7 @@ def finalize_360_reports_from_batches(survey_id, progress_name):
         
         report_doc.save(ignore_permissions=True)
         
-    #frappe.db.set_value('qp_IQ_Survey', survey_id, 'su_report_generated', 1, update_modified=False)
+    frappe.db.set_value('qp_IQ_Survey', survey_id, 'su_report_generated', 1, update_modified=False)
     frappe.db.commit()
     return True
 

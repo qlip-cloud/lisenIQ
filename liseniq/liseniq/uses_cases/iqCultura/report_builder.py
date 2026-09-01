@@ -1,5 +1,8 @@
 import json
+from urllib.parse import quote_plus
+import requests
 import frappe
+from frappe.utils.file_manager import save_file
 from collections import defaultdict
 from liseniq.liseniq.uses_cases.iqCultura.selectors import (
     get_all_responses_for_survey,
@@ -388,7 +391,7 @@ def _process_responses_for_global_metrics(
                 continue
 
             # Use converted value (1-5 scale) for metrics
-            value = resp['answer_converted']
+            value = resp['answer']
             question = resp['question']
             
             # Get question metadata to check if it's an open question
@@ -399,7 +402,8 @@ def _process_responses_for_global_metrics(
             # Skip open-ended questions (dimension = 'Abierta')
             if dimension == 'Abierta':
                 continue
-
+            if dimension == 'Índice de Engagement':
+                value = resp['answer_converted']
             # Add to global scores (using converted 1-5 values)
             all_scores.append(value)
 
@@ -480,7 +484,9 @@ def process_demographic_cutoff_data(
                 continue
 
             # Use converted value (1-5 scale) for all metrics
-            value = resp['answer_converted']
+            value = resp['answer']
+            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+                value = resp['answer_converted']
             scores.append(value)
 
             # Accumulate scores (already in 1-5 scale)
@@ -819,7 +825,7 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
             if resp.get('answer_type') == 'text':
                 continue
             
-            value = resp.get('answer_converted') 
+            value = resp.get('answer') 
             question = resp.get('question')
             
             question_info = questions_metadata.get(question, {})
@@ -829,6 +835,8 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
             if dimension == 'Abierta':
                 continue
             
+            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+                value = resp.get('answer_converted')
 
             accumulated['global_score']['total'] += value
             accumulated['global_score']['count'] += 1
@@ -959,7 +967,7 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                 
                 question = resp.get('question')
                 user_field = resp.get('user')
-                value = resp.get('answer_converted')
+                value = resp.get('answer')
                 
                 if user_field:
                     unique_users_in_batch.add(user_field)
@@ -969,6 +977,9 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                 theme = question_info.get('theme') or 'Sin Tema'
                 dimension = question_info.get('dimension') or 'Sin Dimensión'
                 question_text = question_info.get('text', question)
+
+                if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+                    value = resp.get('answer_converted')
                 
                 if dimension == 'Abierta':
                     text_val = resp.get('answer')
@@ -1044,8 +1055,7 @@ def finalize_cultura_reports_from_batches(survey_id, progress_name):
         
         
         accumulated_data = deserialize_accumulated_data(progress_doc.accumulated_data)
-        
-        # Validación de seguridad adaptada a la nueva estructura
+
         global_score_data = accumulated_data.get('global_score', {})
         if not accumulated_data or global_score_data.get('count', 0) == 0:
             logger.info('finalize_cultura_reports_from_batches | no organizational data found')
@@ -1141,8 +1151,34 @@ def finalize_cultura_reports_from_batches(survey_id, progress_name):
                     row.overall_avg_score = round(global_question_scores.get(row.question_id, 0.0), 2)
                     row.gap = round(row.avg_score - row.overall_avg_score, 2)
                     row.trend_delta = None
-                
+        
 
+                questions = json.loads(report_doc.open_questions_answers or "{}")
+                if report_doc.open_questions_answers:
+                    new_images = {}
+                    for question, answers in questions.items():
+                        text = ",".join([str(ans) for ans in answers if ans is not None])
+            
+                        if not text.strip():
+                            continue
+
+                        try:
+                            safe_text = text.replace(" ", "%20").replace("\n", "%20").replace(",", "%2C")
+                            
+                            if len(safe_text) > 1500:
+                                safe_text = safe_text[:1500]
+
+                            url_publica = f"https://quickchart.io/wordcloud?width=1000&height=550&useWordList=true&fontScale=18&scale=linear&maxNumWords=35&minWordLength=4&removeStopwords=true&backgroundColor=white&text={safe_text}"
+                            
+                            new_images[question] = url_publica
+                        except Exception as img_ex:
+                            frappe.log_error(
+                                message=f"Error generando URL de QuickChart en finalize_report para {question}: {str(img_ex)}", 
+                                title="IQ Cultura Report Finalize Fix"
+                            )
+                            continue
+                if new_images:
+                    report_doc.wordcloud_images = json.dumps(new_images)
                 report_doc.save(ignore_permissions=True)
                 reports_count += 1
                 

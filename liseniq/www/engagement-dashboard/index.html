@@ -1,0 +1,1452 @@
+<!-- your_app/www/survey-dashboard.html -->
+{% extends "templates/web.html" %}
+{% block page_content %}
+<style>
+:root{
+  --red:#FF0000; --red-dark:#C40000; --header:#7B24FF; --header-dark:#5E12CC; --marine:#002D62; --bg:#f2f2f2; --card:#fff;
+  --text:#1a1a1a; --text-2:#5c6270; --border:#e6e6e6; --radius:14px; --gap:16px;
+}
+.wrap{max-width:1340px;margin:0 auto;padding:18px 22px 60px;font-family:Arial,Helvetica,sans-serif;color:var(--text);}
+.topbar{background:linear-gradient(120deg,var(--header),var(--header-dark));border-radius:var(--radius);padding:20px 24px;color:#fff;margin-bottom:var(--gap);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+.topbar h1{margin:0;font-size:20px;}
+.topbar p{margin:4px 0 0;font-size:13px;opacity:.85;}
+.filterbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:var(--gap);}
+.filterbar select{padding:7px 10px;border-radius:7px;border:1px solid var(--border);font-size:12.5px;}
+.filterbar button{padding:7px 12px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer;}
+.msel{position:relative;}
+.msel-btn{padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:12.5px;cursor:pointer;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:6px;}
+.msel-caret{font-size:9px;color:var(--text-2);}
+.msel.open .msel-btn{border-color:var(--header-dark);color:var(--header-dark);}
+.msel-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:20;background:#fff;border:1px solid var(--border);border-radius:9px;box-shadow:0 6px 18px rgba(20,30,60,.14);min-width:220px;max-width:280px;padding:8px;}
+.msel.open .msel-panel{display:block;}
+.msel-actions{display:flex;gap:6px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.msel-actions button{flex:1;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:#f7f7f7;font-size:11px;cursor:pointer;}
+.msel-options{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+.msel-options label{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:4px 4px;border-radius:5px;cursor:pointer;}
+.msel-options label:hover{background:#f5f3ff;}
+.msel-options input{accent-color:var(--header-dark);width:14px;height:14px;flex-shrink:0;}
+#filter-count{font-size:12px;color:var(--text-2);}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--gap);position:sticky;top:0;background:var(--bg);z-index:5;padding:6px 0;}
+.tab-btn{padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:#fff;font-weight:700;font-size:12.5px;color:var(--text-2);cursor:pointer;}
+.tab-btn.active{background:var(--header-dark);color:#fff;border-color:var(--header-dark);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--gap);margin-bottom:var(--gap);}
+.card{position:relative;background:var(--card);border-radius:var(--radius);padding:18px 20px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(20,30,60,.07);margin-bottom:var(--gap);}
+.kpi-card{padding:14px 16px;}
+.kpi-label{font-size:10.5px;text-transform:uppercase;color:var(--text-2);font-weight:700;margin-bottom:6px;letter-spacing:.02em;display:flex;align-items:center;gap:5px;}
+.help-ico{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#e3e6ea;color:var(--text-2);font-size:9.5px;font-weight:800;cursor:help;flex-shrink:0;text-transform:none;}
+.kpi-value{font-size:24px;font-weight:800;color:var(--marine);}
+.kpi-sub{font-size:11px;color:var(--text-2);margin-top:4px;}
+.kpi-tag{display:inline-block;margin-top:6px;padding:2px 9px;border-radius:20px;color:#fff;font-size:10.5px;font-weight:800;}
+.grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:var(--gap);}
+.grid-2b{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap);}
+@media(max-width:960px){.grid-2,.grid-2b,.grid-3{grid-template-columns:1fr;}}
+.chart-box{position:relative;height:340px;}
+table.dtable{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.dtable th{text-align:left;padding:8px;background:#f3f3f3;color:var(--text-2);font-size:10.5px;text-transform:uppercase;cursor:default;}
+table.dtable th[data-key]{cursor:pointer;user-select:none;}
+table.dtable th.sorted{color:var(--red);}
+table.dtable td{padding:8px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
+.dim-group-row td{background:#f5f3ff;font-size:12.5px;padding:9px 8px;border-bottom:2px solid var(--header-dark);}
+.pill{padding:3px 10px;border-radius:20px;font-weight:800;color:#fff;font-size:12px;display:inline-block;min-width:44px;text-align:center;}
+.rank-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.rank-list li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#f7f7f7;font-size:12.5px;}
+.rank-num{width:22px;height:22px;border-radius:50%;background:var(--marine);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rank-list.opp .rank-num{background:var(--red);}
+.alert-item,.finding-item{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:9px;background:#f7f7f7;margin-bottom:7px;font-size:12.5px;}
+.alert-item{background:#FFE5E5;border:1px solid #ffc7c7;}
+.wc-box{display:flex;flex-wrap:wrap;gap:3px 8px;padding:8px;justify-content:center;line-height:1.2;}
+.wc-word{font-weight:700;}
+.loading{padding:60px;text-align:center;color:var(--text-2);}
+.pdf-btn{padding:9px 16px;border-radius:9px;border:none;background:#fff;color:var(--header-dark);font-weight:800;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+.pdf-btn:disabled{opacity:.6;cursor:not-allowed;}
+#pdf-overlay{position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:999;display:flex;align-items:center;justify-content:center;}
+#pdf-overlay .box{background:#fff;border-radius:14px;padding:28px 34px;text-align:center;min-width:260px;box-shadow:0 10px 30px rgba(0,0,0,.25);}
+#pdf-overlay .spinner{width:34px;height:34px;border:4px solid #eee;border-top-color:var(--header-dark);border-radius:50%;margin:0 auto 14px;animation:pdfspin 0.8s linear infinite;}
+@keyframes pdfspin{to{transform:rotate(360deg)}}
+#pdf-overlay .status{font-size:12.5px;color:var(--text-2);font-weight:700;}
+.pdf-exporting .dl-btn{display:none !important;}
+.section-intro{font-size:12.5px;color:var(--text-2);margin-bottom:14px;max-width:900px;line-height:1.5;}
+dl.glossary dt{font-weight:800;color:var(--marine);margin-top:14px;}
+dl.glossary dd{margin:4px 0 0;font-size:13px;color:var(--text-2);}
+.glossary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--gap);margin-bottom:var(--gap);}
+.glossary-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:0 1px 3px rgba(20,30,60,.06);border-top:4px solid var(--header);}
+.glossary-icon{font-size:22px;margin-bottom:8px;}
+.glossary-card h4{margin:0 0 6px;font-size:13.5px;color:var(--marine);font-weight:800;}
+.glossary-card p{margin:0;font-size:12.5px;color:var(--text-2);line-height:1.5;}
+.heat-legend-full{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--text-2);}
+.dl-btn{position:absolute;top:12px;right:12px;background:#f3f3f3;border:1px solid var(--border);border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:13px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:800;}
+.badge.ok{background:#e6f4ea;color:#438D42;}
+.badge.warn{background:#fff3d6;color:#a8710a;}
+.bar-mini{display:flex;height:14px;width:100px;border-radius:4px;overflow:hidden;background:#eee;}
+.bar-mini div{height:100%;}
+select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid var(--border);}
+.heat-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text-2);margin-top:8px;}
+.heat-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle;}
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <div><h1>Dashboard de Clima y Engagement</h1><p id="survey-title">Cargando medición…</p></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div id="filter-count"></div>
+      <button id="btn-export-pdf" class="pdf-btn" disabled>⬇ Descargar PDF</button>
+    </div>
+  </div>
+  <div id="app-root"><div class="loading">Cargando datos de la medición…</div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const SURVEY = params.get('survey') || params.get('survey_name');
+  const SURVEY_TITLE = params.get('survey_title') || SURVEY;
+  const root = document.getElementById('app-root');
+  const MIN_N = 5;
+  const HEAT_COLORS = { 1: '#FF0000', 2: '#FF6900', 3: '#FFAC00', 4: '#FFD616', 5: '#C7D64F', 6: '#438D42' };
+  const ORG_COLOR = '#002D62';
+  const PALETTE = ['#FF0000', '#002D62', '#FF6900', '#438D42', '#05C3DD', '#772583', '#FFAC00', '#5c6270'];
+
+  if (!SURVEY) { root.innerHTML = '<div class="loading">Falta el parámetro "survey" en la URL.</div>'; return; }
+  document.getElementById('survey-title').textContent = 'Medición: ' + SURVEY_TITLE;
+
+  // ---------- utilidades ----------
+  function mean(arr) { const v = arr.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; }
+  function stddev(arr) {
+    const v = arr.filter(x => x != null);
+    if (v.length < 2) return 0;
+    const m = mean(v);
+    return Math.sqrt(v.reduce((s, x) => s + (x - m) * (x - m), 0) / (v.length - 1));
+  }
+  function heatTier(avg5) {
+    if (avg5 == null || isNaN(avg5)) return { tier: 0, label: 'Sin datos', color: '#ccc' };
+    if (avg5 < 2.2) return { tier: 1, label: 'Situación crítica', color: HEAT_COLORS[1] };
+    if (avg5 < 3.0) return { tier: 2, label: 'Atención urgente', color: HEAT_COLORS[2] };
+    if (avg5 < 3.8) return { tier: 3, label: 'Insuficiente', color: HEAT_COLORS[3] };
+    if (avg5 < 4.4) return { tier: 4, label: 'Aceptable', color: HEAT_COLORS[4] };
+    if (avg5 < 4.8) return { tier: 5, label: 'Muy bien', color: HEAT_COLORS[5] };
+    return { tier: 6, label: 'Sobresaliente', color: HEAT_COLORS[6] };
+  }
+  function enpsBand(score) {
+    if (score == null || isNaN(score)) return { label: 'Sin datos', color: '#ccc' };
+    if (score < 0) return { label: 'Crítico', color: '#FF0000' };
+    if (score < 30) return { label: 'Aceptable', color: '#FFAC00' };
+    if (score < 50) return { label: 'Bueno', color: '#FFD616' };
+    if (score < 70) return { label: 'Muy bueno', color: '#C7D64F' };
+    return { label: 'Excelente', color: '#438D42' };
+  }
+  function fmt1(v) { return v == null || isNaN(v) ? '—' : v.toFixed(2); }
+  function fmtPct(v) { return v == null || isNaN(v) ? '—' : v.toFixed(1) + '%'; }
+  function fmtEnps(v) { return v == null || isNaN(v) ? '—' : (v > 0 ? '+' : '') + v.toFixed(1); }
+  function fmtDelta(v) { if (v == null || isNaN(v)) return ''; return (v > 0 ? '+' : '') + v.toFixed(2); }
+  function deltaColor(v) { if (v == null || isNaN(v)) return 'var(--text-2)'; return v > 0.001 ? '#438D42' : (v < -0.001 ? '#FF0000' : 'var(--text-2)'); }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function normalizeSearch(s) { return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function slug(s) { return normalizeSearch(s).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
+
+  // ---------- Chart.js plugins ----------
+  const centerTextPlugin = {
+    id: 'centerText',
+    afterDraw(chart) {
+      const opts = chart.config.options.plugins.centerText;
+      if (!opts || !opts.text) return;
+      const { ctx, chartArea } = chart;
+      const cx = (chartArea.left + chartArea.right) / 2, cy = (chartArea.top + chartArea.bottom) / 2;
+      ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = "800 24px Arial"; ctx.fillStyle = opts.color || '#16233a';
+      ctx.fillText(opts.text, cx, cy - (opts.sub ? 9 : 0));
+      if (opts.sub) { ctx.font = "600 11px Arial"; ctx.fillStyle = '#5c6b83'; ctx.fillText(opts.sub, cx, cy + 13); }
+      ctx.restore();
+    }
+  };
+  const barDataLabelsPlugin = {
+    id: 'barDataLabels',
+    afterDatasetsDraw(chart) {
+      const opts = chart.config.options.plugins.barDataLabels;
+      if (!opts || opts.enabled === false) return;
+      const { ctx } = chart; ctx.save(); ctx.font = "700 10px Arial";
+      chart.data.datasets.forEach((ds, dsIndex) => {
+        const meta = chart.getDatasetMeta(dsIndex); if (meta.hidden) return;
+        meta.data.forEach((el, i) => {
+          const raw = ds.data[i]; if (raw == null || isNaN(raw)) return;
+          const label = opts.format ? opts.format(raw) : raw.toFixed(2);
+          ctx.fillStyle = opts.color || '#16233a';
+          const pos = el.tooltipPosition ? el.tooltipPosition() : { x: el.x, y: el.y };
+          if (chart.config.options.indexAxis === 'y') { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(label, pos.x + 6, pos.y); }
+          else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(label, pos.x, pos.y - 4); }
+        });
+      });
+      ctx.restore();
+    }
+  };
+  const refLinePlugin = {
+    id: 'refLine',
+    afterDatasetsDraw(chart) {
+      const opts = chart.config.options.plugins.refLine;
+      if (!opts || opts.value == null || isNaN(opts.value)) return;
+      const { ctx, chartArea, scales } = chart;
+      const scale = chart.config.options.indexAxis === 'y' ? scales.x : scales.y;
+      if (!scale) return;
+      const pos = scale.getPixelForValue(opts.value);
+      ctx.save(); ctx.strokeStyle = opts.color || '#16233a'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      if (chart.config.options.indexAxis === 'y') { ctx.moveTo(pos, chartArea.top); ctx.lineTo(pos, chartArea.bottom); }
+      else { ctx.moveTo(chartArea.left, pos); ctx.lineTo(chartArea.right, pos); }
+      ctx.stroke(); ctx.restore();
+    }
+  };
+  const radarPointLabelsPlugin = {
+    id: 'radarPointLabels',
+    afterDatasetsDraw(chart) {
+      if (chart.config.type !== 'radar') return;
+      const opts = chart.config.options.plugins.radarPointLabels;
+      if (!opts || opts.enabled === false) return;
+      const { ctx } = chart;
+      ctx.save(); ctx.font = "800 11px Arial"; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+      chart.data.datasets.forEach((ds, dsIndex) => {
+        const meta = chart.getDatasetMeta(dsIndex);
+        if (meta.hidden) return;
+        const offset = dsIndex === 0 ? 16 : -16; // filtro hacia afuera, organización hacia adentro
+        meta.data.forEach((el, i) => {
+          const raw = ds.data[i]; if (raw == null || isNaN(raw)) return;
+          const angle = Math.atan2(el.y - chart.scales.r.yCenter, el.x - chart.scales.r.xCenter);
+          const lx = el.x + Math.cos(angle) * offset, ly = el.y + Math.sin(angle) * offset;
+          const label = raw.toFixed(2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.strokeText(label, lx, ly);
+          ctx.fillStyle = ds.borderColor; ctx.fillText(label, lx, ly);
+        });
+      });
+      ctx.restore();
+    }
+  };
+  Chart.register(centerTextPlugin, barDataLabelsPlugin, refLinePlugin, radarPointLabelsPlugin);
+  Chart.defaults.animation = false; // evita capturar barras/arcos a medio crecer en PNG/PDF
+
+  // ---------- modelo de datos ----------
+  class ClimaData {
+    constructor(payload) {
+      this.questions = payload.questions;
+      this.records = payload.records;
+      this.universe = payload.universe || [];
+      this.demographicFields = payload.demographic_fields;
+      this.wordclouds = payload.wordclouds || {};
+      this.meta = payload.meta || {};
+
+      this.dimensions = [];
+      this.dimQuestionCodes = {};
+      this.attrQuestionCodes = {};
+      this.dimAttrs = {};
+      this.questions.forEach((q, code) => {
+        const [tema, variable, , isIndex] = q;
+        if (!this.dimQuestionCodes[tema]) { this.dimQuestionCodes[tema] = []; this.dimensions.push(tema); }
+        this.dimQuestionCodes[tema].push(code);
+        if (!isIndex) {
+          const key = tema + '|||' + variable;
+          (this.attrQuestionCodes[key] = this.attrQuestionCodes[key] || []).push(code);
+          this.dimAttrs[tema] = this.dimAttrs[tema] || [];
+          if (!this.dimAttrs[tema].includes(variable)) this.dimAttrs[tema].push(variable);
+        }
+      });
+      // Opciones únicas por campo demográfico, precalculadas una sola vez
+      // (se usan para armar los checkboxes y para saber cuándo "todas
+      // seleccionadas" equivale a "sin filtro").
+      this.fieldOptions = this.demographicFields.map((f, i) => this._uniqueValues(i));
+    }
+    answersOf(r) { return r[r.length - 1]; }
+    enpsOf(r) { return r[r.length - 2]; }
+    _matches(row, filters) {
+      for (let i = 0; i < this.demographicFields.length; i++) {
+        const sel = filters[this.demographicFields[i].key];
+        const total = this.fieldOptions[i].length;
+        if (sel && sel.length < total && !sel.includes(row[i])) return false;
+      }
+      return true;
+    }
+    filterRecords(filters) { return this.records.filter(r => this._matches(r, filters)); }
+    filterUniverse(filters) { return this.universe.filter(u => this._matches(u, filters)); }
+    _uniqueValues(fieldIdx) {
+      const set = new Set();
+      this.records.forEach(r => set.add(r[fieldIdx]));
+      this.universe.forEach(r => set.add(r[fieldIdx]));
+      return Array.from(set).sort((a, b) => String(a).localeCompare(String(b), 'es'));
+    }
+    uniqueValues(fieldIdx) { return this.fieldOptions[fieldIdx]; }
+    computeExpected(filters) { return { n: this.filterUniverse(filters).length }; }
+
+    computeKPIs(records) {
+      const n = records.length;
+      if (!n) return { n: 0, puntajeActual: null, indiceEngagement: null, puntajePonderado: null, enpsScore: null, promN: 0, pasN: 0, detN: 0 };
+      let allVals = [], idxVals = [], attrVals = [], enpsVals = [];
+      records.forEach(r => {
+        const answers = this.answersOf(r);
+        this.questions.forEach((q, code) => {
+          const v = answers[code]; if (v == null) return;
+          allVals.push(v);
+          if (q[3]) idxVals.push(v); else attrVals.push(v);
+        });
+        const e = this.enpsOf(r); if (e != null) enpsVals.push(e);
+      });
+      let promN = 0, pasN = 0, detN = 0;
+      enpsVals.forEach(e => { if (e >= 9) promN++; else if (e >= 7) pasN++; else detN++; });
+      const enpsScore = enpsVals.length ? (100 * promN / enpsVals.length) - (100 * detN / enpsVals.length) : null;
+      const mAttr = mean(attrVals), mIdx = mean(idxVals);
+      const puntajePonderado = (mAttr != null && mIdx != null) ? (mAttr * 0.5 + mIdx * 0.5) : null;
+      return {
+        n, puntajeActual: mean(allVals), indiceEngagement: mIdx, puntajePonderado, enpsScore,
+        promN, pasN, detN, enpsN: enpsVals.length,
+        promPct: enpsVals.length ? 100 * promN / enpsVals.length : null,
+        pasPct: enpsVals.length ? 100 * pasN / enpsVals.length : null,
+        detPct: enpsVals.length ? 100 * detN / enpsVals.length : null,
+      };
+    }
+    computeDimensionScores(records) {
+      return this.dimensions.map(tema => {
+        const codes = this.dimQuestionCodes[tema];
+        let vals = [];
+        records.forEach(r => { const a = this.answersOf(r); codes.forEach(c => { if (a[c] != null) vals.push(a[c]); }); });
+        return { tema, avg: mean(vals), n: records.length, sd: stddev(vals) };
+      });
+    }
+    computeAllAttributeScores(records) {
+      let out = [];
+      this.dimensions.forEach(tema => (this.dimAttrs[tema] || []).forEach(variable => {
+        const codes = this.attrQuestionCodes[tema + '|||' + variable];
+        let vals = [];
+        records.forEach(r => { const a = this.answersOf(r); codes.forEach(c => { if (a[c] != null) vals.push(a[c]); }); });
+        out.push({ tema, variable, avg: mean(vals), sd: stddev(vals), n: vals.length });
+      }));
+      return out;
+    }
+    computeQuestionScores(records) {
+      return this.questions.map((q, code) => {
+        let vals = [];
+        records.forEach(r => { const v = this.answersOf(r)[code]; if (v != null) vals.push(v); });
+        const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        vals.forEach(v => { const k = Math.round(v); if (dist[k] != null) dist[k]++; });
+        const favN = vals.filter(v => v >= 4).length, desfavN = vals.filter(v => v <= 2).length;
+        return {
+          code, tema: q[0], variable: q[1], pregunta: q[2], isIndex: q[3],
+          avg: mean(vals), n: vals.length, dist,
+          favPct: vals.length ? 100 * favN / vals.length : null,
+          desfavPct: vals.length ? 100 * desfavN / vals.length : null,
+        };
+      });
+    }
+    computeDemographicBreakdown(records, fieldIdx) {
+      const groups = {};
+      records.forEach(r => { const key = r[fieldIdx]; (groups[key] = groups[key] || []).push(r); });
+      return Object.keys(groups).map(key => {
+        const grp = groups[key], suppressed = grp.length < MIN_N;
+        const kpi = suppressed ? null : this.computeKPIs(grp);
+        return { group: key, n: grp.length, suppressed, avg: kpi && kpi.puntajeActual, indiceEngagement: kpi && kpi.indiceEngagement, enpsScore: kpi && kpi.enpsScore };
+      });
+    }
+    computeDemographicDimensionMatrix(records, fieldIdx) {
+      const groups = {};
+      records.forEach(r => { const key = r[fieldIdx]; (groups[key] = groups[key] || []).push(r); });
+      return Object.keys(groups).sort((a, b) => a.localeCompare(b, 'es')).map(key => {
+        const grp = groups[key], suppressed = grp.length < MIN_N;
+        const dims = {}; let total = null;
+        if (!suppressed) {
+          const ds = this.computeDimensionScores(grp);
+          ds.forEach(d => { dims[d.tema] = d.avg; });
+          total = mean(ds.map(d => d.avg));
+        }
+        return { group: key, n: grp.length, suppressed, dims, total };
+      });
+    }
+    computeInsights(records) {
+      const attrs = this.computeAllAttributeScores(records).filter(a => a.n > 0);
+      const sorted = [...attrs].sort((a, b) => b.avg - a.avg);
+      const dims = this.computeDimensionScores(records);
+      const alerts = [];
+      dims.forEach(d => { const t = heatTier(d.avg); if (t.tier > 0 && t.tier <= 2) alerts.push({ type: 'Dimensión', name: d.tema, avg: d.avg, tier: t }); });
+      attrs.forEach(a => { const t = heatTier(a.avg); if (t.tier > 0 && t.tier <= 2) alerts.push({ type: 'Atributo', name: a.tema + ' — ' + a.variable, avg: a.avg, tier: t }); });
+      // grupos combinando todos los campos demográficos (excepto género, índice 0)
+      let allGroups = [];
+      for (let i = 1; i < this.demographicFields.length; i++) {
+        allGroups = allGroups.concat(this.computeDemographicBreakdown(records, i).filter(g => !g.suppressed && g.indiceEngagement != null));
+      }
+      return { top5: sorted.slice(0, 5), bottom5: sorted.slice(-5).reverse(), alerts, dimsSorted: [...dims].sort((a, b) => (a.avg || 0) - (b.avg || 0)), groups: allGroups };
+    }
+  }
+
+  // ---------- carga de datos ----------
+  fetch('/api/method/liseniq.api.engagement_dashboard.get_dashboard_data?survey=' + encodeURIComponent(SURVEY), {
+    headers: { 'X-Frappe-CSRF-Token': (window.csrf_token || '') }, credentials: 'same-origin'
+  })
+    .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .then(data => {
+      const payload = data.message;
+      if (!payload || !payload.records || !payload.records.length) { root.innerHTML = '<div class="loading">No hay respuestas para esta medición todavía.</div>'; return; }
+      boot(new ClimaData(payload));
+    })
+    .catch(err => { console.error(err); root.innerHTML = '<div class="loading">Ocurrió un error cargando los datos.</div>'; });
+
+  // ---------- render ----------
+  let CD, state = { filters: {} };
+  const trendState = { survey2: null, cd2: null, loading: false, surveysList: null, error: null };
+  const charts = {};
+  function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+  function isFilterActive() {
+    return CD.demographicFields.some((f, i) => {
+      const sel = state.filters[f.key];
+      return sel && sel.length < CD.fieldOptions[i].length;
+    });
+  }
+  function heatLegendHTML() {
+    const labels = ['Crítico', 'Atención urgente', 'Insuficiente', 'Aceptable', 'Muy bien', 'Sobresaliente'];
+    return '<div class="heat-legend">' + labels.map((l, i) => `<span><i style="background:${HEAT_COLORS[i + 1]}"></i>${l}</span>`).join('') + '</div>';
+  }
+  function setChartHeight(canvasId, px) { const c = document.getElementById(canvasId); if (c && c.parentElement) c.parentElement.style.height = px + 'px'; }
+  function dlBtn(targetId, name, type) { return `<button class="dl-btn" data-dl-type="${type || 'chart'}" data-dl-target="${targetId}" data-dl-name="${name}" title="Descargar PNG">⬇</button>`; }
+
+  const TABS = [
+    ['resumen', 'Resumen Ejecutivo'], ['dimensiones', 'Dimensiones & Atributos'], ['preguntas', 'Preguntas'],
+    ['enps', 'eNPS'], ['demografico', 'Demográfico'], ['tendencias', 'Tendencias'], ['abiertas', 'Preguntas Abiertas'],
+    ['insights', 'Insights Automáticos'], ['glosario', 'Glosario'],
+  ];
+
+  function boot(cd) {
+    CD = cd;
+    CD.demographicFields.forEach((f, i) => { state.filters[f.key] = [...CD.fieldOptions[i]]; }); // por defecto: todas seleccionadas
+    root.innerHTML = `
+      <div class="filterbar" id="filterbar"></div>
+      <div class="tabs">${TABS.map((t, i) => `<button class="tab-btn${i === 0 ? ' active' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+      ${TABS.map((t, i) => `<div class="tab-panel${i === 0 ? ' active' : ''}" id="tab-${t[0]}"></div>`).join('')}
+    `;
+    renderFilterbar();
+    root.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+      root.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      root.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active'); document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      Object.values(charts).forEach(ch => { try { ch.resize(); } catch (e) {} });
+    }));
+    renderWordClouds();
+    renderGlosario();
+    renderTendencias(CD.filterRecords(state.filters));
+    loadTrendSurveysList();
+    renderAll();
+    document.addEventListener('click', e => {
+      if (e.target.closest('.dl-btn')) handleDownloadClick(e.target.closest('.dl-btn'));
+      if (!e.target.closest('.msel')) closeAllMsel();
+    });
+    const pdfBtn = document.getElementById('btn-export-pdf');
+    pdfBtn.disabled = false;
+    pdfBtn.addEventListener('click', exportDashboardPdf);
+  }
+
+  function closeAllMsel() { document.querySelectorAll('.msel.open').forEach(m => m.classList.remove('open')); }
+
+  function mselLabel(f, i) {
+    const sel = state.filters[f.key] || [];
+    const total = CD.fieldOptions[i].length;
+    if (sel.length === total) return `${f.label}: Todas`;
+    if (sel.length === 0) return `${f.label}: Ninguna`;
+    if (sel.length === 1) return `${f.label}: ${sel[0]}`;
+    return `${f.label}: ${sel.length} seleccionadas`;
+  }
+
+  function renderFilterbar() {
+    const bar = document.getElementById('filterbar');
+    bar.innerHTML = CD.demographicFields.map((f, i) => {
+      const options = CD.fieldOptions[i];
+      const rows = options.map(v => {
+        const checked = (state.filters[f.key] || []).includes(v) ? 'checked' : '';
+        return `<label><input type="checkbox" value="${escapeHtml(v)}" ${checked}>${escapeHtml(v)}</label>`;
+      }).join('');
+      return `<div class="msel" data-key="${f.key}" data-idx="${i}">
+        <button type="button" class="msel-btn">${escapeHtml(mselLabel(f, i))} <span class="msel-caret">▾</span></button>
+        <div class="msel-panel">
+          <div class="msel-actions"><button type="button" data-action="all">Todas</button><button type="button" data-action="none">Ninguna</button></div>
+          <div class="msel-options">${rows}</div>
+        </div>
+      </div>`;
+    }).join('') + '<button id="btn-reset">Limpiar filtros</button>';
+
+    bar.querySelectorAll('.msel').forEach(msel => {
+      const key = msel.dataset.key, idx = parseInt(msel.dataset.idx, 10);
+      const btn = msel.querySelector('.msel-btn');
+      btn.addEventListener('click', () => {
+        const wasOpen = msel.classList.contains('open');
+        closeAllMsel();
+        if (!wasOpen) msel.classList.add('open');
+      });
+      msel.querySelector('[data-action="all"]').addEventListener('click', () => {
+        msel.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+        state.filters[key] = [...CD.fieldOptions[idx]];
+        btn.firstChild.textContent = mselLabel(CD.demographicFields[idx], idx) + ' ';
+        renderAll();
+      });
+      msel.querySelector('[data-action="none"]').addEventListener('click', () => {
+        msel.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+        state.filters[key] = [];
+        btn.firstChild.textContent = mselLabel(CD.demographicFields[idx], idx) + ' ';
+        renderAll();
+      });
+      msel.querySelectorAll('input[type=checkbox]').forEach(cb => cb.addEventListener('change', () => {
+        state.filters[key] = Array.from(msel.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
+        btn.firstChild.textContent = mselLabel(CD.demographicFields[idx], idx) + ' ';
+        renderAll();
+      }));
+    });
+
+    bar.querySelector('#btn-reset').addEventListener('click', () => {
+      CD.demographicFields.forEach((f, i) => { state.filters[f.key] = [...CD.fieldOptions[i]]; });
+      renderFilterbar();
+      renderAll();
+    });
+  }
+
+  const NON_FILTER_TABS = ['abiertas', 'glosario']; // no dependen del filtro demográfico activo
+  const FILTER_DEPENDENT_TABS = TABS.filter(t => !NON_FILTER_TABS.includes(t[0]));
+
+  function renderAll() {
+    const records = CD.filterRecords(state.filters);
+    document.getElementById('filter-count').textContent = records.length + ' de ' + CD.meta.n_respondentes + ' respuestas seleccionadas';
+
+    if (!records.length) { FILTER_DEPENDENT_TABS.forEach(t => document.getElementById('tab-' + t[0]).innerHTML = '<div class="card"><p class="section-intro">No hay respuestas para esta combinación de filtros.</p></div>'); return; }
+    if (records.length < MIN_N) { FILTER_DEPENDENT_TABS.forEach(t => document.getElementById('tab-' + t[0]).innerHTML = `<div class="card"><p class="section-intro">Este filtro arroja solo ${records.length} respuesta(s) (mínimo ${MIN_N}). Por privacidad no se muestran resultados. Ajusta los filtros.</p></div>`); return; }
+
+    renderResumen(records);
+    renderDimensiones(records);
+    renderPreguntas(records);
+    renderEnps(records);
+    renderDemografico(records);
+    renderInsights(records);
+    renderTendencias(records);
+  }
+
+  function rankItem(i, a, opp) {
+    const t = heatTier(a.avg);
+    return `<li><span class="rank-num">${i + 1}</span><span style="flex:1"><strong>${escapeHtml(a.variable)}</strong><br><small style="color:var(--text-2)">${escapeHtml(a.tema)}</small></span><span class="pill" style="background:${t.color}">${fmt1(a.avg)}</span></li>`;
+  }
+
+  // ----- Resumen -----
+  function help(text) { return `<span class="help-ico" tabindex="0" title="${escapeHtml(text)}">?</span>`; }
+
+  function renderResumen(records) {
+    const kpis = CD.computeKPIs(records);
+    const orgKpi = CD.computeKPIs(CD.records);
+    const expected = CD.computeExpected(state.filters);
+    const respRate = expected.n > 0 ? (100 * kpis.n / expected.n) : null;
+    const dims = CD.computeDimensionScores(records);
+    const orgDims = CD.computeDimensionScores(CD.records);
+    const filterActive = isFilterActive();
+    const insights = CD.computeInsights(records);
+
+    function deltaSub(v, orgV) { if (!filterActive) return ''; const d = v - orgV; return `<div class="kpi-sub" style="color:${deltaColor(d)};font-weight:700">Δ ${fmtDelta(d)} vs. organización</div>`; }
+
+    document.getElementById('tab-resumen').innerHTML = `
+      <p class="section-intro">Vista general de la medición: puntajes, participación y los hallazgos más relevantes. Usa los filtros arriba para comparar un grupo específico contra el total de la organización (línea/serie punteada en las gráficas).</p>
+      <div class="kpi-row">
+        <div class="card kpi-card"><div class="kpi-label">Puntaje General ${help('Promedio simple de las 60 preguntas')}</div><div class="kpi-value">${fmt1(kpis.puntajeActual)}</div><span class="kpi-tag" style="background:${heatTier(kpis.puntajeActual).color}">${heatTier(kpis.puntajeActual).label}</span>${deltaSub(kpis.puntajeActual, orgKpi.puntajeActual)}</div>
+        <div class="card kpi-card"><div class="kpi-label">Índice Engagement ${help('Promedio de las 6 preguntas de compromiso')}</div><div class="kpi-value">${fmt1(kpis.indiceEngagement)}</div><span class="kpi-tag" style="background:${heatTier(kpis.indiceEngagement).color}">${heatTier(kpis.indiceEngagement).label}</span>${deltaSub(kpis.indiceEngagement, orgKpi.indiceEngagement)}</div>
+        <div class="card kpi-card"><div class="kpi-label">Puntaje Ponderado ${help('50% atributos + 50% Índice Engagement')}</div><div class="kpi-value">${fmt1(kpis.puntajePonderado)}</div><div class="kpi-sub">50% atributos + 50% engagement</div>${deltaSub(kpis.puntajePonderado, orgKpi.puntajePonderado)}</div>
+        <div class="card kpi-card"><div class="kpi-label">eNPS ${help('Employee Net Promoter Score')}</div><div class="kpi-value">${fmtEnps(kpis.enpsScore)}</div><span class="kpi-tag" style="background:${enpsBand(kpis.enpsScore).color}">${enpsBand(kpis.enpsScore).label}</span>${deltaSub(kpis.enpsScore, orgKpi.enpsScore)}</div>
+        <div class="card kpi-card"><div class="kpi-label">Participación ${help('Respuestas recibidas sobre el total de personas convocadas (con los filtros activos).')}</div><div class="kpi-value">${fmtPct(respRate)}</div><div class="kpi-sub">${kpis.n} de ${expected.n} esperadas</div></div>
+        <div class="card kpi-card"><div class="kpi-label">Colaboradores Esperados ${help('Universo esperado para el filtro actual')}</div><div class="kpi-value">${expected.n}</div><div class="kpi-sub">${filterActive ? 'Universo del filtro actual' : 'Universo total'}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">Total Respuestas ${help('Encuestas completas recibidas')}</div><div class="kpi-value">${kpis.n}</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">${dlBtn('chart-radar-dim', 'radar_dimensiones')}<h3>Puntaje por dimensión</h3><p class="section-intro">Compara el desempeño de cada dimensión en una sola vista. Escala 1–5${filterActive ? ' · línea sólida = filtro actual, línea punteada = organización' : ''}.</p><div class="chart-box"><canvas id="chart-radar-dim"></canvas></div>${heatLegendHTML()}</div>
+        <div class="card">${dlBtn('chart-enps-donut', 'enps_donut')}<h3>eNPS</h3><p class="section-intro">Distribución de promotores, pasivos y detractores según su calificación a la pregunta de recomendación.</p><div class="chart-box" style="height:220px"><canvas id="chart-enps-donut"></canvas></div><div id="enps-scale-mini"></div></div>
+      </div>
+      <div class="card">${dlBtn('chart-engagement-bar', 'indice_engagement')}<h3>Índice de Engagement</h3><p class="section-intro">Puntaje de la pregunta ancla de cada dimensión — la base del Índice de Engagement general mostrado arriba.</p><div class="chart-box" id="chart-engagement-bar-box" style="height:260px"><canvas id="chart-engagement-bar"></canvas></div></div>
+      <div class="grid-2b">
+        <div class="card">${dlBtn('card-top5', 'top5_fortalezas', 'element')}<h3 id="h-top5">Top 5 Fortalezas</h3><p class="section-intro">Los atributos mejor calificados en el filtro actual.</p><ul class="rank-list" id="card-top5-list"></ul></div>
+        <div class="card">${dlBtn('card-bottom5', 'top5_oportunidades', 'element')}<h3>Top 5 Oportunidades de Mejora</h3><p class="section-intro">Los atributos con menor puntaje — candidatos prioritarios para planes de acción.</p><ul class="rank-list opp" id="card-bottom5-list"></ul></div>
+      </div>
+      <div class="card"><h3>Alertas de resultados críticos</h3><div id="resumen-alerts"></div></div>
+    `;
+    document.getElementById('card-top5-list').innerHTML = insights.top5.map((a, i) => rankItem(i, a)).join('') || '<li>Sin datos suficientes.</li>';
+    document.getElementById('card-bottom5-list').innerHTML = insights.bottom5.map((a, i) => rankItem(i, a)).join('') || '<li>Sin datos suficientes.</li>';
+    document.getElementById('resumen-alerts').innerHTML = insights.alerts.length
+      ? insights.alerts.map(a => `<div class="alert-item"><span class="pill" style="background:${a.tier.color}">${fmt1(a.avg)}</span> ${a.type}: ${escapeHtml(a.name)} — ${a.tier.label}</div>`).join('')
+      : '<p class="section-intro">✅ Sin dimensiones ni atributos en zona crítica.</p>';
+
+    // Radar
+    destroyChart('chart-radar-dim');
+    const radarDatasets = [{ label: 'Filtro actual', data: dims.map(d => d.avg), borderColor: '#5E12CC', backgroundColor: 'rgba(94,18,204,0.12)', borderWidth: 2, pointRadius: 0 }];
+    if (filterActive) radarDatasets.push({ label: 'Organización', data: orgDims.map(d => d.avg), borderColor: ORG_COLOR, backgroundColor: 'rgba(0,45,98,0.08)', borderWidth: 2, borderDash: [5, 3], pointRadius: 0 });
+    charts['chart-radar-dim'] = new Chart(document.getElementById('chart-radar-dim').getContext('2d'), {
+      type: 'radar',
+      data: { labels: dims.map(d => d.tema), datasets: radarDatasets },
+      options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 1, max: 5, ticks: { stepSize: 1 } } }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.formattedValue !== undefined ? Number(c.raw).toFixed(2) : ''}` } }, barDataLabels: { enabled: false }, radarPointLabels: { enabled: true } } }
+    });
+
+    // eNPS donut
+    destroyChart('chart-enps-donut');
+    const total = kpis.promN + kpis.pasN + kpis.detN;
+    charts['chart-enps-donut'] = new Chart(document.getElementById('chart-enps-donut').getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: ['Promotores', 'Pasivos', 'Detractores'], datasets: [{ data: [kpis.promN, kpis.pasN, kpis.detN], backgroundColor: ['#438D42', '#FFD616', '#FF0000'], borderWidth: 2, borderColor: '#fff' }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '68%',
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} (${total ? (100 * c.parsed / total).toFixed(1) : 0}%)` } },
+          centerText: { text: fmtEnps(kpis.enpsScore), sub: 'eNPS', color: enpsBand(kpis.enpsScore).color },
+          barDataLabels: { enabled: false }
+        }
+      }
+    });
+    document.getElementById('enps-scale-mini').innerHTML = enpsScaleHTML(kpis.enpsScore, filterActive ? orgKpi.enpsScore : null);
+
+    // Engagement bar
+    destroyChart('chart-engagement-bar');
+    const idxQs = CD.computeQuestionScores(records).filter(q => q.isIndex);
+    const idxQsOrg = CD.computeQuestionScores(CD.records).filter(q => q.isIndex);
+    setChartHeight('chart-engagement-bar', idxQs.length * (filterActive ? 60 : 42) + 50);
+    const engDatasets = [{ label: 'Filtro actual', data: idxQs.map(q => q.avg), backgroundColor: idxQs.map(q => heatTier(q.avg).color), borderRadius: 6 }];
+    if (filterActive) engDatasets.push({ label: 'Organización', data: idxQsOrg.map(q => q.avg), backgroundColor: ORG_COLOR, borderRadius: 6 });
+    charts['chart-engagement-bar'] = new Chart(document.getElementById('chart-engagement-bar').getContext('2d'), {
+      type: 'bar',
+      data: { labels: idxQs.map(q => q.tema), datasets: engDatasets },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { min: 1, max: 5 } }, plugins: { legend: { display: filterActive }, barDataLabels: { enabled: true } } }
+    });
+  }
+
+  function enpsScaleHTML(score, orgScore) {
+    if (score == null) return '<p class="section-intro">Sin datos de eNPS.</p>';
+    const bands = [{ min: -100, max: 0, label: 'Crítico', color: '#FF0000' }, { min: 0, max: 30, label: 'Aceptable', color: '#FFAC00' }, { min: 30, max: 50, label: 'Bueno', color: '#FFD616' }, { min: 50, max: 70, label: 'Muy bueno', color: '#C7D64F' }, { min: 70, max: 100, label: 'Excelente', color: '#438D42' }];
+    const clampPct = v => Math.max(0, Math.min(100, ((v + 100) / 200) * 100));
+    const pos = clampPct(score);
+    let bar = `<div style="position:relative;height:30px;border-radius:8px;overflow:visible;margin:16px 0 4px;">`;
+    bar += `<div style="position:relative;height:30px;border-radius:8px;overflow:hidden;display:flex;">`;
+    bands.forEach(b => { const w = ((b.max - b.min) / 200) * 100; bar += `<div style="width:${w}%;background:${b.color};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;">${b.label}</div>`; });
+    bar += `</div>`;
+    // Marcadores como círculos simples (más confiables al exportar a imagen/PDF que un triángulo CSS)
+    bar += `<div style="position:absolute;left:calc(${pos}% - 7px);top:-10px;width:14px;height:14px;border-radius:50%;background:#16233a;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);"></div>`;
+    if (orgScore != null) {
+      const posOrg = clampPct(orgScore);
+      bar += `<div style="position:absolute;left:calc(${posOrg}% - 6px);bottom:-9px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #16233a;"></div>`;
+    }
+    bar += `</div><div style="font-size:10.5px;color:var(--text-2);display:flex;justify-content:space-between;"><span>-100</span><span>0</span><span>+100</span></div>`;
+    if (orgScore != null) bar += `<div style="font-size:11px;color:var(--text-2);margin-top:4px;">● Filtro (${fmtEnps(score)}) &nbsp; ○ Organización (${fmtEnps(orgScore)})</div>`;
+    return bar;
+  }
+
+  // ----- Dimensiones & Atributos -----
+  let attrSort = { key: 'avg', dir: -1 };
+  function renderDimensiones(records) {
+    const dims = CD.computeDimensionScores(records), orgDims = CD.computeDimensionScores(CD.records);
+    const attrs = CD.computeAllAttributeScores(records).filter(a => a.n > 0), orgAttrs = CD.computeAllAttributeScores(CD.records);
+    const filterActive = isFilterActive();
+    const sortedDims = [...dims].sort((a, b) => (b.avg || 0) - (a.avg || 0));
+
+    document.getElementById('tab-dimensiones').innerHTML = `
+      <div class="grid-2">
+        <div class="card">${dlBtn('chart-bar-dim', 'ranking_dimensiones')}<h3>Ranking de dimensiones</h3><div class="chart-box"><canvas id="chart-bar-dim"></canvas></div></div>
+        <div class="card">${dlBtn('chart-dispersion-dim', 'dispersion_dimensiones')}<h3>Dispersión por dimensión</h3><p class="section-intro">Mayor dispersión = menor consenso</p><div class="chart-box"><canvas id="chart-dispersion-dim"></canvas></div></div>
+      </div>
+      <div class="card">${dlBtn('chart-bar-attr', 'ranking_atributos')}<h3>Ranking de atributos</h3><div class="chart-box" id="chart-bar-attr-box" style="height:440px"><canvas id="chart-bar-attr"></canvas></div></div>
+      <div class="card">${dlBtn('table-attrs-wrap', 'detalle_atributos', 'element')}<h3>Detalle por dimensión y atributo</h3>
+        <div style="overflow-x:auto" id="table-attrs-wrap"><table class="dtable" id="table-attrs"><thead><tr>
+          <th data-key="tema">Dimensión</th><th data-key="variable">Atributo</th><th data-key="avg">Promedio</th>
+          ${filterActive ? '<th>Organización</th><th>Δ</th>' : '<th colspan="2">Δ vs. organización</th>'}
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    `;
+    destroyChart('chart-bar-dim');
+    const orgMap = {}; orgDims.forEach(d => orgMap[d.tema] = d.avg);
+    const dimDatasets = [{ label: 'Filtro actual', data: sortedDims.map(d => d.avg), backgroundColor: sortedDims.map(d => heatTier(d.avg).color), borderRadius: 6 }];
+    if (filterActive) dimDatasets.push({ label: 'Organización', data: sortedDims.map(d => orgMap[d.tema]), backgroundColor: ORG_COLOR, borderRadius: 6 });
+    charts['chart-bar-dim'] = new Chart(document.getElementById('chart-bar-dim').getContext('2d'), {
+      type: 'bar', data: { labels: sortedDims.map(d => d.tema), datasets: dimDatasets },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { min: 1, max: 5 } }, plugins: { legend: { display: filterActive }, barDataLabels: { enabled: true } } }
+    });
+
+    destroyChart('chart-dispersion-dim');
+    const sortedSd = [...dims].sort((a, b) => b.sd - a.sd);
+    charts['chart-dispersion-dim'] = new Chart(document.getElementById('chart-dispersion-dim').getContext('2d'), {
+      type: 'bar', data: { labels: sortedSd.map(d => d.tema), datasets: [{ data: sortedSd.map(d => d.sd), backgroundColor: '#772583', borderRadius: 6 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, barDataLabels: { enabled: true } } }
+    });
+
+    function paintAttrChartAndTable() {
+      const sorted = [...attrs].sort((a, b) => (a[attrSort.key] > b[attrSort.key] ? 1 : -1) * attrSort.dir);
+      const orgAMap = {}; orgAttrs.forEach(a => orgAMap[a.tema + '|||' + a.variable] = a.avg);
+      setChartHeight('chart-bar-attr', Math.max(440, attrs.length * (filterActive ? 32 : 26) + 40));
+      destroyChart('chart-bar-attr');
+      const byAvg = [...attrs].sort((a, b) => b.avg - a.avg);
+      const attrDatasets = [{ label: 'Filtro actual', data: byAvg.map(a => a.avg), backgroundColor: byAvg.map(a => heatTier(a.avg).color), borderRadius: 6 }];
+      if (filterActive) attrDatasets.push({ label: 'Organización', data: byAvg.map(a => orgAMap[a.tema + '|||' + a.variable]), backgroundColor: ORG_COLOR, borderRadius: 6 });
+      charts['chart-bar-attr'] = new Chart(document.getElementById('chart-bar-attr').getContext('2d'), {
+        type: 'bar', data: { labels: byAvg.map(a => a.variable), datasets: attrDatasets },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { min: 1, max: 5 } }, plugins: { legend: { display: filterActive }, barDataLabels: { enabled: true } } }
+      });
+      document.querySelector('#table-attrs tbody').innerHTML = sorted.map(a => {
+        const t = heatTier(a.avg), orgAvg = orgAMap[a.tema + '|||' + a.variable], gap = a.avg - orgAvg;
+        const gapCell = filterActive ? `<td>${fmt1(orgAvg)}</td><td style="color:${deltaColor(gap)};font-weight:700">${fmtDelta(gap)}</td>` : `<td colspan="2" style="color:var(--text-2)">Sin filtro activo</td>`;
+        return `<tr><td>${escapeHtml(a.tema)}</td><td>${escapeHtml(a.variable)}</td><td><span class="pill" style="background:${t.color}">${fmt1(a.avg)}</span></td>${gapCell}</tr>`;
+      }).join('');
+    }
+    paintAttrChartAndTable();
+    document.querySelectorAll('#table-attrs thead th[data-key]').forEach(th => th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (attrSort.key === key) attrSort.dir *= -1; else { attrSort.key = key; attrSort.dir = -1; }
+      document.querySelectorAll('#table-attrs thead th').forEach(h => h.classList.remove('sorted'));
+      th.classList.add('sorted'); paintAttrChartAndTable();
+    }));
+  }
+
+  // ----- Preguntas -----
+  let qSort = { key: 'avg', dir: -1 }, qSearch = '', qGroupDir = -1;
+  function renderPreguntas(records) {
+    const orgQ = CD.computeQuestionScores(CD.records);
+    const orgMap = {}; orgQ.forEach(q => orgMap[q.code] = q.avg);
+    const filterActive = isFilterActive();
+    const colspan = 7;
+
+    function buildGroups() {
+      let list = CD.computeQuestionScores(records).filter(q => q.n > 0);
+      if (qSearch) { const term = normalizeSearch(qSearch); list = list.filter(q => normalizeSearch(q.pregunta + ' ' + q.variable + ' ' + q.tema).includes(term)); }
+      const groups = CD.dimensions
+        .map(tema => {
+          const items = list.filter(q => q.tema === tema);
+          return { tema, avg: mean(items.map(q => q.avg)), items };
+        })
+        .filter(g => g.items.length);
+      groups.sort((a, b) => (b.avg - a.avg) * -qGroupDir);
+      groups.forEach(g => g.items.sort((a, b) => {
+        const av = a[qSort.key], bv = b[qSort.key];
+        return typeof av === 'string' ? av.localeCompare(bv) * qSort.dir : ((av || 0) - (bv || 0)) * qSort.dir;
+      }));
+      return groups;
+    }
+
+    function groupTableHTML(g) {
+      const rows = g.items.map(q => {
+        const t2 = heatTier(q.avg), orgAvg = orgMap[q.code], gap = q.avg - orgAvg;
+        const gapCell = filterActive ? `<td>${fmt1(orgAvg)}</td><td style="color:${deltaColor(gap)};font-weight:700">${fmtDelta(gap)}</td>` : `<td colspan="2" style="color:var(--text-2);font-size:11px">Sin filtro</td>`;
+        const distBar = [1, 2, 3, 4, 5].map(k => { const pct = q.n > 0 ? (100 * (q.dist[k] || 0) / q.n) : 0; return `<div style="width:${pct}%;background:${HEAT_COLORS[k <= 2 ? 1 : k === 3 ? 3 : k === 4 ? 5 : 6]}" title="${pct.toFixed(0)}%"></div>`; }).join('');
+        return `<tr><td>${escapeHtml(q.variable)}</td><td style="max-width:280px">${escapeHtml(q.pregunta)}${q.isIndex ? ' <span class="badge ok">Índice</span>' : ''}</td>
+          <td><span class="pill" style="background:${t2.color}">${fmt1(q.avg)}</span></td>${gapCell}
+          <td>${fmtPct(q.favPct)}</td><td>${fmtPct(q.desfavPct)}</td><td><div class="bar-mini">${distBar}</div></td></tr>`;
+      }).join('');
+      return `<table class="dtable" data-dim-table><thead><tr>
+        <th data-key="variable">Atributo</th><th>Pregunta</th><th data-key="avg">Promedio</th>
+        ${filterActive ? '<th>Organización</th><th>Δ</th>' : '<th colspan="2">Δ vs. organización</th>'}
+        <th data-key="favPct">% Favorable</th><th data-key="desfavPct">% Desfavorable</th><th>Distribución</th>
+      </tr></thead><tbody>${rows || `<tr><td colspan="${colspan}" style="color:var(--text-2)">Sin resultados.</td></tr>`}</tbody></table>`;
+    }
+
+    function paint() {
+      const groups = buildGroups();
+      const panel = document.getElementById('tab-preguntas');
+      panel.innerHTML = `
+        <div class="card pdf-skip">
+          <h3>Detalle por pregunta</h3>
+          <p class="section-intro">Preguntas agrupadas por dimensión — cada una en su propia tabla. Haz clic en los encabezados para ordenar dentro de cada grupo, o en "Dimensiones" para reordenar los grupos por su propio promedio.</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="text" id="q-search" placeholder="Buscar pregunta…" value="${escapeHtml(qSearch)}" style="padding:7px 10px;border-radius:7px;border:1px solid var(--border);width:280px;">
+            <button type="button" id="q-group-sort" style="padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer;">Dimensiones: ${qGroupDir === -1 ? 'mejor → peor' : 'peor → mejor'}</button>
+          </div>
+        </div>
+        ${groups.map(g => {
+          const t = heatTier(g.avg);
+          return `<div class="card dim-question-card">${dlBtn('dimq-' + slug(g.tema), 'preguntas_' + slug(g.tema), 'element')}
+            <h3><span class="pill" style="background:${t.color}">${fmt1(g.avg)}</span> ${escapeHtml(g.tema)} <span style="color:var(--text-2);font-weight:400;font-size:12px">(${g.items.length} preguntas)</span></h3>
+            <div style="overflow-x:auto" id="dimq-${slug(g.tema)}">${groupTableHTML(g)}</div>
+          </div>`;
+        }).join('') || '<div class="card"><p class="section-intro">Sin resultados para esta búsqueda.</p></div>'}
+      `;
+      document.getElementById('q-search').addEventListener('input', e => { qSearch = e.target.value; paint(); });
+      document.getElementById('q-group-sort').addEventListener('click', () => { qGroupDir *= -1; paint(); });
+      panel.querySelectorAll('[data-dim-table] thead th[data-key]').forEach(th => th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        if (qSort.key === key) qSort.dir *= -1; else { qSort.key = key; qSort.dir = -1; }
+        paint();
+      }));
+    }
+    paint();
+  }
+
+  // ----- eNPS -----
+  function renderEnps(records) {
+    const kpis = CD.computeKPIs(records), orgKpi = CD.computeKPIs(CD.records);
+    const filterActive = isFilterActive();
+    const fieldOptions = CD.demographicFields.map((f, i) => `<option value="${i}">${escapeHtml(f.label)}</option>`).join('');
+    document.getElementById('tab-enps').innerHTML = `
+      <div class="card"><h3>¿Cómo se calcula el eNPS?</h3>
+        <p class="section-intro">Employee Net Promoter Score: % Promotores (9-10) menos % Detractores (0-6), sobre respuestas válidas a "Le recomendaría a un amigo o familiar que trabaje en esta organización". Rango: -100 a 100.</p>
+        <div class="kpi-row">
+          <div class="card kpi-card">${dlBtn('chart-enps-donut-2', 'enps_donut_detalle')}<div class="kpi-label">eNPS</div><div class="chart-box" style="height:200px"><canvas id="chart-enps-donut-2"></canvas></div></div>
+          <div class="card kpi-card"><div class="kpi-label">% Promotores</div><div class="kpi-value">${fmtPct(kpis.promPct)}</div><div class="kpi-sub">${kpis.promN} personas (9-10)</div></div>
+          <div class="card kpi-card"><div class="kpi-label">% Pasivos</div><div class="kpi-value">${fmtPct(kpis.pasPct)}</div><div class="kpi-sub">${kpis.pasN} personas (7-8)</div></div>
+          <div class="card kpi-card"><div class="kpi-label">% Detractores</div><div class="kpi-value">${fmtPct(kpis.detPct)}</div><div class="kpi-sub">${kpis.detN} personas (0-6)</div></div>
+        </div>
+        <div id="enps-scale-full"></div>
+      </div>
+      <div class="card">${dlBtn('chart-enps-group', 'enps_por_grupo')}<h3>eNPS por grupo</h3>
+        <select id="enps-field" class="small" style="margin-bottom:10px">${fieldOptions}</select>
+        <div class="chart-box" id="chart-enps-group-box" style="height:340px"><canvas id="chart-enps-group"></canvas></div>
+        <p class="section-intro" style="margin-top:8px">Grupos con menos de ${MIN_N} encuestados se ocultan por privacidad. La línea punteada marca el eNPS de la organización.</p>
+      </div>
+    `;
+    destroyChart('chart-enps-donut-2');
+    const total = kpis.promN + kpis.pasN + kpis.detN;
+    charts['chart-enps-donut-2'] = new Chart(document.getElementById('chart-enps-donut-2').getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: ['Promotores', 'Pasivos', 'Detractores'], datasets: [{ data: [kpis.promN, kpis.pasN, kpis.detN], backgroundColor: ['#438D42', '#FFD616', '#FF0000'], borderWidth: 2, borderColor: '#fff' }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} (${total ? (100 * c.parsed / total).toFixed(1) : 0}%)` } }, centerText: { text: fmtEnps(kpis.enpsScore), sub: 'eNPS' }, barDataLabels: { enabled: false } } }
+    });
+    document.getElementById('enps-scale-full').innerHTML = enpsScaleHTML(kpis.enpsScore, filterActive ? orgKpi.enpsScore : null);
+
+    function paint() {
+      const idx = parseInt(document.getElementById('enps-field').value, 10);
+      const brk = CD.computeDemographicBreakdown(records, idx).filter(g => !g.suppressed && g.enpsScore != null).sort((a, b) => b.enpsScore - a.enpsScore);
+      setChartHeight('chart-enps-group', Math.max(300, brk.length * 30 + 40));
+      destroyChart('chart-enps-group');
+      charts['chart-enps-group'] = new Chart(document.getElementById('chart-enps-group').getContext('2d'), {
+        type: 'bar',
+        data: { labels: brk.map(d => d.group), datasets: [{ data: brk.map(d => d.enpsScore), backgroundColor: brk.map(d => enpsBand(d.enpsScore).color), borderRadius: 6 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { min: -100, max: 100 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `n=${brk[c.dataIndex].n}: ${c.parsed.x.toFixed(1)}` } }, barDataLabels: { enabled: true, format: v => v.toFixed(1) }, refLine: { value: orgKpi.enpsScore, label: 'Organización' } } }
+      });
+    }
+    document.getElementById('enps-field').addEventListener('change', paint);
+    paint();
+  }
+
+  // ----- Demográfico -----
+  function renderDemografico(records) {
+    const orgKpi = CD.computeKPIs(CD.records);
+    const fieldOptions = CD.demographicFields.map((f, i) => `<option value="${i}">${escapeHtml(f.label)}</option>`).join('');
+    const metricOptions = `<option value="avg">Puntaje General (1-5)</option><option value="indiceEngagement">Índice de Engagement (1-5)</option><option value="enpsScore">eNPS</option>`;
+    document.getElementById('tab-demografico').innerHTML = `
+      <div class="card">${dlBtn('chart-demo-bar', 'comparacion_grupo')}<h3 id="demo-chart-title">Comparación por grupo</h3>
+        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <select id="demo-field" class="small">${fieldOptions}</select>
+          <select id="demo-metric" class="small">${metricOptions}</select>
+        </div>
+        <div class="chart-box" id="chart-demo-bar-box" style="height:420px"><canvas id="chart-demo-bar"></canvas></div>
+      </div>
+      <div class="card">${dlBtn('table-demo-wrap', 'tabla_grupos', 'element')}<div style="overflow-x:auto" id="table-demo-wrap"><table class="dtable" id="table-demo"><thead><tr><th>Grupo</th><th>N</th><th>Puntaje</th><th>Organización</th><th>Δ</th><th>Engagement</th><th>eNPS</th></tr></thead><tbody></tbody></table></div></div>
+      <div class="card">${dlBtn('table-demo-matrix-wrap', 'mapa_calor_grupo_dimension', 'element')}<h3 id="demo-matrix-title">Puntaje por dimensión, según grupo</h3><p class="section-intro">Mapa de calor · escala 1-5</p>
+        <div style="overflow-x:auto" id="table-demo-matrix-wrap"><table class="dtable" id="table-demo-matrix"><thead id="table-demo-matrix-head"></thead><tbody></tbody></table></div>${heatLegendHTML()}
+      </div>
+    `;
+    function paint() {
+      const idx = parseInt(document.getElementById('demo-field').value, 10);
+      const metric = document.getElementById('demo-metric').value;
+      const metricLabel = { avg: 'Puntaje General', indiceEngagement: 'Índice de Engagement', enpsScore: 'eNPS' }[metric];
+      const fieldLabel = document.getElementById('demo-field').selectedOptions[0].textContent;
+      document.getElementById('demo-chart-title').textContent = metricLabel + ' por ' + fieldLabel;
+
+      const data = [...CD.computeDemographicBreakdown(records, idx)].sort((a, b) => {
+        if (a.suppressed && b.suppressed) return 0;
+        if (a.suppressed) return 1;
+        if (b.suppressed) return -1;
+        return (b[metric] ?? -Infinity) - (a[metric] ?? -Infinity);
+      });
+      const visible = data.filter(d => !d.suppressed && d[metric] != null);
+      const isEnps = metric === 'enpsScore';
+      const orgVal = { avg: orgKpi.puntajeActual, indiceEngagement: orgKpi.indiceEngagement, enpsScore: orgKpi.enpsScore }[metric];
+
+      setChartHeight('chart-demo-bar', Math.max(340, visible.length * 28 + 50));
+      destroyChart('chart-demo-bar');
+      charts['chart-demo-bar'] = new Chart(document.getElementById('chart-demo-bar').getContext('2d'), {
+        type: 'bar',
+        data: { labels: visible.map(d => d.group), datasets: [{ data: visible.map(d => d[metric]), backgroundColor: visible.map(d => isEnps ? enpsBand(d[metric]).color : heatTier(d[metric]).color), borderRadius: 6 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: isEnps ? { x: { min: -100, max: 100 } } : { x: { min: 1, max: 5 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `n=${visible[c.dataIndex].n}: ${c.parsed.x.toFixed(2)}` } }, barDataLabels: { enabled: true }, refLine: { value: orgVal, label: 'Organización' } } }
+      });
+
+      document.querySelector('#table-demo tbody').innerHTML = data.map(d => {
+        if (d.suppressed) return `<tr><td>${escapeHtml(d.group)}</td><td>${d.n}</td><td colspan="5"><span class="badge warn">n insuficiente (&lt;${MIN_N})</span></td></tr>`;
+        const gap = d.avg - orgKpi.puntajeActual, t = heatTier(d.avg);
+        return `<tr><td>${escapeHtml(d.group)}</td><td>${d.n}</td><td><span class="pill" style="background:${t.color}">${fmt1(d.avg)}</span></td><td>${fmt1(orgKpi.puntajeActual)}</td><td style="color:${deltaColor(gap)};font-weight:700">${fmtDelta(gap)}</td><td>${fmt1(d.indiceEngagement)}</td><td>${fmtEnps(d.enpsScore)}</td></tr>`;
+      }).join('');
+
+      const matrix = [...CD.computeDemographicDimensionMatrix(records, idx)].sort((a, b) => {
+        if (a.suppressed && b.suppressed) return 0;
+        if (a.suppressed) return 1;
+        if (b.suppressed) return -1;
+        return (b.total ?? -Infinity) - (a.total ?? -Infinity);
+      });
+      document.getElementById('demo-matrix-title').textContent = 'Puntaje por dimensión, según ' + fieldLabel;
+      document.getElementById('table-demo-matrix-head').innerHTML = `<tr><th>Grupo</th><th>N</th>${CD.dimensions.map(d => `<th>${escapeHtml(d)}</th>`).join('')}<th>Total</th></tr>`;
+      document.querySelector('#table-demo-matrix tbody').innerHTML = matrix.map(row => {
+        if (row.suppressed) return `<tr><td>${escapeHtml(row.group)}</td><td>${row.n}</td><td colspan="${CD.dimensions.length + 1}"><span class="badge warn">n insuficiente (&lt;${MIN_N})</span></td></tr>`;
+        const cells = CD.dimensions.map(d => { const v = row.dims[d], t = heatTier(v); return `<td><span class="pill" style="background:${t.color}">${fmt1(v)}</span></td>`; }).join('');
+        const tTot = heatTier(row.total);
+        return `<tr><td>${escapeHtml(row.group)}</td><td>${row.n}</td>${cells}<td><span class="pill" style="background:${tTot.color}">${fmt1(row.total)}</span></td></tr>`;
+      }).join('');
+    }
+    document.getElementById('demo-field').addEventListener('change', paint);
+    document.getElementById('demo-metric').addEventListener('change', paint);
+    paint();
+  }
+
+  // ----- Preguntas Abiertas (nube de palabras, fija — no depende de filtros) -----
+  function renderWordClouds() {
+    const panel = document.getElementById('tab-abiertas');
+    const entries = Object.entries(CD.wordclouds);
+    if (!entries.length) { panel.innerHTML = '<div class="card"><p class="section-intro">No hay preguntas abiertas con suficiente texto en esta medición.</p></div>'; return; }
+    panel.innerHTML = '<p class="section-intro">Una nube de palabras y tabla independiente por cada pregunta abierta de la encuesta.</p>' + entries.map(([questionText, wc], idx) => {
+      if (!wc.words || !wc.words.length) return '';
+      const boxId = 'wc-box-' + idx;
+      const topWords = wc.words.slice(0, 25); // nube más compacta: máximo 25 palabras
+      const max = topWords[0].count, min = topWords[topWords.length - 1].count;
+      const words = topWords.map(w => {
+        const size = 9 + (max > min ? (w.count - min) / (max - min) : 0.6) * 16;
+        const color = PALETTE[Math.abs(w.word.length + w.count) % PALETTE.length];
+        return `<span class="wc-word" style="font-size:${size.toFixed(0)}px;color:${color}" title="${w.count} menciones">${escapeHtml(w.word)}</span>`;
+      }).join('');
+      const rows = wc.words.slice(0, 12).map((w, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(w.word)}</td><td>${w.count}</td><td>${wc.n_valid ? (100 * w.count / wc.n_valid).toFixed(1) : 0}%</td></tr>`).join('');
+      return `<div class="card">${dlBtn(boxId, 'nube_' + idx, 'element')}<h3>${escapeHtml(questionText)}</h3>
+        ${wc.theme ? `<p class="section-intro" style="margin-bottom:2px">${escapeHtml(wc.theme)}</p>` : ''}
+        <p class="section-intro">${wc.n_valid} respuestas válidas · ${wc.n_blank} en blanco · ${wc.total_unique_words} palabras únicas</p>
+        <div class="wc-box" id="${boxId}">${words}</div>
+        <div style="overflow-x:auto;margin-top:10px"><table class="dtable"><thead><tr><th>#</th><th>Palabra</th><th>Menciones</th><th>% de respuestas válidas</th></tr></thead><tbody>${rows}</tbody></table></div>
+      </div>`;
+    }).join('');
+  }
+
+  // ----- Insights -----
+  function renderInsights(records) {
+    const insights = CD.computeInsights(records);
+    const qScores = CD.computeQuestionScores(records).filter(q => q.n > 0);
+    const qSorted = [...qScores].sort((a, b) => b.avg - a.avg);
+    const qTop5 = qSorted.slice(0, 5), qBottom5 = qSorted.slice(-5).reverse();
+    const topGroups = [...insights.groups].sort((a, b) => b.indiceEngagement - a.indiceEngagement).slice(0, 5);
+    const bottomGroups = [...insights.groups].sort((a, b) => a.indiceEngagement - b.indiceEngagement).slice(0, 5);
+    const kpis = CD.computeKPIs(records);
+    const expected = CD.computeExpected(state.filters);
+    const highestSd = [...CD.computeDimensionScores(records)].sort((a, b) => b.sd - a.sd)[0];
+
+    function qRankItem(i, q) {
+      const t = heatTier(q.avg);
+      return `<li><span class="rank-num">${i + 1}</span><span style="flex:1"><strong>${escapeHtml(q.pregunta)}</strong><br><small style="color:var(--text-2)">${escapeHtml(q.tema)} · ${escapeHtml(q.variable)}</small></span><span class="pill" style="background:${t.color}">${fmt1(q.avg)}</span></li>`;
+    }
+    function groupList(list) {
+      if (!list.length) return '<p class="section-intro">Sin grupos con suficientes respuestas.</p>';
+      return '<ul class="rank-list">' + list.map((g, i) => `<li><span class="rank-num">${i + 1}</span><span style="flex:1">${escapeHtml(g.group)} <small style="color:var(--text-2)">(n=${g.n})</small></span><span class="pill" style="background:${heatTier(g.indiceEngagement).color}">${fmt1(g.indiceEngagement)}</span></li>`).join('') + '</ul>';
+    }
+
+    document.getElementById('tab-insights').innerHTML = `
+      <div class="grid-2b">
+        <div class="card"><h3>🏆 Top 5 Fortalezas</h3><ul class="rank-list">${qTop5.map((q, i) => qRankItem(i, q)).join('') || '<li>Sin datos.</li>'}</ul></div>
+        <div class="card"><h3>🎯 Top 5 Oportunidades de mejora</h3><ul class="rank-list opp">${qBottom5.map((q, i) => qRankItem(i, q)).join('') || '<li>Sin datos.</li>'}</ul></div>
+      </div>
+      <div class="grid-2b">
+        <div class="card"><h3>📈 Grupos con mayor engagement</h3><p class="section-intro">Combina todos los campos demográficos (excepto género), n ≥ ${MIN_N}</p>${groupList(topGroups)}</div>
+        <div class="card"><h3>📉 Grupos con menor engagement</h3><p class="section-intro">Combina todos los campos demográficos (excepto género), n ≥ ${MIN_N}</p>${groupList(bottomGroups)}</div>
+      </div>
+      <div class="card"><h3>⚠️ Alertas de resultados críticos</h3>
+        ${insights.alerts.length ? insights.alerts.map(a => `<div class="alert-item"><span class="pill" style="background:${a.tier.color}">${fmt1(a.avg)}</span> ${a.type}: ${escapeHtml(a.name)} — ${a.tier.label}</div>`).join('') : '<p class="section-intro">Sin alertas críticas.</p>'}
+      </div>
+      <div class="card"><h3>🔎 Hallazgos adicionales</h3>
+        ${highestSd ? `<div class="finding-item">La dimensión con mayor dispersión (menor consenso) es <b>${escapeHtml(highestSd.tema)}</b> (desv. estándar ${highestSd.sd.toFixed(2)}).</div>` : ''}
+        ${insights.dimsSorted.length ? `<div class="finding-item">La dimensión más baja en el filtro actual es <b>${escapeHtml(insights.dimsSorted[0].tema)}</b> (${fmt1(insights.dimsSorted[0].avg)}) — candidata prioritaria para planes de acción.</div>` : ''}
+      </div>
+      <div class="card"><h3>✅ Calidad de los datos</h3>
+        <div class="finding-item">ℹ️ ${kpis.n} respuestas de ${expected.n} personas esperadas${expected.n ? ' (' + (100 * kpis.n / expected.n).toFixed(1) + '% de participación)' : ''}.</div>
+        <div class="finding-item">ℹ️ ${CD.questions.length} preguntas evaluadas en ${CD.dimensions.length} dimensiones.</div>
+      </div>
+    `;
+  }
+
+  // ----- Tendencias (comparación contra otra medición) -----
+  async function loadTrendSurveysList() {
+    try {
+      const res = await fetch('/api/method/liseniq.api.engagement_dashboard.get_available_surveys?exclude=' + encodeURIComponent(SURVEY), { credentials: 'same-origin' });
+      const data = await res.json();
+      trendState.surveysList = data.message || [];
+    } catch (e) {
+      console.error(e);
+      trendState.surveysList = [];
+      trendState.error = 'No se pudo cargar la lista de mediciones.';
+    }
+    renderTendencias(CD.filterRecords(state.filters));
+  }
+
+  async function loadComparisonSurvey(surveyName) {
+    trendState.survey2 = surveyName;
+    trendState.cd2 = null;
+    trendState.error = null;
+    if (!surveyName) { renderTendencias(CD.filterRecords(state.filters)); return; }
+    trendState.loading = true;
+    renderTendencias(CD.filterRecords(state.filters));
+    try {
+      const res = await fetch('/api/method/liseniq.api.engagement_dashboard.get_dashboard_data?survey=' + encodeURIComponent(surveyName), { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const payload = data.message;
+      if (!payload || !payload.records || !payload.records.length) {
+        trendState.error = 'La medición seleccionada no tiene respuestas.';
+      } else {
+        trendState.cd2 = new ClimaData(payload);
+      }
+    } catch (e) {
+      console.error(e);
+      trendState.error = 'No se pudo cargar la medición de comparación.';
+    } finally {
+      trendState.loading = false;
+      renderTendencias(CD.filterRecords(state.filters));
+    }
+  }
+
+  function trendMatch(list1, list2, keyFn) {
+    const map2 = new Map();
+    list2.forEach(it => map2.set(normalizeSearch(keyFn(it)), it));
+    return list1.map(it => ({ a: it, b: map2.get(normalizeSearch(keyFn(it))) || null }));
+  }
+
+  function trendPill(v1, v2, fmt) {
+    if (v1 == null || v2 == null) return '<span style="color:var(--text-2)">N/D</span>';
+    const d = v1 - v2;
+    const arrow = d > 0.001 ? '▲' : (d < -0.001 ? '▼' : '●');
+    return `<span style="color:${deltaColor(d)};font-weight:700">${arrow} ${fmt(Math.abs(d))}</span>`;
+  }
+
+  function attachTrendPickerListener() {
+    const sel = document.getElementById('trend-survey-select');
+    if (!sel) return;
+    sel.addEventListener('change', () => {
+      const chosen = sel.value;
+      const opt = (trendState.surveysList || []).find(s => s.name === chosen);
+      trendState.survey2Title = opt ? opt.title : chosen;
+      loadComparisonSurvey(chosen);
+    });
+  }
+
+  function filtersCompatibleWith(cd, filters) {
+    // Solo pasa los filtros cuyo campo (por key) también existe en la
+    // medición de comparación — evita filtrar por un campo que no aplica.
+    const compatible = {};
+    cd.demographicFields.forEach(f => { if (filters[f.key]) compatible[f.key] = filters[f.key]; });
+    return compatible;
+  }
+
+  function renderTendencias(records) {
+    const panel = document.getElementById('tab-tendencias');
+    if (!panel) return;
+
+    const options = (trendState.surveysList || []).map(s => `<option value="${escapeHtml(s.name)}" ${s.name === trendState.survey2 ? 'selected' : ''}>${escapeHtml(s.title)}</option>`).join('');
+    const filterActive = isFilterActive();
+    const pickerHTML = `
+      <div class="card pdf-skip">
+        <h3>Comparar contra otra medición</h3>
+        <p class="section-intro">Compara los resultados de esta medición contra otra ya realizada, emparejando dimensiones, atributos y preguntas por su texto. ${filterActive ? 'Se aplican tus filtros activos también a la medición comparada, solo en los campos demográficos que existan en ambas.' : 'Sin filtros activos, se comparan los totales de organización de cada una.'}</p>
+        <select id="trend-survey-select" class="small" style="min-width:260px">
+          <option value="">${trendState.surveysList === null ? 'Cargando mediciones…' : 'Selecciona una medición…'}</option>
+          ${options}
+        </select>
+      </div>
+    `;
+
+    if (trendState.loading) {
+      panel.innerHTML = pickerHTML + '<div class="card"><p class="section-intro">Cargando datos de la medición seleccionada…</p></div>';
+      attachTrendPickerListener(); return;
+    }
+    if (trendState.error) {
+      panel.innerHTML = pickerHTML + `<div class="card"><p class="section-intro">${escapeHtml(trendState.error)}</p></div>`;
+      attachTrendPickerListener(); return;
+    }
+    if (!trendState.cd2) {
+      panel.innerHTML = pickerHTML + '<div class="card"><p class="section-intro">Selecciona una medición arriba para ver la tendencia.</p></div>';
+      attachTrendPickerListener(); return;
+    }
+
+    const cd2 = trendState.cd2;
+    const records2 = cd2.filterRecords(filtersCompatibleWith(cd2, state.filters));
+
+    if (records2.length < MIN_N) {
+      panel.innerHTML = pickerHTML + `<div class="card"><p class="section-intro">La medición comparada solo tiene ${records2.length} respuesta(s) con este filtro (mínimo ${MIN_N}). Por privacidad no se muestra la tendencia. Ajusta los filtros.</p></div>`;
+      attachTrendPickerListener(); return;
+    }
+
+    const kpi1 = CD.computeKPIs(records), kpi2 = cd2.computeKPIs(records2);
+
+    const dims1 = CD.computeDimensionScores(records), dims2 = cd2.computeDimensionScores(records2);
+    const dimTrend = trendMatch(dims1, dims2, d => d.tema);
+
+    const attrs1 = CD.computeAllAttributeScores(records).filter(a => a.n > 0);
+    const attrs2 = cd2.computeAllAttributeScores(records2).filter(a => a.n > 0);
+    const attrTrend = trendMatch(attrs1, attrs2, a => a.tema + '|||' + a.variable);
+
+    const idx1 = CD.computeQuestionScores(records).filter(q => q.isIndex && q.n > 0);
+    const idx2 = cd2.computeQuestionScores(records2).filter(q => q.isIndex && q.n > 0);
+    const idxTrend = trendMatch(idx1, idx2, q => q.pregunta);
+
+    const q1 = CD.computeQuestionScores(records).filter(q => q.n > 0);
+    const q2 = cd2.computeQuestionScores(records2).filter(q => q.n > 0);
+    const qTrendAll = trendMatch(q1, q2, q => q.pregunta);
+    const qGroups = CD.dimensions.map(tema => ({ tema, items: qTrendAll.filter(t => t.a.tema === tema) })).filter(g => g.items.length);
+
+    const matchedQ = qTrendAll.filter(t => t.b).map(t => ({ ...t, delta: t.a.avg - t.b.avg }));
+    const top10Up = [...matchedQ].sort((x, y) => y.delta - x.delta).slice(0, 10);
+    const top10Down = [...matchedQ].sort((x, y) => x.delta - y.delta).slice(0, 10);
+
+    const compareLabel = trendState.survey2Title || trendState.survey2;
+
+    function trendQRow({ a, b }) {
+      return `<tr><td>${escapeHtml(a.tema)}</td><td>${escapeHtml(a.variable)}</td><td style="max-width:260px">${escapeHtml(a.pregunta)}</td><td><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></td><td>${fmt1(b.avg)}</td><td>${trendPill(a.avg, b.avg, fmt1)}</td></tr>`;
+    }
+    function trendQTable(list) {
+      return `<table class="dtable"><thead><tr><th>Dimensión</th><th>Atributo</th><th>Pregunta</th><th>Actual</th><th>Comparación</th><th>Δ</th></tr></thead>
+        <tbody>${list.map(trendQRow).join('') || '<tr><td colspan="6" style="color:var(--text-2)">Sin preguntas emparejadas.</td></tr>'}</tbody></table>`;
+    }
+
+    panel.innerHTML = pickerHTML + `
+      <div class="kpi-row">
+        <div class="card kpi-card"><div class="kpi-label">Puntaje General</div><div class="kpi-value">${fmt1(kpi1.puntajeActual)}</div><div class="kpi-sub">${trendPill(kpi1.puntajeActual, kpi2.puntajeActual, fmt1)} vs. ${fmt1(kpi2.puntajeActual)}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">Índice Engagement</div><div class="kpi-value">${fmt1(kpi1.indiceEngagement)}</div><div class="kpi-sub">${trendPill(kpi1.indiceEngagement, kpi2.indiceEngagement, fmt1)} vs. ${fmt1(kpi2.indiceEngagement)}</div></div>
+        <div class="card kpi-card"><div class="kpi-label">eNPS</div><div class="kpi-value">${fmtEnps(kpi1.enpsScore)}</div><div class="kpi-sub">${trendPill(kpi1.enpsScore, kpi2.enpsScore, v => v.toFixed(1))} vs. ${fmtEnps(kpi2.enpsScore)}</div></div>
+      </div>
+
+      <div class="card">${dlBtn('chart-trend-dim', 'tendencia_dimensiones')}<h3>Tendencia por dimensión</h3>
+        <p class="section-intro">${escapeHtml(SURVEY)} vs. ${escapeHtml(compareLabel)}</p>
+        <div class="chart-box"><canvas id="chart-trend-dim"></canvas></div>
+      </div>
+
+      <div class="grid-2b">
+        <div class="card">${dlBtn('table-trend-up-wrap', 'top10_tendencia_positiva', 'element')}<h3>📈 Top 10 con mayor tendencia positiva</h3>
+          <div style="overflow-x:auto" id="table-trend-up-wrap">${trendQTable(top10Up)}</div></div>
+        <div class="card">${dlBtn('table-trend-down-wrap', 'top10_tendencia_negativa', 'element')}<h3>📉 Top 10 con mayor tendencia negativa</h3>
+          <div style="overflow-x:auto" id="table-trend-down-wrap">${trendQTable(top10Down)}</div></div>
+      </div>
+
+      <div class="card">${dlBtn('table-trend-attr-wrap', 'tendencia_atributos', 'element')}<h3>Tendencia por atributo</h3>
+        <div style="overflow-x:auto" id="table-trend-attr-wrap"><table class="dtable"><thead><tr><th>Dimensión</th><th>Atributo</th><th>Actual</th><th>Comparación</th><th>Δ</th></tr></thead>
+        <tbody>${attrTrend.map(({ a, b }) => `<tr><td>${escapeHtml(a.tema)}</td><td>${escapeHtml(a.variable)}</td><td><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></td><td>${b ? fmt1(b.avg) : 'N/D'}</td><td>${b ? trendPill(a.avg, b.avg, fmt1) : '—'}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+
+      <div class="card">${dlBtn('table-trend-idx-wrap', 'tendencia_indice_engagement', 'element')}<h3>Tendencia por Índice de Engagement</h3>
+        <p class="section-intro">Comparación de las preguntas ancla de cada dimensión (una por dimensión).</p>
+        <div style="overflow-x:auto" id="table-trend-idx-wrap"><table class="dtable"><thead><tr><th>Dimensión</th><th>Pregunta</th><th>Actual</th><th>Comparación</th><th>Δ</th></tr></thead>
+        <tbody>${idxTrend.map(({ a, b }) => `<tr><td>${escapeHtml(a.tema)}</td><td>${escapeHtml(a.pregunta)}</td><td><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></td><td>${b ? fmt1(b.avg) : 'N/D'}</td><td>${b ? trendPill(a.avg, b.avg, fmt1) : '—'}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+
+      <div class="card pdf-skip"><h3>Tendencia por pregunta</h3>
+        <p class="section-intro">Agrupadas por dimensión, una tarjeta por cada una. Preguntas sin equivalente exacto en la medición comparada muestran "N/D".</p>
+      </div>
+      ${qGroups.map(g => {
+        const avgA = mean(g.items.map(t => t.a.avg));
+        const avgB = mean(g.items.filter(t => t.b).map(t => t.b.avg));
+        const t = heatTier(avgA);
+        return `<div class="card">${dlBtn('trendq-' + slug(g.tema), 'tendencia_preguntas_' + slug(g.tema), 'element')}
+          <h3><span class="pill" style="background:${t.color}">${fmt1(avgA)}</span> ${escapeHtml(g.tema)} ${avgB != null ? trendPill(avgA, avgB, fmt1) : ''}</h3>
+          <div style="overflow-x:auto" id="trendq-${slug(g.tema)}"><table class="dtable"><thead><tr><th>Atributo</th><th>Pregunta</th><th>Actual</th><th>Comparación</th><th>Δ</th></tr></thead>
+          <tbody>${g.items.map(({ a, b }) => `<tr><td>${escapeHtml(a.variable)}</td><td style="max-width:280px">${escapeHtml(a.pregunta)}</td><td><span class="pill" style="background:${heatTier(a.avg).color}">${fmt1(a.avg)}</span></td><td>${b ? fmt1(b.avg) : 'N/D'}</td><td>${b ? trendPill(a.avg, b.avg, fmt1) : '—'}</td></tr>`).join('')}</tbody>
+          </table></div>
+        </div>`;
+      }).join('')}
+    `;
+    attachTrendPickerListener();
+
+    destroyChart('trend-dim');
+    charts['trend-dim'] = new Chart(document.getElementById('chart-trend-dim').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: dimTrend.map(({ a }) => a.tema),
+        datasets: [
+          { label: SURVEY, data: dimTrend.map(({ a }) => a.avg), backgroundColor: '#5E12CC', borderRadius: 6 },
+          { label: compareLabel, data: dimTrend.map(({ b }) => b ? b.avg : null), backgroundColor: '#05C3DD', borderRadius: 6 },
+        ]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { min: 1, max: 5 } }, plugins: { legend: { position: 'bottom' }, barDataLabels: { enabled: true } } }
+    });
+  }
+
+  // ----- Glosario -----
+  function renderGlosario() {
+    const terms = [
+      { icon: '📊', title: 'Índice de Engagement', text: 'Promedio de las 6 preguntas de compromiso (una por dimensión), escala 1 a 5.' },
+      { icon: '⚖️', title: 'Puntaje General vs. Ponderado', text: 'General: promedio simple de las 60 preguntas. Ponderado: 50% atributos + 50% Índice de Engagement.' },
+      { icon: '👍', title: 'Favorabilidad / Desfavorabilidad', text: '% de respuestas ≥4 (favorable) o ≤2 (desfavorable) sobre el total de respuestas válidas a una pregunta.' },
+      { icon: '📈', title: 'Dispersión', text: 'Desviación estándar de las respuestas de una dimensión o atributo. Mayor dispersión = menor consenso dentro del grupo.' },
+      { icon: '✅', title: 'Participación y Tasa de respuesta', text: 'Personas que respondieron sobre el total de personas convocadas (Colaboradores Esperados) para esta medición.' },
+      { icon: '↔️', title: 'Brecha (filtro vs. organización)', text: 'Diferencia entre el puntaje del grupo filtrado y el de la organización completa (100%).' },
+      { icon: '🔒', title: 'Supresión por privacidad', text: `Los grupos con menos de ${MIN_N} respuestas no muestran su promedio individual.` },
+    ];
+    const model = [
+      ['Mi Inspiración', 'Sentido de propósito · Trabajo trascendental · Me conocen'],
+      ['Mi Trabajo', 'Reputación de la Organización · Reputación de mi área · Entorno de trabajo'],
+      ['Ambiente Laboral Positivo', 'Calidad de las relaciones · Trato de la gente · Equidad y transparencia'],
+      ['Mi Equipo', 'Dinámicas de equipo · Comunicación y coordinación · Agilidad y toma de decisiones'],
+      ['Mi Desarrollo y Aprendizaje', 'Oportunidades de crecimiento en mi rol · Oportunidades de crecimiento en la organización · Cultura de aprendizaje'],
+      ['Los Líderes', 'Mi líder · Apoyo · Nuestros líderes'],
+    ];
+    const enpsBands = [
+      ['< 0', 'Crítico', '#FF0000'],
+      ['0 a 30', 'Aceptable', '#FFAC00'],
+      ['30 a 50', 'Bueno', '#FFD616'],
+      ['50 a 70', 'Muy bueno', '#C7D64F'],
+      ['70+', 'Excelente / Referente global', '#438D42'],
+    ];
+    const heatRanges = [
+      ['1.00 – 2.19', 'Situación crítica', '#FF0000'],
+      ['2.20 – 2.99', 'Requiere atención urgente', '#FF6900'],
+      ['3.00 – 3.79', 'Insuficiente', '#FFAC00'],
+      ['3.80 – 4.39', 'Aceptable', '#FFD616'],
+      ['4.40 – 4.79', 'Muy bien', '#C7D64F'],
+      ['4.80 – 5.00', 'Sobresaliente', '#438D42'],
+    ];
+
+    document.getElementById('tab-glosario').innerHTML = `
+      <p class="section-intro">Definiciones de los términos y métricas usados en este dashboard.</p>
+
+      <div class="card">
+        <h3>El modelo</h3>
+        <p class="section-intro">El modelo es circular y está conformado por 6 dimensiones. Cada dimensión tiene 3 atributos, y cada atributo se mide con 3 preguntas (variables). Esto da 54 preguntas de atributos. A esto se suman 6 preguntas de Índice de Engagement (una por dimensión, la que mejor resume su esencia), para un total de 60 preguntas, todas en escala de 1 a 5.</p>
+        <div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Dimensión</th><th>Atributos</th></tr></thead>
+          <tbody>${model.map(([dim, attrs]) => `<tr><td style="font-weight:800;color:var(--marine)">${dim}</td><td>${attrs}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+
+      <div class="glossary-grid">
+        ${terms.map(t => `<div class="glossary-card"><div class="glossary-icon">${t.icon}</div><h4>${escapeHtml(t.title)}</h4><p>${t.text}</p></div>`).join('')}
+      </div>
+
+      <div class="card">
+        <h3>eNPS — Employee Net Promoter Score</h3>
+        <p class="section-intro">Se basa en la pregunta "¿Le recomendaría a un amigo o familiar que trabaje en esta organización?", en escala de 0 a 10.</p>
+        <p class="section-intro">
+          <span class="pill" style="background:#438D42">Promotores</span> 9-10 &nbsp;
+          <span class="pill" style="background:#FFD616">Pasivos</span> 7-8 &nbsp;
+          <span class="pill" style="background:#FF0000">Detractores</span> 0-6
+        </p>
+        <p class="section-intro" style="font-weight:700;color:var(--marine)">eNPS = % Promotores − % Detractores · Rango: −100 a +100</p>
+        <div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Puntaje</th><th>Interpretación</th></tr></thead>
+          <tbody>${enpsBands.map(([range, label, color]) => `<tr><td><span class="pill" style="background:${color}">${range}</span></td><td>${label}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <h3>Mapa de calor (escala 1 a 5)</h3>
+        <div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Rango</th><th>Interpretación</th></tr></thead>
+          <tbody>${heatRanges.map(([range, label, color]) => `<tr><td><span class="pill" style="background:${color}">${range}</span></td><td>${label}</td></tr>`).join('')}</tbody>
+        </table></div>
+        <p class="section-intro" style="margin-top:10px">Este mapa de calor colorea automáticamente los puntajes en todo el dashboard: tarjetas KPI, barras, tablas y rankings.</p>
+      </div>
+    `;
+  }
+
+  // ----- Descarga PNG -----
+  function downloadDataUrl(dataUrl, filename) { const a = document.createElement('a'); a.href = dataUrl; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); }
+  async function handleDownloadClick(btn) {
+    const type = btn.dataset.dlType, targetId = btn.dataset.dlTarget, name = btn.dataset.dlName || 'grafico';
+    const original = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
+    try {
+      let dataUrl;
+      if (type === 'chart') {
+        const canvas = document.getElementById(targetId);
+        const chart = canvas && Chart.getChart(canvas);
+        if (!chart) throw new Error('El gráfico todavía no está listo');
+        dataUrl = chart.toBase64Image('image/png', 1);
+      } else {
+        const el = document.getElementById(targetId);
+        if (!el) throw new Error('Elemento no encontrado');
+        const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+        dataUrl = canvas.toDataURL('image/png');
+      }
+      downloadDataUrl(dataUrl, name + '.png');
+    } catch (err) { console.error(err); alert('No se pudo descargar la imagen: ' + err.message); }
+    finally { btn.innerHTML = original; btn.disabled = false; }
+  }
+
+  // ----- Descarga PDF de todo el dashboard (respeta filtros aplicados) -----
+  function pdfOverlay(show, status) {
+    let ov = document.getElementById('pdf-overlay');
+    if (show) {
+      if (!ov) {
+        ov = document.createElement('div'); ov.id = 'pdf-overlay';
+        ov.innerHTML = '<div class="box"><div class="spinner"></div><div class="status" id="pdf-overlay-status"></div></div>';
+        document.body.appendChild(ov);
+      }
+      document.getElementById('pdf-overlay-status').textContent = status || 'Generando PDF…';
+    } else if (ov) { ov.remove(); }
+  }
+
+  function filtersSummaryText() {
+    return CD.demographicFields.map((f, i) => mselLabel(f, i)).join('   ·   ');
+  }
+
+  // Puntos de corte "seguros" dentro de un bloque: si contiene una tabla,
+  // devuelve el borde inferior de cada fila (en px del canvas capturado)
+  // para no partir nunca una fila a la mitad. Si no hay tabla, no hay
+  // puntos seguros y se usa corte simple (caso de gráficas muy altas).
+  function getSafeRowBreaks(block, canvas) {
+    const table = block.querySelector('table');
+    if (!table) return null;
+    const blockRect = block.getBoundingClientRect();
+    if (!blockRect.width) return null;
+    const ratio = canvas.width / blockRect.width; // relación canvas-px / css-px (por el "scale" de html2canvas)
+    const rows = Array.from(table.querySelectorAll('tr'));
+    if (!rows.length) return null;
+    return rows.map(tr => (tr.getBoundingClientRect().bottom - blockRect.top) * ratio).filter(y => y > 0 && y <= canvas.height);
+  }
+
+  // Dibuja un bloque (ya capturado como canvas) dentro del PDF a partir de
+  // cursorY, aprovechando primero el espacio que quede en la página actual
+  // (nunca se desborda: si no queda espacio útil, salta de página antes de
+  // dibujar). Solo parte el bloque en varias páginas si de verdad no cabe
+  // completo en una sola, usando los puntos seguros (bordes de fila) cuando
+  // hay una tabla dentro.
+  function drawBlock(doc, canvas, block, margin, pageW, pageH, cursorY) {
+    const contentW = pageW - margin * 2;
+    const scale = contentW / canvas.width;
+    const fullHeightPt = canvas.height * scale;
+    const maxUsableHeightPt = pageH - margin * 2;
+    const remainingPt = pageH - margin - cursorY;
+    const MIN_USEFUL_PT = 60; // si queda menos que esto en la página, mejor pasar de hoja
+    // "Casi al tope de una página vacía" = queda disponible casi toda la
+    // altura útil de una hoja (poco o nada dibujado arriba todavía).
+    const nearTopOfEmptyPage = remainingPt >= maxUsableHeightPt - 40;
+
+    // Cabe completo en el espacio restante de la página actual
+    if (fullHeightPt <= remainingPt) {
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.82), 'JPEG', margin, cursorY, contentW, fullHeightPt);
+      return cursorY + fullHeightPt + 16;
+    }
+    // Cabe completo en UNA página propia, y ya hay contenido arriba (no
+    // estamos casi al tope de una página vacía): mejor pasar de hoja entero
+    // que partirlo — esto es lo que evita cortar gráficas/tablas a la mitad.
+    if (fullHeightPt <= maxUsableHeightPt && !nearTopOfEmptyPage) {
+      doc.addPage();
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.82), 'JPEG', margin, margin, contentW, fullHeightPt);
+      return margin + fullHeightPt + 16;
+    }
+
+    // En cualquier otro caso (no cabe en una sola página, o estamos casi al
+    // tope de una página vacía y aun así no cabe completo): hay que
+    // partirlo, aprovechando primero el espacio libre actual.
+    const safeBreaks = getSafeRowBreaks(block, canvas);
+    let y = cursorY, renderedPx = 0;
+    while (renderedPx < canvas.height) {
+      let availablePt = pageH - margin - y;
+      if (availablePt < MIN_USEFUL_PT) { doc.addPage(); y = margin; availablePt = pageH - margin * 2; }
+      const availablePx = availablePt / scale;
+      let sliceEndPx = Math.min(renderedPx + availablePx, canvas.height);
+      if (safeBreaks && sliceEndPx < canvas.height) {
+        const candidates = safeBreaks.filter(b => b > renderedPx && b <= sliceEndPx);
+        if (candidates.length) sliceEndPx = candidates[candidates.length - 1];
+      }
+      const sliceHeightPx = sliceEndPx - renderedPx;
+      if (sliceHeightPx <= 0) { doc.addPage(); y = margin; continue; }
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width; sliceCanvas.height = sliceHeightPx;
+      sliceCanvas.getContext('2d').drawImage(canvas, 0, renderedPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+      doc.addImage(sliceCanvas.toDataURL('image/jpeg', 0.82), 'JPEG', margin, y, contentW, sliceHeightPx * scale);
+      renderedPx = sliceEndPx;
+      if (renderedPx < canvas.height) { doc.addPage(); y = margin; } else { y += sliceHeightPx * scale + 16; }
+    }
+    return y;
+  }
+
+  async function exportDashboardPdf() {
+    if (!window.jspdf) { alert('No se pudo cargar la librería de PDF. Verifica tu conexión e inténtalo de nuevo.'); return; }
+    const pdfBtn = document.getElementById('btn-export-pdf');
+    pdfBtn.disabled = true;
+    closeAllMsel();
+    pdfOverlay(true, 'Preparando exportación…');
+    document.body.classList.add('pdf-exporting');
+
+    const prevTab = root.querySelector('.tab-btn.active').dataset.tab;
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
+      const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight(), margin = 28;
+
+      // Portada
+      const kpis = CD.computeKPIs(CD.filterRecords(state.filters));
+      const expected = CD.computeExpected(state.filters);
+      const respRate = expected.n > 0 ? (100 * kpis.n / expected.n) : null;
+
+      // Franja superior de color
+      doc.setFillColor(0x7B, 0x24, 0xFF); doc.rect(0, 0, pageW, 118, 'F');
+      doc.setFillColor(0x5E, 0x12, 0xCC); doc.rect(0, 112, pageW, 6, 'F');
+      doc.setTextColor('#ffffff');
+      doc.setFontSize(24); doc.setFont(undefined, 'bold'); doc.text('Dashboard de Clima y Engagement', margin, 52);
+      doc.setFontSize(12); doc.setFont(undefined, 'normal'); doc.text('Reporte de resultados · Medición: ' + SURVEY, margin, 76);
+      doc.setFontSize(9.5); doc.setTextColor(235, 225, 255);
+      doc.text('Generado el ' + new Date().toLocaleString('es-CO'), margin, 96);
+
+      // Tarjetas de KPI
+      const cardY = 148, cardH = 66, cardGap = 14;
+      const kpiCards = [
+        ['Puntaje General', fmt1(kpis.puntajeActual), heatTier(kpis.puntajeActual).color],
+        ['Índice Engagement', fmt1(kpis.indiceEngagement), heatTier(kpis.indiceEngagement).color],
+        ['eNPS', fmtEnps(kpis.enpsScore), enpsBand(kpis.enpsScore).color],
+        ['Participación', fmtPct(respRate), '#5E12CC'],
+        ['Respuestas', String(kpis.n), '#5E12CC'],
+      ];
+      const cardW = (pageW - margin * 2 - cardGap * (kpiCards.length - 1)) / kpiCards.length;
+      kpiCards.forEach(([label, value, color], i) => {
+        const x = margin + i * (cardW + cardGap);
+        doc.setDrawColor('#E6E6E6'); doc.setFillColor('#FAFAFA');
+        doc.roundedRect(x, cardY, cardW, cardH, 6, 6, 'FD');
+        doc.setFillColor(color); doc.roundedRect(x, cardY, 5, cardH, 2, 2, 'F');
+        doc.setTextColor('#5c6270'); doc.setFontSize(8); doc.setFont(undefined, 'bold');
+        doc.text(doc.splitTextToSize(label.toUpperCase(), cardW - 16), x + 12, cardY + 20);
+        doc.setTextColor('#002D62'); doc.setFontSize(18); doc.setFont(undefined, 'bold');
+        doc.text(value, x + 12, cardY + 46);
+      });
+      doc.setFont(undefined, 'normal');
+
+      // Filtros aplicados
+      const filtersY = cardY + cardH + 34;
+      doc.setTextColor('#333'); doc.setFontSize(11); doc.setFont(undefined, 'bold');
+      doc.text('Filtros aplicados', margin, filtersY);
+      doc.setFont(undefined, 'normal'); doc.setFontSize(9.5); doc.setTextColor('#666');
+      doc.text(doc.splitTextToSize(filtersSummaryText(), pageW - margin * 2), margin, filtersY + 16);
+
+      // Pie de portada
+      doc.setDrawColor('#E6E6E6'); doc.line(margin, pageH - 34, pageW - margin, pageH - 34);
+      doc.setFontSize(8.5); doc.setTextColor('#999');
+      doc.text('Generado automáticamente desde el dashboard de medición · ' + SURVEY, margin, pageH - 20);
+
+      for (const [key, label] of TABS) {
+        pdfOverlay(true, 'Capturando: ' + label + '…');
+        root.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === key));
+        root.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + key));
+        Object.values(charts).forEach(ch => { try { ch.resize(); ch.update('none'); } catch (e) {} });
+        // dos frames + una espera corta: garantiza que el navegador ya
+        // pintó el tamaño final de cada canvas antes de capturarlo
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise(r => setTimeout(r, 200));
+
+        const container = document.getElementById('tab-' + key);
+        const blocks = Array.from(container.children).filter(b => !b.classList.contains('pdf-skip') && b.offsetWidth > 0 && b.offsetHeight > 0);
+
+        doc.addPage();
+        doc.setFontSize(14); doc.setTextColor('#5E12CC'); doc.text(label, margin, margin + 4);
+        let cursorY = margin + 20;
+
+        for (const block of blocks) {
+          // "Preguntas": cada dimensión en su propia hoja (excepto la
+          // primera, que ya arranca justo debajo del título de la pestaña).
+          if (key === 'preguntas' && block.classList.contains('dim-question-card') && cursorY > margin + 24) {
+            doc.addPage(); cursorY = margin;
+          }
+          const canvas = await html2canvas(block, { scale: 1.4, backgroundColor: '#ffffff', useCORS: true, logging: false });
+          cursorY = drawBlock(doc, canvas, block, margin, pageW, pageH, cursorY);
+        }
+      }
+
+      doc.save('dashboard_' + String(SURVEY).replace(/[^a-z0-9]+/gi, '_') + '.pdf');
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo generar el PDF: ' + err.message);
+    } finally {
+      root.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === prevTab));
+      root.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + prevTab));
+      Object.values(charts).forEach(ch => { try { ch.resize(); } catch (e) {} });
+      document.body.classList.remove('pdf-exporting');
+      pdfOverlay(false);
+      pdfBtn.disabled = false;
+    }
+  }
+})();
+</script>
+{% endblock %}

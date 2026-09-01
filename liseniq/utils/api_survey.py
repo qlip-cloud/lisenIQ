@@ -534,12 +534,7 @@ def generate_public_link_for_survey_hook(doc, method):
     else:
         pass
 
-    # Generar reporte de liderazgo cuando la medición cambie a Finalizada
-    try:
-        from liseniq.liseniq.uses_cases.iq360.report_builder import generate_leadership_report_on_status_change
-        generate_leadership_report_on_status_change(doc, method)
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "generate_public_link_for_survey_hook | leadership_report_generation")
+
 
 def generate_public_link_for_survey(doc, method):
     modified = False

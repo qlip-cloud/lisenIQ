@@ -59,11 +59,11 @@ def get_email_accounts():
         else:
             return {"status": "error", "message": "El usuario no pertenece a ninguna compañía registrada."}
             
-    # Obtener el correo seleccionado actualmente (si lo hay)
+    # Obtener el correo seleccionado actualmente
     company_doc = frappe.get_doc("qp_IQ_Company", default_company)
     current_email = company_doc.co_notification_email
     
-    # Consultar si existen "Email Account" asociados a la compañía de la sesión
+    # Consultar si existen Email Account asociados a la compañía de la sesión
     emails_linked = frappe.db.sql("""
         SELECT parent FROM `tabqp_IQ_EmailAccountCompany`
         WHERE company = %s AND parenttype = 'Email Account'

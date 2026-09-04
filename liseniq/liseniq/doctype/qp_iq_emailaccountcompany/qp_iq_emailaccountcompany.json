@@ -1,0 +1,32 @@
+{
+ "actions": [],
+ "creation": "2026-09-02 21:19:11.406162",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Company",
+   "options": "qp_IQ_Company"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-03 15:02:29.944160",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_EmailAccountCompany",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

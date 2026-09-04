@@ -341,9 +341,19 @@ def launch_pending_surveys():
 				if getattr(survey_doc, "su_end_date", None):
 					end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey_doc.su_end_date}</strong></p>'
 
-				sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+				# Obtener correo configurado en la compañía o usar el default
+				company_name = survey_doc.su_owner
+				sender_email = None
+				if company_name:
+					notification_email_account = frappe.db.get_value("qp_IQ_Company", company_name, "co_notification_email")
+					if notification_email_account:
+						sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
+				
 				if not sender_email:
-					frappe.log_error("Fallo crítico: No se encontró cuenta de correo saliente por defecto.", "launch_pending_surveys - Error Crítico")
+					sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+					
+				if not sender_email:
+					frappe.log_error("Fallo crítico: No se encontró cuenta de correo saliente.", "launch_pending_surveys - Error Crítico")
 					continue
 				
 				sender_formatted = formataddr((_get_notification_sender_name(), sender_email))
@@ -679,10 +689,21 @@ def send_survey_reminders(survey_name=None):
 				frappe.log_error(f"Procesando recordatorios para {survey.name}. {len(recipients_to_remind)} registros candidatos.", "send_survey_reminders - Procesando")
 
 				is_leadership = getattr(survey_doc, "su_is_leadership", 0)
-				sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+				
+				# Obtener correo configurado en la compañía o usar el default
+				company_name = survey_doc.su_owner
+				sender_email = None
+				if company_name:
+					notification_email_account = frappe.db.get_value("qp_IQ_Company", company_name, "co_notification_email")
+					if notification_email_account:
+						sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
+				
 				if not sender_email:
-					frappe.log_error("Fallo crítico: No se encontró cuenta de correo saliente por defecto.", "send_survey_reminders - Error Crítico")
-					if survey_name: return {"status": "error", "message": "No se encontró cuenta de correo saliente por defecto."}
+					sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+					
+				if not sender_email:
+					frappe.log_error("Fallo crítico: No se encontró cuenta de correo saliente.", "send_survey_reminders - Error Crítico")
+					if survey_name: return {"status": "error", "message": "No se encontró cuenta de correo saliente."}
 					continue
 				sender_formatted = formataddr((_get_notification_sender_name(), sender_email))
 
@@ -1029,10 +1050,20 @@ def send_pending_links_for_survey(survey_name: str):
 		if getattr(survey, "su_end_date", None):
 			end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey.su_end_date}</strong></p>'
 
-		sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+		# Obtener correo configurado en la compañía o usar el default
+		company_name = survey.su_owner
+		sender_email = None
+		if company_name:
+			notification_email_account = frappe.db.get_value("qp_IQ_Company", company_name, "co_notification_email")
+			if notification_email_account:
+				sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
+		
+		if not sender_email:
+			sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+			
 		if not sender_email:
 			frappe.log_error("Fallo crítico: No hay cuenta de correo saliente configurada.", "send_pending_links_for_survey - Error Crítico")
-			return {"status": "error", "message": "No hay cuenta de correo predeterminada saliente."}
+			return {"status": "error", "message": "No hay cuenta de correo saliente configurada."}
 		sender_formatted = formataddr((_get_notification_sender_name(), sender_email))
 
 		if is_leadership:

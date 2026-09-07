@@ -9,6 +9,7 @@
 <div class="main-content-padding pt-4 form-scroll-container">
     
     <div class="row">
+        {% if is_consultant %}
         <!-- Tarjeta de Gestión de Compañías -->
         <div class="col-md-4 col-sm-6 mb-4">
             <div class="config-card" id="btn-manage-companies">
@@ -21,6 +22,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- Tarjeta de Notificaciones -->
         <div class="col-md-4 col-sm-6 mb-4">

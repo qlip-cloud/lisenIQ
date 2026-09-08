@@ -189,11 +189,11 @@ def get_available_surveys(exclude=None):
     rows = frappe.get_all(
         "qp_IQ_Survey",
         filters=filters,
-        fields=["su_name", "creation"],
+        fields=["name","su_name", "creation"],
         order_by="creation desc",
         limit_page_length=200,
     )
-    return [{"name": r.su_name, "title": r.su_name} for r in rows if r.su_name]
+    return [{"name": r.name, "title": r.su_name} for r in rows if r.su_name]
 
 
 @frappe.whitelist(methods=["GET"])

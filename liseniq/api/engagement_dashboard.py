@@ -821,26 +821,25 @@ def get_dashboard_metrics(survey, filters=None):
             ) / float(len(values))
         )
 
+    # ------------------------------------------------------------------
+    # Filtrado demográfico
+    # ------------------------------------------------------------------
+
     field_options = []
 
     for field_idx in range(len(demographic_fields)):
 
         values = set()
 
+        # Valores de los respondedores
         for record in records:
-            values.add(record["demo"][field_idx])
+            if field_idx < len(record["demo"]):
+                values.add(record["demo"][field_idx])
 
+        # Valores del universo
         for universe_row in universe:
-
-            if field_idx == 0:
-                value = universe_row.get("gender")
-            else:
-                universe_field = demo_fields[field_idx - 1]
-                value = universe_row.get(universe_field)
-
-            values.add(
-                _norm_demo_value(value) or "Sin dato"
-            )
+            if field_idx < len(universe_row):
+                values.add(universe_row[field_idx])
 
         field_options.append(
             sorted(
@@ -849,52 +848,51 @@ def get_dashboard_metrics(survey, filters=None):
             )
         )
 
+
     def record_matches(record):
 
         for idx, field in enumerate(demographic_fields):
 
             selected = filters.get(field["key"])
 
-            total = len(field_options[idx])
+            # Si no hay filtro, no filtrar
+            if selected is None:
+                continue
 
-            if selected is not None:
+            # Si seleccionó todos los valores, no filtrar
+            if len(selected) >= len(field_options[idx]):
+                continue
 
-                if len(selected) < total:
+            if idx >= len(record["demo"]):
+                return False
 
-                    if record["demo"][idx] not in selected:
-                        return False
+            if record["demo"][idx] not in selected:
+                return False
 
         return True
 
+
     def universe_matches(universe_row):
-
-        demo_values = [
-            _norm_demo_value(
-                universe_row.get("gender")
-            ) or "Sin dato"
-        ]
-
-        demo_values += [
-            _norm_demo_value(
-                universe_row.get(field)
-            ) or "Sin dato"
-            for field in demo_fields
-        ]
 
         for idx, field in enumerate(demographic_fields):
 
             selected = filters.get(field["key"])
 
-            total = len(field_options[idx])
+            if selected is None:
+                continue
 
-            if selected is not None:
+            # "Todas"
+            if len(selected) >= len(field_options[idx]):
+                continue
 
-                if len(selected) < total:
+            if idx >= len(universe_row):
+                return False
 
-                    if demo_values[idx] not in selected:
-                        return False
+            if universe_row[idx] not in selected:
+                return False
 
         return True
+
 
     filtered_records = [
         record
@@ -903,9 +901,9 @@ def get_dashboard_metrics(survey, filters=None):
     ]
 
     filtered_universe = [
-        universe_row
-        for universe_row in universe
-        if universe_matches(universe_row)
+        row
+        for row in universe
+        if universe_matches(row)
     ]
 
     def compute_kpis(record_list):

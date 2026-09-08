@@ -33,7 +33,7 @@ Antes de comenzar, ten en cuenta lo siguiente:
 - La información será utilizada únicamente para los fines definidos por la organización.
 - Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.
 
-[ ] He leído y acepto el [Aviso de Privacidad](https://qlip.cloud/aviso-de-privacidad/) y la [Política de Tratamiento de Datos](https://qlip.cloud/privacy-policy/) para participar en esta medición.
+[ ] He leído y acepto el [Aviso de Privacidad](https://qlip.cloud/aviso-de-privacidad/?utm_source=listenaiq&utm_medium=referral&utm_campaign=aviso_privacidad) y la [Política de Tratamiento de Datos](https://qlip.cloud/privacy-policy/?utm_source=listenaiq&utm_medium=referral&utm_campaign=politica_privacidad) para participar en esta medición.
 
 Cuando estés listo, haz clic en "Comenzar" para iniciar la medición."""
 

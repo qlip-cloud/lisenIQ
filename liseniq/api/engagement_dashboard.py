@@ -14,11 +14,13 @@
 #      Si no existe para una encuesta dada, el dashboard debe ocultar
 #      ese widget (lo maneja el front con enps == null).
 
+import json
 import math
 import re
 from collections import defaultdict, OrderedDict
 from frappe import _
 import frappe
+
 
 REPORT_NAME = "Survey Response Custom Report Front"
 
@@ -67,6 +69,7 @@ STOPWORDS = set(
     "vuestros vuestras esos esas".split()
 )
 
+MIN_N = 5  # mínimo de respondientes para mostrar un KPI o dimensión
 
 def _norm_demo_value(v):
     """Limpia un valor demográfico: recorta espacios y colapsa vacíos a None."""
@@ -399,6 +402,1238 @@ def get_dashboard_data(survey):
         },
     }
 
+
+@frappe.whitelist(methods=["GET"])
+def get_dashboard_metrics(survey, filters=None):
+    """
+    Devuelve las métricas agregadas del dashboard para una medición.
+
+    A diferencia de get_dashboard_data(), este método NO devuelve:
+        - records
+        - preguntas abiertas
+        - wordclouds
+        - tendencias
+
+    Devuelve directamente:
+        - KPIs
+        - dimensiones
+        - atributos
+        - preguntas
+        - engagement
+        - eNPS
+        - demográficos
+        - insights
+
+    filters:
+        JSON opcional con la misma estructura utilizada por el frontend:
+
+        {
+            "gender": ["Femenino"],
+            "departamento": ["Administración", "Comercial"]
+        }
+
+        Si no se envía, se utilizan todos los registros.
+    """
+
+    survey_name = frappe.get_value(
+        "qp_IQ_Survey",
+        {"name": survey},
+        "su_name"
+    )
+
+    if not survey_name:
+        frappe.throw("Falta el parámetro 'survey'")
+
+    if not frappe.db.exists("Survey", survey_name):
+        frappe.throw("Encuesta no encontrada: {}".format(survey_name))
+
+    verify_permissions_user_company(survey_name)
+
+
+    if isinstance(filters, str):
+        try:
+            filters = json.loads(filters)
+        except Exception:
+            frappe.throw("El parámetro 'filters' debe ser un JSON válido")
+
+    if not filters:
+        filters = {}
+
+    from frappe.desk.query_report import run
+
+    current_user = frappe.session.user
+
+    frappe.session.user = "Administrator"
+
+    try:
+        report = run(
+            REPORT_NAME,
+            filters={"survey": survey_name}
+        )
+    except Exception:
+        raise
+    finally:
+        frappe.session.user = current_user
+
+    rows = report.get("result") or []
+
+
+    if not rows:
+        universe = _get_universe(survey_name, [], {})
+
+        return {
+            "meta": {
+                "survey": survey_name,
+                "n_respondentes": 0,
+                "n_respondentes_filtrados": 0,
+                "n_universo": len(universe) or None,
+                "n_universo_filtrado": len(universe) or None,
+                "n_preguntas": 0,
+                "n_dimensiones": 0,
+                "enps_question_matched": False,
+            },
+            "kpis": {
+                "n": 0,
+                "puntaje_actual": None,
+                "indice_engagement": None,
+                "puntaje_ponderado": None,
+                "enps_score": None,
+                "promotores": 0,
+                "pasivos": 0,
+                "detractores": 0,
+                "enps_n": 0,
+                "promotores_pct": None,
+                "pasivos_pct": None,
+                "detractores_pct": None,
+                "participacion_pct": None,
+            },
+            "dimensiones": [],
+            "atributos": [],
+            "preguntas": [],
+            "engagement": [],
+            "enps": {
+                "score": None,
+                "promotores": 0,
+                "pasivos": 0,
+                "detractores": 0,
+                "n": 0,
+                "promotores_pct": None,
+                "pasivos_pct": None,
+                "detractores_pct": None,
+            },
+            "demograficos": [],
+            "insights": {
+                "fortalezas": [],
+                "oportunidades": [],
+                "alertas": [],
+                "dimensiones_ordenadas": [],
+                "grupos_mayor_engagement": [],
+                "grupos_menor_engagement": [],
+                "dimension_mayor_dispersion": None,
+                "dimension_mas_baja": None,
+            },
+        }
+
+
+    col_labels = {
+        c["fieldname"]: c["label"]
+        for c in (report.get("columns") or [])
+    }
+
+
+    demo_fields = [
+        key
+        for key in rows[0].keys()
+        if key not in FIXED_COLUMNS
+    ]
+
+    demographic_fields = [
+        {
+            "key": "gender",
+            "label": col_labels.get("gender", "Género")
+        }
+    ]
+
+    demographic_fields += [
+        {
+            "key": field,
+            "label": col_labels.get(field, field)
+        }
+        for field in demo_fields
+    ]
+
+
+
+    universe = _get_universe(
+        survey_name,
+        demo_fields,
+        col_labels
+    )
+
+
+    question_order = OrderedDict()
+
+    for row in rows:
+
+        theme = row.get("theme")
+        variable = row.get("variable")
+        question = row.get("question") or ""
+
+        if not theme:
+            continue
+
+        if _norm(variable) == _OPEN_TEXT_TAG_NORM:
+            continue
+
+        key = (
+            theme,
+            variable or "Sin variable",
+            question
+        )
+
+        if key not in question_order:
+            question_order[key] = {
+                "code": len(question_order),
+                "is_index": (
+                    _norm(question)
+                    in _ENGAGEMENT_QUESTIONS_NORM
+                ),
+            }
+
+    n_questions = len(question_order)
+
+    dimensions = []
+    dim_question_codes = defaultdict(list)
+    attr_question_codes = defaultdict(list)
+    dim_attrs = defaultdict(list)
+
+    question_info = {}
+
+    for (theme, variable, question), meta in question_order.items():
+
+        code = meta["code"]
+        is_index = meta["is_index"]
+
+        question_info[code] = {
+            "code": code,
+            "tema": theme,
+            "variable": variable,
+            "pregunta": question,
+            "is_index": is_index,
+        }
+
+        if theme not in dimensions:
+            dimensions.append(theme)
+
+        dim_question_codes[theme].append(code)
+
+        if not is_index:
+
+            key = "{}|||{}".format(
+                theme,
+                variable
+            )
+
+            attr_question_codes[key].append(code)
+
+            if variable not in dim_attrs[theme]:
+                dim_attrs[theme].append(variable)
+
+
+    nps_question_texts = _get_nps_question_texts()
+
+    nps_codes = {
+        code
+        for code, question in question_info.items()
+        if _norm(question["pregunta"]) in nps_question_texts
+    }
+
+    enps_code = next(
+        (
+            code
+            for code, question in question_info.items()
+            if _norm(question["pregunta"]) == _ENPS_QUESTION_NORM
+        ),
+        None
+    )
+
+    if enps_code is None and nps_codes:
+        enps_code = next(iter(nps_codes))
+
+    code_max = defaultdict(float)
+
+    for row in rows:
+
+        variable = row.get("variable")
+
+        if _norm(variable) == _OPEN_TEXT_TAG_NORM:
+            continue
+
+        theme = row.get("theme")
+
+        if not theme:
+            continue
+
+        key = (
+            theme,
+            variable or "Sin variable",
+            row.get("question") or ""
+        )
+
+        if key not in question_order:
+            continue
+
+        code = question_order[key]["code"]
+
+        num = _to_float(row.get("answer"))
+
+        if num is not None and num > code_max[code]:
+            code_max[code] = num
+
+    wide_scale_codes = (
+        nps_codes
+        | {
+            code
+            for code, max_value in code_max.items()
+            if max_value > 5
+        }
+    )
+
+    respondents = OrderedDict()
+
+    for row in rows:
+
+        resp_id = row.get("name")
+
+        if resp_id not in respondents:
+
+            demo_values = [
+                _norm_demo_value(row.get("gender")) or "Sin dato"
+            ]
+
+            demo_values += [
+                _norm_demo_value(row.get(field)) or "Sin dato"
+                for field in demo_fields
+            ]
+
+            respondents[resp_id] = {
+                "demo": demo_values,
+                "answers": {},
+                "enps": None,
+            }
+
+        theme = row.get("theme")
+
+        variable = row.get("variable")
+
+        if _norm(variable) == _OPEN_TEXT_TAG_NORM:
+            continue
+
+        if not theme:
+            continue
+
+        key = (
+            theme,
+            variable or "Sin variable",
+            row.get("question") or ""
+        )
+
+        if key not in question_order:
+            continue
+
+        code = question_order[key]["code"]
+
+        num = _to_float(row.get("answer"))
+
+        if num is None:
+            continue
+
+        if code in wide_scale_codes:
+
+            if 1 <= num <= 10:
+                value = min(
+                    5,
+                    max(
+                        1,
+                        int(math.ceil(num / 2.0))
+                    )
+                )
+            else:
+                value = None
+
+            # El eNPS conserva el valor original 0-10
+            if (
+                code == enps_code
+                and 1 <= num <= 10
+            ):
+                respondents[resp_id]["enps"] = num
+
+        else:
+
+            value = (
+                num
+                if 1 <= num <= 5
+                else None
+            )
+
+        respondents[resp_id]["answers"][code] = value
+
+
+    records = []
+
+    for respondent in respondents.values():
+
+        records.append({
+            "demo": respondent["demo"],
+            "answers": respondent["answers"],
+            "enps": respondent["enps"],
+        })
+
+
+    def mean(values):
+        values = [
+            value
+            for value in values
+            if value is not None
+        ]
+
+        if not values:
+            return None
+
+        return sum(values) / float(len(values))
+
+    def stddev(values):
+        values = [
+            value
+            for value in values
+            if value is not None
+        ]
+
+        if not values:
+            return None
+
+        avg = mean(values)
+
+        return math.sqrt(
+            sum(
+                (value - avg) ** 2
+                for value in values
+            ) / float(len(values))
+        )
+
+    field_options = []
+
+    for field_idx in range(len(demographic_fields)):
+
+        values = set()
+
+        for record in records:
+            values.add(record["demo"][field_idx])
+
+        for universe_row in universe:
+
+            if field_idx == 0:
+                value = universe_row.get("gender")
+            else:
+                universe_field = demo_fields[field_idx - 1]
+                value = universe_row.get(universe_field)
+
+            values.add(
+                _norm_demo_value(value) or "Sin dato"
+            )
+
+        field_options.append(
+            sorted(
+                values,
+                key=lambda x: str(x)
+            )
+        )
+
+    def record_matches(record):
+
+        for idx, field in enumerate(demographic_fields):
+
+            selected = filters.get(field["key"])
+
+            total = len(field_options[idx])
+
+            if selected is not None:
+
+                if len(selected) < total:
+
+                    if record["demo"][idx] not in selected:
+                        return False
+
+        return True
+
+    def universe_matches(universe_row):
+
+        demo_values = [
+            _norm_demo_value(
+                universe_row.get("gender")
+            ) or "Sin dato"
+        ]
+
+        demo_values += [
+            _norm_demo_value(
+                universe_row.get(field)
+            ) or "Sin dato"
+            for field in demo_fields
+        ]
+
+        for idx, field in enumerate(demographic_fields):
+
+            selected = filters.get(field["key"])
+
+            total = len(field_options[idx])
+
+            if selected is not None:
+
+                if len(selected) < total:
+
+                    if demo_values[idx] not in selected:
+                        return False
+
+        return True
+
+    filtered_records = [
+        record
+        for record in records
+        if record_matches(record)
+    ]
+
+    filtered_universe = [
+        universe_row
+        for universe_row in universe
+        if universe_matches(universe_row)
+    ]
+
+    def compute_kpis(record_list):
+
+        n = len(record_list)
+
+        if not n:
+            return {
+                "n": 0,
+                "puntaje_actual": None,
+                "indice_engagement": None,
+                "puntaje_ponderado": None,
+                "enps_score": None,
+                "promotores": 0,
+                "pasivos": 0,
+                "detractores": 0,
+                "enps_n": 0,
+                "promotores_pct": None,
+                "pasivos_pct": None,
+                "detractores_pct": None,
+            }
+
+        all_values = []
+        index_values = []
+        attribute_values = []
+        enps_values = []
+
+        for record in record_list:
+
+            answers = record["answers"]
+
+            for code, question in question_info.items():
+
+                value = answers.get(code)
+
+                if value is None:
+                    continue
+
+                all_values.append(value)
+
+                if question["is_index"]:
+                    index_values.append(value)
+                else:
+                    attribute_values.append(value)
+
+            e = record["enps"]
+
+            if e is not None:
+                enps_values.append(e)
+
+        prom_n = 0
+        pas_n = 0
+        det_n = 0
+
+        for e in enps_values:
+
+            if e >= 9:
+                prom_n += 1
+
+            elif e >= 7:
+                pas_n += 1
+
+            else:
+                det_n += 1
+
+        if enps_values:
+
+            enps_score = (
+                100.0 * prom_n / len(enps_values)
+            ) - (
+                100.0 * det_n / len(enps_values)
+            )
+
+        else:
+            enps_score = None
+
+        m_attr = mean(attribute_values)
+        m_idx = mean(index_values)
+
+        if (
+            m_attr is not None
+            and m_idx is not None
+        ):
+            puntaje_ponderado = (
+                m_attr * 0.5
+                + m_idx * 0.5
+            )
+        else:
+            puntaje_ponderado = None
+
+        return {
+            "n": n,
+            "puntaje_actual": mean(all_values),
+            "indice_engagement": m_idx,
+            "puntaje_ponderado": puntaje_ponderado,
+            "enps_score": enps_score,
+
+            "promotores": prom_n,
+            "pasivos": pas_n,
+            "detractores": det_n,
+
+            "enps_n": len(enps_values),
+
+            "promotores_pct": (
+                100.0 * prom_n / len(enps_values)
+                if enps_values
+                else None
+            ),
+
+            "pasivos_pct": (
+                100.0 * pas_n / len(enps_values)
+                if enps_values
+                else None
+            ),
+
+            "detractores_pct": (
+                100.0 * det_n / len(enps_values)
+                if enps_values
+                else None
+            ),
+        }
+    
+    def compute_dimension_scores(record_list):
+
+        result = []
+
+        for theme in dimensions:
+
+            codes = dim_question_codes[theme]
+
+            values = []
+
+            for record in record_list:
+
+                answers = record["answers"]
+
+                for code in codes:
+
+                    value = answers.get(code)
+
+                    if value is not None:
+                        values.append(value)
+
+            result.append({
+                "tema": theme,
+                "avg": mean(values),
+                "n": len(record_list),
+                "sd": stddev(values),
+            })
+
+        return result
+
+    def compute_attribute_scores(record_list):
+
+        result = []
+
+        for theme in dimensions:
+
+            for variable in dim_attrs.get(theme, []):
+
+                key = "{}|||{}".format(
+                    theme,
+                    variable
+                )
+
+                codes = attr_question_codes[key]
+
+                values = []
+
+                for record in record_list:
+
+                    answers = record["answers"]
+
+                    for code in codes:
+
+                        value = answers.get(code)
+
+                        if value is not None:
+                            values.append(value)
+
+                result.append({
+                    "tema": theme,
+                    "variable": variable,
+                    "avg": mean(values),
+                    "sd": stddev(values),
+                    "n": len(values),
+                })
+
+        return result
+    
+
+    def compute_question_scores(record_list):
+
+        result = []
+
+        for code in range(n_questions):
+
+            question = question_info[code]
+
+            values = []
+
+            for record in record_list:
+
+                value = record["answers"].get(code)
+
+                if value is not None:
+                    values.append(value)
+
+            dist = {
+                "1": 0,
+                "2": 0,
+                "3": 0,
+                "4": 0,
+                "5": 0,
+            }
+
+            for value in values:
+
+                key = str(int(round(value)))
+
+                if key in dist:
+                    dist[key] += 1
+
+            fav_n = sum(
+                1
+                for value in values
+                if value >= 4
+            )
+
+            desfav_n = sum(
+                1
+                for value in values
+                if value <= 2
+            )
+
+            result.append({
+                "code": code,
+                "tema": question["tema"],
+                "variable": question["variable"],
+                "pregunta": question["pregunta"],
+                "is_index": question["is_index"],
+                "avg": mean(values),
+                "n": len(values),
+                "dist": dist,
+                "fav_pct": (
+                    100.0 * fav_n / len(values)
+                    if values
+                    else None
+                ),
+                "desfav_pct": (
+                    100.0 * desfav_n / len(values)
+                    if values
+                    else None
+                ),
+            })
+
+        return result
+
+    def compute_demographic_breakdown(record_list, field_idx):
+
+        groups = OrderedDict()
+
+        for record in record_list:
+
+            key = record["demo"][field_idx]
+
+            if key not in groups:
+                groups[key] = []
+
+            groups[key].append(record)
+
+        result = []
+
+        for key, group in groups.items():
+
+            suppressed = len(group) < MIN_N
+
+            if suppressed:
+
+                kpi = None
+
+            else:
+
+                kpi = compute_kpis(group)
+
+            result.append({
+                "group": key,
+                "n": len(group),
+                "suppressed": suppressed,
+                "avg": (
+                    kpi["puntaje_actual"]
+                    if kpi
+                    else None
+                ),
+                "indice_engagement": (
+                    kpi["indice_engagement"]
+                    if kpi
+                    else None
+                ),
+                "enps_score": (
+                    kpi["enps_score"]
+                    if kpi
+                    else None
+                ),
+            })
+
+        return result
+
+
+    def compute_demographic_dimension_matrix(
+        record_list,
+        field_idx
+    ):
+
+        groups = OrderedDict()
+
+        for record in record_list:
+
+            key = record["demo"][field_idx]
+
+            if key not in groups:
+                groups[key] = []
+
+            groups[key].append(record)
+
+        result = []
+
+        for key in sorted(
+            groups.keys(),
+            key=lambda value: str(value)
+        ):
+
+            group = groups[key]
+
+            suppressed = len(group) < MIN_N
+
+            dims = {}
+            total = None
+
+            if not suppressed:
+
+                dimension_scores = (
+                    compute_dimension_scores(group)
+                )
+
+                for dimension in dimension_scores:
+
+                    dims[dimension["tema"]] = (
+                        dimension["avg"]
+                    )
+
+                # IMPORTANTE:
+                # El frontend hace:
+                #
+                # total = mean(ds.map(d => d.avg))
+                #
+                # NO hace promedio de todas las respuestas.
+                #
+                total = mean([
+                    d["avg"]
+                    for d in dimension_scores
+                    if d["avg"] is not None
+                ])
+
+            result.append({
+                "group": key,
+                "n": len(group),
+                "suppressed": suppressed,
+                "dims": dims,
+                "total": total,
+            })
+
+        return result
+
+
+    def heat_tier(value):
+
+        if value is None:
+            return {
+                "tier": 0,
+                "label": "Sin datos",
+            }
+
+        if value < 2.20:
+            return {
+                "tier": 1,
+                "label": "Situación crítica",
+            }
+
+        if value < 3.00:
+            return {
+                "tier": 2,
+                "label": "Requiere atención urgente",
+            }
+
+        if value < 3.80:
+            return {
+                "tier": 3,
+                "label": "Insuficiente",
+            }
+
+        if value < 4.40:
+            return {
+                "tier": 4,
+                "label": "Aceptable",
+            }
+
+        if value < 4.80:
+            return {
+                "tier": 5,
+                "label": "Muy bien",
+            }
+
+        return {
+            "tier": 6,
+            "label": "Sobresaliente",
+        }
+
+
+    kpis = compute_kpis(filtered_records)
+
+    organization_kpis = compute_kpis(records)
+
+    dimensions_result = compute_dimension_scores(
+        filtered_records
+    )
+
+    organization_dimensions = compute_dimension_scores(
+        records
+    )
+
+    attributes_result = [
+        attribute
+        for attribute in compute_attribute_scores(
+            filtered_records
+        )
+        if attribute["n"] > 0
+    ]
+
+    organization_attributes = compute_attribute_scores(
+        records
+    )
+
+    questions_result = [
+        question
+        for question in compute_question_scores(
+            filtered_records
+        )
+        if question["n"] > 0
+    ]
+
+    organization_questions = [
+        question
+        for question in compute_question_scores(records)
+        if question["n"] > 0
+    ]
+
+    engagement_result = [
+        question
+        for question in questions_result
+        if question["is_index"]
+    ]
+
+    organization_engagement = [
+        question
+        for question in organization_questions
+        if question["is_index"]
+    ]
+
+    enps_result = {
+        "score": kpis["enps_score"],
+        "promotores": kpis["promotores"],
+        "pasivos": kpis["pasivos"],
+        "detractores": kpis["detractores"],
+        "n": kpis["enps_n"],
+        "promotores_pct": kpis["promotores_pct"],
+        "pasivos_pct": kpis["pasivos_pct"],
+        "detractores_pct": kpis["detractores_pct"],
+    }
+
+
+    demographic_result = []
+
+    for idx, field in enumerate(demographic_fields):
+
+        breakdown = compute_demographic_breakdown(
+            filtered_records,
+            idx
+        )
+
+        matrix = compute_demographic_dimension_matrix(
+            filtered_records,
+            idx
+        )
+
+        demographic_result.append({
+            "key": field["key"],
+            "label": field["label"],
+            "breakdown": breakdown,
+            "dimension_matrix": matrix,
+        })
+
+
+    question_sorted = sorted(
+        questions_result,
+        key=lambda q: (
+            q["avg"] is not None,
+            q["avg"] if q["avg"] is not None else -float("inf")
+        ),
+        reverse=True
+    )
+
+    question_top5 = question_sorted[:5]
+
+    question_bottom5 = list(
+        reversed(question_sorted[-5:])
+    )
+
+    # ---- Atributos ----
+
+    attribute_sorted = sorted(
+        attributes_result,
+        key=lambda a: (
+            a["avg"] is not None,
+            a["avg"] if a["avg"] is not None else -float("inf")
+        ),
+        reverse=True
+    )
+
+    attribute_top5 = attribute_sorted[:5]
+
+    attribute_bottom5 = list(
+        reversed(attribute_sorted[-5:])
+    )
+
+    alerts = []
+
+    for dimension in dimensions_result:
+
+        tier = heat_tier(dimension["avg"])
+
+        if (
+            tier["tier"] > 0
+            and tier["tier"] <= 2
+        ):
+
+            alerts.append({
+                "type": "Dimensión",
+                "name": dimension["tema"],
+                "avg": dimension["avg"],
+                "tier": tier,
+            })
+
+    for attribute in attributes_result:
+
+        tier = heat_tier(attribute["avg"])
+
+        if (
+            tier["tier"] > 0
+            and tier["tier"] <= 2
+        ):
+
+            alerts.append({
+                "type": "Atributo",
+                "name": "{} — {}".format(
+                    attribute["tema"],
+                    attribute["variable"]
+                ),
+                "avg": attribute["avg"],
+                "tier": tier,
+            })
+
+    all_groups = []
+
+    for idx in range(
+        1,
+        len(demographic_fields)
+    ):
+
+        groups = compute_demographic_breakdown(
+            filtered_records,
+            idx
+        )
+
+        groups = [
+            group
+            for group in groups
+            if (
+                not group["suppressed"]
+                and group["indice_engagement"] is not None
+            )
+        ]
+
+        all_groups.extend(groups)
+
+    groups_highest = sorted(
+        all_groups,
+        key=lambda g: g["indice_engagement"],
+        reverse=True
+    )[:5]
+
+    groups_lowest = sorted(
+        all_groups,
+        key=lambda g: g["indice_engagement"]
+    )[:5]
+
+    dimensions_sorted = sorted(
+        dimensions_result,
+        key=lambda d: (
+            d["avg"]
+            if d["avg"] is not None
+            else 0
+        )
+    )
+
+
+    dimensions_with_sd = [
+        d
+        for d in dimensions_result
+        if d["sd"] is not None
+    ]
+
+    if dimensions_with_sd:
+
+        highest_sd = max(
+            dimensions_with_sd,
+            key=lambda d: d["sd"]
+        )
+
+    else:
+        highest_sd = None
+
+    lowest_dimension = (
+        dimensions_sorted[0]
+        if dimensions_sorted
+        else None
+    )
+
+    insights_result = {
+        "fortalezas_preguntas": question_top5,
+        "oportunidades_preguntas": question_bottom5,
+
+        "fortalezas_atributos": attribute_top5,
+        "oportunidades_atributos": attribute_bottom5,
+
+        "grupos_mayor_engagement": groups_highest,
+        "grupos_menor_engagement": groups_lowest,
+
+        "alertas": alerts,
+
+        "dimensiones_ordenadas": dimensions_sorted,
+
+        "dimension_mayor_dispersion": (
+            highest_sd
+            if highest_sd
+            else None
+        ),
+
+        "dimension_mas_baja": (
+            lowest_dimension
+            if lowest_dimension
+            else None
+        ),
+    }
+
+    expected_n = len(filtered_universe)
+
+    participation_pct = (
+        100.0 * kpis["n"] / expected_n
+        if expected_n > 0
+        else None
+    )
+
+    kpis["participacion_pct"] = participation_pct
+
+    return {
+        "meta": {
+            "survey": survey_name,
+
+            "n_respondentes": len(records),
+            "n_respondentes_filtrados": len(filtered_records),
+
+            "n_universo": (
+                len(universe)
+                if universe
+                else None
+            ),
+
+            "n_universo_filtrado": (
+                len(filtered_universe)
+                if filtered_universe
+                else None
+            ),
+
+            "n_preguntas": n_questions,
+            "n_dimensiones": len(dimensions),
+
+            "enps_question_matched": (
+                enps_code is not None
+            ),
+        },
+
+        "kpis": kpis,
+
+        "dimensiones": dimensions_result,
+
+        "atributos": attributes_result,
+
+        "preguntas": questions_result,
+
+        "engagement": {
+            "indice": kpis["indice_engagement"],
+            "preguntas": engagement_result,
+        },
+
+        "enps": enps_result,
+
+        "demograficos": demographic_result,
+
+        "insights": insights_result,
+
+        "organizacion": {
+            "kpis": organization_kpis,
+            "dimensiones": organization_dimensions,
+            "atributos": organization_attributes,
+            "engagement": organization_engagement,
+        },
+    }
 
 def verify_permissions_user_company(survey):
     """

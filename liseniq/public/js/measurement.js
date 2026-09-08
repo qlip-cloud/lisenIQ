@@ -661,7 +661,7 @@ class MeasurementCreator {
 <li>La información será utilizada únicamente para los fines definidos por la organización.</li>
 </ul>
 <p>Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.</p>
-<p>[ ] He leído y acepto el <a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener">Aviso de Privacidad</a> y la <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
+<p>[ ] He leído y acepto el <a href="https://qlip.cloud/aviso-de-privacidad/?utm_source=listenaiq&utm_medium=referral&utm_campaign=aviso_privacidad" target="_blank" rel="noopener">Aviso de Privacidad</a> y la <a href="https://qlip.cloud/privacy-policy/?utm_source=listenaiq&utm_medium=referral&utm_campaign=politica_privacidad" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
 <p>Cuando estés listo, haz clic en "Comenzar" para iniciar la medición.</p>`
             };
         }

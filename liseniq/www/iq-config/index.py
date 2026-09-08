@@ -6,13 +6,12 @@ def get_context(context):
     if frappe.session.user == "Guest":
         frappe.throw(_("Debes iniciar sesión para acceder a esta página."), frappe.PermissionError)
 
-    # Validación de Rol
+    # Validación de Rol en lugar de redirigir, lo agregamos al contexto
     consultant_role = frappe.db.get_value("qp_IQ_PortalRole", {"pr_mnemonico": "consultant_user"}, "name")
     user_contact_role = frappe.db.get_value("Contact", {"user": frappe.session.user}, "custom_rol_aiq")
 
-    if not consultant_role or user_contact_role != consultant_role:
-        frappe.local.flags.redirect_location = '/iq-home'
-        raise frappe.Redirect
+    # Guardamos en el contexto
+    context.is_consultant = True if (consultant_role and user_contact_role == consultant_role) else False
 
     try:
         context = global_website_context(context)

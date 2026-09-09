@@ -288,7 +288,7 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
                 <label class="iq-welcome-terms-label">
                     <input type="checkbox" id="accept-terms-checkbox" class="iq-welcome-checkbox">
                     <span class="iq-welcome-terms-text">
-                        He leído y acepto los términos y condiciones (<a href="https://qlip.cloud/aviso-de-privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Aviso de Privacidad</a> | <a href="https://qlip.cloud/privacy-policy/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Privacy Policy</a>), y consiento el tratamiento de mis datos y respuestas para los fines de esta medición.
+                        He leído y acepto los términos y condiciones (<a href="https://qlip.cloud/aviso-de-privacidad/?utm_source=listenaiq&utm_medium=referral&utm_campaign=aviso_privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Aviso de Privacidad</a> | <a href="https://qlip.cloud/privacy-policy/?utm_source=listenaiq&utm_medium=referral&utm_campaign=politica_privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Privacy Policy</a>), y consiento el tratamiento de mis datos y respuestas para los fines de esta medición.
                     </span>
                 </label>
             </div>

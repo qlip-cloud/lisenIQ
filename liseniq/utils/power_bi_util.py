@@ -324,6 +324,16 @@ def get_embed_config(report_id: Optional[str] = None,
             "values": [filter_company]
         })
 
+        filtros_pbi.append({
+            "$schema": "http://powerbi.com/product/schema#basicFilter",
+            "target": {
+                "table": "poll_answers SQL", 
+                "column": "company_name"    
+            },
+            "operator": "In",
+            "values": [filter_company]
+        })
+
     # Si se construyeron filtros, asignarlos al diccionario resultante
     if filtros_pbi:
         result["filters"] = filtros_pbi

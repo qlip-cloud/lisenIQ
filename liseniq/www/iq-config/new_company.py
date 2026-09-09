@@ -136,6 +136,11 @@ def create_new_company(data):
                         "cc_company_name": payload.get("co_name"),
                         "cc_is_default": es_principal
                     })
+                    
+                    # Validar si custom_company está vacío y asignarlo
+                    if es_principal == 1 or not contact_doc.custom_company:
+                        contact_doc.custom_company = doc.name
+                        
                     contact_doc.save(ignore_permissions=True)
         except Exception as ce:
             frappe.log_error(f"Error al vincular compañía al Creador: {str(ce)}", "Frontend Contact Update")
@@ -175,7 +180,13 @@ def create_new_company(data):
                     new_admin.last_name = last_name
                     new_admin.email_id = admin_email
                     new_admin.user = admin_email
+                    
+                    # Asignación de la compañía personalizada
                     new_admin.custom_company = doc.name
+                    new_admin.append("links", {
+                        "link_doctype": "qp_IQ_Company",
+                        "link_name": doc.name
+                    })
                     
                     # Agregar a la tabla hija estándar de correos
                     new_admin.append("email_ids", {
@@ -210,6 +221,14 @@ def create_new_company(data):
                     # Asegurar que el usuario esté enlazado si no lo estaba
                     if not existing_admin.user:
                         existing_admin.user = admin_email
+                        
+                    # Validar e insertar Dynamic Link de Frappe si no existe
+                    link_exists = any(link.link_doctype == "qp_IQ_Company" and link.link_name == doc.name for link in existing_admin.get("links", []))
+                    if not link_exists:
+                        existing_admin.append("links", {
+                            "link_doctype": "qp_IQ_Company",
+                            "link_name": doc.name
+                        })
                     
                     # Agregar a su tabla custom_iq_companies si no la tiene
                     existe_admin = any(row.cc_company == doc.name for row in existing_admin.get("custom_iq_companies", []))

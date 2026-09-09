@@ -14,7 +14,8 @@ const ui = {
   reportModal: document.getElementById('report-choice-modal'),
   closeReportModal: document.getElementById('btn-close-report-modal'),
   btnAiqReport: document.getElementById('btn-aiq-report'),
-  btnPbiReport: document.getElementById('btn-pbi-report')
+  btnPbiReport: document.getElementById('btn-pbi-report'),
+  btnDashboard: document.getElementById('btn-dashboard')
 };
 
 const state = {
@@ -25,7 +26,8 @@ const state = {
   embedConfig: null,
   pbiSdkReady: null,
   selectedDoc: null,
-  selectedName: null
+  selectedName: null,
+  selectedCategory: null
 };
 
 // Validación de funcionalidades (features) para mostrar/ocultar elementos o activar flujos alternativos
@@ -88,7 +90,8 @@ function card(item) {
       <button type="button"
               class="btn btn-purple-main btn-sm btn-view-results"
               data-doc="${frappe.utils.escape_html(item.docname)}"
-              data-name="${frappe.utils.escape_html(item.name)}">
+              data-name="${frappe.utils.escape_html(item.name)}"
+              data-category="${frappe.utils.escape_html(item.category || '')}">
         Ver Resultados
       </button>
     </div>
@@ -147,7 +150,7 @@ function initEvents() {
   ui.grid?.addEventListener('click', e => {
     const btn = e.target.closest('.btn-view-results');
     if (!btn) return;
-    openReportModal(btn.dataset.doc, btn.dataset.name);
+    openReportModal(btn.dataset.doc, btn.dataset.name, btn.dataset.category);
   });
   
   ui.backBtn?.addEventListener('click', backToResults);
@@ -176,6 +179,11 @@ function initEvents() {
     if(ui.btnPbiReport.classList.contains('disabled')) return;
     goToPbiReport();
   });
+
+  ui.btnDashboard?.addEventListener('click', () => {
+    if(ui.btnDashboard.classList.contains('disabled')) return;
+    goToDashboard();
+  });
 }
 
 function backToResults() {
@@ -185,9 +193,10 @@ function backToResults() {
 }
 
 // Modal de selección de reporte (AIQ vs PowerBI)
-function openReportModal(doc, name) {
+function openReportModal(doc, name, category) {
   state.selectedDoc = doc;
   state.selectedName = name;
+  state.selectedCategory = category;
 
   const hasAiq = hasFeature('aiq_reports');
   const hasPbi = hasFeature('bi_reports');
@@ -219,6 +228,7 @@ function closeReportModal() {
   ui.reportModal?.classList.add('d-none');
   state.selectedDoc = null;
   state.selectedName = null;
+  state.selectedCategory = null;
 }
 
 // Navegación a Listen AIQ
@@ -248,6 +258,23 @@ async function goToPbiReport() {
   }
 }
 
+async function goToDashboard() {
+  if (!state.selectedDoc) return;
+
+  const surveyName = state.selectedDoc;
+  const surveyTitle = state.selectedName || '';
+  const category = (state.selectedCategory || '').toLowerCase();
+  const dashboardPath = category.includes('cultura') ? '/cultura-dashboard' : '/engagement-dashboard';
+
+  const params = new URLSearchParams({
+    survey: surveyName,
+    survey_name: surveyName,
+    survey_title: surveyTitle
+  });
+
+  window.open(`${dashboardPath}?${params.toString()}`, '_blank');
+  closeReportModal();
+}
 // Configuración y funciones de embebido de Power BI
 function ensurePowerBISDK() {
   if (window.powerbi && window['powerbi-client']) {

@@ -1,15 +1,13 @@
-{% if not is_edit_mode %}
 <div class="mt-4 mb-5">
     <span class="tooltip-wrapper" style="margin-left:4px;">
         <button id="btn-open-question-bank" data-tooltip-bottom="Colección de preguntas disponibles para usar en la creación de plantillas y mediciones. Puedes reutilizar preguntas existentes, filtrarlas por categoría o tema y agregarlas fácilmente a tus encuestas." class="btn btn-purple-main">Ver Biblioteca de preguntas</button>
         <span class="tooltip-icon"></span>
     </span>
 </div>
-{% endif %}
 
 <div id="questions-list" class="questions-list"></div>
 
-{% if not is_edit_mode %}
+<!-- Formulario para agregar preguntas manualmente -->
 <div class="add-question-form mt-4">
 
     <div class="row">
@@ -153,6 +151,8 @@
     </div>
 
 </div>
+
+<!-- Botón final para agregar la pregunta -->
 <div class="text-center mt-5">
     <button id="btn-add-question" class="btn btn-outline-purple">Agregar Pregunta</button>
 </div>
@@ -188,4 +188,3 @@
         </div>
     </div>
 </div>
-{% endif %}

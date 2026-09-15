@@ -205,7 +205,9 @@ class qp_IQ_HistoricMigration(Document):
                         except Exception:
                             pass
 
-            default_q_type = frappe.db.get_value('qp_IQ_QuestionType', None, 'name')
+            default_q_type = frappe.db.get_value('qp_IQ_QuestionType', {'qnt_mnemonico': 'scale_likert'}, 'name')
+            if not default_q_type:
+                default_q_type = frappe.db.get_value('qp_IQ_QuestionType', None, 'name')
 
             for cultura, dimension, atributo in unique_questions:
                 if base_template_id and atributo in existing_template_qs:

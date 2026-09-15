@@ -53,12 +53,14 @@
   {
    "fieldname": "hm_error_log",
    "fieldtype": "Small Text",
-   "label": "Registro de Actividad:"
+   "label": "Registro de Actividad:",
+   "read_only": 1
   },
   {
    "fieldname": "hm_processed_records",
    "fieldtype": "Int",
-   "label": "Registros Procesados:"
+   "label": "Registros Procesados:",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_6",
@@ -67,7 +69,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-14 12:47:14.169583",
+ "modified": "2026-09-14 12:56:05.300567",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_HistoricMigration",

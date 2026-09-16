@@ -35,7 +35,7 @@
    "fieldname": "tp_owner",
    "fieldtype": "Link",
    "label": "Owner",
-   "options": "User"
+   "options": "Contact"
   },
   {
    "fieldname": "tp_status",
@@ -91,7 +91,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-08 19:18:29.585951",
+ "modified": "2026-09-15 21:58:24.765491",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Template",

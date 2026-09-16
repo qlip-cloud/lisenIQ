@@ -5,6 +5,7 @@ import frappe
 import json
 import csv
 import traceback
+import time
 from frappe.model.document import Document
 from frappe.utils.file_manager import get_file_path
 
@@ -20,6 +21,7 @@ class qp_IQ_HistoricMigration(Document):
         
         self.db_set('hm_status', 'En Progreso')
         self.db_set('hm_error_log', '')
+        self.db_set('hm_duration', '')
         frappe.db.commit()
         
         try:
@@ -43,6 +45,7 @@ class qp_IQ_HistoricMigration(Document):
             frappe.db.commit()
 
     def process_migration(self):
+        start_time = time.time()
         try:
             if not self.hm_file:
                 raise Exception("No se adjuntó ningún archivo para procesar.")
@@ -55,7 +58,8 @@ class qp_IQ_HistoricMigration(Document):
             if file_extension in ['xlsx', 'xls']:
                 try:
                     import openpyxl
-                    wb = openpyxl.load_workbook(file_path, data_only=True)
+                    # read_only=True para procesamiento en generador sin saturación de RAM
+                    wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
                     sheet = wb.active
                     data_rows = list(sheet.iter_rows(values_only=True))
                     
@@ -163,12 +167,18 @@ class qp_IQ_HistoricMigration(Document):
                     unique_questions.add((cultura, dimension, atributo))
                     grouped_contacts[id_interno]['responses'][atributo] = respuesta
 
+            # Optimización de caché para demográficos
+            demographics_list = frappe.db.get_all('qp_IQ_DemographicType', pluck='name')
+            demographic_cache = {d: d for d in demographics_list}
+
             def get_or_create_demographic(demo_name):
                 if not demo_name: 
                     return None
                 demo_name = str(demo_name).strip()
-                if frappe.db.exists('qp_IQ_DemographicType', demo_name):
-                    return demo_name
+                
+                if demo_name in demographic_cache:
+                    return demographic_cache[demo_name]
+                
                 try:
                     doc = frappe.get_doc({
                         'doctype': 'qp_IQ_DemographicType',
@@ -184,6 +194,8 @@ class qp_IQ_HistoricMigration(Document):
                         doc.dt_company = company
                     doc.flags.ignore_mandatory = True
                     doc.insert(ignore_permissions=True, set_name=demo_name)
+                    
+                    demographic_cache[demo_name] = doc.name # Añadir al caché
                     return doc.name
                 except Exception:
                     frappe.log_error(frappe.get_traceback(), f"Error creando demográfico {demo_name} - Migración {self.name}")
@@ -209,18 +221,18 @@ class qp_IQ_HistoricMigration(Document):
             if not default_q_type:
                 default_q_type = frappe.db.get_value('qp_IQ_QuestionType', None, 'name')
 
+            # Optimización de caché para preguntas existentes de la compañía
+            company_questions = frappe.db.get_all('qp_IQ_Question', filters={'qn_owner': company}, fields=['name', 'qn_statement'])
+            question_cache = {q.qn_statement: q.name for q in company_questions if q.qn_statement}
+
             for cultura, dimension, atributo in unique_questions:
                 if base_template_id and atributo in existing_template_qs:
                     question_map[atributo] = existing_template_qs[atributo]
                     continue
                 
-                existing_q = frappe.db.exists('qp_IQ_Question', {
-                    'qn_statement': atributo,
-                    'qn_owner': company
-                })
-
-                if existing_q:
-                    question_map[atributo] = existing_q
+                # Búsqueda en el caché de memoria en lugar de llamadas a la base de datos
+                if atributo in question_cache:
+                    question_map[atributo] = question_cache[atributo]
                 else:
                     topic_id = get_or_create_demographic(cultura) if cultura else None
                     dim_id = get_or_create_demographic(dimension) if dimension else None
@@ -236,7 +248,9 @@ class qp_IQ_HistoricMigration(Document):
                     })
                     new_q.flags.ignore_mandatory = True
                     new_q.insert(ignore_permissions=True)
+                    
                     question_map[atributo] = new_q.name
+                    question_cache[atributo] = new_q.name
                     new_questions_created = True
 
             clean_survey_id = str(self.hm_survey_id or self.name).replace("ObjectId(", "").replace(")", "").strip()
@@ -360,6 +374,11 @@ class qp_IQ_HistoricMigration(Document):
                 doc.flags.ignore_mandatory = True
                 doc.insert(ignore_permissions=True)
                 processed_count += 1
+                
+                # Transacción segura cada 500 registros 
+                # Para evitar saturación de memoria y asegurar persistencia
+                if processed_count % 500 == 0:
+                    frappe.db.commit()
 
             self.db_set('hm_status', 'Completado')
             self.db_set('hm_processed_records', processed_count)
@@ -367,8 +386,6 @@ class qp_IQ_HistoricMigration(Document):
             self.db_set('hm_error_log', 'Migración completada exitosamente.')
             if new_questions_created:
                  self.db_set('hm_template', final_template_id)
-            
-            frappe.db.commit()
 
         except Exception as e:
             frappe.db.rollback()
@@ -377,4 +394,13 @@ class qp_IQ_HistoricMigration(Document):
             
             self.db_set('hm_status', 'Fallido')
             self.db_set('hm_error_log', error_trace)
+
+        finally:
+            # Registro de duración de la migración
+            end_time = time.time()
+            duration_seconds = int(end_time - start_time)
+            mins, secs = divmod(duration_seconds, 60)
+            formatted_duration = f"{mins}m {secs}s"
+            
+            self.db_set('hm_duration', formatted_duration)
             frappe.db.commit()

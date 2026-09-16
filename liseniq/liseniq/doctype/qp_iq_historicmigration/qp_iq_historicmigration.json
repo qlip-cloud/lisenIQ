@@ -11,6 +11,7 @@
   "hm_survey_id",
   "hm_status",
   "hm_processed_records",
+  "hm_duration",
   "column_break_6",
   "hm_error_log"
  ],
@@ -65,11 +66,17 @@
   {
    "fieldname": "column_break_6",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "hm_duration",
+   "fieldtype": "Data",
+   "label": "Duraci\u00f3n de la Migraci\u00f3n:",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-14 12:56:05.300567",
+ "modified": "2026-09-15 22:16:33.426387",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_HistoricMigration",

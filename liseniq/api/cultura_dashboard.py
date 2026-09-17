@@ -181,16 +181,16 @@ def get_dashboard_data(survey):
     Requiere sesión iniciada (no se marca allow_guest=True a propósito,
     confirmado con el usuario).
     """
-    survey = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_name") if survey else None
+    if not survey:
+        frappe.throw("Falta el parámetro 'survey'")
+    if not frappe.db.exists("qp_IQ_Survey", survey):
+        frappe.throw(f"Encuesta no encontrada: {survey}")
     verify_permissions_user_company(survey)
+    survey = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_name") if survey else None
     if frappe.session.user == "Guest":
         frappe.throw("Debes iniciar sesión para ver este dashboard.", frappe.PermissionError)
 
-    if not survey:
-        frappe.throw("Falta el parámetro 'survey'")
 
-    if not frappe.db.exists("Survey", survey):
-        frappe.throw(f"Encuesta no encontrada: {survey}")
 
     from frappe.desk.query_report import run
 
@@ -434,11 +434,11 @@ def verify_permissions_user_company(survey):
     if frappe.session.user == "Guest":
         frappe.throw(_("No autorizado"), frappe.PermissionError)
 
-    user_contact = frappe.get_doc("Contact", {"email_id": frappe.session.user})
+    user_contact = frappe.get_doc("Contact", {"user": frappe.session.user})
     company = user_contact.custom_company if user_contact else None
     associated_companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": user_contact.name}, pluck="cc_company") if user_contact else []
 
     companies = set(filter(None, [company] + associated_companies))
-    survey_owner = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey}, "su_owner")
+    survey_owner = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_owner")
     if survey_owner not in companies:
         frappe.throw(_("No autorizado para acceder a esta medición"), frappe.PermissionError)

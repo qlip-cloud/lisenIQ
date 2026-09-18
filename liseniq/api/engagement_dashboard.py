@@ -1642,7 +1642,7 @@ def verify_permissions_user_company(survey):
     if frappe.session.user == "Guest":
         frappe.throw(_("No autorizado"), frappe.PermissionError)
 
-    user_contact = frappe.get_doc("Contact", {"email_id": frappe.session.user})
+    user_contact = frappe.get_doc("Contact", {"user": frappe.session.user})
     company = user_contact.custom_company if user_contact else None
     associated_companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": user_contact.name}, pluck="cc_company") if user_contact else []
 

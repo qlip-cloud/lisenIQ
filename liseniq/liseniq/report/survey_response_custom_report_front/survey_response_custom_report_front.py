@@ -89,7 +89,7 @@ def execute(filters=None):
 
     survey_status = get_survey_status(survey_name)
 
-    question_map = get_question_labels(survey_json)
+    question_map = get_question_labels(survey_name)
     
     # Obtener demographics_map basado en los usuarios específicos de esta encuesta
     demographics_map = get_demographics_labels_by_status(survey_status, survey_name)
@@ -436,29 +436,26 @@ def parse_response_json(response_json):
         return {}
 
 
-def get_question_labels(survey_json):
-    if not survey_json:
-        return {}
-    
-    try:
-        data = json.loads(survey_json) if isinstance(survey_json, str) else survey_json
-    except (json.JSONDecodeError, TypeError):
-        frappe.log_error(f"Error parsing survey JSON: {survey_json}")
-        return {}
 
-    mapping = {}
-    pages = data.get("pages", []) if isinstance(data, dict) else []
-    
-    for page in pages:
-        elements = page.get("elements", []) if isinstance(page, dict) else []
-        for element in elements:
-            if isinstance(element, dict):
-                name = element.get("name")
-                title = element.get("title", name) 
-                if name:
-                    mapping[name] = title or name
+def get_question_labels(survey_name):
+    if not survey_name:
+        return {}
+    template_name = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_template")
+    template = frappe.get_doc("qp_IQ_Template", template_name)
 
-    return mapping
+    questions = frappe.get_all(
+        "qp_IQ_TemplateQuestion",
+        filters={"parent": template.name},
+        fields=["tq_question"],
+        order_by="idx asc",
+    )
+
+    question_labels = {}
+    for question in questions:
+        question_label = frappe.db.get_value("qp_IQ_Question", question.tq_question, "qn_statement")
+        question_labels[question.tq_question] = question_label
+
+    return question_labels
 
 
 def get_demographics_labels_by_status(survey_status, survey_name):

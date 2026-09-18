@@ -202,7 +202,6 @@ class qp_IQ_HistoricMigration(Document):
                     return demo_name
 
             question_map = {}
-            new_questions_created = False
             existing_template_qs = {}
 
             if base_template_id:
@@ -251,39 +250,11 @@ class qp_IQ_HistoricMigration(Document):
                     
                     question_map[atributo] = new_q.name
                     question_cache[atributo] = new_q.name
-                    new_questions_created = True
 
             clean_survey_id = str(self.hm_survey_id or self.name).replace("ObjectId(", "").replace(")", "").strip()
 
-            if new_questions_created:
-                template_name = f"Consolidado Migración - {clean_survey_id}"
-                existing_tpl = frappe.db.exists('qp_IQ_Template', {'tp_name': template_name})
-                
-                if existing_tpl:
-                    final_template_id = existing_tpl
-                else:
-                    new_tpl_data = {
-                        'doctype': 'qp_IQ_Template',
-                        'tp_name': template_name,
-                        'custom_company': company,
-                        'tp_status': 'Activa',
-                        'tp_is_private': 1
-                    }
-                    if template_category:
-                        new_tpl_data['tp_category'] = template_category
-
-                    new_tpl = frappe.get_doc(new_tpl_data)
-                    new_tpl.flags.ignore_mandatory = True
-                    for q_id in question_map.values():
-                        new_tpl.append('tp_questions', {
-                            'question': q_id,
-                            'tq_question': q_id,
-                            'qn_question': q_id
-                        })
-                    new_tpl.insert(ignore_permissions=True)
-                    final_template_id = new_tpl.name
-            else:
-                final_template_id = base_template_id
+            # Forzar el uso de la plantilla original sin generar nuevas plantillas
+            final_template_id = base_template_id
 
             status_doc_name = None
             for field in ['name', 'title', 'status_name', 'ss_name', 'ss_status', 'estado']:
@@ -299,8 +270,9 @@ class qp_IQ_HistoricMigration(Document):
                 status_doc_name = fallback_status[0].name if fallback_status else ''
 
             survey_name_label = f"Medición Migrada - {clean_survey_id}"
-            existing_survey = frappe.db.exists('qp_IQ_Survey', {'su_name': survey_name_label})
             
+            # Creación o validación en qp_IQ_Survey
+            existing_survey = frappe.db.exists('qp_IQ_Survey', {'su_name': survey_name_label})
             if existing_survey:
                 real_survey_id = existing_survey
             else:
@@ -318,6 +290,21 @@ class qp_IQ_HistoricMigration(Document):
                 new_survey.flags.ignore_mandatory = True
                 new_survey.insert(ignore_permissions=True)
                 real_survey_id = new_survey.name
+
+            # Creación en DocType Survey
+            existing_core_survey = frappe.db.exists('Survey', survey_name_label)
+            if not existing_core_survey:
+                new_core_survey = frappe.get_doc({
+                    'doctype': 'Survey',
+                    'name': survey_name_label,
+                    'title': survey_name_label,
+                    'sub_title': f'Migración Histórica generada para {company}',
+                    'custom_iq_survey': real_survey_id
+                })
+                new_core_survey.flags.ignore_mandatory = True
+                new_core_survey.insert(ignore_permissions=True)
+            else:
+                frappe.db.set_value('Survey', existing_core_survey, 'custom_iq_survey', real_survey_id)
 
             processed_count = 0
             safe_company_name = str(company).replace(" ", "_").lower() if company else "company"
@@ -384,8 +371,6 @@ class qp_IQ_HistoricMigration(Document):
             self.db_set('hm_processed_records', processed_count)
             self.db_set('hm_survey_id', real_survey_id)
             self.db_set('hm_error_log', 'Migración completada exitosamente.')
-            if new_questions_created:
-                 self.db_set('hm_template', final_template_id)
 
         except Exception as e:
             frappe.db.rollback()

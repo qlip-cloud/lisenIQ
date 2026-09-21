@@ -2018,8 +2018,8 @@ async function ensureSurveyList() {
   if (window.__UI && document.querySelector('.tab-btn[data-tab="tendencias"].active')) renderTendenciasBody();
 }
 
-async function loadCompareSurvey(name) {
-  compareSurveyName = name;
+async function loadCompareSurvey(name, displayName) {
+  compareSurveyName = displayName || name;
   compareData = null;
   compareError = null;
   if (!name) { renderTendenciasBody(); return; }
@@ -2070,7 +2070,7 @@ function renderSelector() {
       ${availableSurveys.map(s => `<option value="${escapeHtml(s.name)}" ${s === compareSurveyName ? 'selected' : ''}>${escapeHtml(s.title)}</option>`).join('')}
     </select>
   `;
-  document.getElementById('trend-compare-select').addEventListener('change', e => loadCompareSurvey(e.target.value || null));
+  document.getElementById('trend-compare-select').addEventListener('change', e => loadCompareSurvey(e.target.value || null, e.target.options[e.target.selectedIndex].text));
 }
 
 function renderTendenciasBody() {

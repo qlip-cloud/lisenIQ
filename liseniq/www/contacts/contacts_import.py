@@ -585,7 +585,7 @@ def process_contacts_background(log_name, rows, user):
 					if clean_col not in STANDARD_COLUMNS and clean_col and clean_val:
 						data["demographics"].append({"type": clean_col, "value": clean_val})
 
-				# Verificar si existe
+				# Verificar si existe localmente
 				contact_name = None
 				if numero_doc:
 					contact_name = frappe.db.get_value("Contact", {"custom_document_number": numero_doc, "custom_company": user_company}, "name")
@@ -600,6 +600,7 @@ def process_contacts_background(log_name, rows, user):
 					if check_if_modified(contact_doc, data, estatus or contact_doc.custom_status):
 						update_contact_fields(contact_doc, data, estatus or contact_doc.custom_status, demo_map, user_company)
 				else:
+					# Creación para la compañía actual, incluso si existe en otra
 					new_doc = frappe.new_doc("Contact")
 					new_doc.first_name = nombre
 					new_doc.last_name = apellido
@@ -620,7 +621,12 @@ def process_contacts_background(log_name, rows, user):
 					if correo:
 						new_doc.append("email_ids", {"email_id": correo, "is_primary": 1})
 					
-					new_doc.insert(ignore_permissions=True)
+					# Control explícito de autonaming para evitar error de integridad
+					base_name = " ".join(filter(None, [nombre, apellido]))[:120].strip()
+					unique_suffix = frappe.generate_hash(length=8)
+					new_doc.name = f"{base_name}-{unique_suffix}"
+
+					new_doc.insert(ignore_permissions=True, set_name=True)
 					
 					if data['demographics']:
 						if new_doc.meta.get_field(CHILD_TABLE_FIELD):
@@ -640,8 +646,19 @@ def process_contacts_background(log_name, rows, user):
 
 			except Exception as e:
 				error_count += 1
+				error_msg = str(e)
+				
+				# Interceptar e indicar de forma explícita error de correo duplicado
+				if correo:
+					e_lower = error_msg.lower()
+					is_unique_err = isinstance(e, frappe.exceptions.UniqueValidationError)
+					if is_unique_err and ("email" in e_lower or "correo" in e_lower):
+						error_msg = f"El correo electrónico '{correo}' ya se encuentra registrado."
+					elif ("duplicate" in e_lower or "unique" in e_lower or "duplicado" in e_lower) and ("email_id" in e_lower or "contact email" in e_lower):
+						error_msg = f"El correo electrónico '{correo}' ya se encuentra registrado."
+
 				# Agregar al log de errores JSON
-				error_entry = {"fila": i, "error": str(e)}
+				error_entry = {"fila": i, "error": error_msg}
 				error_list.append(error_entry)
 
 			# Actualizar progreso periódicamente (cada 5 registros) para no saturar DB
@@ -651,9 +668,7 @@ def process_contacts_background(log_name, rows, user):
 				log_doc.ul_processed_rows = processed_count
 				log_doc.ul_success_count = success_count
 				log_doc.ul_error_count = error_count
-				# Actualizar JSON de errores incrementalmente si es necesario, 
-				# pero por eficiencia lo guardamos completo o en chunks. 
-				# Aquí guardamos el estado actual.
+				# Actualizar JSON de errores incrementalmente
 				log_doc.ul_error_log = json.dumps(error_list)
 				log_doc.save(ignore_permissions=True)
 				frappe.db.commit()
@@ -669,7 +684,7 @@ def process_contacts_background(log_name, rows, user):
 				delete_count += 1
 				
 		except Exception as e:
-			# Loguear error de eliminación pero no detener el proceso general si ya se procesaron filas
+			# Loguear error de eliminación pero no detener el proceso general
 			error_list.append({"fila": "N/A", "error": f"Error en proceso de eliminación lógica: {str(e)}"})
 
 		# Finalización

@@ -2144,6 +2144,18 @@ function renderTendenciasBody() {
     return;
   }
 
+  // --- Tendencia por pregunta individual: top 10 mayor subida / mayor bajada ---
+  // (mismo cálculo de brecha que usa cada bloque por dimensión más abajo,
+  // pero calculado una sola vez para las 72 preguntas y ordenado de punta a punta)
+  const attrTrendRows = matchedAttrPairs.map(p => {
+    const cur = avgForAttrIds(curRespondents, [p.cur.id]);
+    const cmp = avgForAttrIds(cmpRespondents, [p.cmp.id]);
+    const gap = (cur.avg != null && cmp.avg != null) ? cur.avg - cmp.avg : null;
+    return { attr: p.cur, curAvg: cur.avg, cmpAvg: cmp.avg, gap };
+  }).filter(r => r.gap != null);
+  const top10Positive = [...attrTrendRows].sort((a, b) => b.gap - a.gap).slice(0, 10);
+  const top10Negative = [...attrTrendRows].sort((a, b) => a.gap - b.gap).slice(0, 10);
+
   body.innerHTML = `
     <div class="kpi-row">
       <div class="card kpi-card">
@@ -2163,6 +2175,25 @@ function renderTendenciasBody() {
       </div>
     </div>
     ${cmpNotApplicableFilters.length ? `<div class="finding-item warn"><span>⚠</span><span>"${escapeHtml(compareSurveyName)}" no tiene el campo ${cmpNotApplicableFilters.map(f=>'<b>'+escapeHtml(f.label)+'</b>').join(', ')} — ese filtro no se pudo aplicar del lado de la comparación (se usó el 100% de esa medición para esos campos).</span></div>` : ''}
+
+    <div class="grid-2b">
+      <div class="card">
+        <div style="position:relative">
+          ${dlBtn('table-trend-top-pos','tendencia_top10_positiva','table')}
+          <h3>Top 10 — Mayor Tendencia Positiva</h3>
+          <p class="card-sub">Las preguntas que más subieron frente a "${escapeHtml(compareSurveyName)}".</p>
+          <div id="table-trend-top-pos" class="scroll-x"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="position:relative">
+          ${dlBtn('table-trend-top-neg','tendencia_top10_negativa','table')}
+          <h3>Top 10 — Mayor Tendencia Negativa</h3>
+          <p class="card-sub">Las preguntas que más bajaron frente a "${escapeHtml(compareSurveyName)}".</p>
+          <div id="table-trend-top-neg" class="scroll-x"></div>
+        </div>
+      </div>
+    </div>
 
     <div class="card">
       <div style="position:relative">
@@ -2224,6 +2255,25 @@ function renderTendenciasBody() {
         <td><span class="pill" style="background:${heatTier(t.cmpAvg).color}">${fmt1(t.cmpAvg)}</span></td>
         <td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td></tr>`;
     }).join('')}</tbody></table>`;
+
+  // ---- Tablas: Top 10 mayor tendencia positiva / negativa por pregunta ----
+  function trendRankRowsHTML(rows) {
+    return rows.map((r, i) => `<tr>
+        <td>${i + 1}</td>
+        <td style="max-width:260px">${escapeHtml(r.attr.positivo)}</td>
+        <td style="font-size:11px;color:var(--ink-2)">${r.attr.dimension}</td>
+        <td><span class="pill" style="background:${heatTier(r.curAvg).color}">${fmt1(r.curAvg)}</span></td>
+        <td><span class="pill" style="background:${heatTier(r.cmpAvg).color}">${fmt1(r.cmpAvg)}</span></td>
+        <td style="color:${deltaColor(r.gap)}">${fmtDelta(r.gap)}</td>
+      </tr>`).join('');
+  }
+  const trendTableHead = `<thead><tr><th>#</th><th>Atributo</th><th>Dimensión</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Tendencia</th></tr></thead>`;
+  document.getElementById('table-trend-top-pos').innerHTML = top10Positive.length
+    ? `<table class="dtable">${trendTableHead}<tbody>${trendRankRowsHTML(top10Positive)}</tbody></table>`
+    : `<p class="card-sub">Sin datos suficientes.</p>`;
+  document.getElementById('table-trend-top-neg').innerHTML = top10Negative.length
+    ? `<table class="dtable">${trendTableHead}<tbody>${trendRankRowsHTML(top10Negative)}</tbody></table>`
+    : `<p class="card-sub">Sin datos suficientes.</p>`;
 
   // ---- Chart: dimensiones ----
   destroyChart('chart-trend-dim');

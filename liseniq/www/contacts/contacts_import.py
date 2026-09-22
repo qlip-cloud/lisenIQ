@@ -401,7 +401,7 @@ def check_if_modified(contact_doc, data, status):
 	return False
 
 def update_contact_fields(contact_doc, data, status, demo_map=None, user_company=None):
-	"""Actualiza los campos del documento en memoria y guarda."""
+	"""Actualiza los campos del documento en memoria y guarda con una sola transacción."""
 	contact_doc.first_name = data['firstName']
 	contact_doc.last_name = data['lastName']
 	contact_doc.custom_document_type = data['docType']
@@ -413,8 +413,6 @@ def update_contact_fields(contact_doc, data, status, demo_map=None, user_company
 	contact_doc.custom_entry_date = data['entryDate']
 	contact_doc.custom_status = status
 	
-	contact_doc.save(ignore_permissions=True)
-	
 	new_email = (data.get('email') or "").strip()
 	if new_email:
 		exists = False
@@ -425,7 +423,6 @@ def update_contact_fields(contact_doc, data, status, demo_map=None, user_company
 				break
 		if not exists:
 			contact_doc.append("email_ids", {"email_id": new_email, "is_primary": 1})
-		contact_doc.save(ignore_permissions=True)
 	
 	# Validar existencia del campo de tabla hija en metadata
 	if not contact_doc.meta.get_field(CHILD_TABLE_FIELD):
@@ -449,6 +446,7 @@ def update_contact_fields(contact_doc, data, status, demo_map=None, user_company
 			child.cad_tag = d['type']
 			child.cad_value = d['value']
 	
+	# Un solo save general unifica el commit
 	contact_doc.save(ignore_permissions=True)
 
 def create_upload_log(file_name, total_rows, user, company):
@@ -515,11 +513,15 @@ def process_contacts_background(log_name, rows, user):
 		demo_map = maps["demo_import"]
 
 		def parse_date(value):
-			if not value: return None
+			if not value or isinstance(value, bool): return None
 			try: return frappe.utils.getdate(value)
 			except:
-				try: return datetime.strptime(value, "%d/%m/%Y").date()
+				try: return datetime.strptime(str(value), "%d/%m/%Y").date()
 				except: return None
+
+		def get_str(d_row, key):
+			v = d_row.get(key)
+			return str(v).strip() if v is not None else ""
 
 		success_count = 0
 		error_count = 0
@@ -528,21 +530,22 @@ def process_contacts_background(log_name, rows, user):
 
 		for i, r in enumerate(rows, start=1):
 			try:
-				# Extracción y limpieza de datos básicos
-				tipo_doc_raw = (r.get("Tipo de Documento") or "").strip()
+				# Extracción segura forzando string
+				tipo_doc_raw = get_str(r, "Tipo de Documento")
 				tipo_doc_id = dt_map.get(tipo_doc_raw, tipo_doc_raw)
-				pais_raw = (r.get("País") or "").strip()
+				pais_raw = get_str(r, "País")
 				pais_id = country_map.get(pais_raw, pais_raw)
-				idioma_raw = (r.get("Idioma") or "").strip()
+				idioma_raw = get_str(r, "Idioma")
 				idioma_id = lang_map.get(idioma_raw, idioma_raw)
-				nivel_acad_raw = (r.get("Nivel Académico") or "").strip()
+				nivel_acad_raw = get_str(r, "Nivel Académico")
 				nivel_acad_id = academic_map.get(nivel_acad_raw, nivel_acad_raw)
 				
-				nombre = (r.get("Nombre") or "").strip()
-				apellido = (r.get("Apellido") or "").strip()
-				numero_doc = (r.get("Número de Documento (DNI)") or "").strip()
-				estatus = (r.get("Estatus") or "").strip()
-				correo = (r.get("Correo (Opcional)") or "").strip()
+				nombre = get_str(r, "Nombre")
+				apellido = get_str(r, "Apellido")
+				numero_doc = get_str(r, "Número de Documento (DNI)")
+				estatus = get_str(r, "Estatus")
+				correo = get_str(r, "Correo (Opcional)")
+				genero = get_str(r, "Género")
 
 				if numero_doc:
 					processed_dnis_in_file.add(numero_doc)
@@ -570,7 +573,7 @@ def process_contacts_background(log_name, rows, user):
 					"country": pais_id,
 					"language": idioma_id,
 					"email": correo,
-					"gender": (r.get("Género") or "").strip(),
+					"gender": genero,
 					"education": nivel_acad_id,
 					"birthdate": fecha_nac,
 					"entryDate": fecha_ing,
@@ -579,8 +582,8 @@ def process_contacts_background(log_name, rows, user):
 				
 				# Recolectar demográficos dinámicos
 				for col_name, val in r.items():
-					clean_col = col_name.strip()
-					clean_val = str(val or "").strip()
+					clean_col = str(col_name).strip() if col_name else ""
+					clean_val = str(val).strip() if val is not None else ""
 					
 					if clean_col not in STANDARD_COLUMNS and clean_col and clean_val:
 						data["demographics"].append({"type": clean_col, "value": clean_val})
@@ -621,13 +624,6 @@ def process_contacts_background(log_name, rows, user):
 					if correo:
 						new_doc.append("email_ids", {"email_id": correo, "is_primary": 1})
 					
-					# Control explícito de autonaming para evitar error de integridad
-					base_name = " ".join(filter(None, [nombre, apellido]))[:120].strip()
-					unique_suffix = frappe.generate_hash(length=8)
-					new_doc.name = f"{base_name}-{unique_suffix}"
-
-					new_doc.insert(ignore_permissions=True, set_name=True)
-					
 					if data['demographics']:
 						if new_doc.meta.get_field(CHILD_TABLE_FIELD):
 							for d in data['demographics']:
@@ -639,12 +635,23 @@ def process_contacts_background(log_name, rows, user):
 								child.cad_demographic_type = demo_id
 								child.cad_tag = d['type']
 								child.cad_value = d['value']
-							
-							new_doc.save(ignore_permissions=True)
+					
+					# Control explícito de autonaming
+					base_name = " ".join(filter(None, [nombre, apellido]))[:120].strip()
+					unique_suffix = frappe.generate_hash(length=8)
+					forced_name = f"{base_name}-{unique_suffix}"
+					
+					# set_name DEBE ser un string, enviar True forzaba la PK = 1 en DB generando colisiones.
+					new_doc.insert(ignore_permissions=True, set_name=forced_name)
 				
+				# Confirmamos la transacción (row iterado) para evitar que fallos futuros afecten a los registrados.
+				frappe.db.commit()
 				success_count += 1
 
 			except Exception as e:
+				# Deshacer cambios inconclusos de la fila fallida para proteger el resto de iteraciones
+				frappe.db.rollback() 
+				
 				error_count += 1
 				error_msg = str(e)
 				
@@ -661,14 +668,13 @@ def process_contacts_background(log_name, rows, user):
 				error_entry = {"fila": i, "error": error_msg}
 				error_list.append(error_entry)
 
-			# Actualizar progreso periódicamente (cada 5 registros) para no saturar DB
+			# Actualizar progreso periódicamente (cada 5 registros)
 			processed_count += 1
 			if processed_count % 5 == 0:
 				log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
 				log_doc.ul_processed_rows = processed_count
 				log_doc.ul_success_count = success_count
 				log_doc.ul_error_count = error_count
-				# Actualizar JSON de errores incrementalmente
 				log_doc.ul_error_log = json.dumps(error_list)
 				log_doc.save(ignore_permissions=True)
 				frappe.db.commit()
@@ -682,9 +688,9 @@ def process_contacts_background(log_name, rows, user):
 				contact_name_to_delete = existing_contacts_map[missing_dni]
 				frappe.db.set_value("Contact", contact_name_to_delete, "custom_is_deleted", 1)
 				delete_count += 1
-				
+			frappe.db.commit()
 		except Exception as e:
-			# Loguear error de eliminación pero no detener el proceso general
+			frappe.db.rollback()
 			error_list.append({"fila": "N/A", "error": f"Error en proceso de eliminación lógica: {str(e)}"})
 
 		# Finalización
@@ -703,6 +709,7 @@ def process_contacts_background(log_name, rows, user):
 			log_doc.ul_status = "Completado con errores"
 		
 		log_doc.save(ignore_permissions=True)
+		frappe.db.commit()
 
 		# Crear Notificación de Portal
 		try:
@@ -715,6 +722,7 @@ def process_contacts_background(log_name, rows, user):
 			notification.pn_type = "Info" if error_count == 0 else "Warning"
 			notification.pn_is_read = 0
 			notification.insert(ignore_permissions=True)
+			frappe.db.commit()
 		except Exception as e:
 			frappe.log_error(f"Error creando notificación de portal: {str(e)}", "Portal Notification Error")
 
@@ -722,10 +730,12 @@ def process_contacts_background(log_name, rows, user):
 		frappe.log_error(frappe.get_traceback(), "FATAL ERROR: process_contacts_background")
 		# Intentar marcar como fallido el log si algo catastrófico ocurre
 		try:
+			frappe.db.rollback()
 			log_doc = frappe.get_doc("qp_IQ_UploadLog", log_name)
 			log_doc.ul_status = "Fallido"
 			log_doc.ul_error_log = json.dumps([{"fila": 0, "error": f"Error fatal de sistema: {str(e)}"}])
 			log_doc.save(ignore_permissions=True)
+			frappe.db.commit()
 		except:
 			pass
 

@@ -168,32 +168,39 @@ class qp_IQ_HistoricMigration(Document):
                     grouped_contacts[id_interno]['responses'][atributo] = respuesta
 
             # Optimización de caché para demográficos
-            demographics_list = frappe.db.get_all('qp_IQ_DemographicType', pluck='name')
-            demographic_cache = {d: d for d in demographics_list}
+            demographics_list = frappe.db.get_all('qp_IQ_DemographicType', fields=['name', 'dt_title'])
+            demographic_cache = {d.dt_title: d.name for d in demographics_list if d.dt_title}
+
+            # Evitar fallos si dt_title está vacío
+            for d in demographics_list:
+                if d.name not in demographic_cache:
+                    demographic_cache[d.name] = d.name
 
             def get_or_create_demographic(demo_name):
                 if not demo_name: 
                     return None
                 demo_name = str(demo_name).strip()
                 
+                # Buscar en caché por dt_title
                 if demo_name in demographic_cache:
                     return demographic_cache[demo_name]
                 
+                # Buscar en base de datos si fue creado sin caché activo
+                existing = frappe.db.exists('qp_IQ_DemographicType', {'dt_title': demo_name})
+                if existing:
+                    demographic_cache[demo_name] = existing
+                    return existing
+
                 try:
                     doc = frappe.get_doc({
                         'doctype': 'qp_IQ_DemographicType',
+                        'dt_title': demo_name,
                         'dt_object_type': 'Contacto',
-                        'name': demo_name,
-                        'dt_name': demo_name,
-                        'title': demo_name
+                        'dt_creator_company': company
                     })
-                    meta = frappe.get_meta('qp_IQ_DemographicType')
-                    if meta.has_field('custom_company'):
-                        doc.custom_company = company
-                    elif meta.has_field('dt_company'):
-                        doc.dt_company = company
+                    
                     doc.flags.ignore_mandatory = True
-                    doc.insert(ignore_permissions=True, set_name=demo_name)
+                    doc.insert(ignore_permissions=True)
                     
                     demographic_cache[demo_name] = doc.name # Añadir al caché
                     return doc.name
@@ -257,7 +264,8 @@ class qp_IQ_HistoricMigration(Document):
             final_template_id = base_template_id
 
             status_doc_name = None
-            for field in ['name', 'title', 'status_name', 'ss_name', 'ss_status', 'estado']:
+            # Consultar por el estado 'Finalizada' en qp_IQ_SurveyStatus
+            for field in ['se_status', 'name']:
                 try:
                     status_doc_name = frappe.db.get_value('qp_IQ_SurveyStatus', {field: ['like', '%Finalizada%']}, 'name')
                     if status_doc_name:
@@ -267,44 +275,50 @@ class qp_IQ_HistoricMigration(Document):
             
             if not status_doc_name:
                 fallback_status = frappe.db.get_list('qp_IQ_SurveyStatus', limit_page_length=1)
-                status_doc_name = fallback_status[0].name if fallback_status else ''
+                status_doc_name = fallback_status[0].name if fallback_status else 'Finalizada'
 
             survey_name_label = f"Medición Migrada - {clean_survey_id}"
             
-            # Creación o validación en qp_IQ_Survey
-            existing_survey = frappe.db.exists('qp_IQ_Survey', {'su_name': survey_name_label})
-            if existing_survey:
-                real_survey_id = existing_survey
-            else:
-                new_survey = frappe.get_doc({
-                    'doctype': 'qp_IQ_Survey',
-                    'su_name': survey_name_label,
-                    'su_owner': company,
-                    'su_template': final_template_id,
-                    'su_status': status_doc_name,
-                    'su_type': 'Migración Histórica',
-                    'su_start_date': frappe.utils.now_datetime(),
-                    'su_end_date': frappe.utils.now_datetime(),
-                    'su_in_history': 1
-                })
-                new_survey.flags.ignore_mandatory = True
-                new_survey.insert(ignore_permissions=True)
-                real_survey_id = new_survey.name
+            # Creación en qp_IQ_Survey
+            new_survey = frappe.get_doc({
+                'doctype': 'qp_IQ_Survey',
+                'su_name': survey_name_label,
+                'su_owner': company,
+                'su_template': final_template_id,
+                'su_status': status_doc_name,
+                'su_type': 'Migración Histórica',
+                'su_start_date': frappe.utils.now_datetime(),
+                'su_end_date': frappe.utils.now_datetime(),
+                'su_in_history': 1
+            })
+            new_survey.flags.ignore_mandatory = True
+            new_survey.insert(ignore_permissions=True)
+            
+            # Garantizar que no quede en Draft si el documento admite envios/submissions
+            try:
+                if new_survey.meta.is_submittable:
+                    new_survey.submit()
+            except Exception:
+                pass
+                
+            real_survey_id = new_survey.name
 
-            # Creación en DocType Survey
-            existing_core_survey = frappe.db.exists('Survey', survey_name_label)
-            if not existing_core_survey:
-                new_core_survey = frappe.get_doc({
-                    'doctype': 'Survey',
-                    'name': survey_name_label,
-                    'title': survey_name_label,
-                    'sub_title': f'Migración Histórica generada para {company}',
-                    'custom_iq_survey': real_survey_id
-                })
-                new_core_survey.flags.ignore_mandatory = True
-                new_core_survey.insert(ignore_permissions=True)
-            else:
-                frappe.db.set_value('Survey', existing_core_survey, 'custom_iq_survey', real_survey_id)
+            # Creación directa en DocType Survey
+            new_core_survey = frappe.get_doc({
+                'doctype': 'Survey',
+                'name': survey_name_label,
+                'title': survey_name_label,
+                'sub_title': f'Migración Histórica generada para {company}',
+                'custom_iq_survey': real_survey_id
+            })
+            new_core_survey.flags.ignore_mandatory = True
+            new_core_survey.insert(ignore_permissions=True)
+            
+            try:
+                if new_core_survey.meta.is_submittable:
+                    new_core_survey.submit()
+            except Exception:
+                pass
 
             processed_count = 0
             safe_company_name = str(company).replace(" ", "_").lower() if company else "company"
@@ -337,6 +351,7 @@ class qp_IQ_HistoricMigration(Document):
 
                         mapped_responses[q_id] = clean_resp
 
+                # Creación de registro en qp_IQ_SurveyHistoricData
                 doc = frappe.get_doc({
                     "doctype": "qp_IQ_SurveyHistoricData",
                     "shd_survey_id": real_survey_id,
@@ -351,7 +366,9 @@ class qp_IQ_HistoricMigration(Document):
                 })
                 
                 for d_tag, d_val in data['demographics'].items():
+                    # Crear o recuperar demográfico y obtener su ID
                     d_type_id = get_or_create_demographic(d_tag)
+
                     doc.append("shd_demographics", {
                         "cdh_demographic_type": d_type_id,
                         "cdh_tag": d_tag,

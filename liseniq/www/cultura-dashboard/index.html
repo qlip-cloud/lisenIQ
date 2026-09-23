@@ -260,6 +260,8 @@ function adaptApiPayload(api) {
     catalogs[f.key] = [...vals].sort();
   });
 
+  const demoLabels = {};
+  demoFieldsMeta.forEach(f => { demoLabels[f.key] = f.label; });
   const tipoColors = api.tipo_colors || {};
   const META = {
     organizacion: api.meta.survey || 'Medición',
@@ -284,7 +286,7 @@ function adaptApiPayload(api) {
     variable_values_seen: api.meta.variable_values_seen || [],
   };
 
-  return { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels };
+  return { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels, demoLabels };
 }
 
 window.__ERPNEXT_APP_MAIN__ = async function () {
@@ -1988,22 +1990,45 @@ function attrKey(a) { return a.tipo + '|' + a.dimension + '|' + a.positivo; }
 function activeFilterFields() {
   return FILTER_FIELDS.filter(f => activeFilters[f.key].size < (DATA.catalogs[f.key] || []).length);
 }
+const norm = s => String(s ?? '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .trim().toLowerCase();
+
+function compareKeyFor(f) {
+  const cats = compareData.catalogs || {};
+  const labels = compareData.demoLabels || {};
+  const target = norm(f.label ?? DATA.demoLabels?.[f.key]);
+  if (target) {
+    const byLabel = Object.keys(cats).find(k => norm(labels[k]) === target);
+    if (byLabel) return byLabel;
+  }
+  return (f.key in cats) ? f.key : null;
+}
 function compareFilterSplit() {
   if (!compareData) return { applicable: [], notApplicable: [] };
-  const cmpFieldKeys = new Set(Object.keys(compareData.catalogs || {}));
-  const active = activeFilterFields();
-  return {
-    applicable: active.filter(f => cmpFieldKeys.has(f.key)),
-    notApplicable: active.filter(f => !cmpFieldKeys.has(f.key)),
-  };
+  const applicable = [], notApplicable = [];
+  for (const f of activeFilterFields()) {
+    const cmpKey = compareKeyFor(f);
+    if (cmpKey) applicable.push({ ...f, cmpKey });
+    else notApplicable.push(f);
+  }
+  return { applicable, notApplicable };
 }
+
 function filteredCompareRespondents() {
   if (!compareData) return [];
   const { applicable } = compareFilterSplit();
   if (!applicable.length) return compareData.respondents;
-  return compareData.respondents.filter(r => applicable.every(f => activeFilters[f.key].has(r[f.key])));
-}
 
+  // set normalizado por filtro, calculado una vez
+  const allowed = new Map(applicable.map(f => [
+    f.key, new Set([...activeFilters[f.key]].map(norm))
+  ]));
+
+  return compareData.respondents.filter(r =>
+    applicable.every(f => allowed.get(f.key).has(norm(r[f.cmpKey])))
+  );
+}
 async function ensureSurveyList() {
   if (availableSurveys !== null || surveysError) return;
   try {

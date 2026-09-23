@@ -7,10 +7,12 @@ from frappe.utils.data import get_datetime, add_to_date
 from datetime import datetime, timezone
 import pytz
 
+from .constants import get_legal_modals_html
+
 def generate_default_welcome_markdown(payload: dict) -> str:
     """
     Genera el mensaje de bienvenida por defecto en formato Markdown estructurado.
-    Reemplaza las variables dinámicas de forma segura.
+    Reemplaza las variables dinámicas de forma segura y ahora utiliza enlaces HTML con eventos onClick para abrir modales.
     """
     nombre_medicion = payload.get("nombre_medicion", "")
     numero_preguntas = payload.get("numero_preguntas", 0)
@@ -22,6 +24,7 @@ def generate_default_welcome_markdown(payload: dict) -> str:
         except (ValueError, TypeError):
             numero_preguntas = 0
 
+    # Usamos etiquetas HTML locales <a> apuntando a la función JS openIqModal
     markdown_template = f"""Gracias por dedicar unos minutos para responder esta medición. 
     
 Tu opinión es muy importante y nos ayudará a comprender mejor la experiencia de las personas, identificar oportunidades de mejora y tomar decisiones basadas en información confiable.
@@ -33,7 +36,7 @@ Antes de comenzar, ten en cuenta lo siguiente:
 - La información será utilizada únicamente para los fines definidos por la organización.
 - Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.
 
-[ ] He leído y acepto el [Aviso de Privacidad](https://qlip.cloud/aviso-de-privacidad/?utm_source=listenaiq&utm_medium=referral&utm_campaign=aviso_privacidad) y la [Política de Tratamiento de Datos](https://qlip.cloud/privacy-policy/?utm_source=listenaiq&utm_medium=referral&utm_campaign=politica_privacidad) para participar en esta medición.
+[ ] He leído y acepto el <a href="#" onclick="openIqModal(event, 'iqPrivacyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Aviso de Privacidad</a> y la <a href="#" onclick="openIqModal(event, 'iqPolicyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Política de Tratamiento de Datos</a> para participar en esta medición.
 
 Cuando estés listo, haz clic en "Comenzar" para iniciar la medición."""
 
@@ -189,7 +192,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     
     # Determinar los valores de bienvenida
     welcome_subject = survey_doc.get("su_term_subject")
-    welcome_message = survey_doc.get("su_term_body")
+    welcome_message = survey_doc.get("su_term_body") or ""
 
     if survey_doc.get("su_default_welcome"):
         numero_preguntas = frappe.db.count("qp_IQ_SurveyQuestion", {"parent": survey_name_id}) if survey_name_id else 0
@@ -202,7 +205,12 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
         raw_markdown = generate_default_welcome_markdown(payload)
         welcome_message = md_to_html(raw_markdown)
 
-    # Respuesta exitosa base incluyendo campos de bienvenida personalizados
+    # Añadir siempre la lógica y HTML de los modales para que estén disponibles
+    # incluso si usan una plantilla personalizada que invoque los onClick
+    if welcome_message:
+        welcome_message += get_legal_modals_html()
+
+    # Respuesta exitosa base incluyendo campos de bienvenida personalizados y los modales integrados
     success_response = {
         "allow": True, 
         "welcome_subject": welcome_subject, 
@@ -533,8 +541,6 @@ def generate_public_link_for_survey_hook(doc, method):
             frappe.flags.ignore_permissions = original_ignore_permissions
     else:
         pass
-
-
 
 def generate_public_link_for_survey(doc, method):
     modified = False

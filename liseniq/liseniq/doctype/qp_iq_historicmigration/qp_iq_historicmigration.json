@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "creation": "2026-09-14 11:17:44.232494",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "hm_file",
+  "hm_creator",
+  "hm_template",
+  "hm_survey_id",
+  "hm_status",
+  "hm_processed_records",
+  "hm_duration",
+  "column_break_6",
+  "hm_error_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "hm_creator",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Creado por:",
+   "options": "Contact",
+   "reqd": 1
+  },
+  {
+   "fieldname": "hm_file",
+   "fieldtype": "Attach",
+   "in_list_view": 1,
+   "label": "Documento / Archivo:",
+   "reqd": 1
+  },
+  {
+   "fieldname": "hm_template",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Plantilla de Preguntas:",
+   "options": "qp_IQ_Template",
+   "reqd": 1
+  },
+  {
+   "fieldname": "hm_survey_id",
+   "fieldtype": "Data",
+   "label": "Id de Medici\u00f3n:",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hm_status",
+   "fieldtype": "Select",
+   "label": "Estado del Proceso:",
+   "options": "Pendiente\nEn Progreso\nCompletado\nFallido"
+  },
+  {
+   "fieldname": "hm_error_log",
+   "fieldtype": "Small Text",
+   "label": "Registro de Actividad:",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hm_processed_records",
+   "fieldtype": "Int",
+   "label": "Registros Procesados:",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_6",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "hm_duration",
+   "fieldtype": "Data",
+   "label": "Duraci\u00f3n de la Migraci\u00f3n:",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-15 22:16:33.426387",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_HistoricMigration",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

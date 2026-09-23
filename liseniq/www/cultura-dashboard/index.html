@@ -260,6 +260,8 @@ function adaptApiPayload(api) {
     catalogs[f.key] = [...vals].sort();
   });
 
+  const demoLabels = {};
+  demoFieldsMeta.forEach(f => { demoLabels[f.key] = f.label; });
   const tipoColors = api.tipo_colors || {};
   const META = {
     organizacion: api.meta.survey || 'Medición',
@@ -284,7 +286,7 @@ function adaptApiPayload(api) {
     variable_values_seen: api.meta.variable_values_seen || [],
   };
 
-  return { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels };
+  return { meta: META, catalogs, atributos, respondents, roster, wordclouds_raw: api.wordclouds || {}, open_text_labels: openTextLabels, demoLabels };
 }
 
 window.__ERPNEXT_APP_MAIN__ = async function () {
@@ -1988,22 +1990,45 @@ function attrKey(a) { return a.tipo + '|' + a.dimension + '|' + a.positivo; }
 function activeFilterFields() {
   return FILTER_FIELDS.filter(f => activeFilters[f.key].size < (DATA.catalogs[f.key] || []).length);
 }
+const norm = s => String(s ?? '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .trim().toLowerCase();
+
+function compareKeyFor(f) {
+  const cats = compareData.catalogs || {};
+  const labels = compareData.demoLabels || {};
+  const target = norm(f.label ?? DATA.demoLabels?.[f.key]);
+  if (target) {
+    const byLabel = Object.keys(cats).find(k => norm(labels[k]) === target);
+    if (byLabel) return byLabel;
+  }
+  return (f.key in cats) ? f.key : null;
+}
 function compareFilterSplit() {
   if (!compareData) return { applicable: [], notApplicable: [] };
-  const cmpFieldKeys = new Set(Object.keys(compareData.catalogs || {}));
-  const active = activeFilterFields();
-  return {
-    applicable: active.filter(f => cmpFieldKeys.has(f.key)),
-    notApplicable: active.filter(f => !cmpFieldKeys.has(f.key)),
-  };
+  const applicable = [], notApplicable = [];
+  for (const f of activeFilterFields()) {
+    const cmpKey = compareKeyFor(f);
+    if (cmpKey) applicable.push({ ...f, cmpKey });
+    else notApplicable.push(f);
+  }
+  return { applicable, notApplicable };
 }
+
 function filteredCompareRespondents() {
   if (!compareData) return [];
   const { applicable } = compareFilterSplit();
   if (!applicable.length) return compareData.respondents;
-  return compareData.respondents.filter(r => applicable.every(f => activeFilters[f.key].has(r[f.key])));
-}
 
+  // set normalizado por filtro, calculado una vez
+  const allowed = new Map(applicable.map(f => [
+    f.key, new Set([...activeFilters[f.key]].map(norm))
+  ]));
+
+  return compareData.respondents.filter(r =>
+    applicable.every(f => allowed.get(f.key).has(norm(r[f.cmpKey])))
+  );
+}
 async function ensureSurveyList() {
   if (availableSurveys !== null || surveysError) return;
   try {
@@ -2018,8 +2043,8 @@ async function ensureSurveyList() {
   if (window.__UI && document.querySelector('.tab-btn[data-tab="tendencias"].active')) renderTendenciasBody();
 }
 
-async function loadCompareSurvey(name) {
-  compareSurveyName = name;
+async function loadCompareSurvey(name, displayName) {
+  compareSurveyName = displayName || name;
   compareData = null;
   compareError = null;
   if (!name) { renderTendenciasBody(); return; }
@@ -2067,10 +2092,16 @@ function renderSelector() {
     <label style="font-size:12px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:8px">Comparar esta medición con:</label>
     <select class="small" id="trend-compare-select" style="min-width:260px">
       <option value="">— Selecciona una medición —</option>
-      ${availableSurveys.map(s => `<option value="${escapeHtml(s.name)}" ${s === compareSurveyName ? 'selected' : ''}>${escapeHtml(s.title)}</option>`).join('')}
+      ${availableSurveys.map(s => `<option value="${escapeHtml(s.name)}" data-display-name="${escapeHtml(s.title)}" ${s.title === compareSurveyName ? 'selected' : ''}>${escapeHtml(s.title)}</option>`).join('')}
     </select>
   `;
-  document.getElementById('trend-compare-select').addEventListener('change', e => loadCompareSurvey(e.target.value || null));
+  document.getElementById('trend-compare-select').addEventListener('change', e => {
+    const option = e.target.selectedOptions[0];
+    const surveyName = e.target.value || null;
+    const displayName = option?.dataset.displayName || null;
+
+    loadCompareSurvey(surveyName, displayName);
+  });
 }
 
 function renderTendenciasBody() {
@@ -2138,6 +2169,18 @@ function renderTendenciasBody() {
     return;
   }
 
+  // --- Tendencia por pregunta individual: top 10 mayor subida / mayor bajada ---
+  // (mismo cálculo de brecha que usa cada bloque por dimensión más abajo,
+  // pero calculado una sola vez para las 72 preguntas y ordenado de punta a punta)
+  const attrTrendRows = matchedAttrPairs.map(p => {
+    const cur = avgForAttrIds(curRespondents, [p.cur.id]);
+    const cmp = avgForAttrIds(cmpRespondents, [p.cmp.id]);
+    const gap = (cur.avg != null && cmp.avg != null) ? cur.avg - cmp.avg : null;
+    return { attr: p.cur, curAvg: cur.avg, cmpAvg: cmp.avg, gap };
+  }).filter(r => r.gap != null);
+  const top10Positive = [...attrTrendRows].sort((a, b) => b.gap - a.gap).slice(0, 10);
+  const top10Negative = [...attrTrendRows].sort((a, b) => a.gap - b.gap).slice(0, 10);
+
   body.innerHTML = `
     <div class="kpi-row">
       <div class="card kpi-card">
@@ -2157,6 +2200,25 @@ function renderTendenciasBody() {
       </div>
     </div>
     ${cmpNotApplicableFilters.length ? `<div class="finding-item warn"><span>⚠</span><span>"${escapeHtml(compareSurveyName)}" no tiene el campo ${cmpNotApplicableFilters.map(f=>'<b>'+escapeHtml(f.label)+'</b>').join(', ')} — ese filtro no se pudo aplicar del lado de la comparación (se usó el 100% de esa medición para esos campos).</span></div>` : ''}
+
+    <div class="grid-2b">
+      <div class="card">
+        <div style="position:relative">
+          ${dlBtn('table-trend-top-pos','tendencia_top10_positiva','table')}
+          <h3>Top 10 — Mayor Tendencia Positiva</h3>
+          <p class="card-sub">Las preguntas que más subieron frente a "${escapeHtml(compareSurveyName)}".</p>
+          <div id="table-trend-top-pos" class="scroll-x"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="position:relative">
+          ${dlBtn('table-trend-top-neg','tendencia_top10_negativa','table')}
+          <h3>Top 10 — Mayor Tendencia Negativa</h3>
+          <p class="card-sub">Las preguntas que más bajaron frente a "${escapeHtml(compareSurveyName)}".</p>
+          <div id="table-trend-top-neg" class="scroll-x"></div>
+        </div>
+      </div>
+    </div>
 
     <div class="card">
       <div style="position:relative">
@@ -2218,6 +2280,25 @@ function renderTendenciasBody() {
         <td><span class="pill" style="background:${heatTier(t.cmpAvg).color}">${fmt1(t.cmpAvg)}</span></td>
         <td style="color:${deltaColor(gap)}">${fmtDelta(gap)}</td></tr>`;
     }).join('')}</tbody></table>`;
+
+  // ---- Tablas: Top 10 mayor tendencia positiva / negativa por pregunta ----
+  function trendRankRowsHTML(rows) {
+    return rows.map((r, i) => `<tr>
+        <td>${i + 1}</td>
+        <td style="max-width:260px">${escapeHtml(r.attr.positivo)}</td>
+        <td style="font-size:11px;color:var(--ink-2)">${r.attr.dimension}</td>
+        <td><span class="pill" style="background:${heatTier(r.curAvg).color}">${fmt1(r.curAvg)}</span></td>
+        <td><span class="pill" style="background:${heatTier(r.cmpAvg).color}">${fmt1(r.cmpAvg)}</span></td>
+        <td style="color:${deltaColor(r.gap)}">${fmtDelta(r.gap)}</td>
+      </tr>`).join('');
+  }
+  const trendTableHead = `<thead><tr><th>#</th><th>Atributo</th><th>Dimensión</th><th>Esta medición</th><th>${escapeHtml(compareSurveyName)}</th><th>Tendencia</th></tr></thead>`;
+  document.getElementById('table-trend-top-pos').innerHTML = top10Positive.length
+    ? `<table class="dtable">${trendTableHead}<tbody>${trendRankRowsHTML(top10Positive)}</tbody></table>`
+    : `<p class="card-sub">Sin datos suficientes.</p>`;
+  document.getElementById('table-trend-top-neg').innerHTML = top10Negative.length
+    ? `<table class="dtable">${trendTableHead}<tbody>${trendRankRowsHTML(top10Negative)}</tbody></table>`
+    : `<p class="card-sub">Sin datos suficientes.</p>`;
 
   // ---- Chart: dimensiones ----
   destroyChart('chart-trend-dim');

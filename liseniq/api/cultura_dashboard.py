@@ -91,34 +91,129 @@ def _get_universe(survey, demo_fields):
     que usan los 'records' de respuestas reales, así que la participación
     por segmento demográfico se puede calcular por conteo directo
     (sin necesidad de heurísticas de cruce/matching).
+ 
+    FALLBACK: en algunas mediciones no se registra nada en
+    qp_IQ_SurveyRecipient (el roster viene vacío). En ese caso, la lista de
+    personas se reconstruye a partir de quien REALMENTE respondió —
+    qp_IQ_SurveyHistoricData si la medición está en histórico, o
+    `Survey Response` si está en vivo — para no perder esos datos aunque no
+    haya roster explícito. Ojo: en ese escenario la participación calculada
+    después será ~100% (solo sabemos quién respondió, no quién fue
+    convocado), porque no hay forma de reconstruir a los no-respondientes
+    sin un roster real.
+ 
+    Los demográficos se buscan según el ESTADO de la medición, igual que
+    hace el Report "Survey Response Custom Report Front"
+    (ver get_survey_data / get_demographics_labels_by_status en ese archivo):
+ 
+      - Medición EN VIVO (su_in_history != 1): demográficos desde
+        qp_IQ_ContactAdditionalDetail (tabla "actual" del Contact).
+      - Medición HISTÓRICA/finalizada (su_in_history == 1): demográficos
+        desde qp_IQ_ContactDetailHistoric, que es el SNAPSHOT tomado al
+        momento en que se respondió esa medición (no el dato actual del
+        Contact, que pudo haber cambiado desde entonces) — igual que hace
+        el reporte para las respuestas.
+ 
+      OJO: la tabla histórica solo tiene una fila por RESPUESTA
+      (qp_IQ_SurveyHistoricData), así que solo cubre a quienes sí
+      respondieron. Para alguien del roster (real, no del fallback) que NO
+      respondió una medición ya histórica, no existe snapshot — se usa el
+      dato actual del Contact como mejor esfuerzo (bloque marcado abajo).
+      Si prefieres dejarlos en "Sin dato" en ese caso en vez de mezclar
+      fuentes, borra ese bloque.
     """
-    sr_survey = frappe.db.get_value("qp_IQ_Survey", filters={"su_name": survey}, fieldname="name")
+    survey_info = frappe.db.get_value(
+        "qp_IQ_Survey", {"su_name": survey}, ["name", "su_in_history"], as_dict=True
+    )
+    sr_survey = survey_info.name if survey_info else None
+    is_historical = bool(survey_info and survey_info.su_in_history == 1)
+ 
     contacts = frappe.get_all(
         "qp_IQ_SurveyRecipient", filters={"sr_survey": sr_survey}, pluck="sr_contact"
     )
     contacts = [c for c in contacts if c]
+ 
+    if not contacts and sr_survey:
+        # Fallback: no hay roster explícito, recupera a quien sí respondió.
+        if is_historical:
+            fallback_rows = frappe.db.sql(
+                """
+                SELECT DISTINCT shd_contact_name AS contact
+                FROM `tabqp_IQ_SurveyHistoricData`
+                WHERE shd_survey_id = %s AND shd_contact_name IS NOT NULL
+                """,
+                sr_survey,
+                as_dict=True,
+            )
+        else:
+            fallback_rows = frappe.db.sql(
+                """
+                SELECT DISTINCT user AS contact
+                FROM `tabSurvey Response`
+                WHERE survey = %s AND user IS NOT NULL
+                """,
+                survey,
+                as_dict=True,
+            )
+        contacts = [r.contact for r in fallback_rows if r.contact]
+ 
     if not contacts:
         return []
-
+ 
     gender_map = {}
     for row in frappe.get_all("Contact", filters={"name": ["in", contacts]}, fields=["name", "gender"]):
         gender_map[row.name] = row.gender
-
+ 
     demo_data = {}
     if demo_fields:
         placeholders = ", ".join(["%s"] * len(contacts))
-        rows = frappe.db.sql(
-            f"""
-            SELECT cad.parent as contact, cad.cad_demographic_type as demo_id, cad.cad_value as value
-            FROM `tabqp_IQ_ContactAdditionalDetail` cad
-            WHERE cad.parent IN ({placeholders})
-            """,
-            contacts,
-            as_dict=True,
-        )
-        for r in rows:
-            demo_data.setdefault(r.contact, {})[r.demo_id] = r.value
-
+ 
+        if is_historical:
+            # Snapshot histórico: join vía qp_IQ_SurveyHistoricData, que solo
+            # tiene fila para quienes ya respondieron esta medición.
+            rows = frappe.db.sql(
+                f"""
+                SELECT shd.shd_contact_name as contact, cdh.cdh_demographic_type as demo_id, cdh.cdh_value as value
+                FROM `tabqp_IQ_ContactDetailHistoric` cdh
+                INNER JOIN `tabqp_IQ_SurveyHistoricData` shd ON shd.name = cdh.parent
+                WHERE shd.shd_survey_id = %s AND shd.shd_contact_name IN ({placeholders})
+                """,
+                [sr_survey] + contacts,
+                as_dict=True,
+            )
+            for r in rows:
+                demo_data.setdefault(r.contact, {})[r.demo_id] = r.value
+ 
+            # Fallback para roster sin snapshot histórico (no respondieron):
+            # usa el dato actual del Contact. Quita este bloque si prefieres
+            # "Sin dato" para ellos en vez de mezclar fuentes.
+            missing = [c for c in contacts if c not in demo_data]
+            if missing:
+                placeholders_missing = ", ".join(["%s"] * len(missing))
+                rows_fallback = frappe.db.sql(
+                    f"""
+                    SELECT cad.parent as contact, cad.cad_demographic_type as demo_id, cad.cad_value as value
+                    FROM `tabqp_IQ_ContactAdditionalDetail` cad
+                    WHERE cad.parent IN ({placeholders_missing})
+                    """,
+                    missing,
+                    as_dict=True,
+                )
+                for r in rows_fallback:
+                    demo_data.setdefault(r.contact, {})[r.demo_id] = r.value
+        else:
+            rows = frappe.db.sql(
+                f"""
+                SELECT cad.parent as contact, cad.cad_demographic_type as demo_id, cad.cad_value as value
+                FROM `tabqp_IQ_ContactAdditionalDetail` cad
+                WHERE cad.parent IN ({placeholders})
+                """,
+                contacts,
+                as_dict=True,
+            )
+            for r in rows:
+                demo_data.setdefault(r.contact, {})[r.demo_id] = r.value
+ 
     universe = []
     for c in contacts:
         row = [gender_map.get(c) or "Sin dato"]
@@ -181,16 +276,16 @@ def get_dashboard_data(survey):
     Requiere sesión iniciada (no se marca allow_guest=True a propósito,
     confirmado con el usuario).
     """
-    survey = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_name") if survey else None
+    if not survey:
+        frappe.throw("Falta el parámetro 'survey'")
+    if not frappe.db.exists("qp_IQ_Survey", survey):
+        frappe.throw(f"Encuesta no encontrada: {survey}")
     verify_permissions_user_company(survey)
+    survey = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_name") if survey else None
     if frappe.session.user == "Guest":
         frappe.throw("Debes iniciar sesión para ver este dashboard.", frappe.PermissionError)
 
-    if not survey:
-        frappe.throw("Falta el parámetro 'survey'")
 
-    if not frappe.db.exists("Survey", survey):
-        frappe.throw(f"Encuesta no encontrada: {survey}")
 
     from frappe.desk.query_report import run
 
@@ -434,11 +529,11 @@ def verify_permissions_user_company(survey):
     if frappe.session.user == "Guest":
         frappe.throw(_("No autorizado"), frappe.PermissionError)
 
-    user_contact = frappe.get_doc("Contact", {"email_id": frappe.session.user})
+    user_contact = frappe.get_doc("Contact", {"user": frappe.session.user})
     company = user_contact.custom_company if user_contact else None
     associated_companies = frappe.get_all("qp_IQ_ContactCompany", filters={"parent": user_contact.name}, pluck="cc_company") if user_contact else []
 
     companies = set(filter(None, [company] + associated_companies))
-    survey_owner = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey}, "su_owner")
+    survey_owner = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_owner")
     if survey_owner not in companies:
         frappe.throw(_("No autorizado para acceder a esta medición"), frappe.PermissionError)

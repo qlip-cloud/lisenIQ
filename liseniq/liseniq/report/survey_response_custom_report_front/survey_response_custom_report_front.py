@@ -78,25 +78,27 @@ TEMAS_INDICE_DE_ENGAGEMENT = {
 def execute(filters=None):
     filters = filters or {}
     survey_name = filters.get('survey')
-    
 
     if not frappe.db.exists("Survey", survey_name):
         frappe.throw(_("Encuesta no encontrada: {0}").format(survey_name))
 
     survey_doc = frappe.get_doc("Survey", survey_name)
     survey_json = getattr(survey_doc, "survey_json", "{}") or "{}"
-    
 
     survey_status = get_survey_status(survey_name)
+    is_anonymous = bool(survey_status.get('is_anonymous'))
 
     question_map = get_question_labels(survey_name)
-    
-    # Obtener demographics_map basado en los usuarios específicos de esta encuesta
-    demographics_map = get_demographics_labels_by_status(survey_status, survey_name)
 
-    columns = build_columns(demographics_map)
-    
-    # Verificar si la encuesta está finalizada
+    # En encuestas anónimas no hay contacto asociado, así que no hay demográficos
+    if is_anonymous:
+        demographics_map = {}
+    else:
+        # Obtener demographics_map basado en los usuarios específicos de esta encuesta
+        demographics_map = get_demographics_labels_by_status(survey_status, survey_name)
+
+    columns = build_columns(demographics_map, is_anonymous)
+
     data = get_survey_data(survey_name, question_map, demographics_map, survey_status)
 
     return columns, data
@@ -104,8 +106,18 @@ def execute(filters=None):
 
 def get_survey_status(survey_name):
     """
-    Obtiene el estado de la encuesta desde qp_IQ_Survey, incluyendo compañía y plantilla
+    Obtiene el estado de la encuesta desde qp_IQ_Survey, incluyendo compañía, plantilla
+    y si la encuesta es anónima (su_is_anonymous)
     """
+    default = {
+        'survey_id': '',
+        'in_history': '',
+        'company_id': '',
+        'company_name': '',
+        'template_id': '',
+        'template_name': '',
+        'is_anonymous': 0,
+    }
     try:
         query = """
             SELECT 
@@ -114,7 +126,8 @@ def get_survey_status(survey_name):
                 iq.su_owner as company_id,
                 c.co_name as company_name,
                 iq.su_template as template_id,
-                tp.tp_name as template_name
+                tp.tp_name as template_name,
+                iq.su_is_anonymous as is_anonymous
             FROM `tabqp_IQ_Survey` iq
             LEFT JOIN `tabqp_IQ_Company` c ON c.name = iq.su_owner
             LEFT JOIN `tabqp_IQ_Template` tp ON tp.name = iq.su_template
@@ -122,25 +135,38 @@ def get_survey_status(survey_name):
         """
         result = frappe.db.sql(query, survey_name, as_dict=True)
         if result:
+            r = result[0]
             return {
-                'survey_id': result[0].get('survey_id', ''),
-                'in_history': result[0].get('in_history', ''),
-                'company_id': result[0].get('company_id', ''),
-                'company_name': result[0].get('company_name', ''),
-                'template_id': result[0].get('template_id', ''),
-                'template_name': result[0].get('template_name', '')
+                'survey_id': r.get('survey_id', ''),
+                'in_history': r.get('in_history', ''),
+                'company_id': r.get('company_id', ''),
+                'company_name': r.get('company_name', ''),
+                'template_id': r.get('template_id', ''),
+                'template_name': r.get('template_name', ''),
+                'is_anonymous': 1 if r.get('is_anonymous') else 0,
             }
-        return {'survey_id': '', 'in_history': '', 'company_id': '', 'company_name': '', 'template_id': '', 'template_name': ''}
+        return default
     except Exception as e:
         frappe.log_error(f"Error getting survey status: {str(e)}")
-        return {'survey_id': '', 'in_history': '', 'company_id': '', 'company_name': '', 'template_id': '', 'template_name': ''}
+        return default
 
 
-def get_historical_survey_data(survey_id, question_map, demographics_map):
+def get_historical_survey_data(survey_id, question_map, demographics_map, is_anonymous=False):
     """
-    Obtiene los datos históricos de una encuesta finalizada desde qp_IQ_SurveyHistoricData
+    Obtiene los datos históricos de una encuesta finalizada desde qp_IQ_SurveyHistoricData.
+    Si la encuesta es anónima solo trae el id y las respuestas.
     """
     try:
+        if is_anonymous:
+            query = """
+                SELECT 
+                    shd.name,
+                    shd.shd_measurement_response
+                FROM `tabqp_IQ_SurveyHistoricData` shd
+                WHERE shd.shd_survey_id = %s
+            """
+            return frappe.db.sql(query, survey_id, as_dict=True)
+
         query = """
             SELECT 
                 shd.name,
@@ -173,65 +199,64 @@ def get_historical_survey_data(survey_id, question_map, demographics_map):
         return []
 
 
+def build_question_rows(base_row, parsed_responses, question_map, question_variables_map):
+    """
+    Genera una fila por pregunta a partir de los datos base de la respuesta.
+    El texto de la pregunta cae a question_map (qn_statement) y solo al ID como último recurso.
+    Variable y tema quedan vacíos si la pregunta no los tiene.
+    """
+    rows = []
+    for qid, question_label in question_map.items():
+        question_info = question_variables_map.get(qid, {})
+        row = base_row.copy()
+        row['question'] = question_info.get('question_text') or question_label or qid
+        row['answer'] = parsed_responses.get(qid, '')
+        row['variable'] = question_info.get('variable') or ''
+        row['theme'] = question_info.get('tema') or ''
+        rows.append(row)
+    return rows
+
+
 def process_historical_response_row(hist_record, question_map, demographics_map, survey_status, question_variables_map):
     """
     Procesa un registro histórico de respuesta y retorna múltiples filas (una por pregunta)
     """
+    is_anonymous = bool(survey_status.get('is_anonymous'))
+
     # Datos base del registro histórico que se repiten en cada fila
-    base_row = {
-        'name': hist_record.get('name', ''),
-        'gender': hist_record.get('shd_gender', ''),
-        'custom_dob': hist_record.get('shd_dob', ''),
-        'country': hist_record.get('shd_country', ''),
-        'custom_academic_level': hist_record.get('academic_level', ''),
-        'entry_date': hist_record.get('shd_entry_date', ''),
-    }
+    base_row = {'name': hist_record.get('name', '')}
 
-    # Inicializar campos demográficos
-    for demographic_id in demographics_map.keys():
-        base_row[demographic_id] = ''
+    if not is_anonymous:
+        base_row.update({
+            'gender': hist_record.get('shd_gender', ''),
+            'custom_dob': hist_record.get('shd_dob', ''),
+            'country': hist_record.get('shd_country', ''),
+            'custom_academic_level': hist_record.get('academic_level', ''),
+            'entry_date': hist_record.get('shd_entry_date', ''),
+        })
 
-    # Sobrescribir con los valores del registro histórico
-    demographics_data_str = hist_record.get('demographics_data', '')
-    if demographics_data_str:
-        for demo_pair in demographics_data_str.split('||'):
-            if ':' in demo_pair:
-                demo_type, demo_value = demo_pair.split(':', 1)
-                base_row[demo_type] = demo_value
+        # Inicializar campos demográficos
+        for demographic_id in demographics_map.keys():
+            base_row[demographic_id] = ''
+
+        # Sobrescribir con los valores del registro histórico
+        demographics_data_str = hist_record.get('demographics_data', '')
+        if demographics_data_str:
+            for demo_pair in demographics_data_str.split('||'):
+                if ':' in demo_pair:
+                    demo_type, demo_value = demo_pair.split(':', 1)
+                    base_row[demo_type] = demo_value
 
     # Procesar respuestas de la encuesta
-    response_json = hist_record.get('shd_measurement_response', '{}')
-    parsed_responses = parse_response_json(response_json)
-    
-    # Obtener información de la encuesta para lógica de tema
-    company_name = survey_status.get('company_name', '')
-    template_name = survey_status.get('template_name', '')
-    
-    # Crear una fila por cada pregunta
-    rows = []
-    for qid, question_label in question_map.items():
-        row = base_row.copy()
-        question_info = question_variables_map.get(qid, {})
-        row['question'] = question_info.get('question_text', qid)
-        row['answer'] = parsed_responses.get(qid, '')
-        
-        # Agregar variable y tema
-        variable = question_info.get('variable', '')
-        row['variable'] = variable
-        
-        # Determinar el tema según el template y la compañía
-        tema = ''
-        tema = question_info.get('tema', '')
-        
-        row['theme'] = tema
-        rows.append(row)
-    
-    return rows
+    parsed_responses = parse_response_json(hist_record.get('shd_measurement_response', '{}'))
+
+    return build_question_rows(base_row, parsed_responses, question_map, question_variables_map)
 
 
-def build_columns(demographics_map):
+def build_columns(demographics_map, is_anonymous=False):
     """
-    Construye las columnas del reporte de manera dinámica
+    Construye las columnas del reporte de manera dinámica.
+    En encuestas anónimas se omiten las columnas de género, país, etc.
     """
     columns = [
         {
@@ -240,46 +265,50 @@ def build_columns(demographics_map):
             "fieldtype": "Data",
             "width": 150
         },
-        {
-            "label": _("Género"),
-            "fieldname": "gender",
-            "fieldtype": "Data",
-            "width": 100
-        },
-        {
-            "label": _("Fecha de Nacimiento"),
-            "fieldname": "custom_dob",
-            "fieldtype": "Date",
-            "width": 150
-        },
-        {
-            "label": _("País"),
-            "fieldname": "country",
-            "fieldtype": "Data",
-            "width": 150
-        },
-        {
-            "label": _("Nivel Académico"),
-            "fieldname": "custom_academic_level",
-            "fieldtype": "Data",
-            "width": 200
-        },
-        {
-            "label": _("Fecha de Ingreso"),
-            "fieldname": "entry_date",
-            "fieldtype": "Date",
-            "width": 150
-        },
     ]
 
-    # Agregar columnas demográficas
-    for did, dtitle in demographics_map.items():
-        columns.append({
-            "label": dtitle or did,
-            "fieldname": did,
-            "fieldtype": "Data",
-            "width": 200
-        })
+    if not is_anonymous:
+        columns += [
+            {
+                "label": _("Género"),
+                "fieldname": "gender",
+                "fieldtype": "Data",
+                "width": 100
+            },
+            {
+                "label": _("Fecha de Nacimiento"),
+                "fieldname": "custom_dob",
+                "fieldtype": "Date",
+                "width": 150
+            },
+            {
+                "label": _("País"),
+                "fieldname": "country",
+                "fieldtype": "Data",
+                "width": 150
+            },
+            {
+                "label": _("Nivel Académico"),
+                "fieldname": "custom_academic_level",
+                "fieldtype": "Data",
+                "width": 200
+            },
+            {
+                "label": _("Fecha de Ingreso"),
+                "fieldname": "entry_date",
+                "fieldtype": "Date",
+                "width": 150
+            },
+        ]
+
+        # Agregar columnas demográficas
+        for did, dtitle in demographics_map.items():
+            columns.append({
+                "label": dtitle or did,
+                "fieldname": did,
+                "fieldtype": "Data",
+                "width": 200
+            })
 
     # Agregar columnas de Pregunta y Respuesta al final
     columns.append({
@@ -316,45 +345,59 @@ def get_survey_data(survey_name, question_map, demographics_map, survey_status):
     Ahora cada pregunta genera una fila separada
     """
     data = []
-    
-    # Obtener mapeo de preguntas a variables y temas
-    question_variables_map = get_question_variables_map()
-    
+    is_anonymous = bool(survey_status.get('is_anonymous'))
+
+    # Obtener mapeo de preguntas a variables y temas (solo las de esta encuesta)
+    question_variables_map = get_question_variables_map(list(question_map.keys()))
+
     # Si la encuesta está finalizada, usar datos históricos
     if survey_status.get('in_history') == 1:
         survey_id = survey_status.get('survey_id', '')
         if survey_id:
-            historical_data = get_historical_survey_data(survey_id, question_map, demographics_map)
+            historical_data = get_historical_survey_data(survey_id, question_map, demographics_map, is_anonymous)
             for hist_record in historical_data:
                 rows = process_historical_response_row(hist_record, question_map, demographics_map, survey_status, question_variables_map)
                 data.extend(rows)  # Ahora devuelve múltiples filas
             return data
-    
+
     # Si no está finalizada, usar datos en tiempo real
-    query = """
-        SELECT 
-            sr.name,
-            sr.user,
-            sr.response_json,
-            c.custom_dob,
-            c.custom_entry_date,
-            c.custom_country,
-            c.gender,
-            a.al_title
-        FROM `tabSurvey Response` sr
-        LEFT JOIN `tabContact` c ON c.name = sr.user
-        LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
-        WHERE sr.survey = %s
-        ORDER BY sr.creation DESC
-    """
-    
+    if is_anonymous:
+        query = """
+            SELECT 
+                sr.name,
+                sr.user,
+                sr.response_json
+            FROM `tabSurvey Response` sr
+            WHERE sr.survey = %s
+            ORDER BY sr.creation DESC
+        """
+    else:
+        query = """
+            SELECT 
+                sr.name,
+                sr.user,
+                sr.response_json,
+                c.custom_dob,
+                c.custom_entry_date,
+                c.custom_country,
+                c.gender,
+                a.al_title
+            FROM `tabSurvey Response` sr
+            LEFT JOIN `tabContact` c ON c.name = sr.user
+            LEFT JOIN `tabqp_IQ_AcademicLevel` a ON a.name = c.custom_academic_level
+            WHERE sr.survey = %s
+            ORDER BY sr.creation DESC
+        """
+
     responses = frappe.db.sql(query, (survey_name,), as_dict=True)
-    
+
     if not responses:
         return []
 
-    users_list = [r.user for r in responses if r.user]
-    demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
+    demographics_data = {}
+    if not is_anonymous:
+        users_list = [r.user for r in responses if r.user]
+        demographics_data = get_bulk_demographics(users_list, demographics_map) if users_list else {}
 
     for response in responses:
         rows = process_response_row(response, question_map, demographics_map, demographics_data, survey_status, question_variables_map)
@@ -367,54 +410,32 @@ def process_response_row(response, question_map, demographics_map, demographics_
     """
     Procesa una respuesta individual y retorna múltiples filas (una por pregunta)
     """
-    user = response.get('user', '')
-    
-    # Datos base de la respuesta que se repiten en cada fila
-    base_row = {
-        'name': response.get('name', ''),
-        'gender': response.get('gender', ''),
-        'custom_dob': response.get('custom_dob', ''),
-        'country': response.get('custom_country', ''),
-        'custom_academic_level': response.get('al_title', ''),
-        'entry_date': response.get('custom_entry_date', ''),
-    }
+    is_anonymous = bool(survey_status.get('is_anonymous'))
 
-    # Agregar datos demográficos al base_row
-    for demographic_id in demographics_map.keys():
-        base_row[demographic_id] = ''
-    
-    user_demographics = demographics_data.get(user, {})
-    for demographic_id in user_demographics:
-        base_row[demographic_id] = user_demographics[demographic_id]
+    base_row = {'name': response.get('name', '')}
+
+    if not is_anonymous:
+        user = response.get('user', '')
+        base_row.update({
+            'gender': response.get('gender', ''),
+            'custom_dob': response.get('custom_dob', ''),
+            'country': response.get('custom_country', ''),
+            'custom_academic_level': response.get('al_title', ''),
+            'entry_date': response.get('custom_entry_date', ''),
+        })
+
+        # Agregar datos demográficos al base_row
+        for demographic_id in demographics_map.keys():
+            base_row[demographic_id] = ''
+
+        user_demographics = demographics_data.get(user, {})
+        for demographic_id in user_demographics:
+            base_row[demographic_id] = user_demographics[demographic_id]
 
     # Parsear respuestas
-    response_json = response.get('response_json', '{}')
-    parsed_responses = parse_response_json(response_json)
+    parsed_responses = parse_response_json(response.get('response_json', '{}'))
 
-    # Obtener información de la encuesta para lógica de tema
-    company_name = survey_status.get('company_name', '')
-    template_name = survey_status.get('template_name', '')
-    
-    # Crear una fila por cada pregunta
-    rows = []
-    for qid, question_label in question_map.items():
-        row = base_row.copy()
-        question_info = question_variables_map.get(qid, {})
-        row['question'] = question_info.get('question_text', qid)
-        row['answer'] = parsed_responses.get(qid, '')
-        
-        # Agregar variable y tema
-        variable = question_info.get('variable', '')
-        row['variable'] = variable
-        
-        # Determinar el tema según el template y la compañía
-        tema = ''
-        tema = question_info.get('tema', '')
-        
-        row['theme'] = tema
-        rows.append(row)
-    
-    return rows
+    return build_question_rows(base_row, parsed_responses, question_map, question_variables_map)
 
 
 def parse_response_json(response_json):
@@ -590,37 +611,42 @@ def get_bulk_demographics(users_list, demographics_map):
 
     return demographics_data
 
-def get_question_variables_map():
+def get_question_variables_map(question_ids=None):
     """
-    Obtiene el mapeo de preguntas a sus variables (tags) y temas
+    Obtiene el mapeo de preguntas a sus variables (tags) y temas.
+    Usa LEFT JOIN real: las preguntas sin variable ni tema se incluyen igual
+    (con variable/tema vacíos). Si se pasan question_ids, solo trae esas preguntas.
     """
     try:
-        query = """
+        conditions = ""
+        params = None
+        if question_ids:
+            placeholders = ', '.join(['%s'] * len(question_ids))
+            conditions = f"WHERE a.name IN ({placeholders})"
+            params = list(question_ids)
+
+        query = f"""
             SELECT 
                 a.name as question_id,
                 a.qn_statement as question_text,
                 b.dt_title as variable,
-                b.dt_title as tag,
                 c.dt_title as tema
             FROM `tabqp_IQ_Question` a
-            LEFT JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
-            LEFT JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
-            WHERE b.dt_object_type = 'Pregunta'
+            LEFT JOIN `tabqp_IQ_DemographicType` b 
+                ON b.name = a.qn_demographic AND b.dt_object_type = 'Pregunta'
+            LEFT JOIN `tabqp_IQ_DemographicType` c ON c.name = a.qp_topic
+            {conditions}
         """
-        results = frappe.db.sql(query, as_dict=True)
-        
+        results = frappe.db.sql(query, params, as_dict=True)
+
         mapping = {}
         for row in results:
-            question_id = row.get('question_id', '')
-            question_text = row.get('question_text', '')
-            variable = row.get('variable', '')
-            tema = row.get('tema', '')
-            mapping[question_id] = {
-                'question_text': question_text,
-                'variable': variable,
-                'tema': tema
+            mapping[row.get('question_id', '')] = {
+                'question_text': row.get('question_text', ''),
+                'variable': row.get('variable', '') or '',
+                'tema': row.get('tema', '') or '',
             }
-                
+
         return mapping
     except Exception as e:
         frappe.log_error(f"Error getting question variables map: {str(e)}")

@@ -210,7 +210,7 @@ def build_question_rows(base_row, parsed_responses, question_map, question_varia
         question_info = question_variables_map.get(qid, {})
         row = base_row.copy()
         row['question'] = question_info.get('question_text') or question_label or qid
-        row['answer'] = parsed_responses.get(qid, '')
+        row['answer'] = format_answer(parsed_responses.get(qid, ''))
         row['variable'] = question_info.get('variable') or ''
         row['theme'] = question_info.get('tema') or ''
         rows.append(row)
@@ -456,7 +456,14 @@ def parse_response_json(response_json):
         frappe.log_error(f"Error parsing response JSON: {response_json}")
         return {}
 
-
+def format_answer(value):
+    if value is None:
+        return ''
+    if isinstance(value, (list, tuple)):
+        return '; '.join(str(v) for v in value if v not in (None, ''))
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False)
+    return value
 
 def get_question_labels(survey_name):
     if not survey_name:

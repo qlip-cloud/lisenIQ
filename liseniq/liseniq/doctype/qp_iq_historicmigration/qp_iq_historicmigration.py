@@ -51,6 +51,34 @@ class qp_IQ_HistoricMigration(Document):
                 raise Exception("No se adjuntó ningún archivo para procesar.")
 
             file_path = get_file_path(self.hm_file)
+            
+            # Obtenemos datos preliminares para dinamizar el mapeo de columnas del archivo
+            company = frappe.db.get_value('Contact', self.hm_creator, 'custom_company')
+            if not company:
+                raise Exception(f"El Contacto {self.hm_creator} no tiene compañía configurada (custom_company).")
+                
+            base_template_id = self.hm_template
+            creator_contact = self.hm_creator
+            
+            # Validación de categoría para bifurcación (Ej. Cultura vs Engagement)
+            is_culture_template = False
+            is_engagement_template = False
+            template_category = None
+            
+            if base_template_id:
+                try:
+                    template_category = frappe.db.get_value('qp_IQ_Template', base_template_id, 'tp_category')
+                    if template_category:
+                        qnc_mnemonico = frappe.db.get_value('qp_IQ_TemplateCategory', template_category, 'qnc_mnemonico')
+                        if qnc_mnemonico:
+                            mnemonico_str = str(qnc_mnemonico).strip().lower()
+                            if mnemonico_str == 'template_culture':
+                                is_culture_template = True
+                            elif mnemonico_str == 'template_engagement':
+                                is_engagement_template = True
+                except Exception:
+                    frappe.log_error(frappe.get_traceback(), f"Error detectando categoría - Migración {self.name}")
+
             rows = []
             headers = []
             file_extension = file_path.lower().split('.')[-1]
@@ -60,8 +88,20 @@ class qp_IQ_HistoricMigration(Document):
                     import openpyxl
                     # read_only=True para procesamiento en generador sin saturación de RAM
                     wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
-                    sheet = wb.active
-                    data_rows = list(sheet.iter_rows(values_only=True))
+                    
+                    # Selección dinámica de hoja: 'Cuestionario' o la primera por defecto
+                    target_sheet = None
+                    for sheet_name in wb.sheetnames:
+                        if str(sheet_name).strip().lower() == 'cuestionario':
+                            target_sheet = wb[sheet_name]
+                            break
+                    
+                    if target_sheet is None:
+                        # Fallback a la primera hoja disponible si no se encuentra 'Cuestionario'
+                        first_sheet_name = wb.sheetnames[0] if wb.sheetnames else None
+                        target_sheet = wb[first_sheet_name] if first_sheet_name else wb.active
+                        
+                    data_rows = list(target_sheet.iter_rows(values_only=True))
                     
                     if data_rows:
                         headers = [str(h).strip() if h is not None else '' for h in data_rows[0]]
@@ -92,37 +132,47 @@ class qp_IQ_HistoricMigration(Document):
             if not rows or not headers:
                 raise Exception("El archivo está vacío o no es procesable.")
 
-            cultura_idx = -1
+            pivot_idx = -1
+            pivot_col_name = ''
+            
+            expected_pivots_raw = []
+            if is_culture_template:
+                # Pivote de cultura: Tema -> Dimensión -> Pregunta
+                expected_pivots_raw = ['tema', 'dimension', 'dimension',  'cultura']
+            elif is_engagement_template:
+                # Pivote de engagement: Dimensión -> Atributo -> Pregunta
+                expected_pivots_raw = ['dimensión', 'dimension', 'atributo', 'pregunta']
+            
+            # Fallback a columnas comunes genéricas
+            expected_pivots_raw.extend(['tema', 'tipo de cultura', 'tipo de engagement', 'engagement', 'categoría', 'categoria', 'factor', 'dimensión', 'dimension'])
+            expected_pivots = list(dict.fromkeys(expected_pivots_raw))
+            
+            # Columnas delimitadoras de fallback si no hay categoría principal en el archivo
+            fallback_delimiters = ['dimensión', 'dimension', 'atributo', 'pregunta']
+            
             for i, h in enumerate(headers):
-                if h and h.strip() == 'Tipo de Cultura':
-                    cultura_idx = i
-                    break
-                    
-            if cultura_idx == -1:
-                raise Exception("Columna 'Tipo de Cultura' obligatoria no encontrada.")
+                if h:
+                    # Limpiamos espacios dobles y normalizamos a minúsculas
+                    clean_h = " ".join(str(h).strip().lower().split())
+                    if clean_h in expected_pivots:
+                        pivot_idx = i
+                        pivot_col_name = str(h).strip()
+                        break
+                        
+            # Si no se encontró columna de categoría, buscamos delimitadores secundarios (ej. arranca en Dimensión)
+            if pivot_idx == -1:
+                for i, h in enumerate(headers):
+                    if h:
+                        clean_h = " ".join(str(h).strip().lower().split())
+                        if clean_h in fallback_delimiters:
+                            pivot_idx = i
+                            break
 
-            demo_headers = [h for i, h in enumerate(headers) if i < cultura_idx and h and h.strip() != 'ID Interno']
+            if pivot_idx == -1:
+                display_options = [title.title() for title in (expected_pivots + fallback_delimiters)]
+                raise Exception(f"No se pudo identificar la columna pivote (límite de demográficos). Asegúrese de incluir al menos una de estas columnas: {', '.join(display_options)}")
 
-            company = frappe.db.get_value('Contact', self.hm_creator, 'custom_company')
-            if not company:
-                raise Exception(f"El Contacto {self.hm_creator} no tiene compañía configurada (custom_company).")
-                
-            base_template_id = self.hm_template
-            creator_contact = self.hm_creator
-            
-            # Validación de categoría para activar normalización de respuestas
-            is_culture_template = False
-            template_category = None
-            
-            if base_template_id:
-                try:
-                    template_category = frappe.db.get_value('qp_IQ_Template', base_template_id, 'tp_category')
-                    if template_category:
-                        qnc_mnemonico = frappe.db.get_value('qp_IQ_TemplateCategory', template_category, 'qnc_mnemonico')
-                        if qnc_mnemonico and str(qnc_mnemonico).strip().lower() == 'template_culture':
-                            is_culture_template = True
-                except Exception:
-                    frappe.log_error(frappe.get_traceback(), f"Error detectando categoría - Migración {self.name}")
+            demo_headers = [h for i, h in enumerate(headers) if i < pivot_idx and h and h.strip() != 'ID Interno']
 
             culture_normalization_map = {
                 "-4": "1", "-4.0": "1",
@@ -158,14 +208,35 @@ class qp_IQ_HistoricMigration(Document):
                         'responses': {}
                     }
                 
-                cultura = str(row.get('Tipo de Cultura', '')).strip()
-                dimension = str(row.get('Dimensión', '')).strip()
-                atributo = str(row.get('Atributo', '')).strip()
+                topic_val = ''
+                dimension = ''
+                statement = ''
+                
+                if is_engagement_template:
+                    # Jerarquía Engagement: Dimensión -> Atributo -> Pregunta
+                    topic_val = str(row.get('Dimensión', row.get('Dimension', ''))).strip()
+                    dimension = str(row.get('Atributo', '')).strip()
+                    statement = str(row.get('Pregunta', '')).strip()
+                    
+                    # Fallback por si la estructura está incompleta
+                    if not statement:
+                        statement = dimension
+                        dimension = ''
+                else:
+                    # Jerarquía Cultura: Tema -> Dimensión -> Atributo
+                    topic_val = str(row.get(pivot_col_name, '')).strip() if pivot_col_name else ''
+                    dimension = str(row.get('Dimensión', row.get('Dimension', ''))).strip()
+                    statement = str(row.get('Atributo', '')).strip()
+                    
+                    # Fallback por si la estructura está incompleta
+                    if not statement:
+                        statement = str(row.get('Pregunta', '')).strip()
+                        
                 respuesta = str(row.get('Respuesta', '')).strip()
 
-                if atributo:
-                    unique_questions.add((cultura, dimension, atributo))
-                    grouped_contacts[id_interno]['responses'][atributo] = respuesta
+                if statement:
+                    unique_questions.add((topic_val, dimension, statement))
+                    grouped_contacts[id_interno]['responses'][statement] = respuesta
 
             # Optimización de caché para demográficos
             demographics_list = frappe.db.get_all('qp_IQ_DemographicType', fields=['name', 'dt_title'])
@@ -227,36 +298,43 @@ class qp_IQ_HistoricMigration(Document):
             if not default_q_type:
                 default_q_type = frappe.db.get_value('qp_IQ_QuestionType', None, 'name')
 
+            # Si es medición de Engagement, se garantiza el tipo de pregunta Likert
+            final_q_type = default_q_type
+            if is_engagement_template:
+                likert_type = frappe.db.get_value('qp_IQ_QuestionType', {'qnt_mnemonico': 'scale_likert'}, 'name')
+                if likert_type:
+                    final_q_type = likert_type
+
             # Optimización de caché para preguntas existentes de la compañía
             company_questions = frappe.db.get_all('qp_IQ_Question', filters={'qn_owner': company}, fields=['name', 'qn_statement'])
             question_cache = {q.qn_statement: q.name for q in company_questions if q.qn_statement}
 
-            for cultura, dimension, atributo in unique_questions:
-                if base_template_id and atributo in existing_template_qs:
-                    question_map[atributo] = existing_template_qs[atributo]
+            for topic_val, dimension, statement in unique_questions:
+                if base_template_id and statement in existing_template_qs:
+                    question_map[statement] = existing_template_qs[statement]
                     continue
                 
                 # Búsqueda en el caché de memoria en lugar de llamadas a la base de datos
-                if atributo in question_cache:
-                    question_map[atributo] = question_cache[atributo]
+                if statement in question_cache:
+                    question_map[statement] = question_cache[statement]
                 else:
-                    topic_id = get_or_create_demographic(cultura) if cultura else None
+                    topic_id = get_or_create_demographic(topic_val) if topic_val else None
                     dim_id = get_or_create_demographic(dimension) if dimension else None
                     
                     new_q = frappe.get_doc({
                         'doctype': 'qp_IQ_Question',
-                        'qn_statement': atributo,
+                        'qn_statement': statement,
                         'qn_owner': company,
                         'qp_topic': topic_id,
                         'qn_demographic': dim_id,
-                        'qn_type': default_q_type,
+                        'qn_type': final_q_type,
                         'qn_creator': creator_contact
                     })
                     new_q.flags.ignore_mandatory = True
                     new_q.insert(ignore_permissions=True)
                     
-                    question_map[atributo] = new_q.name
-                    question_cache[atributo] = new_q.name
+                    question_map[statement] = new_q.name
+                    question_cache[statement] = new_q.name
 
             clean_survey_id = str(self.hm_survey_id or self.name).replace("ObjectId(", "").replace(")", "").strip()
 
@@ -333,8 +411,8 @@ class qp_IQ_HistoricMigration(Document):
                 contact_name = f"{safe_company_name}_contacto_{i}"
                 mapped_responses = {}
                 
-                for attr, resp in data['responses'].items():
-                    q_id = question_map.get(attr)
+                for stmt, resp in data['responses'].items():
+                    q_id = question_map.get(stmt)
                     if q_id:
                         clean_resp = str(resp).strip()
                         clean_resp = clean_resp.replace('−', '-').replace('–', '-')

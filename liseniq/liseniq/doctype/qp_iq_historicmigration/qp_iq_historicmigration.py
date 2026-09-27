@@ -82,14 +82,42 @@ class qp_IQ_HistoricMigration(Document):
             rows = []
             headers = []
             file_extension = file_path.lower().split('.')[-1]
+            enps_mapping = {}
 
+            # Lectura y procesamiento de hojas de Excel (Cuestionario y ENPS)
             if file_extension in ['xlsx', 'xls']:
                 try:
                     import openpyxl
                     # read_only=True para procesamiento en generador sin saturación de RAM
                     wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
                     
-                    # Selección dinámica de hoja: 'Cuestionario' o la primera por defecto
+                    # Extracción de la hoja ENPS para mapear las respuestas NPS
+                    if is_engagement_template:
+                        try:
+                            enps_sheet = None
+                            for sheet_name in wb.sheetnames:
+                                if str(sheet_name).strip().lower() == 'enps':
+                                    enps_sheet = wb[sheet_name]
+                                    break
+                            
+                            if enps_sheet:
+                                enps_rows = list(enps_sheet.iter_rows(values_only=True))
+                                if enps_rows:
+                                    enps_headers = [str(h).strip().lower() if h is not None else '' for h in enps_rows[0]]
+                                    id_idx = enps_headers.index('id interno') if 'id interno' in enps_headers else -1
+                                    resp_idx = enps_headers.index('respuesta') if 'respuesta' in enps_headers else -1
+                                    
+                                    if id_idx != -1 and resp_idx != -1:
+                                        for enps_r in enps_rows[1:]:
+                                            if enps_r[id_idx] is not None:
+                                                raw_id = str(enps_r[id_idx]).strip()
+                                                id_interno = raw_id.replace("ObjectId(", "").replace(")", "").strip()
+                                                resp = str(enps_r[resp_idx]).strip() if enps_r[resp_idx] is not None else ''
+                                                enps_mapping[id_interno] = resp
+                        except Exception as ex:
+                            frappe.log_error(frappe.get_traceback(), f"Error procesando hoja ENPS - Migración {self.name}")
+
+                    # Selección dinámica de hoja principal: 'Cuestionario' o la primera por defecto
                     target_sheet = None
                     for sheet_name in wb.sheetnames:
                         if str(sheet_name).strip().lower() == 'cuestionario':
@@ -132,6 +160,7 @@ class qp_IQ_HistoricMigration(Document):
             if not rows or not headers:
                 raise Exception("El archivo está vacío o no es procesable.")
 
+            # Identificando columnas pivote e iniciando la agrupación
             pivot_idx = -1
             pivot_col_name = ''
             
@@ -186,9 +215,19 @@ class qp_IQ_HistoricMigration(Document):
                 "4": "5", "4.0": "5"
             }
 
+            engagement_normalization_map = {
+                "0": "1", "0.0": "1",
+                "1": "2", "1.0": "2",
+                "2": "3", "2.0": "3",
+                "3": "4", "3.0": "4",
+                "4": "5", "4.0": "5"
+            }
+
             grouped_contacts = {}
             unique_questions = set()
+            nps_statements = set()
 
+            # Iterando filas del cuestionario y normalizando jerarquías
             for row in rows:
                 raw_id = str(row.get('ID Interno', '')).strip()
                 id_interno = raw_id.replace("ObjectId(", "").replace(")", "").strip()
@@ -211,11 +250,20 @@ class qp_IQ_HistoricMigration(Document):
                 topic_val = ''
                 dimension = ''
                 statement = ''
+                is_nps = False
                 
+                dimension_col = str(row.get('Dimensión', row.get('Dimension', ''))).strip()
+                atributo_col = str(row.get('Atributo', '')).strip()
+                respuesta = str(row.get('Respuesta', '')).strip()
+                
+                # Identificar si es la pregunta NPS para el Índice de Engagement basado en 'Dimensión' y 'Atributo'
+                if is_engagement_template and dimension_col.lower() == 'ambiente laboral positivo' and atributo_col.lower() == 'indice de engagement':
+                    is_nps = True
+
                 if is_engagement_template:
                     # Jerarquía Engagement: Dimensión -> Atributo -> Pregunta
-                    topic_val = str(row.get('Dimensión', row.get('Dimension', ''))).strip()
-                    dimension = str(row.get('Atributo', '')).strip()
+                    topic_val = dimension_col
+                    dimension = atributo_col
                     statement = str(row.get('Pregunta', '')).strip()
                     
                     # Fallback por si la estructura está incompleta
@@ -232,11 +280,17 @@ class qp_IQ_HistoricMigration(Document):
                     if not statement:
                         statement = str(row.get('Pregunta', '')).strip()
                         
-                respuesta = str(row.get('Respuesta', '')).strip()
+                if is_nps:
+                    nps_statements.add(statement)
+                    # Si existe un mapeo en ENPS para este ID, sobrescribimos la respuesta del cuestionario
+                    if id_interno in enps_mapping and enps_mapping[id_interno] != '':
+                        respuesta = enps_mapping[id_interno]
 
                 if statement:
                     unique_questions.add((topic_val, dimension, statement))
-                    grouped_contacts[id_interno]['responses'][statement] = respuesta
+                    # Solo agregar a las respuestas si tenemos un valor
+                    if respuesta != '':
+                        grouped_contacts[id_interno]['responses'][statement] = respuesta
 
             # Optimización de caché para demográficos
             demographics_list = frappe.db.get_all('qp_IQ_DemographicType', fields=['name', 'dt_title'])
@@ -305,10 +359,16 @@ class qp_IQ_HistoricMigration(Document):
                 if likert_type:
                     final_q_type = likert_type
 
+            # Obtención del tipo de pregunta NPS
+            nps_q_type = frappe.db.get_value('qp_IQ_QuestionType', {'qnt_mnemonico': 'score_nps'}, 'name')
+            if not nps_q_type:
+                nps_q_type = frappe.db.get_value('qp_IQ_QuestionType', {'qnt_type_name': ['like', '%NPS%']}, 'name')
+
             # Optimización de caché para preguntas existentes de la compañía
             company_questions = frappe.db.get_all('qp_IQ_Question', filters={'qn_owner': company}, fields=['name', 'qn_statement'])
             question_cache = {q.qn_statement: q.name for q in company_questions if q.qn_statement}
 
+            # Registrando y validando las preguntas detectadas en sistema
             for topic_val, dimension, statement in unique_questions:
                 if base_template_id and statement in existing_template_qs:
                     question_map[statement] = existing_template_qs[statement]
@@ -321,13 +381,18 @@ class qp_IQ_HistoricMigration(Document):
                     topic_id = get_or_create_demographic(topic_val) if topic_val else None
                     dim_id = get_or_create_demographic(dimension) if dimension else None
                     
+                    qn_type_to_set = final_q_type
+                    # Asignamos estrictamente el tipo NPS a las preguntas identificadas para Engagement
+                    if statement in nps_statements and nps_q_type:
+                        qn_type_to_set = nps_q_type
+                    
                     new_q = frappe.get_doc({
                         'doctype': 'qp_IQ_Question',
                         'qn_statement': statement,
                         'qn_owner': company,
                         'qp_topic': topic_id,
                         'qn_demographic': dim_id,
-                        'qn_type': final_q_type,
+                        'qn_type': qn_type_to_set,
                         'qn_creator': creator_contact
                     })
                     new_q.flags.ignore_mandatory = True
@@ -357,7 +422,8 @@ class qp_IQ_HistoricMigration(Document):
 
             survey_name_label = f"Medición Migrada - {clean_survey_id}"
             
-            # Creación en qp_IQ_Survey
+            # Generando los registros de Measurement y Survey
+            # Creación del registro en DocType qp_IQ_Survey
             new_survey = frappe.get_doc({
                 'doctype': 'qp_IQ_Survey',
                 'su_name': survey_name_label,
@@ -381,7 +447,7 @@ class qp_IQ_HistoricMigration(Document):
                 
             real_survey_id = new_survey.name
 
-            # Creación directa en DocType Survey
+            # Creación del registro en DocType Survey
             new_core_survey = frappe.get_doc({
                 'doctype': 'Survey',
                 'name': survey_name_label,
@@ -401,6 +467,7 @@ class qp_IQ_HistoricMigration(Document):
             processed_count = 0
             safe_company_name = str(company).replace(" ", "_").lower() if company else "company"
             
+            # Procesando respuestas individuales de los contactos con normalización
             for i, (id_interno, data) in enumerate(grouped_contacts.items(), start=1):
                 # Validacion de interrupcion por usuario
                 if i % 10 == 0:
@@ -426,6 +493,10 @@ class qp_IQ_HistoricMigration(Document):
 
                         if is_culture_template:
                             clean_resp = culture_normalization_map.get(clean_resp, clean_resp)
+                        elif is_engagement_template:
+                            # Sólo normalizar en escala Engagement Likert si no es pregunta NPS
+                            if stmt not in nps_statements:
+                                clean_resp = engagement_normalization_map.get(clean_resp, clean_resp)
 
                         mapped_responses[q_id] = clean_resp
 
@@ -462,6 +533,7 @@ class qp_IQ_HistoricMigration(Document):
                 if processed_count % 500 == 0:
                     frappe.db.commit()
 
+            # Finalizando migración y actualizando estados
             self.db_set('hm_status', 'Completado')
             self.db_set('hm_processed_records', processed_count)
             self.db_set('hm_survey_id', real_survey_id)

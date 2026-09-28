@@ -6,8 +6,30 @@ import json
 import csv
 import traceback
 import time
+import unicodedata
+import re
 from frappe.model.document import Document
 from frappe.utils.file_manager import get_file_path
+
+def normalize_string(text):
+    """
+    Normaliza un string eliminando tildes/acentos, signos de puntuación, 
+    y convirtiéndolo a minúsculas.
+    Ej: '¿Índice de Engagement?.' -> 'indice de engagement'
+    """
+    if not text:
+        return ""
+    
+    # NFKD separa los caracteres de sus diacríticos (acentos)
+    # encode('ASCII', 'ignore') elimina los diacríticos
+    # decode('utf-8') lo vuelve a convertir a string normal
+    normalized = unicodedata.normalize('NFKD', str(text)).encode('ASCII', 'ignore').decode('utf-8').lower()
+    
+    # Eliminar cualquier caracter que no sea alfanumérico o espacio (puntos, comas, ?, !, etc.)
+    normalized = re.sub(r'[^\w\s]', '', normalized)
+    
+    # Limpiar espacios dobles/extra que hayan quedado y retornar
+    return " ".join(normalized.split())
 
 class qp_IQ_HistoricMigration(Document):
     
@@ -257,7 +279,10 @@ class qp_IQ_HistoricMigration(Document):
                 respuesta = str(row.get('Respuesta', '')).strip()
                 
                 # Identificar si es la pregunta NPS para el Índice de Engagement basado en 'Dimensión' y 'Atributo'
-                if is_engagement_template and dimension_col.lower() == 'ambiente laboral positivo' and atributo_col.lower() == 'indice de engagement':
+                norm_dimension = normalize_string(dimension_col)
+                norm_atributo = normalize_string(atributo_col)
+
+                if is_engagement_template and norm_dimension == 'ambiente laboral positivo' and norm_atributo == 'indice de engagement':
                     is_nps = True
 
                 if is_engagement_template:
@@ -344,7 +369,8 @@ class qp_IQ_HistoricMigration(Document):
                         try:
                             stmt = frappe.db.get_value('qp_IQ_Question', q_id, 'qn_statement')
                             if stmt: 
-                                existing_template_qs[stmt] = q_id
+                                # Normalizamos la pregunta del template para una búsqueda más robusta
+                                existing_template_qs[normalize_string(stmt)] = q_id
                         except Exception:
                             pass
 
@@ -366,17 +392,21 @@ class qp_IQ_HistoricMigration(Document):
 
             # Optimización de caché para preguntas existentes de la compañía
             company_questions = frappe.db.get_all('qp_IQ_Question', filters={'qn_owner': company}, fields=['name', 'qn_statement'])
-            question_cache = {q.qn_statement: q.name for q in company_questions if q.qn_statement}
+            # Normalizamos las preguntas cacheadas de la base de datos
+            question_cache = {normalize_string(q.qn_statement): q.name for q in company_questions if q.qn_statement}
 
             # Registrando y validando las preguntas detectadas en sistema
             for topic_val, dimension, statement in unique_questions:
-                if base_template_id and statement in existing_template_qs:
-                    question_map[statement] = existing_template_qs[statement]
+                # Obtenemos la versión limpia y normalizada del enunciado actual
+                norm_stmt = normalize_string(statement)
+                
+                if base_template_id and norm_stmt in existing_template_qs:
+                    question_map[statement] = existing_template_qs[norm_stmt]
                     continue
                 
-                # Búsqueda en el caché de memoria en lugar de llamadas a la base de datos
-                if statement in question_cache:
-                    question_map[statement] = question_cache[statement]
+                # Búsqueda en el caché de memoria usando la pregunta normalizada
+                if norm_stmt in question_cache:
+                    question_map[statement] = question_cache[norm_stmt]
                 else:
                     topic_id = get_or_create_demographic(topic_val) if topic_val else None
                     dim_id = get_or_create_demographic(dimension) if dimension else None
@@ -399,7 +429,8 @@ class qp_IQ_HistoricMigration(Document):
                     new_q.insert(ignore_permissions=True)
                     
                     question_map[statement] = new_q.name
-                    question_cache[statement] = new_q.name
+                    # Agregamos la nueva pregunta al caché usando su versión normalizada
+                    question_cache[norm_stmt] = new_q.name
 
             clean_survey_id = str(self.hm_survey_id or self.name).replace("ObjectId(", "").replace(")", "").strip()
 
@@ -497,6 +528,10 @@ class qp_IQ_HistoricMigration(Document):
                             # Sólo normalizar en escala Engagement Likert si no es pregunta NPS
                             if stmt not in nps_statements:
                                 clean_resp = engagement_normalization_map.get(clean_resp, clean_resp)
+                            else:
+                                # Normalización para eNPS: Si la respuesta a la pregunta del índice de engagement es 0, pasa a 1
+                                if clean_resp in ['0', '0.0']:
+                                    clean_resp = '1'
 
                         mapped_responses[q_id] = clean_resp
 

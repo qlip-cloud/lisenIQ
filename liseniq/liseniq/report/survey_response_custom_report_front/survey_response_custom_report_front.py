@@ -470,18 +470,25 @@ def get_question_labels(survey_name):
         return {}
     template_name = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "su_template")
     template = frappe.get_doc("qp_IQ_Template", template_name)
-
-    questions = frappe.get_all(
-        "qp_IQ_TemplateQuestion",
-        filters={"parent": template.name},
-        fields=["tq_question"],
+    survey_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
+    questions= frappe.get_all(
+        "qp_IQ_SurveyQuestion",
+        filters={"parent": survey_id},
+        fields=["sq_question as id_question"],
         order_by="idx asc",
     )
+    if not questions:
+        questions = frappe.get_all(
+            "qp_IQ_TemplateQuestion",
+            filters={"parent": template.name},
+            fields=["tq_question as id_question"],
+            order_by="idx asc",
+        )
 
     question_labels = {}
     for question in questions:
-        question_label = frappe.db.get_value("qp_IQ_Question", question.tq_question, "qn_statement")
-        question_labels[question.tq_question] = question_label
+        question_label = frappe.db.get_value("qp_IQ_Question", question.id_question, "qn_statement")
+        question_labels[question.id_question] = question_label
 
     return question_labels
 

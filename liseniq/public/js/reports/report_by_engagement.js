@@ -488,26 +488,37 @@ function renderDimensionChart(type, data) {
 
     let options = {};
     if (type === 'bar') {
+        const dynamicHeight = Math.max(300, categories.length * 35 + 50);
+
         options = {
             series: [{ name: 'Puntaje Promedio', data: scores }],
-            chart: { type: 'bar', height: '100%', toolbar: { show: false }, fontFamily: 'inherit' },
+            chart: { 
+                type: 'bar', 
+                height: dynamicHeight, 
+                toolbar: { show: false }, 
+                fontFamily: 'inherit',
+                parentHeightOffset: 0
+            },
             colors: colorsArr,
             plotOptions: { 
                 bar: { 
-                    horizontal: false, columnWidth: '45%', borderRadius: 4, distributed: true,
+                    horizontal: true, 
+                    barHeight: '65%',
+                    borderRadius: 4, 
+                    distributed: true,
                     dataLabels: { position: 'center' }
                 } 
             },
             dataLabels: { 
                 enabled: true,
                 formatter: function (val) { return val.toFixed(2); },
-                style: { fontSize: '13px', fontWeight: 700, colors: ["#ffffff"] },
+                style: { fontSize: '11px', fontWeight: 700, colors: ["#ffffff"] },
                 dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.45 }
             },
             legend: { show: false },
             annotations: {
-                yaxis: [{
-                    y: globalScore.toFixed(2),
+                xaxis: [{
+                    x: parseFloat(globalScore.toFixed(2)),
                     borderColor: '#ea580c',
                     strokeDashArray: 4,
                     borderWidth: 1.5,
@@ -515,16 +526,28 @@ function renderDimensionChart(type, data) {
                         borderColor: 'transparent',
                         style: { color: '#ea580c', background: 'transparent', fontSize: '12px', fontWeight: 600 },
                         text: `Promedio ${globalScore.toFixed(2)}`,
-                        position: 'right', offsetX: 0, offsetY: -8
+                        position: 'top', offsetX: 0, offsetY: 0
                     }
                 }]
             },
             xaxis: {
                 categories: categories,
+                min: 1,
+                max: 5,
+                tickAmount: 8,
                 labels: {
+                    formatter: function (val) { 
+                        return isNaN(val) ? val : parseFloat(val).toFixed(1); 
+                    },
+                    style: { colors: '#6b7280', fontWeight: 500 }
+                }
+            },
+            yaxis: { 
+                labels: { 
+                    maxWidth: 350,
                     formatter: function (value) {
                         if (typeof value !== 'string') return value;
-                        const maxLength = 15;
+                        const maxLength = 45;
                         const words = value.split(' ');
                         let lines = [];
                         let currentLine = '';
@@ -539,14 +562,23 @@ function renderDimensionChart(type, data) {
                         if (currentLine.trim()) lines.push(currentLine.trim());
                         return lines; 
                     },
-                    style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 }
+                    style: { 
+                        colors: '#4b5563', 
+                        fontSize: '10px',
+                        fontWeight: 500 
+                    } 
+                } 
+            },
+            grid: { 
+                borderColor: '#f3f4f6', 
+                strokeDashArray: 4,
+                padding: {
+                    top: 0,
+                    right: 15,
+                    bottom: -15,
+                    left: 10
                 }
             },
-            yaxis: { 
-                max: function(max) { return max * 1.15; },
-                labels: { formatter: function (val) { return val.toFixed(1); }, style: { colors: '#6b7280', fontWeight: 500 } } 
-            },
-            grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
             title: { text: 'Puntaje por Atributos', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: `De menor a mayor — línea de referencia en promedio global (${globalScore.toFixed(2)})`, align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {

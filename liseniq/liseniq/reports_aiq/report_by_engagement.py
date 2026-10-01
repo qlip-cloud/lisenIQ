@@ -244,29 +244,45 @@ def build_engagement_context(context, survey_name):
                         "color": t_color
                     })
 
-            # Armamos data agrupada para el Gráfico de Dimensiones
+            # Armamos data agrupada para el Gráfico de Dimensiones (Agrupado por TÍTULO para evitar duplicados)
+            title_agg_totals = {}
+            title_agg_counts = {}
+            title_agg_colors = {}
+
             for demo_id, t_score in grouped_dim_totals.items():
-                avg = round(t_score / grouped_dim_counts[demo_id], 2)
                 demo_title = demo_title_map.get(demo_id, demo_id)
-                demo_color = demo_color_map.get(demo_id, "") 
-                
+                title_agg_totals[demo_title] = title_agg_totals.get(demo_title, 0.0) + t_score
+                title_agg_counts[demo_title] = title_agg_counts.get(demo_title, 0) + grouped_dim_counts[demo_id]
+                if demo_title not in title_agg_colors:
+                    title_agg_colors[demo_title] = demo_color_map.get(demo_id, "")
+
+            for demo_title, t_score in title_agg_totals.items():
+                avg = round(t_score / title_agg_counts[demo_title], 2)
                 grouped_dimension_chart_data.append({
                     "engagement": demo_title,
                     "score": avg,
-                    "color": demo_color
+                    "color": title_agg_colors.get(demo_title, "")
                 })
             grouped_dimension_chart_data.sort(key=lambda x: x["score"])
 
-            # Armamos data para el Gráfico de Engagement/Topics
+            # Armamos data para el Gráfico de Engagement/Topics (Agrupado por TÍTULO para evitar duplicados)
+            topic_title_agg_totals = {}
+            topic_title_agg_counts = {}
+            topic_title_agg_colors = {}
+
             for t_id, t_score in topic_totals.items():
-                avg = round(t_score / topic_counts[t_id], 2)
                 t_title = topic_title_map.get(t_id, t_id)
-                topic_color = topic_color_map.get(t_id, "")
-                
+                topic_title_agg_totals[t_title] = topic_title_agg_totals.get(t_title, 0.0) + t_score
+                topic_title_agg_counts[t_title] = topic_title_agg_counts.get(t_title, 0) + topic_counts[t_id]
+                if t_title not in topic_title_agg_colors:
+                    topic_title_agg_colors[t_title] = topic_color_map.get(t_id, "")
+
+            for t_title, t_score in topic_title_agg_totals.items():
+                avg = round(t_score / topic_title_agg_counts[t_title], 2)
                 engagement_chart_data.append({
                     "topic": t_title,
                     "score": avg,
-                    "color": topic_color
+                    "color": topic_title_agg_colors.get(t_title, "")
                 })
             engagement_chart_data.sort(key=lambda x: x["score"])
     

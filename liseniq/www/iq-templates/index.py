@@ -11,6 +11,10 @@ def get_context(context):
 
     context = global_website_context(context)
 
+     # Obtener el ID del contacto del usuario actual
+    contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
+    context.contact_name = contact_name
+
     # Configuración base de la página
     context.page_title = _("Plantillas")
     context.no_breadcrumbs = True
@@ -20,6 +24,7 @@ def get_context(context):
     user_company = get_current_active_company()
     if not user_company:
         frappe.throw("El usuario actual no tiene una compañía activa asignada. Por favor, contacte al administrador o seleccione una empresa.")
+
 
     # Obtener plantillas públicas (visibles para todos)
     templates_public = frappe.get_list(
@@ -36,7 +41,7 @@ def get_context(context):
         filters=[['custom_company', '=', user_company]],
         or_filters=[
             ['tp_is_private', '=', 0],
-            ['tp_owner', '=', frappe.session.user]
+            ['tp_owner', '=', contact_name]
         ],
         fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private", "tp_is_public"],
         order_by="creation desc",

@@ -21,8 +21,6 @@ def get_context(context):
     if not user_company:
         frappe.throw("El usuario actual no tiene una compañía activa asignada. Por favor, contacte al administrador o seleccione una empresa.")
 
-    user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
-
     # Obtener plantillas públicas (visibles para todos)
     templates_public = frappe.get_list(
         "qp_IQ_Template",
@@ -33,13 +31,12 @@ def get_context(context):
     )
 
     # Obtener plantillas de la compañía del usuario (públicas y privadas del usuario)
-    # Acción 2 (Actualizar Query): Compara tp_owner contra el ID del contacto obtenido
     templates_company_scoped = frappe.get_list(
         "qp_IQ_Template",
         filters=[['custom_company', '=', user_company]],
         or_filters=[
             ['tp_is_private', '=', 0],
-            ['tp_owner', '=', owner_filter_value]
+            ['tp_owner', '=', frappe.session.user]
         ],
         fields=["name", "tp_name", "tp_description", "tp_category", "tp_owner", "tp_is_private", "tp_is_public"],
         order_by="creation desc",
@@ -189,12 +186,9 @@ def create_question_from_template_wizard(question_data):
         data = frappe.parse_json(question_data)
         
         user_contact = frappe.db.get_value("Contact", {"user": frappe.session.user, "custom_is_liseniq_contact": 0}, "name")
-        frappe.logger().info(f"[index.py create_question] Búsqueda de Contacto para {frappe.session.user} -> {user_contact}")
-        
         user_company = get_current_active_company()
 
         if not user_contact or not user_company:
-            frappe.logger().error(f"Falta Contacto ({user_contact}) o Compañía ({user_company}) para el usuario: {frappe.session.user}")
             frappe.throw("No se pudo encontrar el contacto o la compañía para el usuario actual.")
 
         question_doc = frappe.new_doc("qp_IQ_Question")

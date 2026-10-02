@@ -59,6 +59,15 @@ def check_template_name(name):
     return {"exists": bool(exists)}
 
 @frappe.whitelist()
+def get_user_contact_id():
+    contact_name = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
+    
+    if not contact_name:
+        frappe.throw(_("No se encontró un perfil de Contacto asociado a tu usuario. Por favor, contacta al administrador del sistema."))
+        
+    return contact_name
+
+@frappe.whitelist()
 def get_template_details(template_name):
     if not template_name:
         return None

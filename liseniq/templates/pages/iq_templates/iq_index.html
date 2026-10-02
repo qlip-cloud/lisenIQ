@@ -52,7 +52,7 @@
                                         {% endif %}
                                     </div>
                                     <div class="d-flex align-items-center">
-                                        {% if template.tp_owner == frappe.session.user %}
+                                        {% if template.tp_owner == contact_name %}
                                         <a href="/iq-templates/new_template?edit={{ template.name }}" class="text-muted mr-2" style="font-size: 1.2rem; transition: color 0.2s;" title="Editar Plantilla">
                                             <i class="fa fa-edit template-edit-icon" style="color: #7B24FF;"></i>
                                         </a>

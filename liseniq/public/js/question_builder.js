@@ -27,9 +27,9 @@ export class QuestionBuilder {
         this.editingIndex = null; // Para manejo de edición
         this.bankState = {
             questions: [],
-            demographics: [],
+            topics: [],
             selectedIds: new Set(),
-            activeDemographic: null,
+            activeTopic: null,
             searchKeyword: ''
         };
         this.searchDebounceTimer = null;
@@ -203,7 +203,7 @@ export class QuestionBuilder {
             if (activeElement) activeElement.classList.remove('active');
             
             target.classList.add('active');
-            this.bankState.activeDemographic = target.dataset.demographicId;
+            this.bankState.activeTopic = target.dataset.topicId;
             this.fetchBankData();
         });
 
@@ -424,16 +424,16 @@ export class QuestionBuilder {
                 method: 'liseniq.www.iq-templates.index.get_bank_data',
                 args: {
                     keyword: this.bankState.searchKeyword,
-                    demographic: this.bankState.activeDemographic,
+                    topic: this.bankState.activeTopic,
                     template_category: this.currentCategoryName
                 }
             });
             
             if (response.message) {
                 this.bankState.questions = response.message.questions;
-                if (this.bankState.demographics.length === 0) {
-                    this.bankState.demographics = response.message.demographics;
-                    this.renderBankDemographics();
+                if (this.bankState.topics.length === 0) {
+                    this.bankState.topics = response.message.topics;
+                    this.renderBankTopics();
                 }
                 this.renderBankQuestions();
             }
@@ -446,7 +446,7 @@ export class QuestionBuilder {
     openModal() {
         if (this.isReadOnly) return;
         this.bankState.selectedIds.clear();
-        this.bankState.activeDemographic = null;
+        this.bankState.activeTopic = null;
         this.bankState.searchKeyword = '';
         this.ui.bankModal.searchInput.value = '';
         this.fetchBankData();
@@ -458,22 +458,22 @@ export class QuestionBuilder {
         this.ui.bankModal.modal.classList.add('d-none');
     }
     
-    renderBankDemographics() {
+    renderBankTopics() {
         const { categoryList } = this.ui.bankModal;
         if (!categoryList) return;
         categoryList.innerHTML = '';
         
-        const allDemographicsItem = document.createElement('li');
-        allDemographicsItem.className = 'category-filter-item active';
-        allDemographicsItem.textContent = 'Todos los temas';
-        allDemographicsItem.setAttribute('data-demographic-id', '');
-        categoryList.appendChild(allDemographicsItem);
+        const allTopicsItem = document.createElement('li');
+        allTopicsItem.className = 'category-filter-item active';
+        allTopicsItem.textContent = 'Todos los temas';
+        allTopicsItem.setAttribute('data-topic-id', '');
+        categoryList.appendChild(allTopicsItem);
 
-        this.bankState.demographics.forEach(demo => {
+        this.bankState.topics.forEach(t => {
             const item = document.createElement('li');
             item.className = 'category-filter-item';
-            item.textContent = demo.dt_title;
-            item.setAttribute('data-demographic-id', demo.name);
+            item.textContent = t.dt_title;
+            item.setAttribute('data-topic-id', t.dt_title);
             categoryList.appendChild(item);
         });
     }
@@ -568,7 +568,7 @@ export class QuestionBuilder {
                 </div>
                 ${optionsPreviewHtml}
                 <div class="question-details">
-                    <span class="category-tag">• Tema: ${frappe.utils.escape_html(q.demographic_name || 'General')}</span>
+                    <span class="category-tag">• Tema: ${frappe.utils.escape_html(q.culture_name || 'General')}</span>
                     <span>Tipo: ${frappe.utils.escape_html(q.type_name)}</span>
                 </div>
             `;
@@ -611,7 +611,7 @@ export class QuestionBuilder {
                     <div class="item-content">
                         ${itemTextHtml}
                         <div class="item-details">
-                            <span class="category-tag-selected">• ${frappe.utils.escape_html(q.demographic_name || 'General')}</span>
+                            <span class="category-tag-selected">• ${frappe.utils.escape_html(q.culture_name || 'General')}</span>
                             <span>${frappe.utils.escape_html(q.type_name)}</span>
                         </div>
                     </div>
@@ -1119,7 +1119,7 @@ export class QuestionBuilder {
             if (searchTerm.length > 1) {
                 frappe.call({
                     method: 'liseniq.www.iq-templates.index.get_demographic_suggestions_for_questions',
-                    args: { search_term: searchTerm, object_type: 'Pregunta' },
+                    args: { search_term: searchTerm, object_type: 'Dimension' },
                     callback: (r) => {
                         demographicResults.innerHTML = '';
                         if (r.message && r.message.length > 0) {

@@ -564,7 +564,7 @@ def _process_manual_questions(questions_data, user_company, user_contact):
                 new_question.qn_owner = user_company
                 
                 if q.get("demographic"):
-                    demo_filters = {"dt_title": q["demographic"], "dt_object_type": "Pregunta"}
+                    demo_filters = {"dt_title": q["demographic"], "dt_object_type": "Dimension"}
                     if user_company:
                         demo_filters["dt_creator_company"] = user_company
                     
@@ -572,7 +572,7 @@ def _process_manual_questions(questions_data, user_company, user_contact):
                     if not demographic_name:
                         demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
                         demographic_doc.dt_title = q["demographic"]
-                        demographic_doc.dt_object_type = "Pregunta"
+                        demographic_doc.dt_object_type = "Dimension"
                         if user_company:
                             demographic_doc.dt_creator_company = user_company
                         demographic_doc.insert(ignore_permissions=True)
@@ -606,7 +606,7 @@ def _process_manual_questions(questions_data, user_company, user_contact):
                     if frappe.db.exists("qp_IQ_DemographicType", topic_val):
                         new_question.qp_topic = topic_val
                     else:
-                        topic_filters = {"dt_title": topic_val, "dt_object_type": "Pregunta"}
+                        topic_filters = {"dt_title": topic_val, "dt_object_type": "Tema"}
                         if user_company:
                             topic_filters["dt_creator_company"] = user_company
                         
@@ -614,7 +614,7 @@ def _process_manual_questions(questions_data, user_company, user_contact):
                         if not topic_name:
                             topic_doc = frappe.new_doc("qp_IQ_DemographicType")
                             topic_doc.dt_title = topic_val
-                            topic_doc.dt_object_type = "Pregunta"
+                            topic_doc.dt_object_type = "Tema"
                             if user_company:
                                 topic_doc.dt_creator_company = user_company
                             topic_doc.insert(ignore_permissions=True)

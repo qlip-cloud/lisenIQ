@@ -28,7 +28,7 @@ ENPS_QUESTION_TEXT = "Le recomendaría a un amigo o familiar que trabaje en esta
 # 'variable' (tag) en los datos de la medición, no por una lista fija de
 # textos. Cualquier pregunta cuyo tag sea exactamente este valor se trata
 # como pregunta ancla del Índice de Engagement.
-INDICE_ENGAGEMENT_VARIABLE = "Índice de Engagment"
+INDICE_ENGAGEMENT_VARIABLE = "Índice de Engagement"
 
 # Preguntas ABIERTAS (comentarios de texto libre). Se identifican por el
 # TAG/VARIABLE (columna 'variable' del reporte, viene de

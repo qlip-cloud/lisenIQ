@@ -6,11 +6,9 @@
 # dashboard (formato ancho: un registro por respondiente).
 #
 # AJUSTES QUE DEBES REVISAR ANTES DE USAR EN PRODUCCIÓN:
-#   1. ENGAGEMENT_QUESTIONS: confirma que el texto de estas preguntas
-#      coincide EXACTO con el `qn_statement` guardado en qp_IQ_Question.
-#   2. Rango de la escala Likert: asumo 1-5. Si tu encuesta usa otra
+#   1. Rango de la escala Likert: asumo 1-5. Si tu encuesta usa otra
 #      escala (0-10, 1-6, etc.) ajusta la validación en _to_float/uso.
-#   3. eNPS: detecto la pregunta de recomendación por texto exacto.
+#   2. eNPS: detecto la pregunta de recomendación por texto exacto.
 #      Si no existe para una encuesta dada, el dashboard debe ocultar
 #      ese widget (lo maneja el front con enps == null).
 
@@ -24,17 +22,13 @@ import frappe
 
 REPORT_NAME = "Survey Response Custom Report Front"
 
-# Preguntas que conforman el Índice de Engagement (mismo set que
-# TEMAS_INDICE_DE_ENGAGEMENT en tu reporte). Ajusta si tu catálogo cambia.
-ENGAGEMENT_QUESTIONS = {
-    "Si me ofrecieran un trabajo en condiciones similares en otra empresa, me quedaría donde estoy",
-    "Le recomendaría a un amigo o familiar que trabaje en esta organización",
-    "Siento compromiso y orgullo de trabajar en esta organización",
-    "Hago parte de un equipo de alto desempeño en la organización",
-    "Me veo aprendiendo y creciendo en esta organización en el futuro",
-    "Los líderes en esta organización me inspiran",
-}
 ENPS_QUESTION_TEXT = "Le recomendaría a un amigo o familiar que trabaje en esta organización"
+
+# Preguntas del ÍNDICE DE ENGAGEMENT: se identifican por el campo
+# 'variable' (tag) en los datos de la medición, no por una lista fija de
+# textos. Cualquier pregunta cuyo tag sea exactamente este valor se trata
+# como pregunta ancla del Índice de Engagement.
+INDICE_ENGAGEMENT_VARIABLE = "Índice de Engagement"
 
 # Preguntas ABIERTAS (comentarios de texto libre). Se identifican por el
 # TAG/VARIABLE (columna 'variable' del reporte, viene de
@@ -49,7 +43,7 @@ def _norm(text):
 
 
 _ENPS_QUESTION_NORM = _norm(ENPS_QUESTION_TEXT)
-_ENGAGEMENT_QUESTIONS_NORM = {_norm(q) for q in ENGAGEMENT_QUESTIONS}
+_INDICE_ENGAGEMENT_NORM = _norm(INDICE_ENGAGEMENT_VARIABLE)
 _OPEN_TEXT_TAG_NORM = _norm(OPEN_TEXT_TAG)
 
 FIXED_COLUMNS = {
@@ -192,7 +186,7 @@ def get_available_surveys(exclude=None):
     rows = frappe.get_all(
         "qp_IQ_Survey",
         filters=filters,
-        fields=["name","su_name", "creation"],
+        fields=["name", "su_name", "creation"],
         order_by="creation desc",
         limit_page_length=200,
     )
@@ -226,7 +220,7 @@ def get_dashboard_data(survey):
     from frappe.desk.query_report import run
 
     current_user = frappe.session.user
-    frappe.session.user = "Administrator" 
+    frappe.session.user = "Administrator"
     try:
         report = run(REPORT_NAME, filters={"survey": survey})
     except Exception as e:
@@ -257,6 +251,8 @@ def get_dashboard_data(survey):
     #    - Preguntas con tag/variable "Abiertas" (van solo a la nube de palabras)
     #    - Preguntas SIN tema asignado (dato incompleto en el catálogo,
     #      no deben contaminar ningún promedio ni gráfica)
+    #    Una pregunta es "de índice" (Índice de Engagement) cuando su
+    #    variable/tag es exactamente INDICE_ENGAGEMENT_VARIABLE.
     question_order = OrderedDict()
     for r in rows:
         theme = r.get("theme")
@@ -267,7 +263,7 @@ def get_dashboard_data(survey):
         if key not in question_order:
             question_order[key] = {
                 "code": len(question_order),
-                "is_index": _norm(key[2]) in _ENGAGEMENT_QUESTIONS_NORM,
+                "is_index": _norm(variable) == _INDICE_ENGAGEMENT_NORM,
             }
 
     questions_payload = [
@@ -594,10 +590,10 @@ def get_dashboard_metrics(survey, filters=None):
         if key not in question_order:
             question_order[key] = {
                 "code": len(question_order),
-                "is_index": (
-                    _norm(question)
-                    in _ENGAGEMENT_QUESTIONS_NORM
-                ),
+                # Una pregunta es "de índice" (Índice de Engagement) cuando
+                # su variable/tag es exactamente INDICE_ENGAGEMENT_VARIABLE,
+                # no por coincidencia de texto de la pregunta.
+                "is_index": _norm(variable) == _INDICE_ENGAGEMENT_NORM,
             }
 
     n_questions = len(question_order)
@@ -1025,7 +1021,7 @@ def get_dashboard_metrics(survey, filters=None):
                 else None
             ),
         }
-    
+
     def compute_dimension_scores(record_list):
 
         result = []
@@ -1093,7 +1089,7 @@ def get_dashboard_metrics(survey, filters=None):
                 })
 
         return result
-    
+
 
     def compute_question_scores(record_list):
 

@@ -6,8 +6,30 @@ import json
 import csv
 import traceback
 import time
+import unicodedata
+import re
 from frappe.model.document import Document
 from frappe.utils.file_manager import get_file_path
+
+def normalize_string(text):
+    """
+    Normaliza un string eliminando tildes/acentos, signos de puntuación, 
+    y convirtiéndolo a minúsculas.
+    Ej: '¿Índice de Engagement?.' -> 'indice de engagement'
+    """
+    if not text:
+        return ""
+    
+    # NFKD separa los caracteres de sus diacríticos (acentos)
+    # encode('ASCII', 'ignore') elimina los diacríticos
+    # decode('utf-8') lo vuelve a convertir a string normal
+    normalized = unicodedata.normalize('NFKD', str(text)).encode('ASCII', 'ignore').decode('utf-8').lower()
+    
+    # Eliminar cualquier caracter que no sea alfanumérico o espacio (puntos, comas, ?, !, etc.)
+    normalized = re.sub(r'[^\w\s]', '', normalized)
+    
+    # Limpiar espacios dobles/extra que hayan quedado y retornar
+    return " ".join(normalized.split())
 
 class qp_IQ_HistoricMigration(Document):
     
@@ -51,17 +73,85 @@ class qp_IQ_HistoricMigration(Document):
                 raise Exception("No se adjuntó ningún archivo para procesar.")
 
             file_path = get_file_path(self.hm_file)
+            
+            # Obtenemos datos preliminares para dinamizar el mapeo de columnas del archivo
+            company = frappe.db.get_value('Contact', self.hm_creator, 'custom_company')
+            if not company:
+                raise Exception(f"El Contacto {self.hm_creator} no tiene compañía configurada (custom_company).")
+                
+            base_template_id = self.hm_template
+            creator_contact = self.hm_creator
+            
+            # Validación de categoría para bifurcación (Ej. Cultura vs Engagement)
+            is_culture_template = False
+            is_engagement_template = False
+            template_category = None
+            
+            if base_template_id:
+                try:
+                    template_category = frappe.db.get_value('qp_IQ_Template', base_template_id, 'tp_category')
+                    if template_category:
+                        qnc_mnemonico = frappe.db.get_value('qp_IQ_TemplateCategory', template_category, 'qnc_mnemonico')
+                        if qnc_mnemonico:
+                            mnemonico_str = str(qnc_mnemonico).strip().lower()
+                            if mnemonico_str == 'template_culture':
+                                is_culture_template = True
+                            elif mnemonico_str == 'template_engagement':
+                                is_engagement_template = True
+                except Exception:
+                    frappe.log_error(frappe.get_traceback(), f"Error detectando categoría - Migración {self.name}")
+
             rows = []
             headers = []
             file_extension = file_path.lower().split('.')[-1]
+            enps_mapping = {}
 
+            # Lectura y procesamiento de hojas de Excel (Cuestionario y ENPS)
             if file_extension in ['xlsx', 'xls']:
                 try:
                     import openpyxl
                     # read_only=True para procesamiento en generador sin saturación de RAM
                     wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
-                    sheet = wb.active
-                    data_rows = list(sheet.iter_rows(values_only=True))
+                    
+                    # Extracción de la hoja ENPS para mapear las respuestas NPS
+                    if is_engagement_template:
+                        try:
+                            enps_sheet = None
+                            for sheet_name in wb.sheetnames:
+                                if str(sheet_name).strip().lower() == 'enps':
+                                    enps_sheet = wb[sheet_name]
+                                    break
+                            
+                            if enps_sheet:
+                                enps_rows = list(enps_sheet.iter_rows(values_only=True))
+                                if enps_rows:
+                                    enps_headers = [str(h).strip().lower() if h is not None else '' for h in enps_rows[0]]
+                                    id_idx = enps_headers.index('id interno') if 'id interno' in enps_headers else -1
+                                    resp_idx = enps_headers.index('respuesta') if 'respuesta' in enps_headers else -1
+                                    
+                                    if id_idx != -1 and resp_idx != -1:
+                                        for enps_r in enps_rows[1:]:
+                                            if enps_r[id_idx] is not None:
+                                                raw_id = str(enps_r[id_idx]).strip()
+                                                id_interno = raw_id.replace("ObjectId(", "").replace(")", "").strip()
+                                                resp = str(enps_r[resp_idx]).strip() if enps_r[resp_idx] is not None else ''
+                                                enps_mapping[id_interno] = resp
+                        except Exception as ex:
+                            frappe.log_error(frappe.get_traceback(), f"Error procesando hoja ENPS - Migración {self.name}")
+
+                    # Selección dinámica de hoja principal: 'Cuestionario' o la primera por defecto
+                    target_sheet = None
+                    for sheet_name in wb.sheetnames:
+                        if str(sheet_name).strip().lower() == 'cuestionario':
+                            target_sheet = wb[sheet_name]
+                            break
+                    
+                    if target_sheet is None:
+                        # Fallback a la primera hoja disponible si no se encuentra 'Cuestionario'
+                        first_sheet_name = wb.sheetnames[0] if wb.sheetnames else None
+                        target_sheet = wb[first_sheet_name] if first_sheet_name else wb.active
+                        
+                    data_rows = list(target_sheet.iter_rows(values_only=True))
                     
                     if data_rows:
                         headers = [str(h).strip() if h is not None else '' for h in data_rows[0]]
@@ -92,37 +182,48 @@ class qp_IQ_HistoricMigration(Document):
             if not rows or not headers:
                 raise Exception("El archivo está vacío o no es procesable.")
 
-            cultura_idx = -1
+            # Identificando columnas pivote e iniciando la agrupación
+            pivot_idx = -1
+            pivot_col_name = ''
+            
+            expected_pivots_raw = []
+            if is_culture_template:
+                # Pivote de cultura: Tema -> Dimensión -> Pregunta
+                expected_pivots_raw = ['tema', 'dimension', 'dimension',  'cultura']
+            elif is_engagement_template:
+                # Pivote de engagement: Dimensión -> Atributo -> Pregunta
+                expected_pivots_raw = ['dimensión', 'dimension', 'atributo', 'pregunta']
+            
+            # Fallback a columnas comunes genéricas
+            expected_pivots_raw.extend(['tema', 'tipo de cultura', 'tipo de engagement', 'engagement', 'categoría', 'categoria', 'factor', 'dimensión', 'dimension'])
+            expected_pivots = list(dict.fromkeys(expected_pivots_raw))
+            
+            # Columnas delimitadoras de fallback si no hay categoría principal en el archivo
+            fallback_delimiters = ['dimensión', 'dimension', 'atributo', 'pregunta']
+            
             for i, h in enumerate(headers):
-                if h and h.strip() == 'Tipo de Cultura':
-                    cultura_idx = i
-                    break
-                    
-            if cultura_idx == -1:
-                raise Exception("Columna 'Tipo de Cultura' obligatoria no encontrada.")
+                if h:
+                    # Limpiamos espacios dobles y normalizamos a minúsculas
+                    clean_h = " ".join(str(h).strip().lower().split())
+                    if clean_h in expected_pivots:
+                        pivot_idx = i
+                        pivot_col_name = str(h).strip()
+                        break
+                        
+            # Si no se encontró columna de categoría, buscamos delimitadores secundarios (ej. arranca en Dimensión)
+            if pivot_idx == -1:
+                for i, h in enumerate(headers):
+                    if h:
+                        clean_h = " ".join(str(h).strip().lower().split())
+                        if clean_h in fallback_delimiters:
+                            pivot_idx = i
+                            break
 
-            demo_headers = [h for i, h in enumerate(headers) if i < cultura_idx and h and h.strip() != 'ID Interno']
+            if pivot_idx == -1:
+                display_options = [title.title() for title in (expected_pivots + fallback_delimiters)]
+                raise Exception(f"No se pudo identificar la columna pivote (límite de demográficos). Asegúrese de incluir al menos una de estas columnas: {', '.join(display_options)}")
 
-            company = frappe.db.get_value('Contact', self.hm_creator, 'custom_company')
-            if not company:
-                raise Exception(f"El Contacto {self.hm_creator} no tiene compañía configurada (custom_company).")
-                
-            base_template_id = self.hm_template
-            creator_contact = self.hm_creator
-            
-            # Validación de categoría para activar normalización de respuestas
-            is_culture_template = False
-            template_category = None
-            
-            if base_template_id:
-                try:
-                    template_category = frappe.db.get_value('qp_IQ_Template', base_template_id, 'tp_category')
-                    if template_category:
-                        qnc_mnemonico = frappe.db.get_value('qp_IQ_TemplateCategory', template_category, 'qnc_mnemonico')
-                        if qnc_mnemonico and str(qnc_mnemonico).strip().lower() == 'template_culture':
-                            is_culture_template = True
-                except Exception:
-                    frappe.log_error(frappe.get_traceback(), f"Error detectando categoría - Migración {self.name}")
+            demo_headers = [h for i, h in enumerate(headers) if i < pivot_idx and h and h.strip() != 'ID Interno']
 
             culture_normalization_map = {
                 "-4": "1", "-4.0": "1",
@@ -136,9 +237,19 @@ class qp_IQ_HistoricMigration(Document):
                 "4": "5", "4.0": "5"
             }
 
+            engagement_normalization_map = {
+                "0": "1", "0.0": "1",
+                "1": "2", "1.0": "2",
+                "2": "3", "2.0": "3",
+                "3": "4", "3.0": "4",
+                "4": "5", "4.0": "5"
+            }
+
             grouped_contacts = {}
             unique_questions = set()
+            nps_statements = set()
 
+            # Iterando filas del cuestionario y normalizando jerarquías
             for row in rows:
                 raw_id = str(row.get('ID Interno', '')).strip()
                 id_interno = raw_id.replace("ObjectId(", "").replace(")", "").strip()
@@ -158,14 +269,53 @@ class qp_IQ_HistoricMigration(Document):
                         'responses': {}
                     }
                 
-                cultura = str(row.get('Tipo de Cultura', '')).strip()
-                dimension = str(row.get('Dimensión', '')).strip()
-                atributo = str(row.get('Atributo', '')).strip()
+                topic_val = ''
+                dimension = ''
+                statement = ''
+                is_nps = False
+                
+                dimension_col = str(row.get('Dimensión', row.get('Dimension', ''))).strip()
+                atributo_col = str(row.get('Atributo', '')).strip()
                 respuesta = str(row.get('Respuesta', '')).strip()
+                
+                # Identificar si es la pregunta NPS para el Índice de Engagement basado en 'Dimensión' y 'Atributo'
+                norm_dimension = normalize_string(dimension_col)
+                norm_atributo = normalize_string(atributo_col)
 
-                if atributo:
-                    unique_questions.add((cultura, dimension, atributo))
-                    grouped_contacts[id_interno]['responses'][atributo] = respuesta
+                if is_engagement_template and norm_dimension == 'ambiente laboral positivo' and norm_atributo == 'indice de engagement':
+                    is_nps = True
+
+                if is_engagement_template:
+                    # Jerarquía Engagement: Dimensión -> Atributo -> Pregunta
+                    topic_val = dimension_col
+                    dimension = atributo_col
+                    statement = str(row.get('Pregunta', '')).strip()
+                    
+                    # Fallback por si la estructura está incompleta
+                    if not statement:
+                        statement = dimension
+                        dimension = ''
+                else:
+                    # Jerarquía Cultura: Tema -> Dimensión -> Atributo
+                    topic_val = str(row.get(pivot_col_name, '')).strip() if pivot_col_name else ''
+                    dimension = str(row.get('Dimensión', row.get('Dimension', ''))).strip()
+                    statement = str(row.get('Atributo', '')).strip()
+                    
+                    # Fallback por si la estructura está incompleta
+                    if not statement:
+                        statement = str(row.get('Pregunta', '')).strip()
+                        
+                if is_nps:
+                    nps_statements.add(statement)
+                    # Si existe un mapeo en ENPS para este ID, sobrescribimos la respuesta del cuestionario
+                    if id_interno in enps_mapping and enps_mapping[id_interno] != '':
+                        respuesta = enps_mapping[id_interno]
+
+                if statement:
+                    unique_questions.add((topic_val, dimension, statement))
+                    # Solo agregar a las respuestas si tenemos un valor
+                    if respuesta != '':
+                        grouped_contacts[id_interno]['responses'][statement] = respuesta
 
             # Optimización de caché para demográficos
             demographics_list = frappe.db.get_all('qp_IQ_DemographicType', fields=['name', 'dt_title'])
@@ -219,7 +369,8 @@ class qp_IQ_HistoricMigration(Document):
                         try:
                             stmt = frappe.db.get_value('qp_IQ_Question', q_id, 'qn_statement')
                             if stmt: 
-                                existing_template_qs[stmt] = q_id
+                                # Normalizamos la pregunta del template para una búsqueda más robusta
+                                existing_template_qs[normalize_string(stmt)] = q_id
                         except Exception:
                             pass
 
@@ -227,36 +378,59 @@ class qp_IQ_HistoricMigration(Document):
             if not default_q_type:
                 default_q_type = frappe.db.get_value('qp_IQ_QuestionType', None, 'name')
 
+            # Si es medición de Engagement, se garantiza el tipo de pregunta Likert
+            final_q_type = default_q_type
+            if is_engagement_template:
+                likert_type = frappe.db.get_value('qp_IQ_QuestionType', {'qnt_mnemonico': 'scale_likert'}, 'name')
+                if likert_type:
+                    final_q_type = likert_type
+
+            # Obtención del tipo de pregunta NPS
+            nps_q_type = frappe.db.get_value('qp_IQ_QuestionType', {'qnt_mnemonico': 'score_nps'}, 'name')
+            if not nps_q_type:
+                nps_q_type = frappe.db.get_value('qp_IQ_QuestionType', {'qnt_type_name': ['like', '%NPS%']}, 'name')
+
             # Optimización de caché para preguntas existentes de la compañía
             company_questions = frappe.db.get_all('qp_IQ_Question', filters={'qn_owner': company}, fields=['name', 'qn_statement'])
-            question_cache = {q.qn_statement: q.name for q in company_questions if q.qn_statement}
+            # Normalizamos las preguntas cacheadas de la base de datos
+            question_cache = {normalize_string(q.qn_statement): q.name for q in company_questions if q.qn_statement}
 
-            for cultura, dimension, atributo in unique_questions:
-                if base_template_id and atributo in existing_template_qs:
-                    question_map[atributo] = existing_template_qs[atributo]
+            # Registrando y validando las preguntas detectadas en sistema
+            for topic_val, dimension, statement in unique_questions:
+                # Obtenemos la versión limpia y normalizada del enunciado actual
+                norm_stmt = normalize_string(statement)
+                
+                if base_template_id and norm_stmt in existing_template_qs:
+                    question_map[statement] = existing_template_qs[norm_stmt]
                     continue
                 
-                # Búsqueda en el caché de memoria en lugar de llamadas a la base de datos
-                if atributo in question_cache:
-                    question_map[atributo] = question_cache[atributo]
+                # Búsqueda en el caché de memoria usando la pregunta normalizada
+                if norm_stmt in question_cache:
+                    question_map[statement] = question_cache[norm_stmt]
                 else:
-                    topic_id = get_or_create_demographic(cultura) if cultura else None
+                    topic_id = get_or_create_demographic(topic_val) if topic_val else None
                     dim_id = get_or_create_demographic(dimension) if dimension else None
+                    
+                    qn_type_to_set = final_q_type
+                    # Asignamos estrictamente el tipo NPS a las preguntas identificadas para Engagement
+                    if statement in nps_statements and nps_q_type:
+                        qn_type_to_set = nps_q_type
                     
                     new_q = frappe.get_doc({
                         'doctype': 'qp_IQ_Question',
-                        'qn_statement': atributo,
+                        'qn_statement': statement,
                         'qn_owner': company,
                         'qp_topic': topic_id,
                         'qn_demographic': dim_id,
-                        'qn_type': default_q_type,
+                        'qn_type': qn_type_to_set,
                         'qn_creator': creator_contact
                     })
                     new_q.flags.ignore_mandatory = True
                     new_q.insert(ignore_permissions=True)
                     
-                    question_map[atributo] = new_q.name
-                    question_cache[atributo] = new_q.name
+                    question_map[statement] = new_q.name
+                    # Agregamos la nueva pregunta al caché usando su versión normalizada
+                    question_cache[norm_stmt] = new_q.name
 
             clean_survey_id = str(self.hm_survey_id or self.name).replace("ObjectId(", "").replace(")", "").strip()
 
@@ -279,7 +453,8 @@ class qp_IQ_HistoricMigration(Document):
 
             survey_name_label = f"Medición Migrada - {clean_survey_id}"
             
-            # Creación en qp_IQ_Survey
+            # Generando los registros de Measurement y Survey
+            # Creación del registro en DocType qp_IQ_Survey
             new_survey = frappe.get_doc({
                 'doctype': 'qp_IQ_Survey',
                 'su_name': survey_name_label,
@@ -303,7 +478,7 @@ class qp_IQ_HistoricMigration(Document):
                 
             real_survey_id = new_survey.name
 
-            # Creación directa en DocType Survey
+            # Creación del registro en DocType Survey
             new_core_survey = frappe.get_doc({
                 'doctype': 'Survey',
                 'name': survey_name_label,
@@ -323,6 +498,7 @@ class qp_IQ_HistoricMigration(Document):
             processed_count = 0
             safe_company_name = str(company).replace(" ", "_").lower() if company else "company"
             
+            # Procesando respuestas individuales de los contactos con normalización
             for i, (id_interno, data) in enumerate(grouped_contacts.items(), start=1):
                 # Validacion de interrupcion por usuario
                 if i % 10 == 0:
@@ -333,8 +509,8 @@ class qp_IQ_HistoricMigration(Document):
                 contact_name = f"{safe_company_name}_contacto_{i}"
                 mapped_responses = {}
                 
-                for attr, resp in data['responses'].items():
-                    q_id = question_map.get(attr)
+                for stmt, resp in data['responses'].items():
+                    q_id = question_map.get(stmt)
                     if q_id:
                         clean_resp = str(resp).strip()
                         clean_resp = clean_resp.replace('−', '-').replace('–', '-')
@@ -348,6 +524,14 @@ class qp_IQ_HistoricMigration(Document):
 
                         if is_culture_template:
                             clean_resp = culture_normalization_map.get(clean_resp, clean_resp)
+                        elif is_engagement_template:
+                            # Sólo normalizar en escala Engagement Likert si no es pregunta NPS
+                            if stmt not in nps_statements:
+                                clean_resp = engagement_normalization_map.get(clean_resp, clean_resp)
+                            else:
+                                # Normalización para eNPS: Si la respuesta a la pregunta del índice de engagement es 0, pasa a 1
+                                if clean_resp in ['0', '0.0']:
+                                    clean_resp = '1'
 
                         mapped_responses[q_id] = clean_resp
 
@@ -384,6 +568,7 @@ class qp_IQ_HistoricMigration(Document):
                 if processed_count % 500 == 0:
                     frappe.db.commit()
 
+            # Finalizando migración y actualizando estados
             self.db_set('hm_status', 'Completado')
             self.db_set('hm_processed_records', processed_count)
             self.db_set('hm_survey_id', real_survey_id)

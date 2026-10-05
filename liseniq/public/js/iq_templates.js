@@ -267,6 +267,26 @@ document.addEventListener('DOMContentLoaded', function () {
             const hiddenPublic = document.getElementById('tp_is_public_value');
             const isPublic = formStep1.isPublic?.checked ? 1 : (hiddenPublic && hiddenPublic.value === '1' ? 1 : 0);
 
+            let contactId = null;
+            try {
+                const contactResponse = await frappe.call({
+                    method: 'liseniq.www.iq-templates.new_template.get_user_contact_id'
+                });
+                
+                if (contactResponse && contactResponse.message) {
+                    contactId = contactResponse.message;
+                } else {
+                    throw new Error("Respuesta inválida del servidor al solicitar el Contacto.");
+                }
+            } catch (contactError) {
+                console.error("Error durante la validación del contacto:", contactError);
+                if (contactError.message && !contactError.exc) {
+                     throw contactError;
+                }
+                throw new Error("No tienes permisos para acceder a los Contactos o tu perfil no existe. Contacta a un administrador.");
+            }
+
+            // Asignar el ID validado a tp_owner
             const templateDoc = {
                 doctype: 'qp_IQ_Template',
                 tp_name: formStep1.name.value.trim(),
@@ -275,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 tp_status: 'Borrador',
                 tp_is_private: isPublic ? 0 : (isPrivate ? 1 : 0),
                 tp_is_public: isPublic,
-                tp_owner: frappe.session.user,
+                tp_owner: contactId,
                 custom_company: userCompany,
                 tp_questions: allQuestionNames.map(q_name => ({ doctype: 'qp_IQ_TemplateQuestion', tq_question: q_name }))
             };
@@ -315,7 +335,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } catch (err) {
             console.error("Error al guardar la plantilla:", err);
-            showGlobalNotification(`Ocurrio un error al ${isEditMode ? 'actualizar' : 'crear'} la Plantilla, intente nuevamente.`, 'error');
+            
+            // Parsear el string JSON en err._server_messages
+            let errorMessage = `Ocurrió un error al ${isEditMode ? 'actualizar' : 'crear'} la Plantilla, intente nuevamente.`;
+            try {
+                const serverMessages = err._server_messages || (err.responseJSON && err.responseJSON._server_messages);
+                if (serverMessages) {
+                    const parsedMessages = typeof serverMessages === 'string' ? JSON.parse(serverMessages) : serverMessages;
+                    if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
+                        const msgObj = typeof parsedMessages[0] === 'string' ? JSON.parse(parsedMessages[0]) : parsedMessages[0];
+                        if (msgObj && msgObj.message) {
+                            errorMessage = msgObj.message;
+                        }
+                    }
+                } else if (err.message) {
+                    errorMessage = err.message;
+                }
+            } catch (parseError) {
+                console.error("Error al parsear el mensaje de error del servidor:", parseError);
+            }
+            
+            showGlobalNotification(errorMessage, 'error');
+            
             btnSaveTemplate.disabled = false;
             btnSaveTemplate.textContent = isEditMode ? 'Actualizar' : 'Crear';
         }

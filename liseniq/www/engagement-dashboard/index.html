@@ -134,12 +134,12 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
     return { tier: 6, label: 'Sobresaliente', color: HEAT_COLORS[6] };
   }
   function enpsBand(score) {
-    if (score == null || isNaN(score)) return { label: 'Sin datos', color: '#ccc' };
-    if (score < 0) return { label: 'Crítico', color: '#FF0000' };
-    if (score < 30) return { label: 'Aceptable', color: '#FFAC00' };
-    if (score < 50) return { label: 'Bueno', color: '#FFD616' };
-    if (score < 70) return { label: 'Muy bueno', color: '#C7D64F' };
-    return { label: 'Excelente', color: '#438D42' };
+    if (score == null || isNaN(score)) return { label: 'Sin datos', color: '#ccc', desc: 'Sin datos suficientes de eNPS.' };
+    if (score < 0) return { label: 'Alarma', color: '#FF0000', desc: 'Una alarma encendida: hay más detractores que promotores. Requiere acción inmediata y contundente.' };
+    if (score <= 30) return { label: 'Aceptable', color: '#FFAC00', desc: 'Aceptable, con amplio margen de mejora. Encuentra con foco dónde actuar con determinación.' };
+    if (score <= 50) return { label: 'Positivo con oportunidades', color: '#FFD616', desc: 'Positivo, con oportunidades. Debes encontrar las palancas (fortalezas) y las oportunidades de mejora.' };
+    if (score <= 70) return { label: 'Gran lugar para trabajar', color: '#C7D64F', desc: 'Gran lugar para trabajar. Tu reto es mantener el talento y asegurar que este engagement se refleje en los resultados.' };
+    return { label: 'Excelente', color: '#438D42', desc: 'Excelente, eres referente. El reto es mantenerse e innovar para seguir sorprendiendo.' };
   }
   function fmt1(v) { return v == null || isNaN(v) ? '—' : v.toFixed(2); }
   function fmtPct(v) { return v == null || isNaN(v) ? '—' : v.toFixed(1) + '%'; }
@@ -615,7 +615,7 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
 
   function enpsScaleHTML(score, orgScore) {
     if (score == null) return '<p class="section-intro">Sin datos de eNPS.</p>';
-    const bands = [{ min: -100, max: 0, label: 'Crítico', color: '#FF0000' }, { min: 0, max: 30, label: 'Aceptable', color: '#FFAC00' }, { min: 30, max: 50, label: 'Bueno', color: '#FFD616' }, { min: 50, max: 70, label: 'Muy bueno', color: '#C7D64F' }, { min: 70, max: 100, label: 'Excelente', color: '#438D42' }];
+    const bands = [{ min: -100, max: 0, label: 'Alarma', color: '#FF0000' }, { min: 0, max: 30, label: 'Aceptable', color: '#FFAC00' }, { min: 30, max: 50, label: 'Positivo', color: '#FFD616' }, { min: 50, max: 70, label: 'Gran lugar', color: '#C7D64F' }, { min: 70, max: 100, label: 'Excelente', color: '#438D42' }];
     const clampPct = v => Math.max(0, Math.min(100, ((v + 100) / 200) * 100));
     const pos = clampPct(score);
     let bar = `<div style="position:relative;height:30px;border-radius:8px;overflow:visible;margin:16px 0 4px;">`;
@@ -784,6 +784,7 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
           <div class="card kpi-card"><div class="kpi-label">% Detractores</div><div class="kpi-value">${fmtPct(kpis.detPct)}</div><div class="kpi-sub">${kpis.detN} personas (0-6)</div></div>
         </div>
         <div id="enps-scale-full"></div>
+        <div id="enps-interpretation"></div>
       </div>
       <div class="card">${dlBtn('chart-enps-group', 'enps_por_grupo')}<h3>eNPS por grupo</h3>
         <select id="enps-field" class="small" style="margin-bottom:10px">${fieldOptions}</select>
@@ -799,6 +800,11 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
       options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} (${total ? (100 * c.parsed / total).toFixed(1) : 0}%)` } }, centerText: { text: fmtEnps(kpis.enpsScore), sub: 'eNPS' }, barDataLabels: { enabled: false } } }
     });
     document.getElementById('enps-scale-full').innerHTML = enpsScaleHTML(kpis.enpsScore, filterActive ? orgKpi.enpsScore : null);
+    {
+      const band = enpsBand(kpis.enpsScore);
+      document.getElementById('enps-interpretation').innerHTML = kpis.enpsScore == null ? '' :
+        `<div class="section-intro" style="margin-top:10px;padding:10px 14px;border-radius:10px;background:${band.color}22;border-left:4px solid ${band.color}"><span class="pill" style="background:${band.color}">${escapeHtml(band.label)}</span> ${escapeHtml(band.desc)}</div>`;
+    }
 
     function paint() {
       const idx = parseInt(document.getElementById('enps-field').value, 10);
@@ -1178,11 +1184,11 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
       ['Los Líderes', 'Mi líder · Apoyo · Nuestros líderes'],
     ];
     const enpsBands = [
-      ['< 0', 'Crítico', '#FF0000'],
-      ['0 a 30', 'Aceptable', '#FFAC00'],
-      ['30 a 50', 'Bueno', '#FFD616'],
-      ['50 a 70', 'Muy bueno', '#C7D64F'],
-      ['70+', 'Excelente / Referente global', '#438D42'],
+      ['Menos de 0', 'Alarma', '#FF0000', 'Una alarma encendida: hay más detractores que promotores. Requiere acción inmediata y contundente.'],
+      ['0 a 30', 'Aceptable', '#FFAC00', 'Aceptable, con amplio margen de mejora. Encuentra con foco dónde actuar con determinación.'],
+      ['31 a 50', 'Positivo con oportunidades', '#FFD616', 'Positivo, con oportunidades. Debes encontrar las palancas (fortalezas) y las oportunidades de mejora.'],
+      ['51 a 70', 'Gran lugar para trabajar', '#C7D64F', 'Gran lugar para trabajar. Tu reto es mantener el talento y asegurar que este engagement se refleje en los resultados.'],
+      ['71 o superior', 'Excelente', '#438D42', 'Excelente, eres referente. El reto es mantenerse e innovar para seguir sorprendiendo.'],
     ];
     const heatRanges = [
       ['1.00 – 2.19', 'Situación crítica', '#FF0000'],
@@ -1217,8 +1223,8 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
           <span class="pill" style="background:#FF0000">Detractores</span> 0-6
         </p>
         <p class="section-intro" style="font-weight:700;color:var(--marine)">eNPS = % Promotores − % Detractores · Rango: −100 a +100</p>
-        <div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Puntaje</th><th>Interpretación</th></tr></thead>
-          <tbody>${enpsBands.map(([range, label, color]) => `<tr><td><span class="pill" style="background:${color}">${range}</span></td><td>${label}</td></tr>`).join('')}</tbody>
+        <div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Puntaje</th><th>Nivel</th><th>Interpretación</th></tr></thead>
+          <tbody>${enpsBands.map(([range, label, color, desc]) => `<tr><td><span class="pill" style="background:${color}">${range}</span></td><td style="font-weight:700">${label}</td><td>${desc}</td></tr>`).join('')}</tbody>
         </table></div>
       </div>
 

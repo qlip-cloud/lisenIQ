@@ -236,15 +236,15 @@ def create_question_from_template_wizard(question_data):
 
         culture_title = data.get("qp_topic")
         if culture_title:
+            
             culture_name = frappe.db.exists(
                 "qp_IQ_DemographicType",
-                {"dt_title": culture_title, "dt_object_type": "Tema", "dt_creator_company": user_company}
+                {"dt_title": culture_title, "dt_object_type": "Tema"}
             )
             if not culture_name:
                 culture_doc = frappe.new_doc("qp_IQ_DemographicType")
                 culture_doc.dt_title = culture_title
                 culture_doc.dt_object_type = "Tema"
-                culture_doc.dt_creator_company = user_company
                 culture_doc.insert(ignore_permissions=True)
                 culture_name = culture_doc.name
             

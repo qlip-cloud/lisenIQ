@@ -607,16 +607,13 @@ def _process_manual_questions(questions_data, user_company, user_contact):
                         new_question.qp_topic = topic_val
                     else:
                         topic_filters = {"dt_title": topic_val, "dt_object_type": "Tema"}
-                        if user_company:
-                            topic_filters["dt_creator_company"] = user_company
+
                         
                         topic_name = frappe.db.exists("qp_IQ_DemographicType", topic_filters)
                         if not topic_name:
                             topic_doc = frappe.new_doc("qp_IQ_DemographicType")
                             topic_doc.dt_title = topic_val
                             topic_doc.dt_object_type = "Tema"
-                            if user_company:
-                                topic_doc.dt_creator_company = user_company
                             topic_doc.insert(ignore_permissions=True)
                             topic_name = topic_doc.name
                         new_question.qp_topic = topic_name

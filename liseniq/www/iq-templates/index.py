@@ -170,15 +170,18 @@ def get_questions_from_template(template_name):
 
 
 @frappe.whitelist()
-def get_demographic_suggestions_for_questions(search_term, object_type="Pregunta"):
+def get_demographic_suggestions_for_questions(search_term, object_type="Dimension"):
     if not search_term:
         return []
+
+    # Condición de retrocompatibilidad. Si busca dimensiones, permitimos que traiga viejas creadas como 'Pregunta'
+    allowed_types = [object_type, "Pregunta"] if object_type == "Dimension" else [object_type]
 
     return frappe.get_all(
         "qp_IQ_DemographicType",
         filters={
             'dt_title': ['like', f'%{search_term}%'],
-            'dt_object_type': object_type
+            'dt_object_type': ['in', allowed_types]
         },
         fields=['dt_title'],
         limit=10,
@@ -219,12 +222,13 @@ def create_question_from_template_wizard(question_data):
         if demographic_title:
             demographic_name = frappe.db.exists(
                 "qp_IQ_DemographicType",
-                {"dt_title": demographic_title, "dt_object_type": "Pregunta"}
+                {"dt_title": demographic_title, "dt_object_type": "Dimension", "dt_creator_company": user_company} # CORREGIDO
             )
             if not demographic_name:
                 demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
                 demographic_doc.dt_title = demographic_title
-                demographic_doc.dt_object_type = "Pregunta"
+                demographic_doc.dt_object_type = "Dimension"
+                demographic_doc.dt_creator_company = user_company
                 demographic_doc.insert(ignore_permissions=True)
                 demographic_name = demographic_doc.name
             
@@ -234,7 +238,7 @@ def create_question_from_template_wizard(question_data):
         if culture_title:
             culture_name = frappe.db.exists(
                 "qp_IQ_DemographicType",
-                {"dt_title": culture_title, "dt_object_type": "Tema"}
+                {"dt_title": culture_title, "dt_object_type": "Tema", "dt_creator_company": user_company}
             )
             if not culture_name:
                 culture_doc = frappe.new_doc("qp_IQ_DemographicType")
@@ -300,7 +304,7 @@ def create_question_from_template_wizard(question_data):
         frappe.throw(f"Ocurrió un error al crear la pregunta: {str(e)}")
 
 @frappe.whitelist()
-def get_bank_data(keyword=None, demographic=None, template_category=None):
+def get_bank_data(keyword=None, topic=None, template_category=None):
     # Tipos que usan opciones basados en sus nombres clásicos (por si acaso como fallback)
     OPTIONS_BASED_TYPES = [
         'Selección Múltiple', 
@@ -323,8 +327,19 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
     }
     if keyword:
         question_filters['qn_statement'] = ['like', f'%{keyword}%']
-    if demographic:
-        question_filters['qn_demographic'] = demographic
+
+    # Logica de filtro por String de Tema - Agrupado por compañía y públicos
+    if topic:
+        matching_topics = frappe.get_all(
+            "qp_IQ_DemographicType",
+            filters={"dt_title": topic, "dt_object_type": "Tema"},
+            fields=["name"]
+        )
+        topic_ids = [t.name for t in matching_topics]
+        if topic_ids:
+            question_filters['qp_topic'] = ['in', topic_ids]
+        else:
+            question_filters['qp_topic'] = '---_NON_EXISTENT_ID_---' # Forzar vacío si no se encuentra
 
     # Obtener el ID de la categoría "Liderazgo" si existe
     leadership_cat_name = frappe.db.get_value("qp_IQ_TemplateCategory", {"qnc_category": "Liderazgo"}, "name")
@@ -406,17 +421,36 @@ def get_bank_data(keyword=None, demographic=None, template_category=None):
                 )
                 q['options'] = [opt['qo_option_text'] for opt in options]
 
-    demographics = frappe.get_all(
-        "qp_IQ_DemographicType",
-        filters={"dt_object_type": "Pregunta"},
-        fields=["name", "dt_title"],
-        order_by="dt_title",
-        ignore_permissions=True
-    )
+    # Obtener los temas de forma agrupada por nombre (dt_title) 
+    params = [user_company]
+    cat_condition = ""
+    
+    if leadership_cat_name:
+        if template_category == "Liderazgo":
+            cat_condition = "AND q.qn_category = %s"
+            params.append(leadership_cat_name)
+        else:
+            cat_condition = "AND (q.qn_category != %s OR q.qn_category IS NULL)"
+            params.append(leadership_cat_name)
+
+    sql_topics = f"""
+        SELECT DISTINCT dt.dt_title
+        FROM `tabqp_IQ_DemographicType` dt
+        INNER JOIN `tabqp_IQ_Question` q ON q.qp_topic = dt.name
+        WHERE dt.dt_object_type = 'Tema'
+        AND q.qn_status = 'Activa'
+        AND (q.qn_owner = %s OR q.qp_is_public = 1)
+        AND dt.dt_title IS NOT NULL
+        AND dt.dt_title != ''
+        {cat_condition}
+        ORDER BY dt.dt_title
+    """
+    topics_data = frappe.db.sql(sql_topics, tuple(params), as_dict=True)
+    topics = [{"name": t.dt_title, "dt_title": t.dt_title} for t in topics_data]
 
     return {
         "questions": questions,
-        "demographics": demographics
+        "topics": topics
     }
 
 # Metodo para marcar preguntas de una plantilla como públicas

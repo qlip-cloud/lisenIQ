@@ -99,6 +99,7 @@ def update_template_questions(template_name, new_questions):
 def update_template_question(question_name, question_data):
     data = frappe.parse_json(question_data)
     doc = frappe.get_doc("qp_IQ_Question", question_name)
+    user_company = get_current_active_company()
     
     # Actualizar campos directos
     if "qn_statement" in data:
@@ -134,12 +135,14 @@ def update_template_question(question_name, question_data):
     if demographic_title:
         demographic_name = frappe.db.exists(
             "qp_IQ_DemographicType",
-            {"dt_title": demographic_title, "dt_object_type": "Pregunta"}
+            {"dt_title": demographic_title, "dt_object_type": "Dimension", "dt_creator_company": user_company}
         )
         if not demographic_name:
             demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
             demographic_doc.dt_title = demographic_title
-            demographic_doc.dt_object_type = "Pregunta"
+            demographic_doc.dt_object_type = "Dimension"
+            if user_company:
+                demographic_doc.dt_creator_company = user_company
             demographic_doc.insert(ignore_permissions=True)
             demographic_name = demographic_doc.name
         
@@ -150,13 +153,12 @@ def update_template_question(question_name, question_data):
     if culture_title:
         culture_name = frappe.db.exists(
             "qp_IQ_DemographicType",
-            {"dt_title": culture_title, "dt_object_type": "Tema"}
+            {"dt_title": culture_title, "dt_object_type": "Tema", "dt_creator_company": user_company} # CORREGIDO: INCLUIR COMPAÑIA
         )
         if not culture_name:
             culture_doc = frappe.new_doc("qp_IQ_DemographicType")
             culture_doc.dt_title = culture_title
             culture_doc.dt_object_type = "Tema"
-            user_company = get_current_active_company()
             if user_company:
                 culture_doc.dt_creator_company = user_company
             culture_doc.insert(ignore_permissions=True)

@@ -19,7 +19,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Title"
+   "label": "Title",
+   "reqd": 1
   },
   {
    "fieldname": "dt_description",
@@ -29,7 +30,10 @@
   {
    "fieldname": "dt_object_type",
    "fieldtype": "Select",
+   "in_global_search": 1,
    "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
    "label": "Tipo de Objeto",
    "options": "Contacto\nPregunta\nPlantilla\nRespuesta\nTema\nDimension"
   },
@@ -56,7 +60,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 18:08:03.163973",
+ "modified": "2026-10-06 18:30:23.052218",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_DemographicType",

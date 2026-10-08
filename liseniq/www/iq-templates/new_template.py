@@ -135,7 +135,7 @@ def update_template_question(question_name, question_data):
     if demographic_title:
         demographic_name = frappe.db.exists(
             "qp_IQ_DemographicType",
-            {"dt_title": demographic_title, "dt_object_type": "Dimension", "dt_creator_company": user_company}
+            {"dt_title": demographic_title, "dt_object_type": "Dimension"} 
         )
         if not demographic_name:
             demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
@@ -148,19 +148,17 @@ def update_template_question(question_name, question_data):
         
         doc.qn_demographic = demographic_name
 
-    # Validar o crear Cultura dinámicamente
+    # Validar o crear Cultura (Tema) dinámicamente
     culture_title = data.get("qp_topic")
     if culture_title:
         culture_name = frappe.db.exists(
             "qp_IQ_DemographicType",
-            {"dt_title": culture_title, "dt_object_type": "Tema", "dt_creator_company": user_company} # CORREGIDO: INCLUIR COMPAÑIA
+            {"dt_title": culture_title, "dt_object_type": "Tema"}
         )
         if not culture_name:
             culture_doc = frappe.new_doc("qp_IQ_DemographicType")
             culture_doc.dt_title = culture_title
             culture_doc.dt_object_type = "Tema"
-            if user_company:
-                culture_doc.dt_creator_company = user_company
             culture_doc.insert(ignore_permissions=True)
             culture_name = culture_doc.name
         

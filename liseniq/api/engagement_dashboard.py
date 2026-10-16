@@ -123,9 +123,13 @@ def _get_universe(survey, demo_fields, field_titles):
     if not contacts:
         return []
 
-    gender_map = {}
-    for row in frappe.get_all("Contact", filters={"name": ["in", contacts]}, fields=["name", "gender"]):
-        gender_map[row.name] = row.gender
+    contact_demo_map = {}
+    for row in frappe.get_all(
+        "Contact",
+        filters={"name": ["in", contacts]},
+        fields=["name", "gender", "custom_country AS country"],
+    ):
+        contact_demo_map[row.name] = row
 
     # demo_data_by_title[contact][dt_title] = value (más reciente primero)
     demo_data_by_title = {}
@@ -150,7 +154,11 @@ def _get_universe(survey, demo_fields, field_titles):
 
     universe = []
     for c in contacts:
-        row = [_norm_demo_value(gender_map.get(c)) or "Sin dato"]
+        contact = contact_demo_map.get(c)
+        row = [
+            _norm_demo_value(contact.gender if contact else None) or "Sin dato",
+            _norm_demo_value(contact.country if contact else None) or "Sin dato",
+        ]
         row += [
             _norm_demo_value(demo_data_by_title.get(c, {}).get(field_titles.get(f))) or "Sin dato"
             for f in demo_fields
@@ -243,7 +251,10 @@ def get_dashboard_data(survey):
 
     col_labels = {c["fieldname"]: c["label"] for c in (report.get("columns") or [])}
     demo_fields = [k for k in rows[0].keys() if k not in FIXED_COLUMNS]
-    demographic_fields = [{"key": "gender", "label": col_labels.get("gender", "Género")}]
+    demographic_fields = [
+        {"key": "gender", "label": col_labels.get("gender", "Género")},
+        {"key": "country", "label": col_labels.get("country", "País")},
+    ]
     demographic_fields += [{"key": f, "label": col_labels.get(f, f)} for f in demo_fields]
 
     # 1) Catálogo de preguntas Likert/índice: (tema, variable, pregunta) -> code
@@ -283,7 +294,10 @@ def get_dashboard_data(survey):
     for r in rows:
         resp_id = r.get("name")
         if resp_id not in respondents:
-            demo_values = [_norm_demo_value(r.get("gender")) or "Sin dato"]
+            demo_values = [
+                _norm_demo_value(r.get("gender")) or "Sin dato",
+                _norm_demo_value(r.get("country")) or "Sin dato",
+            ]
             demo_values += [_norm_demo_value(r.get(f)) or "Sin dato" for f in demo_fields]
             respondents[resp_id] = {"demo": demo_values, "answers": {}, "enps": None}
 
@@ -547,7 +561,11 @@ def get_dashboard_metrics(survey, filters=None):
         {
             "key": "gender",
             "label": col_labels.get("gender", "Género")
-        }
+        },
+        {
+            "key": "country",
+            "label": col_labels.get("country", "País")
+        },
     ]
 
     demographic_fields += [
@@ -704,7 +722,8 @@ def get_dashboard_metrics(survey, filters=None):
         if resp_id not in respondents:
 
             demo_values = [
-                _norm_demo_value(row.get("gender")) or "Sin dato"
+                _norm_demo_value(row.get("gender")) or "Sin dato",
+                _norm_demo_value(row.get("country")) or "Sin dato",
             ]
 
             demo_values += [

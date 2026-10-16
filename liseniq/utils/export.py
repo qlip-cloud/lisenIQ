@@ -183,6 +183,7 @@ def get_demographics(survey):
         fields=['name', 'dt_title'],
         order_by='dt_title'
     )
+    demographics.append({"name": "País", "dt_title": "País"})
     return demographics
 
 @frappe.whitelist()

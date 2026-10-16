@@ -160,9 +160,13 @@ def _get_universe(survey, demo_fields):
     if not contacts:
         return []
  
-    gender_map = {}
-    for row in frappe.get_all("Contact", filters={"name": ["in", contacts]}, fields=["name", "gender"]):
-        gender_map[row.name] = row.gender
+    contact_demo_map = {}
+    for row in frappe.get_all(
+        "Contact",
+        filters={"name": ["in", contacts]},
+        fields=["name", "gender", "custom_country AS country"],
+    ):
+        contact_demo_map[row.name] = row
  
     demo_data = {}
     if demo_fields:
@@ -216,7 +220,11 @@ def _get_universe(survey, demo_fields):
  
     universe = []
     for c in contacts:
-        row = [gender_map.get(c) or "Sin dato"]
+        contact = contact_demo_map.get(c)
+        row = [
+            contact.gender if contact and contact.gender else "Sin dato",
+            contact.country if contact and contact.country else "Sin dato",
+        ]
         row += [demo_data.get(c, {}).get(f) or "Sin dato" for f in demo_fields]
         universe.append(row)
     return universe
@@ -317,7 +325,10 @@ def get_dashboard_data(survey):
 
     col_labels = {c["fieldname"]: c["label"] for c in (report.get("columns") or [])}
     demo_fields = [k for k in rows[0].keys() if k not in FIXED_COLUMNS]
-    demographic_fields = [{"key": "gender", "label": col_labels.get("gender", "Género")}]
+    demographic_fields = [
+        {"key": "gender", "label": col_labels.get("gender", "Género")},
+        {"key": "country", "label": col_labels.get("country", "País")},
+    ]
     demographic_fields += [{"key": f, "label": col_labels.get(f, f)} for f in demo_fields]
 
     # 1) Catálogo de atributos: (tipo=theme, dimension=variable, texto) -> code.
@@ -374,7 +385,10 @@ def get_dashboard_data(survey):
     for r in rows:
         resp_id = r.get("name")
         if resp_id not in respondents:
-            demo_values = [r.get("gender") or "Sin dato"]
+            demo_values = [
+                r.get("gender") or "Sin dato",
+                r.get("country") or "Sin dato",
+            ]
             demo_values += [r.get(f) or "Sin dato" for f in demo_fields]
             respondents[resp_id] = {"demo": demo_values, "answers": {}, "open_text": {}}
 

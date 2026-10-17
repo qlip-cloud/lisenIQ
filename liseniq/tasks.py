@@ -314,6 +314,11 @@ def launch_pending_surveys():
 					frappe.log_error(f"Encuesta {survey.name} omitida: Fecha inicio {start_dt} es mayor a fecha actual {now_local}.", "launch_pending_surveys - Omitido")
 					continue
 
+				try:
+					frappe.call("liseniq.www.measurement.new_measurement.purge_beta_data", survey_name=survey.name)
+				except Exception as e_purge:
+					frappe.log_error(f"Advertencia limpiando datos Beta en {survey.name}: {e_purge}", "launch_pending_surveys - Purge Beta")
+
 				frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_in_progress)
 				frappe.log_error(f"Iniciando procesamiento y envío de links para encuesta {survey.name}.", "launch_pending_surveys - Procesando")
 
@@ -321,7 +326,7 @@ def launch_pending_surveys():
 
 				recipients_docs = frappe.get_all(
 					"qp_IQ_SurveyRecipient",
-					filters={"sr_survey": survey.name, "sr_status": rs_not_sent},
+					filters={"sr_survey": survey.name, "sr_status": rs_not_sent, "sr_is_beta": 0},
 					fields=["name", "sr_contact", "sr_evaluating_to"]
 				)
 
@@ -671,7 +676,8 @@ def send_survey_reminders(survey_name=None):
 
 				filters = {
 					"sr_survey": survey.name,
-					"sr_status": rs_sent
+					"sr_status": rs_sent,
+					"sr_is_beta": 0
 				}
 				if not survey_name:
 					filters["sr_reminder_send"] = ["<", survey.su_reminder_max]
@@ -935,9 +941,9 @@ def update_finished_surveys():
 						frappe.log_error(f"Encuesta {survey.name} finalizada por fecha.", "update_finished_surveys - Fecha")
 						continue
 
-				total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name})
+				total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_is_beta": 0})
 				if total_recipients > 0:
-					responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded})
+					responded_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey.name, "sr_status": rs_responded, "sr_is_beta": 0})
 					if total_recipients == responded_recipients:
 						frappe.db.set_value("qp_IQ_Survey", survey.name, "su_status", status_finished)
 						start_iq360_report_generation(survey.name)
@@ -1027,7 +1033,7 @@ def send_pending_links_for_survey(survey_name: str):
 
 		recipients_docs = frappe.get_all(
 			"qp_IQ_SurveyRecipient",
-			filters={"sr_survey": survey.name, "sr_status": rs_not_sent},
+			filters={"sr_survey": survey.name, "sr_status": rs_not_sent, "sr_is_beta": 0},
 			fields=["name", "sr_contact", "sr_evaluating_to"]
 		)
 		if not recipients_docs:

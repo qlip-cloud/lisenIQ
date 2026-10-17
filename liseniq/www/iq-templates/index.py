@@ -1,8 +1,96 @@
 import frappe
 import json
+import re
+import unicodedata
 from frappe import _
 from liseniq.utils.login_util import global_website_context, get_current_active_company
 
+
+def _normalize_demographic_title(text):
+    """
+    Normaliza el título de un Tema o Dimensión para comparaciones insensibles a:
+    - Mayúsculas y minúsculas
+    - Acentos, tildes y diéresis (NFKD)
+    - Caracteres especiales, signos de puntuación y espacios múltiples
+    """
+    if not text:
+        return ""
+    text_str = str(text).strip()
+    no_accents = "".join(
+        c for c in unicodedata.normalize("NFKD", text_str)
+        if unicodedata.category(c) != "Mn"
+    )
+    cleaned = re.sub(r"[^a-z0-9]+", " ", no_accents.lower()).strip()
+    return cleaned or text_str.lower()
+
+
+def _get_or_create_demographic_type(raw_value, object_type, user_company=None):
+    """
+    Valida si ya existe un Tema o Dimensión en qp_IQ_DemographicType (dt_title)
+    indiferentemente de la compañía creadora (dt_creator_company), ignorando
+    acentos, mayúsculas/minúsculas y caracteres especiales.
+    Si existe, retorna su 'name'; si no existe, lo crea sin compañía asociada
+    (compartido entre empresas) y retorna el nuevo 'name'.
+    """
+    if not raw_value or not str(raw_value).strip():
+        return None
+
+    clean_raw = str(raw_value).strip()
+    norm_obj_type = _normalize_demographic_title(object_type)
+    allowed_norm_types = ("dimension", "pregunta") if norm_obj_type == "dimension" else (norm_obj_type,)
+
+    # Si el valor recibido es un ID (name) existente de qp_IQ_DemographicType, resolver su dt_title
+    by_id = frappe.db.sql(
+        """
+        SELECT name, dt_title, dt_object_type
+        FROM `tabqp_IQ_DemographicType`
+        WHERE name = %s
+        LIMIT 1
+        """,
+        (clean_raw,),
+        as_dict=True
+    )
+    if by_id and _normalize_demographic_title(by_id[0].get("dt_object_type")) in allowed_norm_types:
+        if by_id[0].get("dt_title"):
+            clean_raw = by_id[0].get("dt_title").strip()
+        else:
+            return by_id[0].name
+
+    normalized_target = _normalize_demographic_title(clean_raw)
+    if not normalized_target:
+        return None
+
+    # Consultar todos los registros sin filtrar por compañía ni depender de colación en dt_object_type
+    candidates = frappe.db.sql(
+        """
+        SELECT name, dt_title, dt_object_type
+        FROM `tabqp_IQ_DemographicType`
+        WHERE dt_title IS NOT NULL
+          AND dt_title != ''
+        ORDER BY creation ASC
+        """,
+        as_dict=True
+    )
+
+    # Priorizar coincidencia exacta de tipo ('dimension' o 'tema') sobre 'pregunta'
+    candidates.sort(
+        key=lambda r: 0 if _normalize_demographic_title(r.get("dt_object_type")) == norm_obj_type else 1
+    )
+
+    for rec in candidates:
+        rec_type_norm = _normalize_demographic_title(rec.get("dt_object_type"))
+        if rec_type_norm in allowed_norm_types:
+            if _normalize_demographic_title(rec.get("dt_title")) == normalized_target:
+                return rec.name
+
+    # Si no existe coincidencia normalizada, crear el nuevo registro compartido (sin dt_creator_company para Dimension/Tema)
+    new_doc = frappe.new_doc("qp_IQ_DemographicType")
+    new_doc.dt_title = clean_raw
+    new_doc.dt_object_type = object_type
+    if norm_obj_type not in ("dimension", "tema") and user_company:
+        new_doc.dt_creator_company = user_company
+    new_doc.insert(ignore_permissions=True)
+    return new_doc.name
 
 def get_context(context):
 
@@ -171,22 +259,41 @@ def get_questions_from_template(template_name):
 
 @frappe.whitelist()
 def get_demographic_suggestions_for_questions(search_term, object_type="Dimension"):
-    if not search_term:
+    if not search_term or not str(search_term).strip():
+        return []
+
+    normalized_search = _normalize_demographic_title(search_term)
+    if not normalized_search:
         return []
 
     # Condición de retrocompatibilidad. Si busca dimensiones, permitimos que traiga viejas creadas como 'Pregunta'
     allowed_types = [object_type, "Pregunta"] if object_type == "Dimension" else [object_type]
 
-    return frappe.get_all(
-        "qp_IQ_DemographicType",
-        filters={
-            'dt_title': ['like', f'%{search_term}%'],
-            'dt_object_type': ['in', allowed_types]
-        },
-        fields=['dt_title'],
-        limit=10,
-        ignore_permissions=True
+    records = frappe.db.sql(
+        """
+        SELECT dt_title, dt_object_type
+        FROM `tabqp_IQ_DemographicType`
+        WHERE dt_object_type IN %(allowed_types)s
+          AND dt_title IS NOT NULL
+          AND dt_title != ''
+        ORDER BY CASE WHEN dt_object_type = %(object_type)s THEN 0 ELSE 1 END, creation ASC
+        """,
+        {"allowed_types": tuple(allowed_types), "object_type": object_type},
+        as_dict=True
     )
+
+    suggestions = []
+    seen_normalized = set()
+    for rec in records:
+        title = (rec.get("dt_title") or "").strip()
+        norm_title = _normalize_demographic_title(title)
+        if norm_title and normalized_search in norm_title and norm_title not in seen_normalized:
+            seen_normalized.add(norm_title)
+            suggestions.append({"dt_title": title})
+            if len(suggestions) >= 10:
+                break
+
+    return suggestions
 
 @frappe.whitelist()
 def create_question_from_template_wizard(question_data):
@@ -220,35 +327,15 @@ def create_question_from_template_wizard(question_data):
         
         demographic_title = data.get("qn_demographic")
         if demographic_title:
-            demographic_name = frappe.db.exists(
-                "qp_IQ_DemographicType",
-                {"dt_title": demographic_title, "dt_object_type": "Dimension", "dt_creator_company": user_company} # CORREGIDO
+            question_doc.qn_demographic = _get_or_create_demographic_type(
+                demographic_title, "Dimension", user_company
             )
-            if not demographic_name:
-                demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
-                demographic_doc.dt_title = demographic_title
-                demographic_doc.dt_object_type = "Dimension"
-                demographic_doc.dt_creator_company = user_company
-                demographic_doc.insert(ignore_permissions=True)
-                demographic_name = demographic_doc.name
-            
-            question_doc.qn_demographic = demographic_name
 
-        culture_title = data.get("qp_topic")
+        culture_title = data.get("qp_topic") or data.get("culture")
         if culture_title:
-            
-            culture_name = frappe.db.exists(
-                "qp_IQ_DemographicType",
-                {"dt_title": culture_title, "dt_object_type": "Tema"}
+            question_doc.qp_topic = _get_or_create_demographic_type(
+                culture_title, "Tema", user_company
             )
-            if not culture_name:
-                culture_doc = frappe.new_doc("qp_IQ_DemographicType")
-                culture_doc.dt_title = culture_title
-                culture_doc.dt_object_type = "Tema"
-                culture_doc.insert(ignore_permissions=True)
-                culture_name = culture_doc.name
-            
-            question_doc.qp_topic = culture_name
 
         nps_min = data.get("qn_nps_min")
         if nps_min is not None and nps_min != '':
@@ -328,14 +415,19 @@ def get_bank_data(keyword=None, topic=None, template_category=None):
     if keyword:
         question_filters['qn_statement'] = ['like', f'%{keyword}%']
 
-    # Logica de filtro por String de Tema - Agrupado por compañía y públicos
+    # Logica de filtro por String de Tema normalizado - Agrupado por compañía y públicos
     if topic:
-        matching_topics = frappe.get_all(
+        norm_topic = _normalize_demographic_title(topic)
+        all_topics = frappe.get_all(
             "qp_IQ_DemographicType",
-            filters={"dt_title": topic, "dt_object_type": "Tema"},
-            fields=["name"]
+            filters={"dt_object_type": "Tema"},
+            fields=["name", "dt_title"],
+            ignore_permissions=True
         )
-        topic_ids = [t.name for t in matching_topics]
+        topic_ids = [
+            t.name for t in all_topics
+            if _normalize_demographic_title(t.dt_title) == norm_topic
+        ]
         if topic_ids:
             question_filters['qp_topic'] = ['in', topic_ids]
         else:
@@ -446,7 +538,13 @@ def get_bank_data(keyword=None, topic=None, template_category=None):
         ORDER BY dt.dt_title
     """
     topics_data = frappe.db.sql(sql_topics, tuple(params), as_dict=True)
-    topics = [{"name": t.dt_title, "dt_title": t.dt_title} for t in topics_data]
+    topics = []
+    seen_topics = set()
+    for t in topics_data:
+        norm_t = _normalize_demographic_title(t.dt_title)
+        if norm_t and norm_t not in seen_topics:
+            seen_topics.add(norm_t)
+            topics.append({"name": t.dt_title, "dt_title": t.dt_title})
 
     return {
         "questions": questions,

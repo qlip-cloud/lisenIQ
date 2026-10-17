@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span>Tipo: ${frappe.utils.escape_html(questionDisplayName)}</span>
                         <div>
                             <span class="review-question-tag">Dimensión: ${frappe.utils.escape_html(question.demographic || 'General')}</span>
-                            ${question.culture ? `<span class="review-question-tag" style="margin-left:10px;">Tema: ${frappe.utils.escape_html(question.culture)}</span>` : ''}
+                            ${(question.culture || question.qp_topic_title) ? `<span class="review-question-tag" style="margin-left:10px;">Tema: ${frappe.utils.escape_html(question.culture || question.qp_topic_title)}</span>` : ''}
                         </div>
                     </div>
                     ${optionsHtml}
@@ -199,10 +199,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             const questions = questionBuilder.getQuestions();
-            const newQuestionNames = [];
-            const manualQuestions = questions.filter(q => q.id.startsWith('manual-'));
+            const manualQuestions = questions.filter(q => String(q.id || '').startsWith('manual-'));
 
             for (const q of manualQuestions) {
+                const demographicClean = (q.demographic || '').trim() || null;
+                const topicClean = (q.culture || q.qp_topic_title || '').trim() || null;
+
                 const questionDoc = {
                     qn_statement: q.text,
                     qn_statement_others: q.text_others || null,
@@ -213,8 +215,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     qn_positive_statement: q.positive_statement || null,
                     qn_nps_min: q.nps_min,
                     qn_nps_max: q.nps_max,
-                    qn_demographic: q.demographic,
-                    qp_topic: q.culture,
+                    qn_demographic: demographicClean,
+                    qp_topic: topicClean,
                     qp_others: q.qp_others ? 1 : 0,
                     qp_none_above: q.qp_none_above ? 1 : 0,
                     qn_optional: q.qn_optional ? 1 : 0
@@ -240,12 +242,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 
                 if (result.message) {
-                    newQuestionNames.push(result.message);
+                    q.id = result.message;
                 }
             }
 
-            const bankQuestionNames = questions.filter(q => !q.id.startsWith('manual-')).map(q => q.id);
-            const allQuestionNames = [...newQuestionNames, ...bankQuestionNames];
+            const allQuestionNames = questions
+                .filter(q => q.id && !String(q.id).startsWith('manual-'))
+                .map(q => q.id);
 
             if (isEditMode) {
                 // Flujo de Actualización

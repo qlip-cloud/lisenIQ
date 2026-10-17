@@ -385,7 +385,7 @@ export class QuestionBuilder {
             `;
         }
 
-        const topicText = question.qp_topic_title || question.culture;
+        const topicText = question.culture || question.qp_topic_title;
         
         questionCard.innerHTML = `
             <div class="question-item-header">
@@ -817,14 +817,19 @@ export class QuestionBuilder {
 
         if (!this.validateQuestionForm()) return;
 
+        const demographicVal = qf.demographic ? qf.demographic.value.trim() : '';
+        const cultureVal = qf.culture ? qf.culture.value.trim() : null;
+
         const newQuestion = { 
             id: `manual-${Date.now()}`, 
             text: qf.text.value.trim(), 
             text_others: this.isLeadershipMode && qf.textOthers ? qf.textOthers.value.trim() : null,
             type: qf.type.value, 
             typeName: questionTypeName, 
-            demographic: qf.demographic.value.trim(),
-            culture: qf.culture ? qf.culture.value.trim() : null,
+            demographic: demographicVal,
+            culture: cultureVal,
+            qp_topic: null,
+            qp_topic_title: cultureVal,
             category_name: this.isLeadershipMode ? 'Liderazgo' : 'Manual',
             qn_optional: qf.mandatory && !qf.mandatory.checked ? 1 : 0
         };
@@ -1014,6 +1019,10 @@ export class QuestionBuilder {
             const original = this.questions[index];
             const duplicate = JSON.parse(JSON.stringify(original));
             duplicate.id = `manual-dup-${Date.now()}`;
+            const topicTitle = duplicate.culture || duplicate.qp_topic_title || null;
+            duplicate.culture = topicTitle;
+            duplicate.qp_topic_title = topicTitle;
+            duplicate.qp_topic = null;
             
             // Incrementador de Copia
             const match = duplicate.text.match(/ - Copia (\d+)$/);

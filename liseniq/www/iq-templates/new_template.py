@@ -1,7 +1,95 @@
 import frappe
+import re
+import unicodedata
 from frappe import _
 from liseniq.utils.login_util import global_website_context, get_current_active_company
 
+
+def _normalize_demographic_title(text):
+    """
+    Normaliza el título de un Tema o Dimensión para comparaciones insensibles a:
+    - Mayúsculas y minúsculas
+    - Acentos, tildes y diéresis (NFKD)
+    - Caracteres especiales, signos de puntuación y espacios múltiples
+    """
+    if not text:
+        return ""
+    text_str = str(text).strip()
+    no_accents = "".join(
+        c for c in unicodedata.normalize("NFKD", text_str)
+        if unicodedata.category(c) != "Mn"
+    )
+    cleaned = re.sub(r"[^a-z0-9]+", " ", no_accents.lower()).strip()
+    return cleaned or text_str.lower()
+
+
+def _get_or_create_demographic_type(raw_value, object_type, user_company=None):
+    """
+    Valida si ya existe un Tema o Dimensión en qp_IQ_DemographicType (dt_title)
+    indiferentemente de la compañía creadora (dt_creator_company), ignorando
+    acentos, mayúsculas/minúsculas y caracteres especiales.
+    Si existe, retorna su 'name'; si no existe, lo crea sin compañía asociada
+    (compartido entre empresas) y retorna el nuevo 'name'.
+    """
+    if not raw_value or not str(raw_value).strip():
+        return None
+
+    clean_raw = str(raw_value).strip()
+    norm_obj_type = _normalize_demographic_title(object_type)
+    allowed_norm_types = ("dimension", "pregunta") if norm_obj_type == "dimension" else (norm_obj_type,)
+
+    # Si el valor recibido es un ID (name) existente de qp_IQ_DemographicType, resolver su dt_title
+    by_id = frappe.db.sql(
+        """
+        SELECT name, dt_title, dt_object_type
+        FROM `tabqp_IQ_DemographicType`
+        WHERE name = %s
+        LIMIT 1
+        """,
+        (clean_raw,),
+        as_dict=True
+    )
+    if by_id and _normalize_demographic_title(by_id[0].get("dt_object_type")) in allowed_norm_types:
+        if by_id[0].get("dt_title"):
+            clean_raw = by_id[0].get("dt_title").strip()
+        else:
+            return by_id[0].name
+
+    normalized_target = _normalize_demographic_title(clean_raw)
+    if not normalized_target:
+        return None
+
+    # Consultar todos los registros sin filtrar por compañía ni depender de colación en dt_object_type
+    candidates = frappe.db.sql(
+        """
+        SELECT name, dt_title, dt_object_type
+        FROM `tabqp_IQ_DemographicType`
+        WHERE dt_title IS NOT NULL
+          AND dt_title != ''
+        ORDER BY creation ASC
+        """,
+        as_dict=True
+    )
+
+    # Priorizar coincidencia exacta de tipo ('dimension' o 'tema') sobre 'pregunta'
+    candidates.sort(
+        key=lambda r: 0 if _normalize_demographic_title(r.get("dt_object_type")) == norm_obj_type else 1
+    )
+
+    for rec in candidates:
+        rec_type_norm = _normalize_demographic_title(rec.get("dt_object_type"))
+        if rec_type_norm in allowed_norm_types:
+            if _normalize_demographic_title(rec.get("dt_title")) == normalized_target:
+                return rec.name
+
+    # Si no existe coincidencia normalizada, crear el nuevo registro compartido (sin dt_creator_company para Dimension/Tema)
+    new_doc = frappe.new_doc("qp_IQ_DemographicType")
+    new_doc.dt_title = clean_raw
+    new_doc.dt_object_type = object_type
+    if norm_obj_type not in ("dimension", "tema") and user_company:
+        new_doc.dt_creator_company = user_company
+    new_doc.insert(ignore_permissions=True)
+    return new_doc.name
 
 def get_context(context):
 
@@ -130,39 +218,21 @@ def update_template_question(question_name, question_data):
                 "qo_url": opt.get("qo_url")
             })
         
-    # Validar o crear el demográfico dinámicamente
-    demographic_title = data.get("qn_demographic")
-    if demographic_title:
-        demographic_name = frappe.db.exists(
-            "qp_IQ_DemographicType",
-            {"dt_title": demographic_title, "dt_object_type": "Dimension"} 
+    # Validar o crear el demográfico (Dimensión) dinámicamente sin duplicar entre empresas
+    if "qn_demographic" in data:
+        demographic_title = data.get("qn_demographic")
+        doc.qn_demographic = (
+            _get_or_create_demographic_type(demographic_title, "Dimension", user_company)
+            if demographic_title else None
         )
-        if not demographic_name:
-            demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
-            demographic_doc.dt_title = demographic_title
-            demographic_doc.dt_object_type = "Dimension"
-            if user_company:
-                demographic_doc.dt_creator_company = user_company
-            demographic_doc.insert(ignore_permissions=True)
-            demographic_name = demographic_doc.name
-        
-        doc.qn_demographic = demographic_name
 
-    # Validar o crear Cultura (Tema) dinámicamente
-    culture_title = data.get("qp_topic")
-    if culture_title:
-        culture_name = frappe.db.exists(
-            "qp_IQ_DemographicType",
-            {"dt_title": culture_title, "dt_object_type": "Tema"}
+    # Validar o crear Cultura (Tema) dinámicamente sin duplicar entre empresas
+    if "qp_topic" in data or "culture" in data:
+        culture_title = data.get("qp_topic") or data.get("culture")
+        doc.qp_topic = (
+            _get_or_create_demographic_type(culture_title, "Tema", user_company)
+            if culture_title else None
         )
-        if not culture_name:
-            culture_doc = frappe.new_doc("qp_IQ_DemographicType")
-            culture_doc.dt_title = culture_title
-            culture_doc.dt_object_type = "Tema"
-            culture_doc.insert(ignore_permissions=True)
-            culture_name = culture_doc.name
-        
-        doc.qp_topic = culture_name
         
     doc.save(ignore_permissions=True)
     return {"status": "success"}

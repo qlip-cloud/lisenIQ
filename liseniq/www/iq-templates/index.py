@@ -83,7 +83,7 @@ def _get_or_create_demographic_type(raw_value, object_type, user_company=None):
             if _normalize_demographic_title(rec.get("dt_title")) == normalized_target:
                 return rec.name
 
-    # 3. Si no existe coincidencia normalizada, crear el nuevo registro compartido (sin dt_creator_company para Dimension/Tema)
+    # Si no existe coincidencia normalizada, crear el nuevo registro compartido (sin dt_creator_company para Dimension/Tema)
     new_doc = frappe.new_doc("qp_IQ_DemographicType")
     new_doc.dt_title = clean_raw
     new_doc.dt_object_type = object_type

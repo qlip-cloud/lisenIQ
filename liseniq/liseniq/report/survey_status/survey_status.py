@@ -83,7 +83,16 @@ def get_data(filters):
     select_extra = ""
     group_extra = ""
 
-    if demographic1:
+    demographic1_label = frappe.get_value(
+        "qp_IQ_DemographicType", demographic1, "dt_title") or demographic1
+    demographic2_label = frappe.get_value(
+        "qp_IQ_DemographicType", demographic2, "dt_title") or demographic2
+
+    
+    is_country_demographic1 = demographic1_label and demographic1_label.lower() == "país"
+    is_country_demographic2 = demographic2_label and demographic2_label.lower() == "país"
+    
+    if demographic1 and not is_country_demographic1:
         joins += f"""
             LEFT JOIN `tabqp_IQ_ContactAdditionalDetail` cad1 
                 ON cad1.parent = c.name 
@@ -92,7 +101,7 @@ def get_data(filters):
         select_extra += ", cad1.cad_value AS demographic1"
         group_extra += ", cad1.cad_value"
 
-    if demographic2:
+    if demographic2 and not is_country_demographic2:
         joins += f"""
             LEFT JOIN `tabqp_IQ_ContactAdditionalDetail` cad2 
                 ON cad2.parent = c.name 
@@ -100,6 +109,14 @@ def get_data(filters):
         """
         select_extra += ", cad2.cad_value AS demographic2"
         group_extra += ", cad2.cad_value"
+
+    if is_country_demographic1:
+        select_extra += ", c.custom_country AS demographic1"
+        group_extra += ", c.custom_country"
+
+    if is_country_demographic2:
+        select_extra += ", c.custom_country AS demographic2"
+        group_extra += ", c.custom_country"
 
     conditions = []
     if filters.get("company"):

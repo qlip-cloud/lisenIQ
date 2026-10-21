@@ -79,6 +79,12 @@ class MeasurementCreator {
                 remindersSection: document.getElementById('reminders-section'),
                 reminderFrequency: document.getElementById('reminder-frequency'),
                 reminderMax: document.getElementById('reminder-max'),
+                betaSection: document.getElementById('beta-test-section'),
+                betaEmailsInput: document.getElementById('beta-emails-input'),
+                betaRoleGroup: document.getElementById('beta-role-group'),
+                betaRoleSelect: document.getElementById('beta-leadership-role'),
+                btnSendBeta: document.getElementById('btn-send-beta'),
+                betaFeedbackMsg: document.getElementById('beta-feedback-msg'),
             },
             contactsModal: {
                 modal: document.getElementById('view-contacts-modal'),
@@ -261,6 +267,8 @@ class MeasurementCreator {
                      selectedContactsSection?.classList.add('d-none');
                 }
 
+                this.state.measurementData.contacts.surveyType = data.contacts.surveyType || 'selected';
+                this.state.measurementData.contacts.responseType = data.contacts.responseType || 'anonymous';
                 this.state.measurementData.contacts.headers = Array.isArray(data.contacts.headers) && data.contacts.headers.length > 0
                     ? data.contacts.headers : ['Nombre'];
                 this.state.measurementData.contacts.list = Array.isArray(data.contacts.list) ? data.contacts.list : [];
@@ -426,6 +434,16 @@ class MeasurementCreator {
         });
         navButtons.back5?.addEventListener('click', () => this.showStep(4));
         navButtons.next5?.addEventListener('click', () => this.saveMeasurement());
+
+        // Eventos de Prueba Beta en el Paso 5
+        reviewStep.btnSendBeta?.addEventListener('click', () => this.sendBetaTest());
+        reviewStep.betaEmailsInput?.addEventListener('input', () => {
+            reviewStep.betaEmailsInput.classList.remove('is-invalid');
+            if (reviewStep.betaFeedbackMsg) {
+                reviewStep.betaFeedbackMsg.classList.add('d-none');
+                reviewStep.betaFeedbackMsg.textContent = '';
+            }
+        });
 
         // Eventos de Personalización
         personalizationStep.typeButtons.invitation?.addEventListener('click', () => {
@@ -1595,16 +1613,9 @@ class MeasurementCreator {
         return isValid;
     }
 
-    async saveMeasurement() {
-        const { navButtons, reviewStep, contactsStep, step1Form } = this.ui;
-        const saveButton = navButtons.next5;
-
-        saveButton.disabled = true;
-        saveButton.innerHTML = this.state.isEditMode
-            ? `<i class="fa fa-spinner fa-spin"> </i> Guardando...`
-            : `<i class="fa fa-spinner fa-spin"> </i> Enviando...`;
-
-        const surveyType = this.ui.contactsStep.surveyTypeSelect?.value;
+    buildMeasurementPayload() {
+        const { reviewStep, contactsStep, step1Form } = this.ui;
+        const surveyType = contactsStep.surveyTypeSelect?.value;
         const isAnonymousLink = surveyType === 'anonymous_link';
 
         const useDefaultEmail = !!this.ui.personalizationStep.useDefaultCheck?.checked || isAnonymousLink;
@@ -1635,7 +1646,9 @@ class MeasurementCreator {
             ...(reminders ? { reminders } : {})
         };
 
-        const measurementPayload = this.state.isEditMode
+        const canEditQuestions = !this.state.measurementData.status || this.state.measurementData.status === 'Programada';
+
+        return this.state.isEditMode
             ? { 
                 ...basePayload, 
                 is_edit_mode: true, 
@@ -1643,10 +1656,10 @@ class MeasurementCreator {
                 leadershipNetwork: this.state.measurementData.leadershipNetwork,
                 contacts: {
                     surveyType: surveyType || 'selected',
-                    responseType: this.ui.contactsStep.responseTypeSelect?.value || 'identified',
+                    responseType: contactsStep.responseTypeSelect?.value || 'identified',
                     list: this.state.measurementData.contacts.list
                 },
-                questions: this.state.measurementData.status === 'Programada' ? this.state.measurementData.questions : undefined
+                questions: canEditQuestions ? this.state.measurementData.questions : undefined
             }
             : {
                 ...basePayload,
@@ -1659,6 +1672,20 @@ class MeasurementCreator {
                     list: this.state.measurementData.contacts.list 
                 }
             };
+    }
+
+    async saveMeasurement(silent = false) {
+        const { navButtons } = this.ui;
+        const saveButton = navButtons.next5;
+
+        if (!silent && saveButton) {
+            saveButton.disabled = true;
+            saveButton.innerHTML = this.state.isEditMode
+                ? `<i class="fa fa-spinner fa-spin"> </i> Guardando...`
+                : `<i class="fa fa-spinner fa-spin"> </i> Enviando...`;
+        }
+
+        const measurementPayload = this.buildMeasurementPayload();
 
         try {
             const response = await frappe.call({
@@ -1667,24 +1694,150 @@ class MeasurementCreator {
             });
 
             if (response.message && response.message.status === 'success') {
+                if (silent) {
+                    this.state.isEditMode = true;
+                    this.state.docName = response.message.docname;
+                    if (!this.state.measurementData.status) {
+                        this.state.measurementData.status = 'Programada';
+                    }
+                    if (saveButton) {
+                        saveButton.textContent = 'Guardar Cambios';
+                    }
+                    return response.message;
+                }
                 showGlobalNotification(response.message.message, 'success');
                 setTimeout(() => window.location.href = `/iq-home`, 1500);
             } else {
-                throw new Error(response.message.message || 'Ocurrió un error al guardar la medición.');
+                throw new Error(response.message?.message || 'Ocurrió un error al guardar la medición.');
             }
         } catch (error) {
             console.error("Error al guardar la medición:", error);
-            showGlobalNotification(error.message, 'error');
-            saveButton.disabled = false;
-            saveButton.textContent = this.state.isEditMode ? 'Guardar Cambios' : 'Enviar';
+            if (!silent) {
+                showGlobalNotification(error.message, 'error');
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.textContent = this.state.isEditMode ? 'Guardar Cambios' : 'Enviar';
+                }
+            }
+            throw error;
+        }
+    }
+
+    async sendBetaTest() {
+        const { betaEmailsInput, betaRoleSelect, btnSendBeta, betaFeedbackMsg } = this.ui.reviewStep;
+        if (!betaEmailsInput || !btnSendBeta) return;
+
+        const rawEmails = (betaEmailsInput.value || '').trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailList = rawEmails
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(e => e.length > 0);
+
+        const validEmails = [...new Set(emailList.filter(e => emailRegex.test(e)))];
+        const invalidEmails = emailList.filter(e => !emailRegex.test(e));
+
+        const showBetaFeedback = (msg, isError = false, links = [], isWarning = false) => {
+            if (!betaFeedbackMsg) return;
+            betaFeedbackMsg.classList.remove('d-none', 'text-success', 'text-danger', 'text-warning');
+            const colorClass = isError ? 'text-danger' : (isWarning ? 'text-warning' : 'text-success');
+            betaFeedbackMsg.classList.add(colorClass);
+
+            let html = `<div>${frappe.utils.escape_html(msg)}</div>`;
+            if (Array.isArray(links) && links.length > 0) {
+                html += `<div class="mt-2 p-2 rounded" style="background: rgba(123, 36, 255, 0.06); border: 1px solid rgba(123, 36, 255, 0.2);">`;
+                html += `<div class="font-weight-bold mb-1" style="color: #5a12cc;">Enlaces directos de Prueba Beta activos:</div>`;
+                links.forEach(item => {
+                    const safeEmail = frappe.utils.escape_html(item.email || '');
+                    const safeUrl = frappe.utils.escape_html(item.url || '');
+                    html += `
+                        <div class="d-flex align-items-center justify-content-between py-1" style="gap: 8px; flex-wrap: wrap;">
+                            <span class="text-dark"><strong>${safeEmail}:</strong></span>
+                            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-purple" style="padding: 2px 10px; font-size: 0.78rem;">
+                                <i class="fa fa-external-link mr-1"></i> Abrir Prueba Beta
+                            </a>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+            betaFeedbackMsg.innerHTML = html;
+        };
+
+        if (validEmails.length === 0 || invalidEmails.length > 0) {
+            betaEmailsInput.classList.add('is-invalid');
+            const errMsg = invalidEmails.length > 0
+                ? `Formato de correo inválido: ${invalidEmails.join(', ')}`
+                : 'Ingrese al menos un correo electrónico válido para enviar la prueba Beta.';
+            showBetaFeedback(errMsg, true);
+            showGlobalNotification(errMsg, 'error');
+            return;
+        }
+
+        betaEmailsInput.classList.remove('is-invalid');
+        const originalBtnHtml = btnSendBeta.innerHTML;
+        btnSendBeta.disabled = true;
+        btnSendBeta.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Enviando Beta...`;
+        if (betaFeedbackMsg) betaFeedbackMsg.classList.add('d-none');
+
+        try {
+            // Auto-guardado transparente (creación o sincronización en modo edición) sin redirigir a /iq-home
+            this.syncEmailStateFromFields();
+            await this.saveMeasurement(true);
+
+            const testRole = (this.state.measurementData.isLeadership && betaRoleSelect)
+                ? betaRoleSelect.value
+                : 'Autoevaluación';
+
+            const response = await frappe.call({
+                method: 'liseniq.www.measurement.new_measurement.send_beta_measurement',
+                args: {
+                    survey_name: this.state.docName,
+                    beta_emails: JSON.stringify(validEmails),
+                    test_role: testRole
+                }
+            });
+
+            const res = response.message || {};
+            if (res.status === 'success') {
+                const hasWarning = !!res.mail_warning;
+                const successMsg = res.message || `Prueba Beta enviada exitosamente a ${validEmails.length} correo(s).`;
+                showBetaFeedback(successMsg, false, res.links || [], hasWarning);
+                showGlobalNotification(successMsg, hasWarning ? 'warning' : 'success');
+            } else {
+                throw new Error(res.message || 'No se pudo enviar la prueba Beta.');
+            }
+        } catch (error) {
+            console.error('Error al enviar prueba Beta:', error);
+            const errMsg = error.message || 'Ocurrió un error al enviar la prueba Beta.';
+            showBetaFeedback(errMsg, true);
+            showGlobalNotification(errMsg, 'error');
+        } finally {
+            btnSendBeta.disabled = false;
+            btnSendBeta.innerHTML = originalBtnHtml;
         }
     }
 
     renderReviewStep() {
-        const { measurementName, surveyType, responseType, questionsCount, contactCount, questionsList, viewContactsBtn } = this.ui.reviewStep;
+        const {
+            measurementName,
+            surveyType,
+            responseType,
+            questionsCount,
+            contactCount,
+            questionsList,
+            viewContactsBtn,
+            betaSection,
+            betaRoleGroup,
+            betaEmailsInput,
+            btnSendBeta,
+            betaFeedbackMsg
+        } = this.ui.reviewStep;
         const { surveyTypeSelect, responseTypeSelect } = this.ui.contactsStep;
 
         measurementName.textContent = this.state.measurementData.name;
+
+        let isAnonymousLink = false;
 
         if (this.state.measurementData.isLeadership) {
             surveyType.textContent = 'Liderazgo (360°)';
@@ -1701,28 +1854,32 @@ class MeasurementCreator {
             if (this.state.isEditMode) {
                 const dataEl = document.getElementById('measurement-data');
                 const data = dataEl && dataEl.dataset.measurement ? JSON.parse(dataEl.dataset.measurement) : null;
+                const currentSurveyType = data?.contacts?.surveyType || surveyTypeSelect?.value || 'selected';
+                const currentResponseType = data?.contacts?.responseType || responseTypeSelect?.value || 'anonymous';
+                isAnonymousLink = (currentSurveyType === 'anonymous_link');
                 
-                if (data?.contacts?.surveyType === 'anonymous_link') {
+                if (currentSurveyType === 'anonymous_link') {
                     surveyType.textContent = 'Medición Anónima';
-                } else if (data?.contacts?.surveyType === 'selected') {
+                } else if (currentSurveyType === 'selected') {
                     surveyType.textContent = 'Contactos Cargados Previamente';
                 } else {
                     surveyType.textContent = 'Público Externo';
                 }
 
-                responseType.textContent = data?.contacts?.responseType === 'anonymous' ? 'Anónima' : 'No Anónima';
-                questionsCount.textContent = (data?.questions || []).length;
+                responseType.textContent = currentResponseType === 'anonymous' ? 'Anónima' : 'No Anónima';
+                questionsCount.textContent = (this.state.measurementData.questions?.length ? this.state.measurementData.questions : (data?.questions || [])).length;
 
                 const listLen = this.state.measurementData.contacts.list?.length || 0;
-                contactCount.textContent = listLen;
-                if (viewContactsBtn) viewContactsBtn.style.display = (listLen > 0 && data?.contacts?.surveyType !== 'anonymous_link') ? 'inline-block' : 'none';
+                contactCount.textContent = isAnonymousLink ? 'N/A' : listLen;
+                if (viewContactsBtn) viewContactsBtn.style.display = (listLen > 0 && !isAnonymousLink) ? 'inline-block' : 'none';
             } else {
+                isAnonymousLink = (surveyTypeSelect.value === 'anonymous_link');
                 surveyType.textContent = surveyTypeSelect.options[surveyTypeSelect.selectedIndex].text;
                 responseType.textContent = responseTypeSelect.options[responseTypeSelect.selectedIndex].text;
                 questionsCount.textContent = this.state.measurementData.questions.length;
                 
-            // Revisión en modo anónimo
-                if (surveyTypeSelect.value === 'anonymous_link') {
+                // Revisión en modo anónimo
+                if (isAnonymousLink) {
                     contactCount.textContent = "N/A";
                     if (viewContactsBtn) viewContactsBtn.style.display = 'none';
                 } else {
@@ -1732,10 +1889,25 @@ class MeasurementCreator {
             }
         }
 
+        // Configurar visibilidad del bloque Beta según tipo de medición (360° vs Estándar / Enlace Abierto)
+        if (betaRoleGroup) {
+            betaRoleGroup.classList.toggle('d-none', !this.state.measurementData.isLeadership);
+        }
+        if (betaSection) {
+            betaSection.classList.remove('d-none');
+            if (betaEmailsInput) betaEmailsInput.disabled = false;
+            if (btnSendBeta) btnSendBeta.disabled = false;
+        }
+        if (betaFeedbackMsg) {
+            betaFeedbackMsg.classList.add('d-none');
+        }
+
         questionsList.innerHTML = '';
-        const questions = this.state.isEditMode
-            ? (JSON.parse(document.getElementById('measurement-data')?.dataset?.measurement || '{}').questions || [])
-            : this.state.measurementData.questions;
+        const questions = (this.state.measurementData.questions && this.state.measurementData.questions.length > 0)
+            ? this.state.measurementData.questions
+            : (this.state.isEditMode
+                ? (JSON.parse(document.getElementById('measurement-data')?.dataset?.measurement || '{}').questions || [])
+                : []);
 
         if (questions.length === 0) {
             questionsList.innerHTML = `<div class="text-center text-muted p-4">No se han añadido preguntas.</div>`;
@@ -1764,7 +1936,7 @@ class MeasurementCreator {
             optionsHtml = `<div class="review-question-options">${optionsInnerHtml}</div>`;
         }
 
-        const topicText = question.culture;
+        const topicText = question.culture || question.qp_topic_title;
         const topicHtml = topicText ? `<span class="review-question-tag" style="margin-top: 5px;">Tema: ${frappe.utils.escape_html(topicText)}</span>` : '';
 
         item.innerHTML = `

@@ -13,6 +13,7 @@
   "sr_evaluating_to",
   "sr_access_section",
   "sr_status",
+  "sr_is_beta",
   "sr_link",
   "sr_access_column",
   "sr_token",
@@ -137,11 +138,19 @@
    "fieldname": "sr_error_link",
    "fieldtype": "Long Text",
    "label": "Error"
+  },
+  {
+   "default": "0",
+   "description": "Identifica si el destinatario fue creado para una prueba Beta.",
+   "fieldname": "sr_is_beta",
+   "fieldtype": "Check",
+   "label": "Es Prueba Beta",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-17 21:05:57.069194",
+ "modified": "2026-10-16 14:26:13.675161",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_SurveyRecipient",

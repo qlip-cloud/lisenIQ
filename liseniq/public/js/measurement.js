@@ -1746,7 +1746,7 @@ class MeasurementCreator {
             let html = `<div>${frappe.utils.escape_html(msg)}</div>`;
             if (Array.isArray(links) && links.length > 0) {
                 html += `<div class="mt-2 p-2 rounded" style="background: rgba(123, 36, 255, 0.06); border: 1px solid rgba(123, 36, 255, 0.2);">`;
-                html += `<div class="font-weight-bold mb-1" style="color: #5a12cc;">Enlaces directos de Prueba Beta activos:</div>`;
+                html += `<div class="font-weight-bold mb-1" style="color: #5a12cc;">Enlaces directos de Encuesta de Prueba:</div>`;
                 links.forEach(item => {
                     const safeEmail = frappe.utils.escape_html(item.email || '');
                     const safeUrl = frappe.utils.escape_html(item.url || '');
@@ -1754,7 +1754,7 @@ class MeasurementCreator {
                         <div class="d-flex align-items-center justify-content-between py-1" style="gap: 8px; flex-wrap: wrap;">
                             <span class="text-dark"><strong>${safeEmail}:</strong></span>
                             <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-purple" style="padding: 2px 10px; font-size: 0.78rem;">
-                                <i class="fa fa-external-link mr-1"></i> Abrir Prueba Beta
+                                <i class="fa fa-external-link mr-1"></i> Abrir Encuesta de Prueba
                             </a>
                         </div>
                     `;
@@ -1768,7 +1768,7 @@ class MeasurementCreator {
             betaEmailsInput.classList.add('is-invalid');
             const errMsg = invalidEmails.length > 0
                 ? `Formato de correo inválido: ${invalidEmails.join(', ')}`
-                : 'Ingrese al menos un correo electrónico válido para enviar la prueba Beta.';
+                : 'Ingrese al menos un correo electrónico válido para enviar la encuesta de prueba.';
             showBetaFeedback(errMsg, true);
             showGlobalNotification(errMsg, 'error');
             return;

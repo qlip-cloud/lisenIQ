@@ -599,7 +599,7 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
     }
 
     const betaBannerHTML = isBeta
-        ? `<div class="iq-beta-banner">MODO PRUEBA BETA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados finales</div>`
+        ? `<div class="iq-beta-banner">ENCUESTA DE PRUEBA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados finales</div>`
         : "";
 
     const welcomeHTML = `
@@ -640,7 +640,7 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
 const load_survey = function (survey_name, cachedResponses) {
   $(".web-form-container").toggle(false);
   if (window.liseniq_is_beta) {
-    $('<div class="iq-beta-banner" style="max-width: 800px; margin: 15px auto;">MODO PRUEBA BETA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados finales</div>').appendTo($(".page_content"));
+    $('<div class="iq-beta-banner" style="max-width: 800px; margin: 15px auto;">ENCUESTA DE PRUEBA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados finales</div>').appendTo($(".page_content"));
   }
   $('<div id="surveyElement"></div>').appendTo($(".page_content"));
   

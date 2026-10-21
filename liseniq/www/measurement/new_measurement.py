@@ -1335,7 +1335,7 @@ def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación")
             if (is_custom_email and survey.su_invitation_subject)
             else f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
         )
-        subject = f"[PRUEBA BETA] {base_subject}"
+        subject = f"[ENCUESTA DE PRUEBA] {base_subject}"
 
         end_date_html = ""
         if getattr(survey, "su_end_date", None):
@@ -1535,14 +1535,14 @@ def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación")
 
         if mail_warnings and mail_sent_count == 0:
             msg = _(
-                f"Se generaron {sent_count} enlace(s) de Prueba Beta válidos, pero el servidor de correo no pudo despachar el email ({mail_warnings[0]}). Puede abrir o copiar el enlace de prueba directamente aquí abajo."
+                f"Se generaron {sent_count} enlace(s) de encuesta de prueba válidos, pero el servidor de correo no pudo despachar el email ({mail_warnings[0]}). Puede abrir o copiar el enlace de prueba directamente aquí abajo."
             )
         elif mail_warnings:
             msg = _(
-                f"Prueba Beta enviada a {mail_sent_count} de {sent_count} correo(s). Algunos correos presentaron advertencias de despacho, pero todos los enlaces directos están activos."
+                f"Encuesta de Prueba enviada a {mail_sent_count} de {sent_count} correo(s). Algunos correos presentaron advertencias de despacho, pero todos los enlaces directos están activos."
             )
         else:
-            msg = _(f"Prueba Beta enviada exitosamente a {sent_count} correo(s).")
+            msg = _(f"Encuesta de Prueba enviada exitosamente a {sent_count} correo(s).")
 
         return {
             "status": "success",

@@ -289,6 +289,7 @@ def get_dashboard_data(survey):
     if not frappe.db.exists("qp_IQ_Survey", survey):
         frappe.throw(f"Encuesta no encontrada: {survey}")
     verify_permissions_user_company(survey)
+    permission_ia = get_permission_ia(survey)
     survey = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_name") if survey else None
     if frappe.session.user == "Guest":
         frappe.throw("Debes iniciar sesión para ver este dashboard.", frappe.PermissionError)
@@ -312,6 +313,7 @@ def get_dashboard_data(survey):
     if not rows:
         universe = _get_universe(survey, [])
         return {
+            "permission_ia": permission_ia,
             "attributes": [], "tipos_order": [], "dimensions_order": [],
             "dim_to_tipo": {}, "tipo_colors": {},
             "records": [], "universe": universe, "wordclouds": {},
@@ -458,6 +460,7 @@ def get_dashboard_data(survey):
     universe = _get_universe(survey, demo_fields)
 
     return {
+        "permission_ia": permission_ia,
         "attributes": attributes_payload,
         "tipos_order": tipos_order,
         "dimensions_order": dimensions_order,
@@ -551,3 +554,13 @@ def verify_permissions_user_company(survey):
     survey_owner = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_owner")
     if survey_owner not in companies:
         frappe.throw(_("No autorizado para acceder a esta medición"), frappe.PermissionError)
+
+def get_permission_ia(survey):
+    """
+    Verifica que la compañía de la medición tenga chequeado el permiso para IA en dashboards (ia_access en qp_IQ_Company) """
+    survey_owner = frappe.db.get_value("qp_IQ_Survey", {"name": survey}, "su_owner")
+    if not survey_owner:
+        frappe.throw(_("No se encontró la compañía asociada a la medición"), frappe.PermissionError)
+
+    ia_access = frappe.db.get_value("qp_IQ_Company", {"name": survey_owner}, "ia_access")
+    return bool(ia_access)

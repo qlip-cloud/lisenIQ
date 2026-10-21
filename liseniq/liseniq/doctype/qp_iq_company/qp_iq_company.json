@@ -28,7 +28,9 @@
   "co_accept_terms",
   "co_accept_privacy_policy",
   "notificaciones_section",
-  "co_notification_email"
+  "co_notification_email",
+  "sb_features",
+  "ia_access"
  ],
  "fields": [
   {
@@ -161,11 +163,22 @@
    "fieldname": "notificaciones_section",
    "fieldtype": "Section Break",
    "label": "Notificaciones"
+  },
+  {
+   "fieldname": "sb_features",
+   "fieldtype": "Section Break",
+   "label": "Features"
+  },
+  {
+   "default": "0",
+   "fieldname": "ia_access",
+   "fieldtype": "Check",
+   "label": "IA Reportes "
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-02 21:23:44.279600",
+ "modified": "2026-10-21 15:21:29.782460",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Company",

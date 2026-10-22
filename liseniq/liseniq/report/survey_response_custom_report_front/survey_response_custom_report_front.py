@@ -641,14 +641,17 @@ def get_question_variables_map(question_ids=None):
 
         query = f"""
             SELECT 
-                a.name as question_id,
-                a.qn_statement as question_text,
-                b.dt_title as variable,
-                c.dt_title as tema
+                a.name AS question_id,
+                a.qn_statement AS question_text,
+                b.dt_title AS variable,
+                c.dt_title AS tema
             FROM `tabqp_IQ_Question` a
-            LEFT JOIN `tabqp_IQ_DemographicType` b 
-                ON b.name = a.qn_demographic AND b.dt_object_type = 'Pregunta'
-            LEFT JOIN `tabqp_IQ_DemographicType` c ON c.name = a.qp_topic
+            LEFT JOIN `tabqp_IQ_DemographicType` b
+                ON b.name = a.qn_demographic
+                AND b.dt_object_type = 'Dimension'
+            LEFT JOIN `tabqp_IQ_DemographicType` c
+                ON c.name = a.qp_topic
+                AND c.dt_object_type = 'Tema'
             {conditions}
         """
         results = frappe.db.sql(query, params, as_dict=True)

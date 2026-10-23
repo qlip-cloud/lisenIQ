@@ -20,10 +20,6 @@ def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
 def process_survey_response(doc, method):
     # frappe.log_error("Iniciando process_survey_response", "Survey Response Hook")
 
-    # Por defecto toda respuesta es de producción salvo que provenga de un enlace Beta
-    if hasattr(doc, "custom_is_beta") and not getattr(doc, "custom_is_beta", None):
-        doc.custom_is_beta = 0
-
     is_anonymous_survey = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "su_is_anonymous")
 
     # Verificar si existe un token pendiente de procesar antes de bloquear por usuario 'Anonimo'.
@@ -60,8 +56,6 @@ def process_survey_response(doc, method):
                  token = doc.user
             else:
                 # frappe.log_error("Respuesta sin token (anónima o inválida). Saltando enlace de recipient.", "Survey Response Hook")
-                if hasattr(doc, "custom_is_beta"):
-                    doc.custom_is_beta = 0
                 return
 
         secret = frappe.conf.get("liseniq_jwt_secret") or frappe.conf.get("encryption_key")
@@ -72,13 +66,9 @@ def process_survey_response(doc, method):
         except jwt.InvalidTokenError:
             frappe.throw("Enlace inválido o expirado.")
 
-        rid = payload.get("rid")
-        is_beta = bool(payload.get("beta", False))
-        if not is_beta and rid:
-            is_beta = bool(frappe.db.get_value("qp_IQ_SurveyRecipient", rid, "sr_is_beta"))
-
-        if hasattr(doc, "custom_is_beta"):
-            doc.custom_is_beta = 1 if is_beta else 0
+        # Si por cualquier vía llegara una respuesta de Prueba Beta al backend, no debe almacenarse ni alterar métricas
+        if payload.get("beta"):
+            return
 
         status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
         status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
@@ -88,10 +78,10 @@ def process_survey_response(doc, method):
             "qp_IQ_Survey", {"su_name": doc.survey}, ["su_status", "su_start_date", "su_end_date"]
         ) or (None, None, None)
         
-        if status_finished and su_status == status_finished and not is_beta:
+        if status_finished and su_status == status_finished:
             frappe.throw("Esta encuesta ya fue completada. Gracias por tu participación.")
 
-        if not is_beta and status_in_progress and su_status != status_in_progress:
+        if status_in_progress and su_status != status_in_progress:
             if su_start_date:
                 start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
                 frappe.throw(f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar.")
@@ -100,7 +90,7 @@ def process_survey_response(doc, method):
 
         now_local = _now_in_survey_tz_by_su_name(doc.survey).replace(tzinfo=None)
 
-        if not is_beta and su_start_date:
+        if su_start_date:
             if get_datetime(su_start_date) > now_local:
                 start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
                 frappe.throw(f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar.")
@@ -112,9 +102,9 @@ def process_survey_response(doc, method):
         is_public = payload.get("public", False)
         
         if is_public:
-            # Si la medición tiene destinatarios reales (no Beta), exigir que el DNI pertenezca a un destinatario válido
+            # Si la medición tiene destinatarios, exigir que el DNI pertenezca a un destinatario válido
             survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
-            recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name_id, "sr_is_beta": 0}) if survey_name_id else 0
+            recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name_id}) if survey_name_id else 0
             if recipients_count > 0:
                 if not (doc.user and doc.user != "Anonimo"):
                     frappe.throw("Debe ingresar su DNI para responder esta encuesta.")
@@ -129,12 +119,13 @@ def process_survey_response(doc, method):
                     frappe.throw("No está habilitado para responder esta encuesta.")
                 recipient_exists = frappe.db.exists(
                     "qp_IQ_SurveyRecipient",
-                    {"sr_survey": survey_name_id, "sr_contact": contact_info.name, "sr_is_beta": 0}
+                    {"sr_survey": survey_name_id, "sr_contact": contact_info.name}
                 )
                 if not recipient_exists:
                     frappe.throw("No está habilitado para responder esta encuesta.")
             return
 
+        rid = payload.get("rid")
         token_sur = payload.get("sur")
 
         if token_sur and token_sur != doc.survey:
@@ -159,7 +150,6 @@ def process_survey_response(doc, method):
                 frappe.throw("El DNI proporcionado no pertenece a un contacto válido para esta encuesta.")
 
             contact_name = contact_info.name
-            beta_flag = 1 if is_beta else 0
 
             if contact_name:
                 survey_name_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": doc.survey}, "name")
@@ -169,7 +159,6 @@ def process_survey_response(doc, method):
                         {
                             "survey": doc.survey,
                             "user": contact_name,
-                            "custom_is_beta": beta_flag,
                             "name": ["!=", doc.name]
                         }
                     )
@@ -181,7 +170,6 @@ def process_survey_response(doc, method):
                         {
                             "sr_survey": survey_name_id,
                             "sr_contact": contact_name,
-                            "sr_is_beta": beta_flag,
                         }
                     )
                     if recipient_exists:
@@ -190,7 +178,6 @@ def process_survey_response(doc, method):
                             {
                                 "sr_survey": survey_name_id,
                                 "sr_contact": contact_name,
-                                "sr_is_beta": beta_flag,
                             },
                             {"sr_status": rs_responded, "sr_survey_response": doc.name}
                         )
@@ -202,7 +189,6 @@ def process_survey_response(doc, method):
                 {
                     "survey": doc.survey,
                     "user": doc.user,
-                    "custom_is_beta": beta_flag,
                     "name": ["!=", doc.name]
                 }
             )
@@ -216,22 +202,17 @@ def process_survey_response(doc, method):
 
         recipient = None
         if rid:
-            # Agregamos 'sr_evaluating_to' y 'sr_is_beta' a la consulta para traer al evaluador, evaluado y bandera Beta
+            # Agregamos 'sr_evaluating_to' a la consulta para traer al evaluador y evaluado
             recipient = frappe.db.get_value(
-                "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey", "sr_contact", "sr_evaluating_to", "sr_is_beta"], as_dict=True
+                "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey", "sr_contact", "sr_evaluating_to"], as_dict=True
             )
         if not recipient:
             recipient = frappe.db.get_value(
-                "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact", "sr_evaluating_to", "sr_is_beta"], as_dict=True
+                "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact", "sr_evaluating_to"], as_dict=True
             )
 
         if not recipient:
             frappe.throw("Enlace inválido o expirado.")
-
-        is_beta = is_beta or bool(recipient.get("sr_is_beta"))
-        beta_flag = 1 if is_beta else 0
-        if hasattr(doc, "custom_is_beta"):
-            doc.custom_is_beta = beta_flag
 
         # Obtenemos el evaluador y evaluado desde el recipient para usarlos en la lógica de asignación y validación
         evaluator = recipient.get("sr_evaluating_to") # Contacto que evalúa
@@ -250,14 +231,13 @@ def process_survey_response(doc, method):
         if hasattr(doc, 'custom_evaluator'):
             doc.custom_evaluator = evaluator
 
-        # Validar si este evaluador ya completó la encuesta para este líder en específico (aislando Beta vs Producción).
+        # Validar si este evaluador ya completó la encuesta para este líder en específico.
         if doc.user:
             dni = frappe.db.get_value("Contact", doc.user, "custom_document_number")
             if dni:
                 existing_response_query = {
                     "survey": doc.survey,
                     "user": dni,
-                    "custom_is_beta": beta_flag,
                     "name": ["!=", doc.name]
                 }
                 
@@ -282,24 +262,18 @@ def process_survey_response(doc, method):
         )
         # frappe.log_error(f"Destinatario {recipient.name} actualizado a 'Responded'.", "Survey Response Hook")
 
-        # El bloque de auto-cierre al 100% SOLO aplica a respuestas reales de producción (is_beta == False)
-        # y únicamente contabiliza destinatarios reales (sr_is_beta = 0).
-        if not is_beta:
-            survey_name = recipient.sr_survey
-            total_recipients = frappe.db.count(
-                "qp_IQ_SurveyRecipient",
-                {"sr_survey": survey_name, "sr_is_beta": 0}
-            )
-            responded_recipients = frappe.db.count(
-                "qp_IQ_SurveyRecipient",
-                {"sr_survey": survey_name, "sr_status": rs_responded, "sr_is_beta": 0}
-            )
+        survey_name = recipient.sr_survey
+        total_recipients = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name})
+        responded_recipients = frappe.db.count(
+            "qp_IQ_SurveyRecipient",
+            {"sr_survey": survey_name, "sr_status": rs_responded}
+        )
 
-            if total_recipients > 0 and total_recipients == responded_recipients:
-                status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
-                if status_finished:
-                    frappe.db.set_value("qp_IQ_Survey", survey_name, "su_status", status_finished)
-                    frappe.log_error(f"Encuesta {survey_name} finalizada por completitud (100%).", "Survey Response Hook")
+        if total_recipients > 0 and total_recipients == responded_recipients:
+            status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
+            if status_finished:
+                frappe.db.set_value("qp_IQ_Survey", survey_name, "su_status", status_finished)
+                frappe.log_error(f"Encuesta {survey_name} finalizada por completitud (100%).", "Survey Response Hook")
 
         frappe.db.commit()
 

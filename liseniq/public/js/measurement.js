@@ -79,6 +79,7 @@ class MeasurementCreator {
                 remindersSection: document.getElementById('reminders-section'),
                 reminderFrequency: document.getElementById('reminder-frequency'),
                 reminderMax: document.getElementById('reminder-max'),
+                enableBetaCheck: document.getElementById('enable-beta-test-check'),
                 betaSection: document.getElementById('beta-test-section'),
                 betaEmailsInput: document.getElementById('beta-emails-input'),
                 betaRoleGroup: document.getElementById('beta-role-group'),
@@ -435,7 +436,10 @@ class MeasurementCreator {
         navButtons.back5?.addEventListener('click', () => this.showStep(4));
         navButtons.next5?.addEventListener('click', () => this.saveMeasurement());
 
-        // Eventos de Prueba Beta en el Paso 5
+        // Eventos de Encuesta de prueba en el Paso 5
+        reviewStep.enableBetaCheck?.addEventListener('change', (e) => {
+            reviewStep.betaSection?.classList.toggle('d-none', !e.target.checked);
+        });
         reviewStep.btnSendBeta?.addEventListener('click', () => this.sendBetaTest());
         reviewStep.betaEmailsInput?.addEventListener('input', () => {
             reviewStep.betaEmailsInput.classList.remove('is-invalid');
@@ -1737,47 +1741,58 @@ class MeasurementCreator {
         const validEmails = [...new Set(emailList.filter(e => emailRegex.test(e)))];
         const invalidEmails = emailList.filter(e => !emailRegex.test(e));
 
-        const showBetaFeedback = (msg, isError = false, links = [], isWarning = false) => {
+        const showBetaFeedback = (msg, isSuccess = true, resData = null) => {
             if (!betaFeedbackMsg) return;
             betaFeedbackMsg.classList.remove('d-none', 'text-success', 'text-danger', 'text-warning');
-            const colorClass = isError ? 'text-danger' : (isWarning ? 'text-warning' : 'text-success');
-            betaFeedbackMsg.classList.add(colorClass);
+            betaFeedbackMsg.classList.add(isSuccess ? 'text-success' : 'text-danger');
 
             let html = `<div>${frappe.utils.escape_html(msg)}</div>`;
-            if (Array.isArray(links) && links.length > 0) {
-                html += `<div class="mt-2 p-2 rounded" style="background: rgba(123, 36, 255, 0.06); border: 1px solid rgba(123, 36, 255, 0.2);">`;
-                html += `<div class="font-weight-bold mb-1" style="color: #5a12cc;">Enlaces directos de Encuesta de Prueba:</div>`;
-                links.forEach(item => {
-                    const safeEmail = frappe.utils.escape_html(item.email || '');
-                    const safeUrl = frappe.utils.escape_html(item.url || '');
-                    html += `
-                        <div class="d-flex align-items-center justify-content-between py-1" style="gap: 8px; flex-wrap: wrap;">
-                            <span class="text-dark"><strong>${safeEmail}:</strong></span>
-                            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-purple" style="padding: 2px 10px; font-size: 0.78rem;">
-                                <i class="fa fa-external-link mr-1"></i> Abrir Encuesta de Prueba
-                            </a>
+            if (resData && (resData.url || resData.email_html)) {
+                const safeUrl = resData.url ? frappe.utils.escape_html(resData.url) : '#';
+                html += `
+                    <div class="mt-2 p-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(123, 36, 255, 0.06); border: 1px solid rgba(123, 36, 255, 0.2); gap: 8px; flex-wrap: wrap;">
+                        <span class="text-dark small"><strong>Validación rápida:</strong></span>
+                        <div class="d-flex" style="gap: 8px; flex-wrap: wrap;">
+                            ${resData.email_html ? `
+                            <button type="button" id="btn-preview-beta-email" class="btn btn-sm btn-outline-purple" style="padding: 3px 10px; font-size: 0.78rem;">
+                                <i class="fa fa-envelope-open-o mr-1"></i> Ver Formato de Correo
+                            </button>` : ''}
+                            ${resData.url ? `
+                            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-purple-main" style="padding: 3px 10px; font-size: 0.78rem; color: #fff;">
+                                <i class="fa fa-external-link mr-1"></i> Abrir WebForm
+                            </a>` : ''}
                         </div>
-                    `;
-                });
-                html += `</div>`;
+                    </div>
+                `;
             }
             betaFeedbackMsg.innerHTML = html;
+
+            if (resData && resData.email_html) {
+                const btnPreview = document.getElementById('btn-preview-beta-email');
+                btnPreview?.addEventListener('click', () => {
+                    const previewWin = window.open('', '_blank', 'width=720,height=680,scrollbars=yes,resizable=yes');
+                    if (previewWin) {
+                        previewWin.document.open();
+                        previewWin.document.write(resData.email_html);
+                        previewWin.document.title = resData.email_subject || 'Vista Previa de Correo';
+                        previewWin.document.close();
+                    }
+                });
+            }
         };
 
         if (validEmails.length === 0 || invalidEmails.length > 0) {
             betaEmailsInput.classList.add('is-invalid');
-            const errMsg = invalidEmails.length > 0
-                ? `Formato de correo inválido: ${invalidEmails.join(', ')}`
-                : 'Ingrese al menos un correo electrónico válido para enviar la encuesta de prueba.';
-            showBetaFeedback(errMsg, true);
-            showGlobalNotification(errMsg, 'error');
+            const validationMsg = 'El envío del correo no fue exitoso. Verifique los correos electrónicos ingresados.';
+            showBetaFeedback(validationMsg, false);
+            showGlobalNotification(validationMsg, 'error');
             return;
         }
 
         betaEmailsInput.classList.remove('is-invalid');
         const originalBtnHtml = btnSendBeta.innerHTML;
         btnSendBeta.disabled = true;
-        btnSendBeta.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Enviando Beta...`;
+        btnSendBeta.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Enviando encuesta de prueba...`;
         if (betaFeedbackMsg) betaFeedbackMsg.classList.add('d-none');
 
         try {
@@ -1799,19 +1814,18 @@ class MeasurementCreator {
             });
 
             const res = response.message || {};
-            if (res.status === 'success') {
-                const hasWarning = !!res.mail_warning;
-                const successMsg = res.message || `Prueba Beta enviada exitosamente a ${validEmails.length} correo(s).`;
-                showBetaFeedback(successMsg, false, res.links || [], hasWarning);
-                showGlobalNotification(successMsg, hasWarning ? 'warning' : 'success');
-            } else {
-                throw new Error(res.message || 'No se pudo enviar la prueba Beta.');
-            }
+            const isMailSuccess = (res.status === 'success' && res.mail_sent > 0);
+            const feedbackMsg = isMailSuccess
+                ? 'El envío del correo de la encuesta de prueba fue exitoso.'
+                : 'El envío del correo de la encuesta de prueba no fue exitoso.';
+
+            showBetaFeedback(feedbackMsg, isMailSuccess, res);
+            showGlobalNotification(feedbackMsg, isMailSuccess ? 'success' : 'error');
         } catch (error) {
-            console.error('Error al enviar prueba Beta:', error);
-            const errMsg = error.message || 'Ocurrió un error al enviar la prueba Beta.';
-            showBetaFeedback(errMsg, true);
-            showGlobalNotification(errMsg, 'error');
+            console.error('Error al enviar encuesta de prueba:', error);
+            const failMsg = 'El envío del correo de la encuesta de prueba no fue exitoso.';
+            showBetaFeedback(failMsg, false);
+            showGlobalNotification(failMsg, 'error');
         } finally {
             btnSendBeta.disabled = false;
             btnSendBeta.innerHTML = originalBtnHtml;
@@ -1827,6 +1841,7 @@ class MeasurementCreator {
             contactCount,
             questionsList,
             viewContactsBtn,
+            enableBetaCheck,
             betaSection,
             betaRoleGroup,
             betaEmailsInput,
@@ -1889,12 +1904,13 @@ class MeasurementCreator {
             }
         }
 
-        // Configurar visibilidad del bloque Beta según tipo de medición (360° vs Estándar / Enlace Abierto)
+        // Configurar visibilidad del bloque de encuesta de prueba según el checkbox y el tipo de medición (360° vs Estándar)
         if (betaRoleGroup) {
             betaRoleGroup.classList.toggle('d-none', !this.state.measurementData.isLeadership);
         }
         if (betaSection) {
-            betaSection.classList.remove('d-none');
+            const isBetaChecked = !!enableBetaCheck?.checked;
+            betaSection.classList.toggle('d-none', !isBetaChecked);
             if (betaEmailsInput) betaEmailsInput.disabled = false;
             if (btnSendBeta) btnSendBeta.disabled = false;
         }

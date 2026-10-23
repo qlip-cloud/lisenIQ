@@ -409,18 +409,28 @@
                         </div>
                     </div>
 
-                    <!-- Bloque de Prueba Beta (Validación previa al lanzamiento) -->
-                    <div id="beta-test-section" class="beta-test-section mt-4 p-3" style="border: 1.5px dashed var(--brand-primary, #7B24FF); background-color: rgba(123, 36, 255, 0.04); border-radius: 10px;">
+                    <div class="form-check mt-3 mb-3">
+                        <input class="form-check-input" type="checkbox" value="" id="enable-beta-test-check">
+                        <span class="tooltip-wrapper">
+                            <label class="form-check-label" for="enable-beta-test-check" data-tooltip-bottom="Habilita la sección de encuesta de prueba para enviar la medición a correos de prueba antes del lanzamiento oficial, validando formato de correo, bienvenida y preguntas sin afectar los resultados.">
+                                Enviar encuesta de prueba
+                            </label>
+                            <span class="tooltip-icon"></span>
+                        </span>
+                    </div>
+
+                    <!-- Bloque de Encuesta de prueba (Validación previa al lanzamiento) -->
+                    <div id="beta-test-section" class="beta-test-section mt-2 p-3 d-none" style="border: 1.5px dashed var(--brand-primary, #7B24FF); background-color: rgba(123, 36, 255, 0.04); border-radius: 10px;">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="tooltip-wrapper">
-                                <h5 class="mb-0" style="font-size: 0.95rem; font-weight: 600; color: var(--brand-primary, #7B24FF);" data-tooltip-bottom="Envía una versión de prueba a correos específicos para validar invitación, bienvenida y preguntas antes de la fecha de inicio, sin afectar las métricas reales ni bloquear la edición.">
-                                    <i class="fa fa-flask mr-1"></i> ENCUESTA DE PRUEBA (Validación previa al lanzamiento)
+                                <h5 class="mb-0" style="font-size: 0.95rem; font-weight: 600; color: var(--brand-primary, #7B24FF);" data-tooltip-bottom="Envía una encuesta de prueba a correos específicos para validar invitación, bienvenida y preguntas antes de la fecha de inicio, sin afectar los resultados ni bloquear la edición.">
+                                    <i class="fa fa-flask mr-1"></i> Encuesta de prueba
                                 </h5>
                                 <span class="tooltip-icon"></span>
                             </span>
                         </div>
                         <p class="text-muted small mb-3">
-                            Envía una prueba piloto antes del lanzamiento oficial para validar el correo de invitación, el mensaje instructivo y las preguntas sin contaminar los resultados reales.
+                            Envía una encuesta de prueba antes del lanzamiento oficial para validar el correo de invitación, el mensaje instructivo y las preguntas sin afectar los resultados.
                         </p>
                         <div class="form-group mb-2">
                             <label for="beta-emails-input" class="small font-weight-bold">Correos electrónicos de prueba (separados por coma)</label>
@@ -435,7 +445,7 @@
                         </div>
                         <div class="d-flex align-items-center justify-content-between mt-3">
                             <button id="btn-send-beta" type="button" class="btn btn-outline-purple">
-                                <i class="fa fa-paper-plane mr-1"></i> Enviar Encuesta de Prueba
+                                <i class="fa fa-paper-plane mr-1"></i> Enviar encuesta de prueba
                             </button>
                         </div>
                         <small id="beta-feedback-msg" class="form-text mt-2 d-none"></small>

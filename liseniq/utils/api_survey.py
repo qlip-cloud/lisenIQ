@@ -72,62 +72,46 @@ def get_public_survey(survey_name, token=None, dni=None):
     if survey_doc and survey_doc.su_is_leadership:
         recipient = None
         is_beta = False
+        beta_role = "Autoevaluación"
         
-        # Intentar obtener el destinatario por medio del token (incluyendo soporte para tokens Beta)
+        # Intentar obtener el destinatario o el rol Beta por medio del token
         if token and token != "Anonimo":
             secret = _get_jwt_secret()
             try:
                 payload = jwt.decode(token, secret, algorithms=["HS256"])
-                rid = payload.get("rid")
                 is_beta = bool(payload.get("beta", False))
-                if rid:
-                    recipient = frappe.db.get_value(
-                        "qp_IQ_SurveyRecipient",
-                        rid,
-                        ["sr_evaluation_role", "sr_evaluating_to", "sr_contact", "sr_is_beta"],
-                        as_dict=True
-                    )
-                else:
-                    recipient = frappe.db.get_value(
-                        "qp_IQ_SurveyRecipient",
-                        {"sr_token": token},
-                        ["sr_evaluation_role", "sr_evaluating_to", "sr_contact", "sr_is_beta"],
-                        as_dict=True
-                    )
-                if recipient and recipient.get("sr_is_beta"):
-                    is_beta = True
+                beta_role = payload.get("role") or "Autoevaluación"
+                rid = payload.get("rid")
+                if not is_beta:
+                    if rid:
+                        recipient = frappe.db.get_value("qp_IQ_SurveyRecipient", rid, ["sr_evaluation_role", "sr_evaluating_to", "sr_contact"], as_dict=True)
+                    else:
+                        recipient = frappe.db.get_value("qp_IQ_SurveyRecipient", {"sr_token": token}, ["sr_evaluation_role", "sr_evaluating_to", "sr_contact"], as_dict=True)
             except Exception:
                 pass
         
-        # Si no hay token personalizado, buscar por DNI únicamente entre participantes reales (no Beta)
-        if not recipient and dni:
+        # Si no hay token personalizado ni es Beta, buscar por DNI
+        if not is_beta and not recipient and dni:
             contact_name = frappe.db.get_value("Contact", {"custom_document_number": dni, "custom_company": survey_doc.su_owner}, "name")
             if contact_name:
                 recipients = frappe.get_all(
                     "qp_IQ_SurveyRecipient", 
-                    filters={
-                        "sr_survey": survey_doc.name,
-                        "sr_contact": contact_name,
-                        "sr_status": ["!=", "Responded"],
-                        "sr_is_beta": 0
-                    }, 
-                    fields=["sr_evaluation_role", "sr_evaluating_to", "sr_contact", "sr_is_beta"],
+                    filters={"sr_survey": survey_doc.name, "sr_contact": contact_name, "sr_status": ["!=", "Responded"]}, 
+                    fields=["sr_evaluation_role", "sr_evaluating_to", "sr_contact"],
                     limit_page_length=1
                 )
                 if recipients:
                     recipient = recipients[0]
         
-        if recipient:
-            # Validar si cumple condición de Autoevaluación
-            # Cuando sr_evaluation_role != "Autoevaluación" (tanto en producción como en prueba Beta de Evaluador),
-            # is_auto es False y se reemplazan los enunciados por qn_statement_others.
-            is_auto = (
-                recipient.sr_evaluation_role == "Autoevaluación"
-                and (is_beta or recipient.sr_evaluating_to == recipient.sr_contact)
-            )
-            
-            # Si evalúa a un tercero, reemplazar enunciado por qn_statement_others
-            if not is_auto:
+        should_use_others_statement = False
+        if is_beta:
+            should_use_others_statement = (beta_role != "Autoevaluación")
+        elif recipient:
+            is_auto = (recipient.sr_evaluation_role == "Autoevaluación" and recipient.sr_evaluating_to == recipient.sr_contact)
+            should_use_others_statement = not is_auto
+
+        if should_use_others_statement:
+            if True:
                 parsed_json = json.loads(survey_data.survey_json)
                 survey_questions = frappe.get_all("qp_IQ_SurveyQuestion", filters={"parent": survey_doc.name}, fields=["sq_question"])
                 
@@ -220,13 +204,13 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
 
     if survey_doc.get("su_default_welcome"):
         numero_preguntas = frappe.db.count("qp_IQ_SurveyQuestion", {"parent": survey_name_id}) if survey_name_id else 0
-        payload_welcome = {
+        payload = {
             "nombre_medicion": survey_name,
             "numero_preguntas": numero_preguntas
         }
         # Inyectar Asunto y Cuerpo transformando Markdown a HTML Nativo
         welcome_subject = f"¡Bienvenido/a a la medición {survey_name}!"
-        raw_markdown = generate_default_welcome_markdown(payload_welcome)
+        raw_markdown = generate_default_welcome_markdown(payload)
         welcome_message = md_to_html(raw_markdown)
 
     # Añadir siempre la lógica y HTML de los modales para que estén disponibles
@@ -234,39 +218,33 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
     if welcome_message:
         welcome_message += get_legal_modals_html()
 
-    # Pre-decodificar token si está presente para identificar si se trata de una Prueba Beta
-    secret = _get_jwt_secret()
-    decoded_payload = None
-    is_beta = False
-    rid_from_token = None
-
-    if token and token != "Anonimo":
-        try:
-            decoded_payload = jwt.decode(token, secret, algorithms=["HS256"])
-            rid_from_token = decoded_payload.get("rid")
-            is_beta = bool(decoded_payload.get("beta", False))
-            if not is_beta and rid_from_token:
-                is_beta = bool(frappe.db.get_value("qp_IQ_SurveyRecipient", rid_from_token, "sr_is_beta"))
-        except jwt.ExpiredSignatureError:
-            return {"allow": False, "message": "El enlace ha expirado."}
-        except jwt.InvalidTokenError:
-            return {"allow": False, "message": "Enlace inválido o expirado."}
-
     # Respuesta exitosa base incluyendo campos de bienvenida personalizados y los modales integrados
     success_response = {
         "allow": True, 
         "welcome_subject": welcome_subject, 
         "welcome_message": welcome_message
     }
-    if is_beta:
-        success_response["is_beta"] = True
-        if rid_from_token:
-            success_response["require_dni"] = False
 
-    if status_finished and su_status == status_finished and not is_beta:
+    # Si viene un token de Prueba Beta, permitir validar directamente el Web Form sin crear ni exigir contactos, DNI ni fechas
+    if token and token != "Anonimo":
+        secret = _get_jwt_secret()
+        try:
+            beta_payload = jwt.decode(token, secret, algorithms=["HS256"])
+            if beta_payload.get("beta"):
+                if beta_payload.get("sur") and beta_payload.get("sur") != survey_name:
+                    return {"allow": False, "message": "Enlace inválido o expirado."}
+                success_response["is_beta"] = True
+                success_response["require_dni"] = False
+                return success_response
+        except jwt.ExpiredSignatureError:
+            return {"allow": False, "message": "El enlace ha expirado."}
+        except jwt.InvalidTokenError:
+            return {"allow": False, "message": "Enlace inválido o expirado."}
+
+    if status_finished and su_status == status_finished:
       return {"allow": False, "message": "La medición ha finalizado."}
       
-    if not is_beta and status_in_progress and su_status != status_in_progress:
+    if status_in_progress and su_status != status_in_progress:
       if su_start_date:
         start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
         return {"allow": False, "message": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
@@ -275,8 +253,8 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
       
     now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
 
-    # Validación de inicio de la medición (se omite en modo Beta)
-    if not is_beta and su_start_date:
+    # Validación de inicio de la medición
+    if su_start_date:
       if get_datetime(su_start_date) > now_local:
         start_date_str = get_datetime(su_start_date).strftime("%d/%m/%Y a las %H:%M")
         return {"allow": False, "message": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
@@ -287,27 +265,23 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
         return {"allow": False, "message": "El enlace ha expirado."}
 
     if not token or token == "Anonimo":
-      # Permitir acceso público si el DNI corresponde a un destinatario registrado no-Beta
+      # Permitir acceso público si el DNI corresponde a un destinatario registrado
       if dni:
         if survey_name_id:
           recipient_exists = frappe.db.exists(
             "qp_IQ_SurveyRecipient",
-            {
-                "sr_survey": survey_name_id,
-                "sr_contact": frappe.db.get_value("Contact", {"custom_document_number": dni}, "name"),
-                "sr_is_beta": 0
-            }
+            {"sr_survey": survey_name_id, "sr_contact": frappe.db.get_value("Contact", {"custom_document_number": dni}, "name")}
           )
           if recipient_exists:
             return success_response
       return success_response
 
+    secret = _get_jwt_secret()
     try:
-      payload = decoded_payload if decoded_payload is not None else jwt.decode(token, secret, algorithms=["HS256"])
+      payload = jwt.decode(token, secret, algorithms=["HS256"])
       rid = payload.get("rid")
       sur_claim = payload.get("sur")
       is_public = payload.get("public", False)
-      beta_flag = 1 if is_beta else 0
 
       if sur_claim != survey_name:
           return {"allow": False, "message": "Enlace inválido o expirado."}
@@ -317,7 +291,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
           if get_datetime(survey_end_date) < now_local:
               return {"allow": False, "message": "El enlace ha expirado."}
 
-      recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name_id, "sr_is_beta": 0}) if survey_name_id else 0
+      recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": survey_name_id}) if survey_name_id else 0
 
       # Enlace público (genérico)
       if is_public:
@@ -344,7 +318,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
 
           recipient_exists = frappe.db.exists(
               "qp_IQ_SurveyRecipient",
-              {"sr_survey": survey_name_id, "sr_contact": contact_info.name, "sr_is_beta": 0}
+              {"sr_survey": survey_name_id, "sr_contact": contact_info.name}
           )
           if recipient_exists:
               return success_response
@@ -380,14 +354,14 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
           if contact_name and survey_name_id:
               recipient_exists = frappe.db.exists(
                   "qp_IQ_SurveyRecipient",
-                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_is_beta": beta_flag}
+                  {"sr_survey": survey_name_id, "sr_contact": contact_name}
               )
               if not recipient_exists:
                   return {"allow": False, "valid_dni": False, "message": "No está habilitado para responder esta encuesta."}
 
               existing_response_by_contact = frappe.db.exists(
                   "Survey Response",
-                  {"survey": survey_name, "user": contact_name, "custom_is_beta": beta_flag}
+                  {"survey": survey_name, "user": contact_name}
               )
               # Evitar validación directa de completado por nombre/dni si es liderazgo
               if existing_response_by_contact and not is_leadership:
@@ -395,14 +369,14 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
 
               existing_recipient = frappe.db.exists(
                   "qp_IQ_SurveyRecipient",
-                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_status": rs_responded, "sr_is_beta": beta_flag}
+                  {"sr_survey": survey_name_id, "sr_contact": contact_name, "sr_status": rs_responded}
               )
               if existing_recipient and not is_leadership:
                   return {"allow": False, "message": "Esta encuesta ya fue completada. Gracias por tu participación."}
 
           existing_response = frappe.db.exists(
               "Survey Response",
-              {"survey": survey_name, "user": dni, "custom_is_beta": beta_flag}
+              {"survey": survey_name, "user": dni}
           )
           if existing_response and not is_leadership:
               return {"allow": False, "message": "Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación."}
@@ -410,33 +384,27 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
       recipient = None
       if rid:
         recipient = frappe.db.get_value(
-          "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey", "sr_contact", "sr_is_beta"], as_dict=True
+          "qp_IQ_SurveyRecipient", rid, ["name", "sr_status", "sr_survey", "sr_contact"], as_dict=True
         )
       if not recipient:
         recipient = frappe.db.get_value(
-          "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact", "sr_is_beta"], as_dict=True
+          "qp_IQ_SurveyRecipient", {"sr_token": token}, ["name", "sr_status", "sr_survey", "sr_contact"], as_dict=True
         )
 
       if rid and not recipient:
         return {"allow": False, "message": "Este enlace ya no es válido. El destinatario fue removido de la medición."}
 
       if recipient:
-        if recipient.get("sr_is_beta"):
-            is_beta = True
-            beta_flag = 1
-            success_response["is_beta"] = True
-            success_response["require_dni"] = False
-
         if recipient.get("sr_contact"):
             contact_status = frappe.db.get_value("Contact", recipient.sr_contact, "status")
-            if contact_status and contact_status not in ("Enabled", "Passive") and not is_beta:
+            if contact_status and contact_status not in ("Enabled", "Passive"):
                 return {"allow": False, "message": "El contacto no está activo para responder esta encuesta."}
 
             dni_from_contact = frappe.db.get_value("Contact", recipient.sr_contact, "custom_document_number")
             if dni_from_contact and not is_leadership:
                 existing_response = frappe.db.exists(
                     "Survey Response",
-                    {"survey": survey_name, "user": dni_from_contact, "custom_is_beta": beta_flag}
+                    {"survey": survey_name, "user": dni_from_contact}
                 )
                 if existing_response:
                     return {"allow": False, "message": "Esta encuesta ya fue completada con el DNI proporcionado. Gracias por tu participación."}
@@ -476,11 +444,15 @@ def get_survey_route_for_public_link(token, dni=None):
     survey_name = payload.get("sur")
     rid = payload.get("rid")
     is_beta = bool(payload.get("beta", False))
-    if not is_beta and rid:
-        is_beta = bool(frappe.db.get_value("qp_IQ_SurveyRecipient", rid, "sr_is_beta"))
     
     if not survey_name:
         return {"error": "Token de encuesta inválido."}
+
+    if is_beta:
+        web_form_route = frappe.db.get_value("Web Form", {"title": survey_name}, "route")
+        if not web_form_route:
+            return {"error": "No se encontró el formulario para la encuesta."}
+        return {"route": web_form_route, "is_leadership": False, "has_rid": True, "is_beta": True}
 
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
     status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
@@ -490,10 +462,10 @@ def get_survey_route_for_public_link(token, dni=None):
     if not su_doc:
         return {"error": "Encuesta no encontrada."}
         
-    if status_finished and su_doc.su_status == status_finished and not is_beta:
+    if status_finished and su_doc.su_status == status_finished:
         return {"error": "El enlace ha expirado o la medición ha finalizado."}
 
-    if not is_beta and status_in_progress and su_doc.su_status != status_in_progress:
+    if status_in_progress and su_doc.su_status != status_in_progress:
         if su_doc.su_start_date:
             start_date_str = get_datetime(su_doc.su_start_date).strftime("%d/%m/%Y a las %H:%M")
             return {"error": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
@@ -502,7 +474,7 @@ def get_survey_route_for_public_link(token, dni=None):
 
     now_local = _now_in_survey_tz_by_su_name(survey_name).replace(tzinfo=None)
 
-    if not is_beta and su_doc.su_start_date:
+    if su_doc.su_start_date:
         if get_datetime(su_doc.su_start_date) > now_local:
             start_date_str = get_datetime(su_doc.su_start_date).strftime("%d/%m/%Y a las %H:%M")
             return {"error": f"Agradecemos tu interés. Esta medición iniciará el {start_date_str}. Te invitamos a regresar a partir de esa fecha para participar."}
@@ -516,7 +488,7 @@ def get_survey_route_for_public_link(token, dni=None):
         return {"error": "No se encontró el formulario para la encuesta."}
         
     if not su_doc.su_is_leadership:
-        return {"route": web_form_route, "is_leadership": False, "has_rid": bool(rid), "is_beta": is_beta}
+        return {"route": web_form_route, "is_leadership": False, "has_rid": bool(rid)}
         
     # Es medición de Liderazgo (360), buscamos al evaluador
     contact_name = None
@@ -536,28 +508,19 @@ def get_survey_route_for_public_link(token, dni=None):
             
     # Si no hay ni DNI ni RID, es un enlace genérico y se debe solicitar DNI obligatoriamente en el formulario
     if not contact_name:
-        return {"require_dni": True, "is_leadership": True, "is_beta": is_beta}
+        return {"require_dni": True, "is_leadership": True}
         
     rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
     
-    # Buscamos todas las evaluaciones asignadas a este evaluador (filtrando por sr_is_beta según corresponda)
-    recipient_filters = {
-        "sr_survey": su_doc.name,
-        "sr_evaluating_to": contact_name,
-        "sr_status": ["!=", rs_responded],
-        "sr_is_beta": 1 if is_beta else 0
-    }
-    if is_beta and rid:
-        recipient_filters["name"] = rid
-
+    # Buscamos todas las evaluaciones asignadas a este evaluador
     recipients = frappe.get_all(
         "qp_IQ_SurveyRecipient", 
-        filters=recipient_filters, 
-        fields=["name", "sr_evaluation_role", "sr_evaluating_to", "sr_contact", "sr_is_beta"]
+        filters={"sr_survey": su_doc.name, "sr_evaluating_to": contact_name, "sr_status": ["!=", rs_responded]}, 
+        fields=["name", "sr_evaluation_role", "sr_evaluating_to", "sr_contact"]
     )
     
     if not recipients:
-        return {"is_completed": True, "is_beta": is_beta, "message": "Has completado todas tus evaluaciones. ¡Gracias por tu participación!"}
+        return {"is_completed": True, "message": "Has completado todas tus evaluaciones. ¡Gracias por tu participación!"}
         
     evaluations = []
     for r in recipients:
@@ -573,25 +536,21 @@ def get_survey_route_for_public_link(token, dni=None):
             "rid": r.name,
             "iat": int(time()),
         }
-        if is_beta:
-            eval_payload["beta"] = True
-
         eval_token = jwt.encode(eval_payload, secret, algorithm="HS256")
         if isinstance(eval_token, bytes):
             eval_token = eval_token.decode("utf-8")
             
-        is_auto = (r.sr_evaluation_role == "Autoevaluación" and (is_beta or r.sr_evaluating_to == r.sr_contact))
+        is_auto = (r.sr_evaluation_role == "Autoevaluación" and r.sr_evaluating_to == r.sr_contact)
         
         evaluations.append({
             "id": r.name,
             "role": r.sr_evaluation_role or "Evaluador",
             "evaluatee_name": evaluatee_name,
             "is_auto": is_auto,
-            "is_beta": is_beta,
             "token": eval_token
         })
         
-    return {"route": web_form_route, "is_leadership": True, "is_beta": is_beta, "evaluations": evaluations}
+    return {"route": web_form_route, "is_leadership": True, "evaluations": evaluations}
 
 def generate_public_link_for_survey_hook(doc, method):
 

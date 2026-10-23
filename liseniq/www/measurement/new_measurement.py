@@ -3,15 +3,14 @@ import json
 import re
 import unicodedata
 import base64
-import re
-import jwt
-from time import time
-from email.utils import formataddr
 import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
 from io import BytesIO
 from frappe import _
-from frappe.utils import now
+import re
+import jwt
+from time import time
+from email.utils import formataddr
 from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
 from liseniq.utils.api_survey import generate_public_link_for_survey, _get_jwt_secret
 from liseniq.utils.login_util import global_website_context, get_current_active_company
@@ -172,8 +171,8 @@ def get_context(context):
                     "qn_optional": q_doc.get("qn_optional", 0)
                 })
 
-            # Datos de participantes (excluyendo siempre destinatarios de Prueba Beta)
-            recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": doc.name, "sr_is_beta": 0})
+            # Datos de participantes
+            recipients_count = frappe.db.count("qp_IQ_SurveyRecipient", {"sr_survey": doc.name})
             
             if doc.su_custom_generate_public_link and recipients_count == 0 and doc.su_is_anonymous:
                  survey_type = "anonymous_link"
@@ -212,11 +211,7 @@ def get_context(context):
             if doc.get("su_is_leadership"):
                 networks_dict = {}
                 if recipients_count > 0:
-                    recipients = frappe.get_all(
-                        "qp_IQ_SurveyRecipient",
-                        filters={"sr_survey": doc.name, "sr_is_beta": 0},
-                        fields=["name", "sr_contact", "sr_evaluating_to", "sr_evaluation_role"]
-                    )
+                    recipients = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": doc.name}, fields=["name", "sr_contact", "sr_evaluating_to", "sr_evaluation_role"])
                     
                     contact_ids = list(set([r.sr_contact for r in recipients if r.sr_contact] + [r.sr_evaluating_to for r in recipients if r.sr_evaluating_to]))
                     contact_map = {}
@@ -254,11 +249,7 @@ def get_context(context):
                 contacts_headers = ["Nombre"]
                 contacts_list = []
                 if recipients_count > 0:
-                    recipient_rows = frappe.get_all(
-                        "qp_IQ_SurveyRecipient",
-                        filters={"sr_survey": doc.name, "sr_is_beta": 0},
-                        fields=["sr_contact"]
-                    )
+                    recipient_rows = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": doc.name}, fields=["sr_contact"])
                     contact_names = [r.sr_contact for r in recipient_rows if r.sr_contact]
                     if contact_names:
                         contact_docs = frappe.get_all("Contact", filters={"name": ["in", contact_names]}, fields=["name", "first_name", "last_name"])
@@ -594,7 +585,7 @@ def delete_measurement_contacts(survey_name, contact_names):
             try:
                 rec = frappe.db.get_value(
                     "qp_IQ_SurveyRecipient",
-                    {"sr_survey": survey.name, "sr_contact": contact_name, "sr_is_beta": 0},
+                    {"sr_survey": survey.name, "sr_contact": contact_name},
                     ["name", "sr_status"],
                     as_dict=True
                 )
@@ -607,7 +598,7 @@ def delete_measurement_contacts(survey_name, contact_names):
                 if responded:
                     found_responses = frappe.get_all(
                         "Survey Response",
-                        filters={"survey": survey.su_name, "user": contact_name, "custom_is_beta": 0},
+                        filters={"survey": survey.su_name, "user": contact_name},
                         fields=["name"]
                     )
                     for r in found_responses:
@@ -945,7 +936,7 @@ def save_measurement(data):
                             web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
                             
                             is_hidden = field.hidden
-                            if field.fieldname in ["custom_evaluatee", "custom_evaluator", "custom_is_beta", "responses", "response_json", "user", "survey"]:
+                            if field.fieldname in ["custom_evaluatee", "custom_evaluator", "responses", "response_json", "user", "survey"]:
                                 is_hidden = 1
 
                             web_form.append("web_form_fields", {
@@ -995,17 +986,13 @@ def save_measurement(data):
             frappe.db.commit()
             final_survey_name = survey.name
 
-            # Lógica de actualización de Contactos (filtrando únicamente participantes reales sr_is_beta = 0)
+            # Lógica de actualización de Contactos
             rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
             
             if survey.su_is_leadership:
                 leadership_network = data.get("leadershipNetwork", [])
                 if leadership_network:
-                    existing_recipients = frappe.get_all(
-                        "qp_IQ_SurveyRecipient",
-                        filters={"sr_survey": survey.name, "sr_is_beta": 0},
-                        fields=["name", "sr_contact", "sr_evaluating_to", "sr_evaluation_role"]
-                    )
+                    existing_recipients = frappe.get_all("qp_IQ_SurveyRecipient", filters={"sr_survey": survey.name}, fields=["name", "sr_contact", "sr_evaluating_to", "sr_evaluation_role"])
                     existing_pairs = {(r.sr_evaluating_to, r.sr_contact, r.sr_evaluation_role) for r in existing_recipients}
                     
                     for network in leadership_network:
@@ -1015,23 +1002,14 @@ def save_measurement(data):
                             role_label = ev.get("role")
                             
                             if (evaluator_id, leader_id, role_label) not in existing_pairs:
-                                has_responded = frappe.db.exists(
-                                    "Survey Response",
-                                    {
-                                        "survey": survey.su_name,
-                                        "user": evaluator_id,
-                                        "custom_evaluatee": leader_id,
-                                        "custom_is_beta": 0
-                                    }
-                                )
+                                has_responded = frappe.db.exists("Survey Response", {"survey": survey.su_name, "user": evaluator_id, "custom_evaluatee": leader_id})
                                 if not has_responded:
                                     doc_vals = {
                                         "doctype": "qp_IQ_SurveyRecipient",
                                         "sr_survey": survey.name,
                                         "sr_contact": leader_id,
                                         "sr_evaluating_to": evaluator_id,
-                                        "sr_status": rs_not_sent,
-                                        "sr_is_beta": 0
+                                        "sr_status": rs_not_sent
                                     }
                                     if not ev.get("isAuto") and role_label:
                                         doc_vals["sr_evaluation_role"] = role_label
@@ -1046,7 +1024,7 @@ def save_measurement(data):
                 if new_contacts:
                     existing_recipients = frappe.get_all(
                         "qp_IQ_SurveyRecipient",
-                        filters={"sr_survey": survey.name, "sr_is_beta": 0},
+                        filters={"sr_survey": survey.name},
                         fields=["sr_contact"]
                     )
                     existing_contact_names = set(r["sr_contact"] for r in existing_recipients if r["sr_contact"])
@@ -1058,7 +1036,7 @@ def save_measurement(data):
 
                         has_responded = frappe.db.exists(
                             "Survey Response",
-                            {"survey": survey.su_name, "user": contact_name, "custom_is_beta": 0}
+                            {"survey": survey.su_name, "user": contact_name}
                         )
                         if has_responded:
                             continue
@@ -1067,8 +1045,7 @@ def save_measurement(data):
                             "doctype": "qp_IQ_SurveyRecipient",
                             "sr_survey": survey.name,
                             "sr_contact": contact_name,
-                            "sr_status": rs_not_sent,
-                            "sr_is_beta": 0
+                            "sr_status": rs_not_sent
                         }).insert(ignore_permissions=True)
                         
             frappe.db.commit()
@@ -1123,7 +1100,7 @@ def save_measurement(data):
                         web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
                         
                         is_hidden = field.hidden
-                        if field.fieldname in ["custom_evaluatee", "custom_evaluator", "custom_is_beta", "responses", "response_json", "user", "survey"]:
+                        if field.fieldname in ["custom_evaluatee", "custom_evaluator", "responses", "response_json", "user", "survey"]:
                             is_hidden = 1
 
                         web_form.append("web_form_fields", {
@@ -1237,8 +1214,7 @@ def save_measurement(data):
                             "sr_survey": survey.name,
                             "sr_contact": leader_id,
                             "sr_evaluating_to": evaluator_id,
-                            "sr_status": rs_not_sent,
-                            "sr_is_beta": 0
+                            "sr_status": rs_not_sent
                         }
                         if not ev.get("isAuto") and role_label:
                             doc_vals["sr_evaluation_role"] = role_label
@@ -1257,8 +1233,7 @@ def save_measurement(data):
                                 "doctype": "qp_IQ_SurveyRecipient",
                                 "sr_survey": survey.name,
                                 "sr_contact": contact_name,
-                                "sr_status": rs_not_sent,
-                                "sr_is_beta": 0
+                                "sr_status": rs_not_sent
                             }).insert(ignore_permissions=True)
                     frappe.db.commit()
 
@@ -1268,417 +1243,6 @@ def save_measurement(data):
     except Exception as e:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Error en save_measurement")
-        return {"status": "error", "message": str(e)}
-
-def _resolve_beta_contact(email, user_company, fallback_label="Tester Beta"):
-    """
-    Busca un Contact activo en la empresa con el correo indicado.
-    Si no existe, crea o reutiliza un contacto técnico temporal de prueba (custom_is_liseniq_contact = 0)
-    o usa el contacto del usuario creador para garantizar integridad referencial sin contaminar el padrón real.
-    """
-    rows = frappe.db.sql(
-        """
-        SELECT c.name
-        FROM `tabContact` c
-        LEFT JOIN `tabContact Email` ce ON ce.parent = c.name AND ce.parenttype = 'Contact'
-        WHERE c.custom_company = %s
-          AND (LOWER(c.email_id) = %s OR LOWER(ce.email_id) = %s)
-        ORDER BY c.custom_is_liseniq_contact DESC, c.creation DESC
-        LIMIT 1
-        """,
-        (user_company, email.lower(), email.lower()),
-        as_dict=True
-    )
-    if rows:
-        return rows[0].name
-
-    try:
-        local_part = email.split("@")[0].replace(".", " ").replace("_", " ").title() or fallback_label
-        contact_doc = frappe.new_doc("Contact")
-        contact_doc.first_name = f"[Beta] {local_part}"[:100]
-        contact_doc.email_id = email
-        contact_doc.status = "Enabled"
-        if hasattr(contact_doc, "custom_company"):
-            contact_doc.custom_company = user_company
-        if hasattr(contact_doc, "custom_is_liseniq_contact"):
-            contact_doc.custom_is_liseniq_contact = 0
-        if hasattr(contact_doc, "custom_is_deleted"):
-            contact_doc.custom_is_deleted = 0
-        if hasattr(contact_doc, "custom_status"):
-            contact_doc.custom_status = "Activo"
-        contact_doc.append("email_ids", {
-            "email_id": email,
-            "is_primary": 1
-        })
-        contact_doc.insert(ignore_permissions=True)
-        return contact_doc.name
-    except Exception:
-        creator_contact = frappe.db.get_value("Contact", {"user": frappe.session.user}, "name")
-        if creator_contact:
-            return creator_contact
-        any_company_contact = frappe.db.get_value("Contact", {"custom_company": user_company}, "name")
-        return any_company_contact
-
-def _resolve_beta_leader_for_third_party(survey, evaluator_contact_id, user_company):
-    """
-    Obtiene un contacto Líder distinto al evaluador para validar enunciados hacia terceros (qn_statement_others)
-    en mediciones 360° cuando test_role != 'Autoevaluación'.
-    """
-    existing_leader = frappe.db.get_value(
-        "qp_IQ_SurveyRecipient",
-        {
-            "sr_survey": survey.name,
-            "sr_is_beta": 0,
-            "sr_contact": ["!=", evaluator_contact_id]
-        },
-        "sr_contact"
-    )
-    if existing_leader:
-        return existing_leader
-
-    other_company_contact = frappe.db.get_value(
-        "Contact",
-        {
-            "custom_company": user_company,
-            "name": ["!=", evaluator_contact_id]
-        },
-        "name"
-    )
-    if other_company_contact:
-        return other_company_contact
-
-    dummy_leader_email = f"lider.beta.{survey.name.lower()}@liseniq.local"
-    leader_id = _resolve_beta_contact(dummy_leader_email, user_company, fallback_label="Colaborador Evaluado")
-    return leader_id or evaluator_contact_id
-
-@frappe.whitelist()
-def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación"):
-    """
-    Envía la medición en Modo Piloto / Prueba Beta a una lista de correos electrónicos
-    sin alterar el estado de la medición ni contaminar las métricas o participantes reales.
-    """
-    try:
-        if not survey_name:
-            return {"status": "error", "message": _("El identificador de la medición es requerido.")}
-
-        survey = frappe.get_doc("qp_IQ_Survey", survey_name)
-        user_company = get_current_active_company()
-        if not user_company or survey.su_owner != user_company:
-            return {"status": "error", "message": _("No tiene permisos para enviar pruebas Beta de esta medición.")}
-
-        if isinstance(beta_emails, str):
-            try:
-                parsed_emails = json.loads(beta_emails)
-            except Exception:
-                parsed_emails = [e.strip() for e in beta_emails.split(",") if e.strip()]
-        elif isinstance(beta_emails, (list, tuple)):
-            parsed_emails = list(beta_emails)
-        else:
-            parsed_emails = []
-
-        email_regex = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-        clean_emails = []
-        for raw_email in parsed_emails:
-            em = str(raw_email or "").strip().lower()
-            if em and email_regex.match(em) and em not in clean_emails:
-                clean_emails.append(em)
-
-        if not clean_emails:
-            return {"status": "error", "message": _("Debe proporcionar al menos un correo electrónico válido.")}
-
-        secret = _get_jwt_secret()
-        if not secret:
-            return {"status": "error", "message": _("No se encontró clave secreta para firmar el token de prueba Beta.")}
-
-        rs_not_sent = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Not Sent"}, "name") or "Not Sent"
-        web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
-        if not web_form_route:
-            return {"status": "error", "message": _("No se encontró el Web Form asociado a la medición.")}
-
-        is_leadership = bool(getattr(survey, "su_is_leadership", 0))
-        is_custom_email = str(getattr(survey, "su_default_notif", "1")) == "0"
-        base_subject = (
-            survey.su_invitation_subject
-            if (is_custom_email and survey.su_invitation_subject)
-            else f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
-        )
-        subject = f"[PRUEBA BETA] {base_subject}"
-
-        end_date_html = ""
-        if getattr(survey, "su_end_date", None):
-            end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey.su_end_date}</strong></p>'
-
-        sender_email = None
-        if survey.su_owner:
-            notification_email_account = frappe.db.get_value("qp_IQ_Company", survey.su_owner, "co_notification_email")
-            if notification_email_account:
-                sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
-        if not sender_email:
-            sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
-
-        sender_formatted = formataddr((_get_notification_sender_name(), sender_email)) if sender_email else None
-
-        sent_count = 0
-        mail_sent_count = 0
-        mail_warnings = []
-        test_links = []
-
-        for email in clean_emails:
-            contact_id = _resolve_beta_contact(email, user_company)
-            if not contact_id:
-                return {
-                    "status": "error",
-                    "message": _(f"No fue posible asociar un contacto de prueba para el correo {email}.")
-                }
-
-            if is_leadership:
-                if test_role == "Autoevaluación":
-                    sr_contact = contact_id
-                    sr_evaluating_to = contact_id
-                    sr_evaluation_role = "Autoevaluación"
-                else:
-                    leader_prueba_id = _resolve_beta_leader_for_third_party(survey, contact_id, user_company)
-                    sr_contact = leader_prueba_id
-                    sr_evaluating_to = contact_id
-                    sr_evaluation_role = test_role or "Evaluador"
-
-                existing_beta_recs = frappe.get_all(
-                    "qp_IQ_SurveyRecipient",
-                    filters={
-                        "sr_survey": survey.name,
-                        "sr_evaluating_to": sr_evaluating_to,
-                        "sr_is_beta": 1
-                    },
-                    fields=["name", "sr_survey_response"]
-                )
-            else:
-                sr_contact = contact_id
-                sr_evaluating_to = None
-                sr_evaluation_role = None
-
-                existing_beta_recs = frappe.get_all(
-                    "qp_IQ_SurveyRecipient",
-                    filters={
-                        "sr_survey": survey.name,
-                        "sr_contact": sr_contact,
-                        "sr_is_beta": 1
-                    },
-                    fields=["name", "sr_survey_response"]
-                )
-
-            # Eliminar respuestas Beta previas de este destinatario para permitir re-probar ilimitadamente
-            for old_rec in existing_beta_recs:
-                if old_rec.get("sr_survey_response") and frappe.db.exists("Survey Response", old_rec.sr_survey_response):
-                    frappe.delete_doc("Survey Response", old_rec.sr_survey_response, force=1, ignore_permissions=True)
-
-            prev_beta_responses = frappe.get_all(
-                "Survey Response",
-                filters={
-                    "survey": survey.su_name,
-                    "user": contact_id,
-                    "custom_is_beta": 1
-                },
-                pluck="name"
-            )
-            for resp_name in prev_beta_responses:
-                frappe.delete_doc("Survey Response", resp_name, force=1, ignore_permissions=True)
-
-            if existing_beta_recs:
-                recipient = frappe.get_doc("qp_IQ_SurveyRecipient", existing_beta_recs[0].name)
-                recipient.sr_contact = sr_contact
-                recipient.sr_evaluating_to = sr_evaluating_to
-                recipient.sr_evaluation_role = sr_evaluation_role
-                recipient.sr_status = rs_not_sent
-                recipient.sr_survey_response = None
-                recipient.sr_is_beta = 1
-                recipient.save(ignore_permissions=True)
-                for extra_rec in existing_beta_recs[1:]:
-                    frappe.delete_doc("qp_IQ_SurveyRecipient", extra_rec.name, force=1, ignore_permissions=True)
-            else:
-                recipient_vals = {
-                    "doctype": "qp_IQ_SurveyRecipient",
-                    "sr_survey": survey.name,
-                    "sr_contact": sr_contact,
-                    "sr_status": rs_not_sent,
-                    "sr_is_beta": 1
-                }
-                if is_leadership:
-                    recipient_vals["sr_evaluating_to"] = sr_evaluating_to
-                    recipient_vals["sr_evaluation_role"] = sr_evaluation_role
-                recipient = frappe.get_doc(recipient_vals).insert(ignore_permissions=True)
-
-            payload = {
-                "sur": survey.su_name,
-                "rid": recipient.name,
-                "beta": True,
-                "iat": int(time())
-            }
-            token = jwt.encode(payload, secret, algorithm="HS256")
-            if isinstance(token, bytes):
-                token = token.decode("utf-8")
-
-            if is_leadership:
-                base_url = frappe.utils.get_url("/iq-register")
-                unique_url = f"{base_url}?token={token}&uq=true"
-            else:
-                base_url = frappe.utils.get_url(web_form_route)
-                unique_url = f"{base_url}?new=1&token={token}"
-
-            try:
-                frappe.db.set_value("qp_IQ_SurveyRecipient", recipient.name, {
-                    "sr_link": unique_url,
-                    "sr_token": token,
-                    "sr_status": rs_not_sent,
-                    "sr_sent_on": now(),
-                    "sr_is_beta": 1
-                })
-            except Exception as e_db:
-                if "Data too long" in str(e_db):
-                    frappe.db.set_value("qp_IQ_SurveyRecipient", recipient.name, {
-                        "sr_token": token,
-                        "sr_status": rs_not_sent,
-                        "sr_sent_on": now(),
-                        "sr_is_beta": 1
-                    })
-
-            html_body = _get_invitation_html(
-                survey.su_name,
-                survey.su_invitation_body,
-                end_date_html,
-                unique_url,
-                is_custom_email
-            )
-
-            link_error_msg = ""
-            mail_dispatched = False
-            sendmail_kwargs = {
-                "recipients": [email],
-                "subject": subject,
-                "message": html_body,
-                "now": True
-            }
-            if sender_formatted:
-                sendmail_kwargs["sender"] = sender_formatted
-
-            try:
-                frappe.sendmail(**sendmail_kwargs)
-                mail_dispatched = True
-                mail_sent_count += 1
-            except Exception as e_mail_now:
-                # Si falla con sender_formatted o now=True, intentar encolar sin forzar desencriptación inmediata o sin sender personalizado
-                try:
-                    fallback_kwargs = {
-                        "recipients": [email],
-                        "subject": subject,
-                        "message": html_body,
-                        "now": False
-                    }
-                    frappe.sendmail(**fallback_kwargs)
-                    mail_dispatched = True
-                    mail_sent_count += 1
-                except Exception as e_mail_fallback:
-                    err_str = str(e_mail_now or e_mail_fallback)[:200]
-                    link_error_msg = f"Enlace Beta generado en BD, pero fallo al enviar correo: {err_str}"
-                    mail_warnings.append(f"{email}: {err_str}")
-                    frappe.log_error(
-                        f"Error enviando correo Beta a {email}: {e_mail_now}\n{frappe.get_traceback()}",
-                        "send_beta_measurement - Error Mail"
-                    )
-
-            if link_error_msg:
-                try:
-                    frappe.db.set_value("qp_IQ_SurveyRecipient", recipient.name, "sr_error_link", link_error_msg)
-                except Exception:
-                    pass
-
-            sent_count += 1
-            test_links.append({
-                "email": email,
-                "url": unique_url,
-                "mail_sent": mail_dispatched
-            })
-
-        frappe.db.commit()
-
-        if mail_warnings and mail_sent_count == 0:
-            msg = _(
-                f"Se generaron {sent_count} enlace(s) de Prueba Beta válidos, pero el servidor de correo no pudo despachar el email ({mail_warnings[0]}). Puede abrir o copiar el enlace de prueba directamente aquí abajo."
-            )
-        elif mail_warnings:
-            msg = _(
-                f"Prueba Beta enviada a {mail_sent_count} de {sent_count} correo(s). Algunos correos presentaron advertencias de despacho, pero todos los enlaces directos están activos."
-            )
-        else:
-            msg = _(f"Prueba Beta enviada exitosamente a {sent_count} correo(s).")
-
-        return {
-            "status": "success",
-            "sent": sent_count,
-            "mail_sent": mail_sent_count,
-            "mail_warning": mail_warnings[0] if mail_warnings else None,
-            "links": test_links,
-            "message": msg
-        }
-
-    except Exception as e:
-        frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(), "send_beta_measurement")
-        return {"status": "error", "message": _("Error al enviar la prueba Beta: ") + str(e)}
-
-@frappe.whitelist()
-def purge_beta_data(survey_name):
-    """
-    Elimina todos los registros de Survey Response (custom_is_beta = 1) y
-    qp_IQ_SurveyRecipient (sr_is_beta = 1) asociados a una medición.
-    Puede ser invocada automáticamente por el cron job al pasar a 'En Progreso' o manualmente.
-    """
-    try:
-        if not survey_name:
-            return {"status": "error", "message": _("survey_name es requerido.")}
-
-        su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name")
-        if not su_name:
-            su_name = survey_name
-            survey_id = frappe.db.get_value("qp_IQ_Survey", {"su_name": survey_name}, "name")
-        else:
-            survey_id = survey_name
-
-        deleted_responses = 0
-        deleted_recipients = 0
-
-        if survey_id:
-            beta_recipients = frappe.get_all(
-                "qp_IQ_SurveyRecipient",
-                filters={"sr_survey": survey_id, "sr_is_beta": 1},
-                fields=["name", "sr_survey_response"]
-            )
-            for rec in beta_recipients:
-                if rec.get("sr_survey_response") and frappe.db.exists("Survey Response", rec.sr_survey_response):
-                    frappe.delete_doc("Survey Response", rec.sr_survey_response, force=1, ignore_permissions=True)
-                    deleted_responses += 1
-                frappe.delete_doc("qp_IQ_SurveyRecipient", rec.name, force=1, ignore_permissions=True)
-                deleted_recipients += 1
-
-        if su_name:
-            beta_responses = frappe.get_all(
-                "Survey Response",
-                filters={"survey": su_name, "custom_is_beta": 1},
-                pluck="name"
-            )
-            for resp_name in beta_responses:
-                if frappe.db.exists("Survey Response", resp_name):
-                    frappe.delete_doc("Survey Response", resp_name, force=1, ignore_permissions=True)
-                    deleted_responses += 1
-
-        frappe.db.commit()
-        return {
-            "status": "success",
-            "deleted_recipients": deleted_recipients,
-            "deleted_responses": deleted_responses
-        }
-    except Exception as e:
-        frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(), "purge_beta_data")
         return {"status": "error", "message": str(e)}
 
 @frappe.whitelist()
@@ -1860,3 +1424,152 @@ def process_leadership_excel(file_base64):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "process_leadership_excel")
         return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
+def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación"):
+    """
+    Envía una Encuesta de prueba (Modo Piloto / Dry-Run) 100% stateless:
+    - NO crea registros en Contact ni en qp_IQ_SurveyRecipient.
+    - Genera un enlace directo al Web Form con un JWT firmado que incluye 'beta': True y 'role': test_role.
+    - Retorna siempre 'url', 'email_subject' y 'email_html' para permitir ver el formato del correo y abrir el WebForm
+      sin importar si el servidor de correo completó o no el envío, sin exponer detalles técnicos.
+    """
+    try:
+        if not survey_name:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        survey = frappe.get_doc("qp_IQ_Survey", survey_name)
+        user_company = get_current_active_company()
+        if not user_company or survey.su_owner != user_company:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        if isinstance(beta_emails, str):
+            try:
+                parsed_emails = json.loads(beta_emails)
+            except Exception:
+                parsed_emails = [e.strip() for e in beta_emails.split(",") if e.strip()]
+        elif isinstance(beta_emails, (list, tuple)):
+            parsed_emails = list(beta_emails)
+        else:
+            parsed_emails = []
+
+        email_regex = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+        clean_emails = []
+        for raw_email in parsed_emails:
+            em = str(raw_email or "").strip().lower()
+            if em and email_regex.match(em) and em not in clean_emails:
+                clean_emails.append(em)
+
+        if not clean_emails:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        secret = _get_jwt_secret()
+        if not secret:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
+        if not web_form_route:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        # Generar un único token JWT stateless para validar el Web Form (sin crear Contact ni SurveyRecipient)
+        payload = {
+            "sur": survey.su_name,
+            "beta": True,
+            "role": test_role or "Autoevaluación",
+            "iat": int(time())
+        }
+        token = jwt.encode(payload, secret, algorithm="HS256")
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
+
+        base_url = frappe.utils.get_url(web_form_route)
+        unique_url = f"{base_url}?new=1&token={token}"
+
+        is_custom_email = str(getattr(survey, "su_default_notif", "1")) == "0"
+        base_subject = (
+            survey.su_invitation_subject
+            if (is_custom_email and survey.su_invitation_subject)
+            else f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
+        )
+        subject = f"[ENCUESTA DE PRUEBA] {base_subject}"
+
+        end_date_html = ""
+        if getattr(survey, "su_end_date", None):
+            end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey.su_end_date}</strong></p>'
+
+        html_body = _get_invitation_html(
+            survey.su_name,
+            survey.su_invitation_body,
+            end_date_html,
+            unique_url,
+            is_custom_email
+        )
+
+        sender_formatted = None
+        try:
+            sender_email = None
+            if survey.su_owner:
+                notification_email_account = frappe.db.get_value("qp_IQ_Company", survey.su_owner, "co_notification_email")
+                if notification_email_account:
+                    sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
+            if not sender_email:
+                sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+
+            if sender_email:
+                sender_formatted = formataddr((_get_notification_sender_name(), sender_email))
+        except Exception:
+            sender_formatted = None
+
+        mail_sent_count = 0
+
+        for email in clean_emails:
+            sendmail_kwargs = {
+                "recipients": [email],
+                "subject": subject,
+                "message": html_body,
+                "now": True
+            }
+            if sender_formatted:
+                sendmail_kwargs["sender"] = sender_formatted
+
+            try:
+                frappe.sendmail(**sendmail_kwargs)
+                mail_sent_count += 1
+            except Exception as e_mail_now:
+                try:
+                    fallback_kwargs = {
+                        "recipients": [email],
+                        "subject": subject,
+                        "message": html_body,
+                        "now": False
+                    }
+                    frappe.sendmail(**fallback_kwargs)
+                    mail_sent_count += 1
+                except Exception:
+                    frappe.log_error(
+                        f"Error enviando correo de prueba a {email}: {e_mail_now}\n{frappe.get_traceback()}",
+                        "send_beta_measurement - Error Mail"
+                    )
+
+        is_mail_ok = mail_sent_count > 0
+        return {
+            "status": "success" if is_mail_ok else "error",
+            "sent": len(clean_emails),
+            "mail_sent": mail_sent_count,
+            "url": unique_url,
+            "email_subject": subject,
+            "email_html": html_body,
+            "message": _(
+                "El envío del correo de la encuesta de prueba fue exitoso."
+                if is_mail_ok
+                else "El envío del correo de la encuesta de prueba no fue exitoso."
+            )
+        }
+
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "send_beta_measurement")
+        return {
+            "status": "error",
+            "mail_sent": 0,
+            "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")
+        }

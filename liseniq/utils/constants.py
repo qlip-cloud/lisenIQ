@@ -301,7 +301,7 @@ const uqFromUrl = urlParamsGlobal.get("uq") === "true";
 const uqStored = sessionStorage.getItem("liseniq_uq_flag") === "true";
 let uqFlag = uqFromUrl || uqStored;
 
-// Variables globales para almacenar el estado de anonimato, liderazgo y prueba Beta
+// Variables globales para almacenar el estado de anonimato, liderazgo y encuesta de prueba
 window.liseniq_is_anonymous_survey = false;
 window.liseniq_is_leadership = false;
 window.liseniq_is_beta = false;
@@ -384,7 +384,7 @@ frappe.web_form.after_load = () => {
   const token = urlParams.get("token");
   const dni = localStorage.getItem("liseniq_doc_id");
   
-  // Verificamos si el token es personalizado (tiene rid) o si es token de Prueba Beta
+  // Verificamos si el token es personalizado (tiene rid) o si es token de encuesta de prueba
   const decodedToken = parseJwt(token);
   const hasRid = decodedToken && !!decodedToken.rid;
   const isBetaToken = decodedToken && !!decodedToken.beta;
@@ -398,7 +398,7 @@ frappe.web_form.after_load = () => {
       // Guardamos el estado globalmente para usarlo al enviar
       window.liseniq_is_anonymous_survey = !!is_anonymous;
 
-      // Sanitización de URL en caso de encuesta anónima (se conserva el token si es Prueba Beta)
+      // Sanitización de URL en caso de encuesta anónima (se conserva el token si es encuesta de prueba)
       if (is_anonymous && token && !window.liseniq_is_beta) {
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete("token");
@@ -407,7 +407,7 @@ frappe.web_form.after_load = () => {
           urlParamsGlobal = new URLSearchParams(window.location.search);
       }
 
-      // Agregamos la excepción "!hasRid" y "!window.liseniq_is_beta" para no pedir DNI en enlaces directos de 360 ni en pruebas Beta
+      // Agregamos la excepción "!hasRid" y "!window.liseniq_is_beta" para no pedir DNI en enlaces directos de 360 ni en encuestas de prueba
       if (!window.liseniq_is_anonymous_survey && (!dni || String(dni).trim() === "") && !hasRid && !window.liseniq_is_beta) {
           frappe.msgprint({
               title: __("Acceso denegado"),
@@ -496,7 +496,7 @@ const validate_dni_on_input = function(dni) {
     if (!dni) {
         return;
     }
-    // Si es anónima o prueba Beta, no validamos DNI de forma bloqueante
+    // Si es anónima o encuesta de prueba, no validamos DNI de forma bloqueante
     if (window.liseniq_is_anonymous_survey || window.liseniq_is_beta) {
         localStorage.setItem("liseniq_doc_id", dni);
         return;
@@ -599,7 +599,7 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
     }
 
     const betaBannerHTML = isBeta
-        ? `<div class="iq-beta-banner">MODO PRUEBA BETA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados finales</div>`
+        ? `<div class="iq-beta-banner">ENCUESTA DE PRUEBA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados</div>`
         : "";
 
     const welcomeHTML = `
@@ -640,7 +640,7 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
 const load_survey = function (survey_name, cachedResponses) {
   $(".web-form-container").toggle(false);
   if (window.liseniq_is_beta) {
-    $('<div class="iq-beta-banner" style="max-width: 800px; margin: 15px auto;">MODO PRUEBA BETA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados finales</div>').appendTo($(".page_content"));
+    $('<div class="iq-beta-banner" style="max-width: 800px; margin: 15px auto;">ENCUESTA DE PRUEBA — Las respuestas enviadas en este enlace son de validación y no afectarán los resultados</div>').appendTo($(".page_content"));
   }
   $('<div id="surveyElement"></div>').appendTo($(".page_content"));
   
@@ -662,8 +662,10 @@ const load_survey = function (survey_name, cachedResponses) {
       const survey = new Survey.Model(frappe.survey_json);
       survey.locale = "es";
       
-      // Control de comportamiento según el tipo de medición
-      if (r.message.is_leadership) {
+      // Control de comportamiento según el tipo de medición y Encuesta de prueba
+      if (window.liseniq_is_beta) {
+          survey.completedHtml = "<h4>" + __("¡Encuesta de prueba completada! Esta respuesta es de validación y no afectará los resultados.") + "</h4>";
+      } else if (r.message.is_leadership) {
           window.liseniq_is_leadership = true;
           survey.completedHtml = "<h4>" + __("Guardando respuesta y verificando evaluaciones pendientes...") + "</h4>";
       } else {
@@ -714,6 +716,14 @@ const submit_response = function (data) {
   const urlParams = urlParamsGlobal;
   const token = urlParams.get("token");
   const doc_id = localStorage.getItem("liseniq_doc_id");
+  const decodedTokenCheck = parseJwt(token);
+
+  // Si es Encuesta de prueba, NO se guarda ninguna respuesta en la base de datos
+  if (window.liseniq_is_beta || (decodedTokenCheck && decodedTokenCheck.beta)) {
+      localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
+      window.saving = false;
+      return;
+  }
   
   // Sanitización del campo 'user' para evitar errores de longitud
   let user_for_db = "Anonimo";
@@ -775,8 +785,7 @@ const submit_response = function (data) {
         doctype: frappe.web_form.doc_type,
         survey: frappe.web_form.title,
         response_json: JSON.stringify(payload),
-        user: user_for_db,
-        custom_is_beta: isBeta ? 1 : 0
+        user: user_for_db
       };
 
       frappe.call({
@@ -824,7 +833,7 @@ nav, .navbar {
     padding-top: 15px !important;
 }
 
-/* Banner distintivo para Modo Prueba Beta */
+/* Banner distintivo para Encuesta de prueba */
 .iq-beta-banner {
     width: 100%;
     background-color: #f3ebff;

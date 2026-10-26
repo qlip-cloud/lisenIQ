@@ -181,52 +181,96 @@ select.small{padding:6px 8px;font-size:12px;border-radius:6px;border:1px solid v
     return doc;
   }
 
-  async function requestAiReport() {
+function requestAiReport() {
     if (chatbotButton.disabled) return;
-    const accepted = window.confirm('Está por enviar un request para obtener un informe sobre la medición con IA. ¿Desea continuar?');
-    if (!accepted) return;
 
-    const reportWindow = window.open('', '_blank');
-    if (!reportWindow) {
-      window.alert('No se pudo abrir una nueva pestaña. Permita ventanas emergentes e inténtelo de nuevo.');
-      return;
-    }
-    reportWindow.document.write('<title>Informe IA</title><p>Generando informe con IA...</p>');
-    chatbotButton.disabled = true;
-    try {
-      const response = await fetch('/api/method/qlipiav1.api.listenaiq.send_request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Frappe-CSRF-Token': window.csrf_token || ''
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({ survey: SURVEY })
-      });
-      const body = await response.json();
-      const result = body && body.message;
-      if (!response.ok || !result || result.ok !== true || typeof result.respuesta !== 'string') {
-        throw new Error((result && result.respuesta) || body.exc_type || ('HTTP ' + response.status));
-      }
+    frappe.confirm(
+        'Está por enviar una solicitud para obtener un informe sobre la medición con IA. ¿Desea continuar?',
+        async () => {
+            const reportWindow = window.open('', '_blank');
 
-      const pdf = markdownReportPdf(result.respuesta);
-      const blobUrl = URL.createObjectURL(pdf.output('blob'));
-      reportWindow.location.href = blobUrl;
-      const download = document.createElement('a');
-      download.href = blobUrl;
-      download.download = 'informe_IA_' + String(SURVEY).replace(/[^a-z0-9]+/gi, '_') + '.pdf';
-      document.body.appendChild(download);
-      download.click();
-      download.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-    } catch (error) {
-      reportWindow.close();
-      console.error(error);
-      window.alert('No se pudo generar el informe con IA: ' + error.message);
-    } finally {
-      chatbotButton.disabled = !iaAccess;
-    }
-  }
+            if (!reportWindow) {
+                frappe.msgprint({
+                    title: 'Ventana emergente bloqueada',
+                    message: 'No se pudo abrir una nueva pestaña. Permita las ventanas emergentes e inténtelo de nuevo.',
+                    indicator: 'orange'
+                });
+                return;
+            }
+
+            reportWindow.document.write(
+                '<title>Informe IA</title><p>Generando informe con IA...</p>'
+            );
+
+            chatbotButton.disabled = true;
+
+            try {
+                const response = await fetch(
+                    '/api/method/qlipiav1.api.listenaiq.send_request',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Frappe-CSRF-Token': frappe.csrf_token || ''
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ survey: SURVEY })
+                    }
+                );
+
+                const body = await response.json();
+                const result = body && body.message;
+
+                if (
+                    !response.ok ||
+                    !result ||
+                    result.ok !== true ||
+                    typeof result.respuesta !== 'string'
+                ) {
+                    throw new Error(
+                        (result && result.respuesta) ||
+                        body.exc_type ||
+                        ('HTTP ' + response.status)
+                    );
+                }
+
+                const pdf = markdownReportPdf(result.respuesta);
+                const blobUrl = URL.createObjectURL(pdf.output('blob'));
+
+                reportWindow.location.href = blobUrl;
+
+                const download = document.createElement('a');
+                download.href = blobUrl;
+                download.download =
+                    'informe_IA_' +
+                    String(SURVEY).replace(/[^a-z0-9]+/gi, '_') +
+                    '.pdf';
+
+                document.body.appendChild(download);
+                download.click();
+                download.remove();
+
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+
+            } catch (error) {
+                reportWindow.close();
+                console.error(error);
+
+                frappe.msgprint({
+                    title: 'Error',
+                    message:
+                        'No se pudo generar el informe con IA: ' +
+                        (error.message || 'Error desconocido'),
+                    indicator: 'red'
+                });
+
+            } finally {
+                chatbotButton.disabled = !iaAccess;
+            }
+        }
+    );
+}
+
   chatbotButton.addEventListener('click', requestAiReport);
   // ---------- utilidades ----------
    function load_material_icons() {

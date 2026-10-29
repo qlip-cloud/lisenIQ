@@ -5,12 +5,13 @@ import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
 from io import BytesIO
 from frappe import _
+from frappe.utils import md_to_html
 import re
 import jwt
 from time import time
 from email.utils import formataddr
-from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
-from liseniq.utils.api_survey import generate_public_link_for_survey, _get_jwt_secret
+from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS, get_legal_modals_html
+from liseniq.utils.api_survey import generate_public_link_for_survey, _get_jwt_secret, generate_default_welcome_markdown
 from liseniq.utils.login_util import global_website_context, get_current_active_company
 from liseniq.tasks import _get_invitation_html, _get_notification_sender_name
 
@@ -738,6 +739,244 @@ def _build_survey_elements(questions_data, manual_question_map):
         
     return elements
 
+def _build_preview_survey_elements(questions_data, is_leadership=False, test_role="Autoevaluación"):
+    """
+    Construye los elementos de SurveyJS en memoria para la Encuesta de Prueba (sin insertar registros en BD).
+    Soporta tanto preguntas existentes en qp_IQ_Question como preguntas manuales aún no guardadas,
+    y aplica enunciados hacia terceros (qn_statement_others) cuando es 360° en rol Evaluador.
+    """
+    if not questions_data:
+        return []
+
+    question_types_map = {
+        qt.name: qt
+        for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name", "qnt_mnemonico"])
+    }
+    elements = []
+
+    LIKERT_ICON_MAP = {
+        5: "/files/aiq - totalmente de acuerdo.png",
+        4: "/files/aiq - de acuerdo.png",
+        3: "/files/aiq - ni de acuerdo ni desacuerdo.png",
+        2: "/files/aiq - desacuerdo.png",
+        1: "/files/aiq - totalmente desacuerdo.png",
+    }
+    DEFAULT_LIKERT_OPTIONS = [
+        {"text": "Totalmente de acuerdo", "value": 5},
+        {"text": "De acuerdo", "value": 4},
+        {"text": "Ni de acuerdo ni en desacuerdo", "value": 3},
+        {"text": "En desacuerdo", "value": 2},
+        {"text": "Totalmente en desacuerdo", "value": 1},
+    ]
+    transparent_gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+    use_others = bool(is_leadership and test_role and test_role != "Autoevaluación")
+
+    for idx, q in enumerate(questions_data):
+        q_id = str(q.get("id") or f"preview-q-{idx + 1}")
+        is_manual = q_id.startswith("manual-")
+        q_doc = None
+        if not is_manual and frappe.db.exists("qp_IQ_Question", q_id):
+            try:
+                q_doc = frappe.get_doc("qp_IQ_Question", q_id)
+            except Exception:
+                q_doc = None
+
+        qt_info = question_types_map.get(q.get("type"), {})
+        question_type_mnemonic = qt_info.get("qnt_mnemonico")
+
+        surveyjs_type = "text"
+        if question_type_mnemonic == "radio_group":
+            surveyjs_type = "radiogroup"
+        elif question_type_mnemonic == "text_area":
+            surveyjs_type = "comment"
+        elif question_type_mnemonic == "score_nps":
+            surveyjs_type = "rating"
+        elif question_type_mnemonic in ["scale_likert", "scale_emoji"]:
+            surveyjs_type = "imagepicker"
+        elif question_type_mnemonic == "check_group":
+            surveyjs_type = "checkbox"
+        elif question_type_mnemonic == "text_short":
+            surveyjs_type = "text"
+
+        title_text = q.get("text") or ""
+        if use_others:
+            other_stmt = (
+                q.get("qn_statement_others")
+                or q.get("statement_others")
+                or (getattr(q_doc, "qn_statement_others", None) if q_doc else None)
+            )
+            if other_stmt:
+                title_text = other_stmt
+
+        element = {
+            "type": surveyjs_type,
+            "name": q_id,
+            "title": title_text,
+            "isRequired": False if q.get("qn_optional") else True
+        }
+
+        if question_type_mnemonic == "scale_likert":
+            choices = []
+            if q_doc and q_doc.qn_response_options:
+                for opt in q_doc.qn_response_options:
+                    try:
+                        val_int = int(opt.qo_option_value)
+                    except Exception:
+                        val_int = None
+                    image_url = getattr(opt, "qo_url", None) or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
+                    choices.append({
+                        "text": opt.qo_option_text,
+                        "value": opt.qo_option_value,
+                        "imageLink": image_url if image_url else transparent_gif
+                    })
+            else:
+                raw_opts = q.get("options") or DEFAULT_LIKERT_OPTIONS
+                for i_opt, opt in enumerate(raw_opts):
+                    if isinstance(opt, dict):
+                        opt_text = opt.get("text") or str(opt.get("value") or "")
+                        opt_val = opt.get("value") if opt.get("value") is not None else (5 - i_opt)
+                        opt_url = opt.get("url")
+                    else:
+                        opt_text = str(opt)
+                        opt_val = 5 - i_opt
+                        opt_url = None
+                    try:
+                        val_int = int(opt_val)
+                    except Exception:
+                        val_int = None
+                    image_url = opt_url or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
+                    choices.append({
+                        "text": opt_text,
+                        "value": opt_val,
+                        "imageLink": image_url if image_url else transparent_gif
+                    })
+            element["choices"] = choices
+            element["showLabel"] = True
+            element["multiSelect"] = False
+            element["imageFit"] = "contain"
+            element["imageHeight"] = 32
+            element["imageWidth"] = 32
+            element["choicesOrder"] = "none"
+
+        elif question_type_mnemonic == "scale_emoji":
+            choices = []
+            if q_doc and q_doc.qn_response_options:
+                for opt in q_doc.qn_response_options:
+                    choices.append({
+                        "text": opt.qo_option_text,
+                        "value": opt.qo_option_value,
+                        "imageLink": opt.qo_url if opt.qo_url else transparent_gif
+                    })
+            else:
+                for opt in (q.get("options") or []):
+                    if isinstance(opt, dict):
+                        choices.append({
+                            "text": opt.get("text") or "",
+                            "value": opt.get("value") if opt.get("value") is not None else opt.get("text"),
+                            "imageLink": opt.get("url") or transparent_gif
+                        })
+                    else:
+                        choices.append({
+                            "text": str(opt),
+                            "value": str(opt),
+                            "imageLink": transparent_gif
+                        })
+            element["choices"] = choices
+            element["showLabel"] = True
+            element["multiSelect"] = False
+            element["imageFit"] = "contain"
+            element["imageHeight"] = 32
+            element["imageWidth"] = 32
+            element["choicesOrder"] = "none"
+
+        elif question_type_mnemonic == "radio_group" and q.get("options"):
+            element["choices"] = q["options"]
+
+        elif question_type_mnemonic == "check_group":
+            if q.get("options"):
+                element["choices"] = q["options"]
+            if q.get("qp_others"):
+                element["hasOther"] = True
+                element["otherText"] = "Otros"
+            if q.get("qp_none_above"):
+                element["hasNone"] = True
+                element["noneText"] = "Ninguna de las anteriores"
+
+        elif question_type_mnemonic == "score_nps":
+            element["rateMin"] = q.get("nps_min", 1)
+            element["rateMax"] = q.get("nps_max", 10)
+            element["minRateDescription"] = "NADA PROBABLE"
+            element["maxRateDescription"] = "MUY PROBABLE"
+            element["rateDescriptionLocation"] = "top"
+
+        elif question_type_mnemonic == "text_short":
+            element["maxLength"] = 70
+
+        elements.append(element)
+
+    return elements
+
+def _ensure_beta_preview_web_form():
+    """
+    Garantiza que exista un único Web Form genérico de previsualización (ruta: 'encuesta-de-prueba')
+    sin asociarlo a ningún qp_IQ_Survey (custom_iq_survey = None), evitando guardar la medición en BD.
+    """
+    preview_route = "encuesta-de-prueba"
+    preview_title = "Encuesta de Prueba"
+    existing_wf_name = frappe.db.get_value("Web Form", {"route": preview_route}, "name")
+
+    if existing_wf_name:
+        wf_doc = frappe.get_doc("Web Form", existing_wf_name)
+        needs_save = False
+        if wf_doc.client_script != WEB_FORM_CLIENT_SCRIPT:
+            wf_doc.client_script = WEB_FORM_CLIENT_SCRIPT
+            needs_save = True
+        if wf_doc.custom_css != WEB_FORM_CUSTOM_CSS:
+            wf_doc.custom_css = WEB_FORM_CUSTOM_CSS
+            needs_save = True
+        if not wf_doc.published:
+            wf_doc.published = 1
+            needs_save = True
+        if needs_save:
+            wf_doc.save(ignore_permissions=True)
+            frappe.db.commit()
+        return preview_route
+
+    web_form = frappe.new_doc("Web Form")
+    web_form.title = preview_title
+    web_form.route = preview_route
+    web_form.doc_type = "Survey Response"
+    web_form.module = "Frappe Survey"
+    web_form.client_script = WEB_FORM_CLIENT_SCRIPT
+    web_form.custom_css = WEB_FORM_CUSTOM_CSS
+    web_form.published = 1
+    web_form.custom_iq_survey = None
+
+    survey_response_meta = frappe.get_meta("Survey Response")
+    fieldtype_mapping = {"Long Text": "Text Editor"}
+    for field in survey_response_meta.fields:
+        if field.fieldtype not in ["Section Break", "Column Break", "Tab Break"]:
+            web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
+            is_hidden = field.hidden
+            if field.fieldname in ["custom_evaluatee", "custom_evaluator", "responses", "response_json", "user", "survey"]:
+                is_hidden = 1
+
+            web_form.append("web_form_fields", {
+                "fieldname": field.fieldname,
+                "fieldtype": web_form_fieldtype,
+                "label": field.label,
+                "reqd": field.reqd,
+                "options": field.options,
+                "hidden": is_hidden,
+                "read_only": field.read_only,
+                "default": field.default,
+                "description": field.description,
+            })
+
+    web_form.insert(ignore_permissions=True)
+    frappe.db.commit()
+    return preview_route
+
 @frappe.whitelist()
 def save_measurement(data):
     try:
@@ -1359,22 +1598,79 @@ def process_leadership_excel(file_base64):
         return {"status": "error", "message": str(e)}
 
 @frappe.whitelist()
-def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación"):
+def send_beta_measurement(measurement_data=None, beta_emails=None, test_role="Autoevaluación", survey_name=None):
     """
-    Envía una Encuesta de prueba (Modo Piloto / Dry-Run) 100% stateless:
-    - NO crea registros en Contact ni en qp_IQ_SurveyRecipient.
-    - Genera un enlace directo al Web Form con un JWT firmado que incluye 'beta': True y 'role': test_role.
-    - Retorna siempre 'url', 'email_subject' y 'email_html' para permitir ver el formato del correo y abrir el WebForm
-      sin importar si el servidor de correo completó o no el envío, sin exponer detalles técnicos.
+    Envía una Encuesta de prueba (Modo Piloto / Dry-Run) 100% efímera y sin estado en BD:
+    - NO guarda ni modifica registros en qp_IQ_Survey, Survey, Contact ni qp_IQ_SurveyRecipient.
+    - Construye la vista previa de la encuesta en memoria a partir de `measurement_data` y la guarda temporalmente en Redis (frappe.cache).
+    - Genera un enlace hacia el Web Form genérico de prueba ('encuesta-de-prueba') con un JWT firmado ('beta': True, 'preview_id': ...).
+    - Retorna siempre 'url', 'email_subject' y 'email_html' sin importar si el servidor de correo completó o no el envío.
     """
     try:
-        if not survey_name:
+        user_company = get_current_active_company()
+        if not user_company:
             return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
 
-        survey = frappe.get_doc("qp_IQ_Survey", survey_name)
-        user_company = get_current_active_company()
-        if not user_company or survey.su_owner != user_company:
-            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+        data = {}
+        if measurement_data:
+            data = json.loads(measurement_data) if isinstance(measurement_data, str) else dict(measurement_data)
+        elif survey_name and frappe.db.exists("qp_IQ_Survey", survey_name):
+            survey_doc = frappe.get_doc("qp_IQ_Survey", survey_name)
+            if survey_doc.su_owner != user_company:
+                return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+            data = {
+                "name": survey_doc.su_name,
+                "is_leadership": bool(survey_doc.su_is_leadership),
+                "endDate": survey_doc.su_end_date,
+                "email_use_default": str(getattr(survey_doc, "su_default_notif", "1")) != "0",
+                "welcome_use_default": str(getattr(survey_doc, "su_default_welcome", "1")) != "0",
+                "email_customization": {
+                    "invitation_subject": survey_doc.su_invitation_subject,
+                    "invitation_body": survey_doc.su_invitation_body,
+                    "welcome_subject": survey_doc.su_term_subject,
+                    "welcome_body": survey_doc.su_term_body,
+                },
+                "questions": [
+                    {
+                        "id": sq.sq_question,
+                        "text": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_statement") or "",
+                        "type": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_type"),
+                        "qn_optional": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_optional") or 0,
+                        "nps_min": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_nps_min"),
+                        "nps_max": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_nps_max"),
+                        "qp_others": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qp_others") or 0,
+                        "qp_none_above": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qp_none_above") or 0,
+                    }
+                    for sq in (survey_doc.su_questions or [])
+                ]
+            }
+
+        su_name = (data.get("name") or "Encuesta de Prueba").strip()
+        is_leadership = bool(data.get("is_leadership"))
+        end_date = data.get("endDate")
+        email_use_default = bool(data.get("email_use_default", True))
+        welcome_use_default = bool(data.get("welcome_use_default", True))
+        email_data = data.get("email_customization") or {}
+        questions_list = data.get("questions")
+
+        # Si estaba en modo edición de una medición ya en curso y questions no vino en el payload, leer las preguntas actuales sin modificar BD
+        if questions_list is None and data.get("doc_name") and frappe.db.exists("qp_IQ_Survey", data.get("doc_name")):
+            existing_survey = frappe.get_doc("qp_IQ_Survey", data.get("doc_name"))
+            questions_list = []
+            for sq in (existing_survey.su_questions or []):
+                q_doc = frappe.get_doc("qp_IQ_Question", sq.sq_question)
+                questions_list.append({
+                    "id": q_doc.name,
+                    "text": q_doc.qn_statement,
+                    "type": q_doc.qn_type,
+                    "options": [opt.qo_option_text for opt in (q_doc.qn_response_options or [])],
+                    "nps_min": q_doc.qn_nps_min,
+                    "nps_max": q_doc.qn_nps_max,
+                    "qp_others": q_doc.get("qp_others", 0),
+                    "qp_none_above": q_doc.get("qp_none_above", 0),
+                    "qn_optional": q_doc.get("qn_optional", 0)
+                })
+        questions_list = questions_list or []
 
         if isinstance(beta_emails, str):
             try:
@@ -1400,14 +1696,52 @@ def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación")
         if not secret:
             return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
 
-        web_form_route = frappe.db.get_value("Web Form", {"title": survey.su_name}, "route")
-        if not web_form_route:
-            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+        # Construir elementos de SurveyJS en memoria sin crear registros en qp_IQ_Question ni Survey
+        elements = _build_preview_survey_elements(questions_list, is_leadership=is_leadership, test_role=test_role)
+        survey_json_str = json.dumps({
+            "title": su_name,
+            "description": "",
+            "pages": [{"name": "page1", "elements": elements}]
+        })
 
-        # Generar un único token JWT stateless para validar el Web Form (sin crear Contact ni SurveyRecipient)
+        # Construir asunto y mensaje de bienvenida en memoria
+        if welcome_use_default:
+            welcome_subject = f"¡Bienvenido/a a la medición {su_name}!"
+            raw_markdown = generate_default_welcome_markdown({
+                "nombre_medicion": su_name,
+                "numero_preguntas": len(questions_list)
+            })
+            welcome_message = md_to_html(raw_markdown)
+        else:
+            welcome_subject = email_data.get("welcome_subject") or su_name
+            welcome_message = email_data.get("welcome_body") or ""
+
+        if welcome_message:
+            welcome_message += get_legal_modals_html()
+
+        # Guardar previsualización efímera en Redis (frappe.cache) por 48 horas sin tocar las tablas de mediciones
+        preview_id = frappe.generate_hash(length=12)
+        preview_cache_payload = {
+            "name": su_name,
+            "is_leadership": 1 if is_leadership else 0,
+            "role": test_role or "Autoevaluación",
+            "survey_json": survey_json_str,
+            "welcome_subject": welcome_subject,
+            "welcome_message": welcome_message
+        }
+        frappe.cache().set_value(
+            f"liseniq_beta_preview:{preview_id}",
+            json.dumps(preview_cache_payload),
+            expires_in_sec=172800
+        )
+
+        # Garantizar el Web Form contenedor genérico ('encuesta-de-prueba')
+        web_form_route = _ensure_beta_preview_web_form()
+
         payload = {
-            "sur": survey.su_name,
+            "sur": su_name,
             "beta": True,
+            "preview_id": preview_id,
             "role": test_role or "Autoevaluación",
             "iat": int(time())
         }
@@ -1418,21 +1752,24 @@ def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación")
         base_url = frappe.utils.get_url(web_form_route)
         unique_url = f"{base_url}?new=1&token={token}"
 
-        is_custom_email = str(getattr(survey, "su_default_notif", "1")) == "0"
+        is_custom_email = not email_use_default
+        custom_inv_subject = email_data.get("invitation_subject")
+        custom_inv_body = email_data.get("invitation_body")
+
         base_subject = (
-            survey.su_invitation_subject
-            if (is_custom_email and survey.su_invitation_subject)
-            else f"Bienvenido(a) al proceso de Medición - {survey.su_name}"
+            custom_inv_subject
+            if (is_custom_email and custom_inv_subject)
+            else f"Bienvenido(a) al proceso de Medición - {su_name}"
         )
         subject = f"[ENCUESTA DE PRUEBA] {base_subject}"
 
         end_date_html = ""
-        if getattr(survey, "su_end_date", None):
-            end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{survey.su_end_date}</strong></p>'
+        if end_date:
+            end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{end_date}</strong></p>'
 
         html_body = _get_invitation_html(
-            survey.su_name,
-            survey.su_invitation_body,
+            su_name,
+            custom_inv_body,
             end_date_html,
             unique_url,
             is_custom_email
@@ -1441,10 +1778,9 @@ def send_beta_measurement(survey_name, beta_emails, test_role="Autoevaluación")
         sender_formatted = None
         try:
             sender_email = None
-            if survey.su_owner:
-                notification_email_account = frappe.db.get_value("qp_IQ_Company", survey.su_owner, "co_notification_email")
-                if notification_email_account:
-                    sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
+            notification_email_account = frappe.db.get_value("qp_IQ_Company", user_company, "co_notification_email")
+            if notification_email_account:
+                sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
             if not sender_email:
                 sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
 

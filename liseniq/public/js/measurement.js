@@ -1796,9 +1796,9 @@ class MeasurementCreator {
         if (betaFeedbackMsg) betaFeedbackMsg.classList.add('d-none');
 
         try {
-            // Auto-guardado transparente (creación o sincronización en modo edición) sin redirigir a /iq-home
+            // Sincronizar en memoria sin guardar la medición en base de datos hasta que el usuario pulse 'Enviar'
             this.syncEmailStateFromFields();
-            await this.saveMeasurement(true);
+            const measurementPayload = this.buildMeasurementPayload();
 
             const testRole = (this.state.measurementData.isLeadership && betaRoleSelect)
                 ? betaRoleSelect.value
@@ -1807,7 +1807,7 @@ class MeasurementCreator {
             const response = await frappe.call({
                 method: 'liseniq.www.measurement.new_measurement.send_beta_measurement',
                 args: {
-                    survey_name: this.state.docName,
+                    measurement_data: JSON.stringify(measurementPayload),
                     beta_emails: JSON.stringify(validEmails),
                     test_role: testRole
                 }

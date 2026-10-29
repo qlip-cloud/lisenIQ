@@ -53,12 +53,43 @@ def _now_in_survey_tz_by_su_name(su_name: str) -> datetime:
         tz = pytz.utc
     return datetime.now(tz)
 
+def _get_cached_beta_preview(preview_id):
+    if not preview_id:
+        return None
+    raw = frappe.cache().get_value(f"liseniq_beta_preview:{preview_id}")
+    if not raw:
+        return None
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except Exception:
+            return None
+    if isinstance(raw, dict):
+        return raw
+    return None
+
 @frappe.whitelist(allow_guest=True)
 def get_public_survey(survey_name, token=None, dni=None):
   if dni and str(dni).strip().lower() in ["null", "none", "undefined", ""]:
       dni = None
       
   try:
+    # Si es una Encuesta de Prueba efímera (aún no guardada en BD), servir el JSON directamente desde frappe.cache()
+    if token and token != "Anonimo":
+        secret = _get_jwt_secret()
+        try:
+            beta_payload = jwt.decode(token, secret, algorithms=["HS256"])
+            if beta_payload.get("beta") and beta_payload.get("preview_id"):
+                preview_data = _get_cached_beta_preview(beta_payload.get("preview_id"))
+                if preview_data and preview_data.get("survey_json"):
+                    return {
+                        "survey_json": preview_data.get("survey_json"),
+                        "theme_json": None,
+                        "is_leadership": preview_data.get("is_leadership", 0)
+                    }
+        except Exception:
+            pass
+
     survey_data = frappe.db.get_value("Survey", survey_name, ["survey_json", "theme_json"], as_dict=True)
     if not survey_data:
         frappe.throw("Encuesta no encontrada.")
@@ -180,6 +211,30 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
       
   uq_flag = str(uq).lower() == "true"
   try:
+    # Si viene un token de Encuesta de Prueba efímera, validar y responder desde caché sin exigir que exista en qp_IQ_Survey
+    if token and token != "Anonimo":
+        secret = _get_jwt_secret()
+        try:
+            beta_payload = jwt.decode(token, secret, algorithms=["HS256"])
+            if beta_payload.get("beta"):
+                preview_id = beta_payload.get("preview_id")
+                if preview_id:
+                    preview_data = _get_cached_beta_preview(preview_id)
+                    if not preview_data:
+                        return {"allow": False, "message": "El enlace de prueba ha expirado."}
+                    return {
+                        "allow": True,
+                        "is_beta": True,
+                        "require_dni": False,
+                        "survey_display_name": preview_data.get("name") or beta_payload.get("sur") or survey_name,
+                        "welcome_subject": preview_data.get("welcome_subject"),
+                        "welcome_message": preview_data.get("welcome_message")
+                    }
+        except jwt.ExpiredSignatureError:
+            return {"allow": False, "message": "El enlace ha expirado."}
+        except jwt.InvalidTokenError:
+            return {"allow": False, "message": "Enlace inválido o expirado."}
+
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
     status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
     rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"
@@ -225,7 +280,7 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
         "welcome_message": welcome_message
     }
 
-    # Si viene un token de Prueba Beta, permitir validar directamente el Web Form sin crear ni exigir contactos, DNI ni fechas
+    # Respaldo para tokens Beta asociados a una encuesta ya guardada en BD
     if token and token != "Anonimo":
         secret = _get_jwt_secret()
         try:
@@ -449,9 +504,9 @@ def get_survey_route_for_public_link(token, dni=None):
         return {"error": "Token de encuesta inválido."}
 
     if is_beta:
-        web_form_route = frappe.db.get_value("Web Form", {"title": survey_name}, "route")
-        if not web_form_route:
-            return {"error": "No se encontró el formulario para la encuesta."}
+        if payload.get("preview_id"):
+            return {"route": "encuesta-de-prueba", "is_leadership": False, "has_rid": True, "is_beta": True}
+        web_form_route = frappe.db.get_value("Web Form", {"title": survey_name}, "route") or "encuesta-de-prueba"
         return {"route": web_form_route, "is_leadership": False, "has_rid": True, "is_beta": True}
 
     status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")

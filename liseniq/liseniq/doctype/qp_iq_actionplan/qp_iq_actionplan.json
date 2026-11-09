@@ -1,0 +1,421 @@
+{
+ "actions": [],
+ "autoname": "PLAN.00000000000",
+ "creation": "2026-11-02 06:08:27.556112",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "ap_sec_general",
+  "ap_name",
+  "ap_company",
+  "ap_category",
+  "ap_priority",
+  "ap_status",
+  "ap_col_general",
+  "ap_responsible",
+  "ap_start_date",
+  "ap_target_date",
+  "ap_objective",
+  "ap_description",
+  "ap_sec_scope",
+  "ap_origin_survey",
+  "ap_scope_type",
+  "ap_col_scope",
+  "ap_dimension",
+  "ap_topic",
+  "ap_question",
+  "ap_scope_label",
+  "ap_sec_goal",
+  "ap_initial_score",
+  "ap_target_score",
+  "ap_expected_increment",
+  "ap_col_goal",
+  "ap_expected_eval_date",
+  "ap_scale_min",
+  "ap_scale_max",
+  "ap_sec_tasks",
+  "ap_tasks",
+  "ap_sec_progress",
+  "ap_total_tasks",
+  "ap_completed_tasks",
+  "ap_pending_tasks",
+  "ap_col_progress",
+  "ap_overdue_tasks",
+  "ap_progress_pct",
+  "ap_sec_evaluation",
+  "ap_goal_status",
+  "ap_comparison_survey",
+  "ap_posterior_score",
+  "ap_col_evaluation",
+  "ap_observed_variation",
+  "ap_goal_difference",
+  "ap_goal_achievement_pct",
+  "ap_evaluated_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "ap_sec_general",
+   "fieldtype": "Section Break",
+   "label": "1. Información General"
+  },
+  {
+   "fieldname": "ap_name",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Nombre del Plan",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Empresa",
+   "options": "qp_IQ_Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Categoría",
+   "options": "Liderazgo\nComunicación\nBienestar\nCapacitación\nReconocimiento\nInnovación\nCultura\nSeguridad\nDiversidad e inclusión",
+   "reqd": 1
+  },
+  {
+   "default": "Media",
+   "fieldname": "ap_priority",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Prioridad",
+   "options": "Baja\nMedia\nAlta\nCrítica",
+   "reqd": 1
+  },
+  {
+   "default": "Borrador",
+   "fieldname": "ap_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Estado del Plan",
+   "options": "Borrador\nEn ejecución\nFinalizado\nCancelado",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_col_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ap_responsible",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Responsable del Plan",
+   "options": "Contact",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_start_date",
+   "fieldtype": "Date",
+   "label": "Fecha de Inicio",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_target_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Fecha Objetivo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_objective",
+   "fieldtype": "Small Text",
+   "label": "Objetivo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_description",
+   "fieldtype": "Small Text",
+   "label": "Descripción"
+  },
+  {
+   "fieldname": "ap_sec_scope",
+   "fieldtype": "Section Break",
+   "label": "2. Alcance del Plan"
+  },
+  {
+   "fieldname": "ap_origin_survey",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Medición de Origen",
+   "options": "qp_IQ_Survey",
+   "reqd": 1
+  },
+  {
+   "default": "Medición",
+   "fieldname": "ap_scope_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tipo de Alcance",
+   "options": "Medición\nDimensión\nTema\nPregunta",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_col_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:in_list(['Dimensión', 'Tema', 'Pregunta'], doc.ap_scope_type)",
+   "fieldname": "ap_dimension",
+   "fieldtype": "Link",
+   "label": "Dimensión",
+   "mandatory_depends_on": "eval:in_list(['Dimensión', 'Tema', 'Pregunta'], doc.ap_scope_type)",
+   "options": "qp_IQ_DemographicType"
+  },
+  {
+   "depends_on": "eval:in_list(['Tema', 'Pregunta'], doc.ap_scope_type)",
+   "fieldname": "ap_topic",
+   "fieldtype": "Link",
+   "label": "Tema",
+   "mandatory_depends_on": "eval:doc.ap_scope_type == 'Tema'",
+   "options": "qp_IQ_DemographicType"
+  },
+  {
+   "depends_on": "eval:doc.ap_scope_type == 'Pregunta'",
+   "fieldname": "ap_question",
+   "fieldtype": "Link",
+   "label": "Pregunta",
+   "mandatory_depends_on": "eval:doc.ap_scope_type == 'Pregunta'",
+   "options": "qp_IQ_Question"
+  },
+  {
+   "description": "Etiqueta histórica del elemento evaluado al momento de crear el plan",
+   "fieldname": "ap_scope_label",
+   "fieldtype": "Small Text",
+   "label": "Referencia de Alcance (Snapshot)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_sec_goal",
+   "fieldtype": "Section Break",
+   "label": "3. Meta"
+  },
+  {
+   "fieldname": "ap_initial_score",
+   "fieldtype": "Float",
+   "label": "Puntaje Inicial (Resultado Actual)",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_target_score",
+   "fieldtype": "Float",
+   "label": "Puntaje Objetivo (Meta)",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_expected_increment",
+   "fieldtype": "Float",
+   "label": "Incremento Esperado",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_col_goal",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ap_expected_eval_date",
+   "fieldtype": "Date",
+   "label": "Fecha Esperada de Evaluación"
+  },
+  {
+   "default": "1",
+   "fieldname": "ap_scale_min",
+   "fieldtype": "Float",
+   "label": "Escala Mínima",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "default": "5",
+   "fieldname": "ap_scale_max",
+   "fieldtype": "Float",
+   "label": "Escala Máxima",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_sec_tasks",
+   "fieldtype": "Section Break",
+   "label": "4. Acciones del Plan"
+  },
+  {
+   "fieldname": "ap_tasks",
+   "fieldtype": "Table",
+   "label": "Acciones",
+   "options": "qp_IQ_ActionPlanTask"
+  },
+  {
+   "fieldname": "ap_sec_progress",
+   "fieldtype": "Section Break",
+   "label": "Avance Operativo"
+  },
+  {
+   "default": "0",
+   "fieldname": "ap_total_tasks",
+   "fieldtype": "Int",
+   "label": "Total de Acciones",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "ap_completed_tasks",
+   "fieldtype": "Int",
+   "label": "Acciones Finalizadas",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "ap_pending_tasks",
+   "fieldtype": "Int",
+   "label": "Acciones Pendientes / En Progreso",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_col_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "ap_overdue_tasks",
+   "fieldtype": "Int",
+   "label": "Acciones Vencidas",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "ap_progress_pct",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Avance de Acciones (%)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_sec_evaluation",
+   "fieldtype": "Section Break",
+   "label": "5. Evaluación del Impacto (Medición Posterior)"
+  },
+  {
+   "default": "Pendiente de evaluación",
+   "fieldname": "ap_goal_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Estado de la Meta",
+   "options": "Pendiente de evaluación\nMeta alcanzada\nMeta parcialmente alcanzada\nMeta no alcanzada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ap_comparison_survey",
+   "fieldtype": "Link",
+   "label": "Medición Posterior Comparada",
+   "options": "qp_IQ_Survey"
+  },
+  {
+   "fieldname": "ap_posterior_score",
+   "fieldtype": "Float",
+   "label": "Puntaje Posterior",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_col_evaluation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ap_observed_variation",
+   "fieldtype": "Float",
+   "label": "Variación Observada",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_goal_difference",
+   "fieldtype": "Float",
+   "label": "Diferencia frente a la Meta",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_goal_achievement_pct",
+   "fieldtype": "Percent",
+   "label": "Porcentaje de Cumplimiento de Meta",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ap_evaluated_on",
+   "fieldtype": "Datetime",
+   "label": "Fecha de Evaluación",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-02 07:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_ActionPlan",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Customer",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "ap_name",
+ "track_changes": 1
+}

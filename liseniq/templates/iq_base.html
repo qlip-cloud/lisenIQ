@@ -51,6 +51,15 @@
                                 </a>
                             </li>
                             <li class="nav-item" id="results-sec"><a href="/iq-results" class="nav-link {% if frappe.request.path == '/iq-results' %}active-link{% endif %}"><i class="fa fa-bar-chart fa-fw mr-3"></i>Resultados</a></li>
+                            <li class="nav-item" id="action-plan-sec">
+                                <a href="/iq-action-plan" class="nav-link {% if frappe.request.path.startswith('/iq-action-plan') %}active-link{% endif %}">
+                                    <i class="fa fa-check-square-o fa-fw mr-3"></i>Planes de Acción
+                                    <span class="tooltip-wrapper">
+                                        <span class="tooltip-icon"></span>
+                                        <span data-tooltip-bottom="Convierte los hallazgos de tus mediciones en planes de mejora con metas cuantitativas, seguimiento de acciones y evaluación de impacto."></span>
+                                    </span>
+                                </a>
+                            </li>
                             <li class="nav-item" id="contacts-sec"><a href="/contacts" class="nav-link {% if frappe.request.path == '/contacts' %}active-link{% endif %}"><i class="fa fa-users fa-fw mr-3"></i>Contactos</a></li>
 
                             <li class="nav-item" id="config-sec">

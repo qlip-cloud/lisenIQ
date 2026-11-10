@@ -1,0 +1,1250 @@
+<!-- listenaiq/www/liderazgo-dashboard.html -->
+{% extends "templates/web.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_content %}
+
+{% raw %}
+<style>
+#ll360{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;border-radius:12px;}
+#ll360 *{box-sizing:border-box;}
+#ll360{
+  --purple:#6d28d9; --purple-dark:#4c1d95; --purple-light:#ede9fe;
+  --teal:#0d9488; --teal-light:#ccfbf1; --blue:#2563eb;
+  --bg:#f4f5f9; --card:#ffffff; --text:#1f2430; --text-sec:#6b7280; --border:#e5e7eb;
+  --positive:#059669; --negative:#dc2626; --amber:#d97706;
+  --radius:14px; --shadow:0 1px 3px rgba(17,24,39,.06), 0 1px 2px rgba(17,24,39,.04);
+}
+#ll360 .wrap{max-width:1320px;margin:0 auto;padding:20px;}
+#ll360 .header{background:linear-gradient(120deg,var(--purple-dark),var(--purple) 65%,var(--teal));border-radius:var(--radius);padding:26px 30px;color:#fff;margin-bottom:18px;box-shadow:var(--shadow);}
+#ll360 .header .eyebrow{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.8;font-weight:600;}
+#ll360 .header h1{margin:6px 0 4px;font-size:26px;font-weight:700;}
+#ll360 .header .sub{font-size:13.5px;opacity:.9;max-width:760px;line-height:1.5;}
+#ll360 .header .meta{margin-top:14px;display:flex;gap:18px;flex-wrap:wrap;font-size:12px;opacity:.85;}
+#ll360 .header .meta b{font-weight:600;opacity:1;}
+#ll360 .header-actions{margin-top:16px;}
+#ll360 .pdf-btn{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12.5px;font-weight:700;padding:9px 18px;border-radius:9px;cursor:pointer;backdrop-filter:blur(2px);transition:.15s;}
+#ll360 .pdf-btn:hover{background:rgba(255,255,255,.28);}
+#ll360 .pdf-btn:disabled{opacity:.7;cursor:wait;}
+#ll360 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;position:sticky;top:0;z-index:20;background:var(--bg);padding:8px 0;}
+#ll360 .tab-btn{border:1px solid var(--border);background:#fff;color:var(--text-sec);padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;}
+#ll360 .tab-btn:hover{border-color:var(--purple);color:var(--purple);}
+#ll360 .tab-btn.active{background:var(--purple);border-color:var(--purple);color:#fff;}
+#ll360 .tab-panel{display:none;}
+#ll360 .tab-panel.active{display:block;animation:fade .25s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+#ll360 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:16px;}
+#ll360 .kpi-card{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border);}
+#ll360 .kpi-label{font-size:11.5px;color:var(--text-sec);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;}
+#ll360 .kpi-value{font-size:26px;font-weight:800;color:var(--purple-dark);line-height:1;}
+#ll360 .kpi-note{font-size:12px;color:var(--text-sec);margin-top:6px;}
+#ll360 .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-bottom:16px;}
+#ll360 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;}
+@media(max-width:900px){#ll360 .grid2,#ll360 .grid3{grid-template-columns:1fr;}
+}
+#ll360 .card{background:var(--card);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:16px;}
+#ll360 .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+#ll360 .card-head h3{flex:1;}
+#ll360 .dl-btn{flex-shrink:0;border:1px solid var(--border);background:#fafafa;color:var(--text-sec);font-size:10.5px;font-weight:700;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:.15s;}
+#ll360 .dl-btn:hover{border-color:var(--purple);color:var(--purple);background:var(--purple-light);}
+#ll360 .dl-btn:active{transform:scale(.96);}
+#ll360 .card h3{margin:0 0 3px;font-size:14.5px;font-weight:700;}
+#ll360 .card .card-sub{font-size:12px;color:var(--text-sec);margin-bottom:14px;}
+#ll360 .card canvas{max-height:320px;}
+#ll360 .section-title{font-size:18px;font-weight:800;margin:4px 0 4px;color:var(--purple-dark);}
+#ll360 .section-desc{font-size:13px;color:var(--text-sec);margin-bottom:16px;max-width:820px;}
+#ll360 .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;}
+#ll360 .pill.pos{background:#d1fae5;color:var(--positive);}
+#ll360 .pill.neg{background:#fee2e2;color:var(--negative);}
+#ll360 .pill.amber{background:#fef3c7;color:var(--amber);}
+#ll360 .pill.purple{background:var(--purple-light);color:var(--purple-dark);}
+#ll360 .pill.teal{background:var(--teal-light);color:#0f766e;}
+#ll360 table{width:100%;border-collapse:collapse;font-size:12.8px;}
+#ll360 th{text-align:left;padding:9px 10px;border-bottom:2px solid var(--border);color:var(--text-sec);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;user-select:none;white-space:nowrap;}
+#ll360 th:hover{color:var(--purple);}
+#ll360 td{padding:9px 10px;border-bottom:1px solid #f1f2f5;}
+#ll360 tr:hover td{background:#faf9ff;}
+#ll360 .table-wrap{overflow-x:auto;}
+#ll360 .table-wrap.scroll-y{max-height:520px;overflow-y:auto;}
+#ll360 .table-wrap.scroll-y thead th{position:sticky;top:0;background:#fff;z-index:2;}
+#ll360 tr.group-row td{background:var(--purple-light);color:var(--purple-dark);font-weight:700;padding:8px 10px;border-top:2px solid #d8cdf5;}
+#ll360 tr.group-row:hover td{background:var(--purple-light);}
+#ll360 .rank-list{display:flex;flex-direction:column;gap:9px;}
+#ll360 .rank-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;background:#fafafa;border:1px solid var(--border);}
+#ll360 .rank-item .n{width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+#ll360 .rank-item.low .n{background:var(--negative);}
+#ll360 .rank-item .txt{flex:1;font-size:12.6px;}
+#ll360 .rank-item .txt .main{font-weight:600;}
+#ll360 .rank-item .txt .sub{color:var(--text-sec);font-size:11px;}
+#ll360 .rank-item .score{font-weight:800;font-size:14px;}
+#ll360 .filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+#ll360 .filter-bar select,#ll360 .filter-bar input{padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:12.5px;background:#fff;color:var(--text);}
+#ll360 .filter-bar label{font-size:12px;color:var(--text-sec);font-weight:600;}
+#ll360 .msel{display:flex;flex-wrap:wrap;gap:6px;max-width:460px;}
+#ll360 .msel-chip{border:1px solid var(--border);background:#fafafa;color:var(--text-sec);font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:999px;cursor:pointer;user-select:none;transition:.15s;}
+#ll360 .msel-chip.on{background:var(--purple);border-color:var(--purple);color:#fff;}
+#ll360 .insight{border-left:4px solid var(--purple);background:var(--purple-light);border-radius:8px;padding:12px 16px;font-size:13px;line-height:1.55;margin-bottom:10px;}
+#ll360 .insight.teal{border-left-color:var(--teal);background:var(--teal-light);}
+#ll360 .insight.amber{border-left-color:var(--amber);background:#fffbeb;}
+#ll360 .insight b{color:var(--purple-dark);}
+#ll360 .word-cloud{display:flex;flex-wrap:wrap;gap:8px;}
+#ll360 .word-tag{background:var(--purple-light);color:var(--purple-dark);padding:5px 12px;border-radius:999px;font-weight:600;}
+#ll360 .quad-wrap{position:relative;height:420px;}
+#ll360 .legend-scale{display:flex;gap:14px;font-size:11.5px;color:var(--text-sec);margin-top:8px;flex-wrap:wrap;}
+#ll360 .legend-scale span{display:flex;align-items:center;gap:5px;}
+#ll360 .legend-scale i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+#ll360 .gloss-cat-title{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--purple-dark);font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:9px;}
+#ll360 .gloss-cat-title::before{content:'';width:20px;height:3px;background:linear-gradient(90deg,var(--purple),var(--teal));border-radius:2px;display:inline-block;}
+#ll360 .gloss-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:8px;}
+#ll360 .gloss-card{background:#fafafa;border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:10px;padding:13px 15px;transition:.15s;}
+#ll360 .gloss-card:hover{background:#fff;box-shadow:var(--shadow);border-left-color:var(--teal);}
+#ll360 .gloss-term{font-weight:700;color:var(--purple-dark);font-size:13px;margin-bottom:5px;display:flex;align-items:center;gap:7px;}
+#ll360 .gloss-def{font-size:12.3px;color:var(--text);line-height:1.55;}
+#ll360 .gloss-swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0;display:inline-block;}
+#ll360 .dim-group-title{margin:22px 0 12px;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,var(--purple-dark),var(--purple));color:#fff;font-size:14px;font-weight:800;letter-spacing:.2px;}
+#ll360 .dim-group-title span{font-weight:500;opacity:.85;font-size:12px;margin-left:4px;}
+body.pdf-export #ll360 .dl-btn{visibility:hidden !important;}
+#ll360 .footer{text-align:center;font-size:11.5px;color:var(--text-sec);padding:22px 0 10px;}
+#ll360 .empty-note{color:var(--text-sec);font-size:12.5px;font-style:italic;padding:8px 0;}
+
+
+#ll360 .ll-state{padding:60px 20px;text-align:center;color:var(--text-sec);font-size:14px;}
+#ll360 .ll-state.error{color:var(--negative);}
+</style>
+
+<div id="ll360">
+  <div class="ll-state" id="ll-state">Cargando dashboard…</div>
+  <div id="ll-app" style="display:none">
+<div class="wrap">
+  <div class="header">
+    <div class="eyebrow">Informe Confidencial</div>
+    <h1>Dashboard Organizacional de Liderazgo 360°</h1>
+    <div class="sub" id="m-sub"></div>
+    <div class="meta">
+      <span><b id="m-lideres"></b> líderes evaluados</span>
+      <span><b id="m-evaluadores"></b> evaluadores</span>
+      <span><b id="m-respuestas"></b> respuestas analizadas</span>
+      <span>Escala <b id="m-escala-min"></b> – <b id="m-escala-max"></b></span>
+    </div>
+    <div class="header-actions">
+      <button class="pdf-btn" id="btn-download-pdf" onclick="generateFullPdf()">⬇ Descargar dashboard completo en PDF</button>
+    </div>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="panels"></div>
+  <div class="footer" id="m-footer"></div>
+</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pako@1.0.11/dist/pako.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js"></script>
+<script>
+(function(){
+  var API = '/api/method/liseniq.api.leadership_dashboard.get_dashboard_data';
+  var SURVEY = new URLSearchParams(window.location.search).get('survey') || window.LL_SURVEY;
+  var state = document.getElementById('ll-state');
+  function fail(msg){ state.className = 'll-state error'; state.textContent = msg; }
+  if(!SURVEY){ fail('Falta el parámetro "survey" en la URL.'); return; }
+
+  function boot(DATA){
+
+// ============ Palette & chart helpers ============
+const COLORS = {
+  purple:'#6d28d9', purpleDark:'#4c1d95', purpleSoft:'#c4b5fd',
+  teal:'#0d9488', amber:'#d97706', red:'#dc2626', green:'#059669', blue:'#2563eb',
+  heatRed:'#fecaca', heatAmber:'#fde68a', heatLightGreen:'#bbf7d0', heatDarkGreen:'#4ade80',
+  grid:'#eceef2', text:'#6b7280'
+};
+Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+Chart.defaults.color = COLORS.text;
+Chart.defaults.font.size = 11.5;
+if(window.ChartDataLabels){ Chart.register(ChartDataLabels); }
+Chart.defaults.set('plugins.datalabels', { display:false });
+
+function barLabels(opts){
+  return Object.assign({ display:true, color:'#3a2a5c', font:{weight:'700', size:10.5},
+    formatter:(v)=> typeof v==='number' ? v.toFixed(2) : v }, opts||{});
+}
+function heatBarColor(v){
+  if(v==null) return '#e5e7eb';
+  if(v>=4.6) return COLORS.heatDarkGreen;
+  if(v>=4.4) return COLORS.heatLightGreen;
+  if(v>=4.0) return COLORS.heatAmber;
+  return COLORS.heatRed;
+}
+function fmt(v){ return (v===null||v===undefined) ? '–' : Number(v).toFixed(2); }
+function pill(brecha){
+  if(brecha==null) return '<span class="pill purple">–</span>';
+  const cls = brecha>0.2 ? 'amber' : (brecha>0.35?'neg':'pos');
+  const sign = brecha>=0?'+':'';
+  return `<span class="pill ${cls}">${sign}${fmt(brecha)}</span>`;
+}
+function nivel(score){
+  // Alineado exactamente con las bandas del mapa de calor (heatBarColor):
+  // en una escala 1–5, equivalen a 4.6 / 4.4 / 4.0 — aquí expresadas como
+  // fracción del rango de la escala para que ambos usen el mismo corte.
+  if(score==null) return {label:'Sin datos', cls:'purple'};
+  const {min,max} = DATA.escala;
+  const span = max-min;
+  if(score>=min+span*0.90) return {label:'Excepcional', cls:'pos'};
+  if(score>=min+span*0.85) return {label:'Sólido', cls:'purple'};
+  if(score>=min+span*0.75) return {label:'En desarrollo', cls:'amber'};
+  return {label:'Prioritario', cls:'neg'};
+}
+function heatCell(v){ return `<td style="background:${heatBarColor(v)};font-weight:700;text-align:center;">${fmt(v)}</td>`; }
+function slugify(s){
+  return s.toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+}
+function dlBtn(targetId, filename){
+  return `<button class="dl-btn" onclick="downloadAsJpeg('${targetId}','${filename}')" title="Descargar como imagen JPEG">⬇ JPEG</button>`;
+}
+async function downloadAsJpeg(elementId, filename){
+  const el = document.getElementById(elementId);
+  if(!el || !window.html2canvas) return;
+  const btns = el.querySelectorAll('.dl-btn');
+  btns.forEach(b=> b.style.visibility='hidden');
+  try{
+    const canvas = await html2canvas(el, {backgroundColor:'#ffffff', scale:2, useCORS:true});
+    const link = document.createElement('a');
+    link.download = (filename||'dashboard') + '.jpg';
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.click();
+  } finally { btns.forEach(b=> b.style.visibility=''); }
+}
+
+// ============ Header KPIs ============
+document.getElementById('m-lideres').textContent = DATA.kpis.n_lideres;
+document.getElementById('m-evaluadores').textContent = DATA.kpis.n_evaluadores;
+document.getElementById('m-respuestas').textContent = DATA.kpis.n_respuestas.toLocaleString('es-CO');
+document.getElementById('m-escala-min').textContent = DATA.escala.min;
+document.getElementById('m-escala-max').textContent = DATA.escala.max;
+
+// ============ Tabs (built dynamically from data shape) ============
+const HAS_DEMO = (DATA.demographic_fields || []).length > 0;
+const TABS = [
+  {id:'resumen', label:'Resumen Ejecutivo'},
+  {id:'dimensiones', label:'Dimensiones'},
+  {id:'competencias', label:'Competencias'},
+  {id:'comportamientos', label:'Comportamientos'},
+  {id:'perspectiva', label:'Perspectiva 360°'},
+  {id:'brechas', label:'Brechas y Consenso'},
+];
+if(HAS_DEMO) TABS.push({id:'demografico', label:'Demográfico'});
+TABS.push({id:'insights', label:'Insights y Prioridades'});
+TABS.push({id:'glosario', label:'Glosario'});
+
+const tabsEl = document.getElementById('tabs');
+const panelsEl = document.getElementById('panels');
+TABS.forEach((t,i)=>{
+  const btn = document.createElement('button');
+  btn.className = 'tab-btn' + (i===0?' active':'');
+  btn.textContent = t.label;
+  btn.onclick = ()=> activateTab(t.id);
+  btn.dataset.tab = t.id;
+  tabsEl.appendChild(btn);
+  const panel = document.createElement('div');
+  panel.className = 'tab-panel' + (i===0?' active':'');
+  panel.id = 'panel-' + t.id;
+  panelsEl.appendChild(panel);
+});
+
+const rendered = new Set();
+function activateTab(id){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+id));
+  if(!rendered.has(id)){ RENDERERS[id](); rendered.add(id); }
+}
+const RENDERERS = {
+  resumen: renderResumen, dimensiones: renderDimensiones, competencias: renderCompetencias,
+  comportamientos: renderComportamientos, perspectiva: renderPerspectiva, brechas: renderBrechas,
+  insights: renderInsights, glosario: renderGlosario,
+};
+if(HAS_DEMO) RENDERERS.demografico = renderDemografico;
+
+activateTab('resumen');
+
+// ================= RESUMEN EJECUTIVO =================
+function renderResumen(){
+  const k = DATA.kpis;
+  const lvl = nivel(k.puntaje_otros);
+  const nDim = DATA.dimensiones.length;
+  const topFortalezas = DATA.behav_top5 || [];
+  const topOportunidades = DATA.behav_bottom5 || [];
+  const mejorDim = DATA.dimensiones[0];
+  const peorDim = DATA.dimensiones[DATA.dimensiones.length-1];
+  const peorComp = DATA.top_oportunidades_comp[0];
+
+  const html = `
+    <div class="section-title">Resumen Ejecutivo</div>
+    <div class="section-desc">Estado general del liderazgo en ${DATA.meta.cliente} — pensado para leerse en menos de 2 minutos.</div>
+
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-label">Líderes evaluados</div><div class="kpi-value">${k.n_lideres}</div><div class="kpi-note">${k.n_evaluaciones} relaciones evaluador–líder</div></div>
+      <div class="kpi-card"><div class="kpi-label">Evaluadores únicos</div><div class="kpi-value">${k.n_evaluadores}</div><div class="kpi-note">Jefe, Pares y Colaboradores</div></div>
+      <div class="kpi-card"><div class="kpi-label">Respuestas totales</div><div class="kpi-value">${k.n_respuestas.toLocaleString('es-CO')}</div><div class="kpi-note">${DATA.comportamientos.length} comportamientos × ${DATA.competencias.length} competencias</div></div>
+      <div class="kpi-card"><div class="kpi-label">Resultado global (Otros)</div><div class="kpi-value">${fmt(k.puntaje_otros)}<span class="pill ${lvl.cls}" style="margin-left:8px;font-size:11px;vertical-align:middle;">${lvl.label}</span></div><div class="kpi-note">Autoevaluación: ${fmt(k.puntaje_auto)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Brecha Auto vs. Otros</div><div class="kpi-value">${k.brecha_global>0?'+':''}${fmt(k.brecha_global)}</div><div class="kpi-note">${k.brecha_global>0 ? 'Los líderes se autoevalúan por encima de la percepción de su entorno' : 'Los líderes se autoevalúan por debajo de la percepción de su entorno'}</div></div>
+    </div>
+
+    <div class="card" id="card-resumen-dimbar">
+      <div class="card-head"><h3>Comparación de dimensiones — Auto vs. Otros</h3>${dlBtn('card-resumen-dimbar','resumen_dimensiones')}</div>
+      <div class="card-sub">${nDim>1 ? `Promedio organizacional en las ${nDim} dimensiones del modelo de liderazgo` : 'Promedio organizacional de la dimensión evaluada por este modelo'}</div>
+      <canvas id="chart-resumen-dim-bar" style="max-height:320px"></canvas>
+    </div>
+
+    <div class="card">
+      <h3>Cómo leer los mapas de calor de este dashboard</h3>
+      <div class="card-sub">Escala de color usada en las tablas y gráficos de "Dimensiones", "Competencias", "Comportamientos" y "Perspectiva 360°" para ubicar rápidamente puntajes altos y bajos</div>
+      <div class="legend-scale" style="font-size:13px;">
+        <span><i style="background:#fecaca"></i><b>&lt; 4.0</b> — Requiere atención</span>
+        <span><i style="background:#fde68a"></i><b>4.0 – 4.4</b> — En desarrollo</span>
+        <span><i style="background:#bbf7d0"></i><b>4.4 – 4.6</b> — Sólido</span>
+        <span><i style="background:#4ade80"></i><b>&gt; 4.6</b> — Excepcional</span>
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div class="card" id="card-resumen-top">
+        <div class="card-head"><h3>Top ${topFortalezas.length} fortalezas</h3>${dlBtn('card-resumen-top','resumen_top_fortalezas')}</div>
+        <div class="card-sub">Comportamientos mejor valorados por el entorno (de ${DATA.comportamientos.length} evaluados)</div>
+        <div class="rank-list">
+          ${topFortalezas.map((c,i)=>`<div class="rank-item"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${c.comportamiento}</div><div class="sub">${c.competencia}</div></div>
+            <div class="score" style="color:var(--positive)">${fmt(c.otros)}</div></div>`).join('') || '<div class="empty-note">Sin datos suficientes.</div>'}
+        </div>
+      </div>
+      <div class="card" id="card-resumen-bottom">
+        <div class="card-head"><h3>Top ${topOportunidades.length} oportunidades</h3>${dlBtn('card-resumen-bottom','resumen_top_oportunidades')}</div>
+        <div class="card-sub">Comportamientos con mayor espacio de desarrollo</div>
+        <div class="rank-list">
+          ${topOportunidades.map((c,i)=>`<div class="rank-item low"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${c.comportamiento}</div><div class="sub">${c.competencia}</div></div>
+            <div class="score" style="color:var(--negative)">${fmt(c.otros)}</div></div>`).join('') || '<div class="empty-note">Sin datos suficientes.</div>'}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Lectura rápida</h3>
+        <div class="card-sub">Qué dicen los números</div>
+        <div class="insight"><b>Nivel general:</b> el resultado global "${lvl.label}" (${fmt(k.puntaje_otros)}) ubica a ${DATA.meta.cliente} en la banda ${lvl.label.toLowerCase()} de la escala del modelo.</div>
+        ${nDim>1 ? `<div class="insight teal"><b>Dimensión más fuerte:</b> "${mejorDim.tema}" (${fmt(mejorDim.otros)}); la de mayor oportunidad es "${peorDim.tema}" (${fmt(peorDim.otros)}).</div>` : ''}
+        <div class="insight amber"><b>Mayor oportunidad:</b> "${peorComp.competencia}" es la competencia con menor puntaje (${fmt(peorComp.otros)}) y una brecha de autopercepción de ${pill(peorComp.brecha)}.</div>
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-resumen').innerHTML = html;
+
+  new Chart(document.getElementById('chart-resumen-dim-bar'), {
+    type:'bar',
+    data:{
+      labels: DATA.dimensiones.map(d=>d.tema),
+      datasets:[
+        {label:'Otros (Jefe+Par+Colab.)', data:DATA.dimensiones.map(d=>d.otros), backgroundColor:COLORS.purple, borderRadius:6, datalabels:barLabels({anchor:'end',align:'top',color:COLORS.purpleDark})},
+        {label:'Autoevaluación', data:DATA.dimensiones.map(d=>d.auto), backgroundColor:COLORS.blue, borderRadius:6, datalabels:barLabels({anchor:'end',align:'top',color:'#1e3a8a'})},
+      ]
+    },
+    options:{ responsive:true, plugins:{legend:{position:'bottom'}},
+      scales:{ y:{ min:Math.max(DATA.escala.min, 1), max:DATA.escala.max, grid:{color:COLORS.grid} }, x:{grid:{display:false}} } }
+  });
+}
+
+// ================= DIMENSIONES =================
+function renderDimensiones(){
+  const dims = DATA.dimensiones;
+  const nDim = dims.length;
+  const html = `
+    <div class="section-title">Resultados por Dimensión</div>
+    <div class="section-desc">${nDim>1 ? `Las ${nDim} dimensiones del modelo de liderazgo, comparadas contra el resultado global organizacional (${fmt(DATA.kpis.puntaje_otros)}) y desagregadas por tipo de evaluador.` : `Este modelo evalúa una sola dimensión integral de liderazgo, desagregada por tipo de evaluador.`}</div>
+
+    <div class="card" id="card-dim-bar">
+      <div class="card-head"><h3>Puntaje por dimensión — Auto vs. Otros vs. tipo de evaluador</h3>${dlBtn('card-dim-bar','dimensiones_comparacion')}</div>
+      <div class="card-sub">${nDim>1 ? 'Ordenado de mayor a menor puntaje "Otros"' : 'Único valor del modelo'}</div>
+      <canvas id="chart-dim-bar" style="max-height:340px"></canvas>
+    </div>
+
+    ${nDim>1 ? `
+    <div class="grid2">
+      <div class="card">
+        <h3>Fortaleza principal</h3>
+        <div class="card-sub">Dimensión con resultado más alto</div>
+        ${dimCard(dims[0], true)}
+      </div>
+      <div class="card">
+        <h3>Oportunidad principal</h3>
+        <div class="card-sub">Dimensión con mayor espacio de mejora</div>
+        ${dimCard(dims[dims.length-1], false)}
+      </div>
+    </div>` : ''}
+
+    <div class="card" id="card-tbl-dim">
+      <div class="card-head"><h3>Tabla comparativa de ${nDim>1?'dimensiones':'la dimensión evaluada'}</h3>${dlBtn('card-tbl-dim','dimensiones_tabla')}</div>
+      <div class="card-sub">Colores según el mapa de calor (ver Resumen Ejecutivo)</div>
+      <div class="table-wrap">
+        <table id="tbl-dim">
+          <thead><tr><th>Dimensión</th><th>Otros</th><th>Auto</th><th>Brecha</th><th>Jefe</th><th>Par</th><th>Colaborador</th><th>Nivel</th></tr></thead>
+          <tbody>
+            ${dims.map(d=>{ const lv=nivel(d.otros); return `<tr>
+              <td><b>${d.tema}</b></td>${heatCell(d.otros)}${heatCell(d.auto)}<td>${pill(d.brecha)}</td>
+              ${heatCell(d.jefe)}${heatCell(d.par)}${heatCell(d.colaborador)}
+              <td><span class="pill ${lv.cls}">${lv.label}</span></td></tr>`; }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-dimensiones').innerHTML = html;
+
+  new Chart(document.getElementById('chart-dim-bar'), {
+    type:'bar',
+    data:{
+      labels: dims.map(d=>d.tema),
+      datasets:[
+        {label:'Otros (Jefe+Par+Colab.)', data:dims.map(d=>d.otros), backgroundColor:COLORS.purple, borderRadius:6, datalabels:barLabels({anchor:'end',align:'top',color:COLORS.purpleDark})},
+        {label:'Autoevaluación', data:dims.map(d=>d.auto), backgroundColor:COLORS.blue, borderRadius:6, datalabels:barLabels({anchor:'end',align:'top',color:'#1e3a8a'})},
+      ]
+    },
+    options:{ responsive:true, plugins:{legend:{position:'bottom'}},
+      scales:{ y:{ min:Math.max(DATA.escala.min,1), max:DATA.escala.max, grid:{color:COLORS.grid} }, x:{grid:{display:false}} } }
+  });
+  makeSortable('tbl-dim');
+}
+function dimCard(d, isTop){
+  const color = isTop ? 'var(--positive)' : 'var(--negative)';
+  return `<div class="rank-item ${isTop?'':'low'}" style="background:#fff;">
+    <div class="txt"><div class="main">${d.tema}</div><div class="sub">Jefe ${fmt(d.jefe)} · Par ${fmt(d.par)} · Colab. ${fmt(d.colaborador)}</div></div>
+    <div class="score" style="color:${color}">${fmt(d.otros)}</div>
+  </div>
+  <div class="insight" style="margin-top:12px;">Brecha autopercepción: ${pill(d.brecha)} — la autoevaluación es ${fmt(d.auto)} frente a ${fmt(d.otros)} percibido por el entorno.</div>`;
+}
+
+// Orden de presentación de dimensiones: primero las del modelo DML en su orden natural
+// (Dirección, Movilización, Logro); cualquier otra dimensión (p. ej. "Como persona" o las
+// de un modelo a la medida) va después, ordenada por puntaje "Otros".
+const DIM_CANON_ORDER = ['direccion','movilizacion','logro'];
+function _norm(x){ return (x||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
+function dimRank(tema){
+  const i = DIM_CANON_ORDER.indexOf(_norm(tema));
+  if(i>=0) return i;
+  const extra = [...DATA.dimensiones].filter(d=>DIM_CANON_ORDER.indexOf(_norm(d.tema))<0)
+    .sort((a,b)=>(b.otros||0)-(a.otros||0)).map(d=>d.tema);
+  return DIM_CANON_ORDER.length + Math.max(0, extra.indexOf(tema));
+}
+function sortByDimension(arr){
+  return [...arr].sort((a,b)=> dimRank(a.tema)-dimRank(b.tema) || (b.otros||0)-(a.otros||0));
+}
+
+// ================= COMPETENCIAS =================
+let compChart = null;
+function renderCompetencias(){
+  const temas = ['Todas', ...new Set(sortByDimension(DATA.competencias).map(c=>c.tema))];
+  const nTop = DATA.top_fortalezas_comp.length;
+  const html = `
+    <div class="section-title">Ranking de Competencias</div>
+    <div class="section-desc">Detalle de las ${DATA.competencias.length} competencias del modelo. Usa el filtro para ver solo las de una dimensión.</div>
+
+    <div class="grid2">
+      <div class="card" id="card-comp-top">
+        <div class="card-head"><h3>Top ${nTop} fortalezas</h3>${dlBtn('card-comp-top','competencias_top_fortalezas')}</div>
+        <div class="card-sub">Mejor puntaje "Otros" (de ${DATA.competencias.length} competencias)</div>
+        <div class="rank-list">
+          ${DATA.top_fortalezas_comp.map((c,i)=>`<div class="rank-item"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${c.competencia}</div><div class="sub">${c.tema}</div></div>
+            <div class="score" style="color:var(--positive)">${fmt(c.otros)}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="card" id="card-comp-bottom">
+        <div class="card-head"><h3>Top ${nTop} oportunidades de desarrollo</h3>${dlBtn('card-comp-bottom','competencias_top_oportunidades')}</div>
+        <div class="card-sub">Menor puntaje "Otros"</div>
+        <div class="rank-list">
+          ${DATA.top_oportunidades_comp.map((c,i)=>`<div class="rank-item low"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${c.competencia}</div><div class="sub">${c.tema}</div></div>
+            <div class="score" style="color:var(--negative)">${fmt(c.otros)}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-comp-chart">
+      <div class="card-head"><h3>Comparación de competencias</h3>${dlBtn('card-comp-chart','competencias_comparacion')}</div>
+      <div class="filter-bar">
+        <label>Filtrar por dimensión:</label>
+        <select id="filter-comp-tema">${temas.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
+      <div class="card-sub">Puntaje "Otros" por competencia · agrupadas por dimensión · colores según el mapa de calor</div>
+      <canvas id="chart-comp-bar" style="max-height:420px"></canvas>
+    </div>
+
+    <div class="card" id="card-comp-tbl">
+      <div class="card-head"><h3>Tabla completa de competencias</h3>${dlBtn('card-comp-tbl','competencias_tabla')}</div>
+      <div class="table-wrap">
+        <table id="tbl-comp">
+          <thead><tr><th>Competencia</th><th>Dimensión</th><th>Otros</th><th>Auto</th><th>Brecha</th></tr></thead>
+          <tbody id="tbl-comp-body"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-competencias').innerHTML = html;
+  document.getElementById('filter-comp-tema').addEventListener('change', (e)=> drawCompChart(e.target.value));
+  drawCompChart('Todas');
+  makeSortable('tbl-comp');
+}
+function drawCompChart(temaFilter){
+  const rows = (temaFilter==='Todas') ? DATA.competencias : DATA.competencias.filter(c=>c.tema===temaFilter);
+  const sorted = sortByDimension(rows);
+  document.getElementById('tbl-comp-body').innerHTML = sorted.map(c=>`<tr>
+    <td><b>${c.competencia}</b></td><td>${c.tema}</td>${heatCell(c.otros)}${heatCell(c.auto)}
+    <td>${pill(c.brecha)}</td></tr>`).join('');
+  if(compChart) compChart.destroy();
+  compChart = new Chart(document.getElementById('chart-comp-bar'), {
+    type:'bar',
+    data:{
+      labels: sorted.map(c=>c.competencia.length>38 ? c.competencia.slice(0,36)+'…' : c.competencia),
+      datasets:[{ label:'Otros', data:sorted.map(c=>c.otros), backgroundColor: sorted.map(c=>heatBarColor(c.otros)), borderRadius:5,
+        datalabels: barLabels({anchor:'end', align:'right', color:'#1f2937'}) }]
+    },
+    options:{ responsive:true, indexAxis:'y', plugins:{legend:{display:false}},
+      scales:{ x:{ min:Math.max(DATA.escala.min,1), max:DATA.escala.max, grid:{color:COLORS.grid} }, y:{grid:{display:false}, ticks:{font:{size:11}}} } }
+  });
+}
+
+// ================= COMPORTAMIENTOS =================
+let behavChart = null;
+function renderComportamientos(){
+  const temas = ['Todas', ...new Set(sortByDimension(DATA.competencias).map(c=>c.tema))];
+  const behavTop = DATA.behav_top10.slice(0,8), behavBottom = DATA.behav_bottom10.slice(0,8);
+  const nTop = behavTop.length;
+  const html = `
+    <div class="section-title">Comportamientos</div>
+    <div class="section-desc">Detalle a nivel de los ${DATA.comportamientos.length} comportamientos evaluados — el nivel más granular del modelo, base de cálculo de competencias y dimensiones.</div>
+
+    <div class="grid2">
+      <div class="card" id="card-behav-top">
+        <div class="card-head"><h3>Top ${nTop} comportamientos mejor valorados</h3>${dlBtn('card-behav-top','comportamientos_top')}</div>
+        <div class="card-sub">Puntaje "Otros" más alto entre los ${DATA.comportamientos.length} comportamientos</div>
+        <div class="rank-list">
+          ${behavTop.map((c,i)=>`<div class="rank-item"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${c.comportamiento}</div><div class="sub">${c.competencia}</div></div>
+            <div class="score" style="color:var(--positive)">${fmt(c.otros)}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="card" id="card-behav-bottom">
+        <div class="card-head"><h3>Top ${nTop} oportunidades de desarrollo</h3>${dlBtn('card-behav-bottom','comportamientos_bottom')}</div>
+        <div class="card-sub">Puntaje "Otros" más bajo entre los ${DATA.comportamientos.length} comportamientos</div>
+        <div class="rank-list">
+          ${behavBottom.map((c,i)=>`<div class="rank-item low"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${c.comportamiento}</div><div class="sub">${c.competencia}</div></div>
+            <div class="score" style="color:var(--negative)">${fmt(c.otros)}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-behav-chart">
+      <div class="card-head"><h3>Ranking de comportamientos</h3>${dlBtn('card-behav-chart','comportamientos_ranking')}</div>
+      <div class="filter-bar">
+        <label>Filtrar por dimensión:</label>
+        <select id="filter-behav-tema">${temas.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+        <label>Mostrar:</label>
+        <select id="filter-behav-n">
+          <option value="15">Top / Bottom 15</option>
+          <option value="all" selected>Todos (${DATA.comportamientos.length})</option>
+        </select>
+      </div>
+      <div class="card-sub">Ordenado por puntaje "Otros" · colores según el mapa de calor</div>
+      <canvas id="chart-behav-bar" style="max-height:900px"></canvas>
+    </div>
+
+    <div class="card" id="card-behav-tbl-intro">
+      <div class="card-head"><h3>Tablas de comportamientos por competencia</h3></div>
+      <div class="card-sub">Una tabla independiente por cada competencia (${DATA.competencias.length} en total), cada una descargable por separado — ordenadas de mayor a menor puntaje "Otros"</div>
+      <div class="filter-bar">
+        <label>Filtrar por dimensión:</label>
+        <select id="filter-behav-tbl-tema">${temas.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div id="tbl-behav-container"></div>
+  `;
+  document.getElementById('panel-comportamientos').innerHTML = html;
+  document.getElementById('filter-behav-tema').addEventListener('change', drawBehavChart);
+  document.getElementById('filter-behav-n').addEventListener('change', drawBehavChart);
+  document.getElementById('filter-behav-tbl-tema').addEventListener('change', (e)=> drawBehavTable(e.target.value));
+  drawBehavChart();
+  drawBehavTable('Todas');
+}
+function drawBehavChart(){
+  const temaFilter = document.getElementById('filter-behav-tema').value;
+  const nFilter = document.getElementById('filter-behav-n').value;
+  let rows = (temaFilter==='Todas') ? DATA.comportamientos : DATA.comportamientos.filter(c=>c.tema===temaFilter);
+  let sorted = [...rows].sort((a,b)=>(b.otros||0)-(a.otros||0));
+  let chartRows = sorted;
+  if(nFilter==='15' && sorted.length>30){ chartRows = [...sorted.slice(0,15), ...sorted.slice(-15)]; }
+  if(behavChart) behavChart.destroy();
+  behavChart = new Chart(document.getElementById('chart-behav-bar'), {
+    type:'bar',
+    data:{
+      labels: chartRows.map(c=>c.comportamiento.length>50 ? c.comportamiento.slice(0,48)+'…' : c.comportamiento),
+      datasets:[{ label:'Otros', data:chartRows.map(c=>c.otros), backgroundColor: chartRows.map(c=>heatBarColor(c.otros)), borderRadius:4,
+        datalabels: barLabels({anchor:'end', align:'right', color:'#1f2937', font:{weight:'700', size:9.5}}) }]
+    },
+    options:{ responsive:true, indexAxis:'y', plugins:{legend:{display:false}},
+      scales:{ x:{ min:Math.max(DATA.escala.min,1), max:DATA.escala.max, grid:{color:COLORS.grid} }, y:{grid:{display:false}, ticks:{font:{size:10}}} } }
+  });
+}
+function drawBehavTable(temaFilter){
+  const comps = [...DATA.competencias].filter(c=> temaFilter==='Todas' || c.tema===temaFilter);
+  // dimensiones en orden Dirección, Movilización, Logro (luego el resto); dentro de cada una, competencias de mayor a menor puntaje
+  const dimOrder = [...DATA.dimensiones].map(d=>d.tema).filter(t=> comps.some(c=>c.tema===t)).sort((a,b)=>dimRank(a)-dimRank(b));
+  const html = dimOrder.map(tema=>{
+    const dimInfo = DATA.dimensiones.find(d=>d.tema===tema);
+    const compsOfDim = comps.filter(c=>c.tema===tema).sort((a,b)=>(b.otros||0)-(a.otros||0));
+    const cards = compsOfDim.map(comp=>{
+      const slug = 'behavtbl-' + slugify(comp.competencia);
+      const behaviors = DATA.comportamientos.filter(b=>b.competencia===comp.competencia).sort((a,b)=>(b.otros||0)-(a.otros||0));
+      return `
+      <div class="card" id="card-${slug}">
+        <div class="card-head"><h3>${comp.competencia}</h3>${dlBtn('card-'+slug, 'comportamientos_'+slugify(comp.competencia))}</div>
+        <div class="card-sub">${comp.tema} · promedio de competencia (Otros): ${fmt(comp.otros)} · ${behaviors.length} comportamientos</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Comportamiento</th><th>Otros</th><th>Auto</th><th>Brecha</th><th>Consenso (σ)</th></tr></thead>
+            <tbody>
+              ${behaviors.map(c=>`<tr><td>${c.comportamiento}</td>${heatCell(c.otros)}${heatCell(c.auto)}<td>${pill(c.brecha)}</td><td>${c.dispersion.toFixed(2)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="dim-group-title">Dimensión: ${tema} <span>· Otros ${fmt(dimInfo.otros)} · ${compsOfDim.length} competencia${compsOfDim.length>1?'s':''}</span></div>${cards}`;
+  }).join('');
+  document.getElementById('tbl-behav-container').innerHTML = html;
+}
+
+// ================= PERSPECTIVA 360 =================
+function renderPerspectiva(){
+  const dims = DATA.dimensiones;
+  const html = `
+    <div class="section-title">Perspectiva 360° — Autoevaluación vs. Jefe vs. Pares vs. Colaboradores</div>
+    <div class="section-desc">Cómo perciben los distintos grupos de evaluadores el liderazgo organizacional, por dimensión y por competencia.</div>
+
+    <div class="card" id="card-360-dim">
+      <div class="card-head"><h3>Por dimensión</h3>${dlBtn('card-360-dim','perspectiva360_dimensiones')}</div>
+      <canvas id="chart-360-dim" style="max-height:340px"></canvas>
+    </div>
+
+    <div class="card" id="card-360-heat-comp">
+      <div class="card-head"><h3>Mapa de calor por competencia y tipo de evaluador</h3>${dlBtn('card-360-heat-comp','perspectiva360_heatmap_competencias')}</div>
+      <div class="legend-scale">
+        <span><i style="background:#fecaca"></i>&lt; 4.0</span><span><i style="background:#fde68a"></i>4.0 – 4.4</span>
+        <span><i style="background:#bbf7d0"></i>4.4 – 4.6</span><span><i style="background:#4ade80"></i>&gt; 4.6</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Competencia</th><th>Auto</th><th>Jefe</th><th>Par</th><th>Colaborador</th></tr></thead>
+          <tbody>
+            ${[...DATA.competencias].sort((a,b)=>(b.otros||0)-(a.otros||0)).map(c=>`<tr>
+              <td>${c.competencia}</td>${heatCell(c.auto)}${heatCell(c.jefe)}${heatCell(c.par)}${heatCell(c.colaborador)}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="insight"><b>Patrón a observar:</b> compara cómo Jefe, Par y Colaborador valoran cada competencia — las mayores diferencias entre columnas señalan percepciones menos alineadas sobre ese líder o grupo de líderes.</div>
+
+    <div class="card" id="card-360-heat-behav-intro">
+      <div class="card-head"><h3>Mapa de calor por comportamiento y tipo de evaluador</h3></div>
+      <div class="card-sub">Nivel más granular del modelo (${DATA.comportamientos.length} comportamientos) · una tabla independiente por competencia, descargable por separado</div>
+      <div class="legend-scale">
+        <span><i style="background:#fecaca"></i>&lt; 4.0</span><span><i style="background:#fde68a"></i>4.0 – 4.4</span>
+        <span><i style="background:#bbf7d0"></i>4.4 – 4.6</span><span><i style="background:#4ade80"></i>&gt; 4.6</span>
+      </div>
+      <div class="filter-bar">
+        <label>Filtrar por dimensión:</label>
+        <select id="filter-heat-tema">${['Todas', ...new Set(sortByDimension(DATA.competencias).map(c=>c.tema))].map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div id="tbl-heat-behav-container"></div>
+  `;
+  document.getElementById('panel-perspectiva').innerHTML = html;
+
+  new Chart(document.getElementById('chart-360-dim'), {
+    type:'bar',
+    data:{
+      labels: dims.map(d=>d.tema),
+      datasets:[
+        {label:'Autoevaluación', data:dims.map(d=>d.auto), backgroundColor:COLORS.purpleDark, borderRadius:5, datalabels:barLabels({anchor:'end',align:'top',color:COLORS.purpleDark})},
+        {label:'Jefe', data:dims.map(d=>d.jefe), backgroundColor:COLORS.purple, borderRadius:5, datalabels:barLabels({anchor:'end',align:'top',color:COLORS.purple})},
+        {label:'Par', data:dims.map(d=>d.par), backgroundColor:COLORS.amber, borderRadius:5, datalabels:barLabels({anchor:'end',align:'top',color:COLORS.amber})},
+        {label:'Colaborador', data:dims.map(d=>d.colaborador), backgroundColor:COLORS.teal, borderRadius:5, datalabels:barLabels({anchor:'end',align:'top',color:'#0f766e'})},
+      ]
+    },
+    options:{ responsive:true, plugins:{legend:{position:'bottom'}}, scales:{ y:{min:Math.max(DATA.escala.min,1),max:DATA.escala.max,grid:{color:COLORS.grid}}, x:{grid:{display:false}} } }
+  });
+
+  document.getElementById('filter-heat-tema').addEventListener('change', drawBehavHeatmap);
+  drawBehavHeatmap();
+}
+function drawBehavHeatmap(){
+  const temaFilter = document.getElementById('filter-heat-tema').value;
+  const compOrder = sortByDimension(DATA.competencias.filter(c=> temaFilter==='Todas' || c.tema===temaFilter));
+  const html = compOrder.map(comp=>{
+    const slug = 'heattbl-' + slugify(comp.competencia);
+    const behaviors = DATA.comportamientos.filter(b=>b.competencia===comp.competencia).sort((a,b)=>(b.otros||0)-(a.otros||0));
+    return `
+      <div class="card" id="card-${slug}">
+        <div class="card-head"><h3>${comp.competencia}</h3>${dlBtn('card-'+slug, 'perspectiva360_heatmap_'+slugify(comp.competencia))}</div>
+        <div class="card-sub">${comp.tema} · ${behaviors.length} comportamientos</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Comportamiento</th><th>Auto</th><th>Jefe</th><th>Par</th><th>Colaborador</th></tr></thead>
+            <tbody>
+              ${behaviors.map(c=>`<tr><td>${c.comportamiento}</td>${heatCell(c.auto)}${heatCell(c.jefe)}${heatCell(c.par)}${heatCell(c.colaborador)}</tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('tbl-heat-behav-container').innerHTML = html;
+}
+
+// ================= BRECHAS Y CONSENSO =================
+function renderBrechas(){
+  const gaps = DATA.gap_top10;
+  const bajo = DATA.consenso_bajo;
+  const alto = DATA.consenso_alto;
+  const html = `
+    <div class="section-title">Brechas y Consenso</div>
+    <div class="section-desc">Diferencias entre autopercepción y percepción de terceros (Brecha = Auto − Otros), y nivel de acuerdo entre los distintos grupos de evaluadores.</div>
+
+    <div class="card" id="card-gap">
+      <div class="card-head"><h3>Top ${gaps.length} brechas — mayor sobreestimación</h3>${dlBtn('card-gap','brechas_top')}</div>
+      <div class="card-sub">Comportamientos donde el líder se percibe mejor de lo que lo ve su entorno</div>
+      <canvas id="chart-gap" style="max-height:380px"></canvas>
+    </div>
+
+    <div class="grid2">
+      <div class="card" id="card-consenso-bajo">
+        <div class="card-head"><h3>Menor consenso entre evaluadores</h3>${dlBtn('card-consenso-bajo','consenso_bajo')}</div>
+        <div class="card-sub">Mayor dispersión entre promedios de Jefe / Par / Colaborador (desviación estándar entre tipos)</div>
+        <div class="rank-list">
+          ${bajo.map((b,i)=>`<div class="rank-item low"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${b.comportamiento}</div><div class="sub">${b.competencia}</div></div>
+            <div class="score" style="color:var(--amber)">σ ${b.dispersion}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="card" id="card-consenso-alto">
+        <div class="card-head"><h3>Mayor consenso entre evaluadores</h3>${dlBtn('card-consenso-alto','consenso_alto')}</div>
+        <div class="card-sub">Menor dispersión — percepción alineada entre tipos de evaluador</div>
+        <div class="rank-list">
+          ${alto.map((b,i)=>`<div class="rank-item"><div class="n">${i+1}</div>
+            <div class="txt"><div class="main">${b.comportamiento}</div><div class="sub">${b.competencia}</div></div>
+            <div class="score" style="color:var(--positive)">σ ${b.dispersion}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-brechas').innerHTML = html;
+
+  new Chart(document.getElementById('chart-gap'), {
+    type:'bar',
+    data:{
+      labels: gaps.map(g=>g.comportamiento.length>42? g.comportamiento.slice(0,40)+'…':g.comportamiento),
+      datasets:[{ label:'Brecha (Auto − Otros)', data:gaps.map(g=>g.brecha), backgroundColor:COLORS.amber, borderRadius:5,
+        datalabels: barLabels({anchor:'end', align:'right', clamp:true, formatter:(v)=>(v>=0?'+':'')+v.toFixed(2)}) }]
+    },
+    options:{ responsive:true, indexAxis:'y', layout:{padding:{right:36}}, plugins:{legend:{display:false}},
+      scales:{ x:{beginAtZero:true, suggestedMax:Math.max(...gaps.map(g=>g.brecha||0))*1.2, grid:{color:COLORS.grid}}, y:{grid:{display:false}, ticks:{font:{size:10.5}}} } }
+  });
+}
+
+// ================= DEMOGRÁFICO (solo si hay campos con variación real) =================
+let demoChart = null;
+function renderDemografico(){
+  const fields = DATA.demographic_fields;
+  const html = `
+    <div class="section-title">Análisis Demográfico y Organizacional</div>
+    <div class="section-desc">Comparación del resultado de liderazgo entre los grupos disponibles en los datos. Selecciona el campo por el cual quieres ver los resultados. Por acuerdo del proyecto, se muestra sin umbral mínimo de evaluadores por grupo.</div>
+    <div class="card" id="demo-selector-card">
+      <div class="filter-bar" style="margin-bottom:0;">
+        <label for="filter-demo-field">Ver resultados por:</label>
+        <select id="filter-demo-field">${fields.map(f=>`<option value="${f.key}">${f.label}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div id="demo-content"></div>
+  `;
+  document.getElementById('panel-demografico').innerHTML = html;
+  document.getElementById('filter-demo-field').addEventListener('change', (e)=> drawDemoSelected(e.target.value));
+  drawDemoSelected(fields[0].key);
+}
+function drawDemoSelected(fieldKey){
+  const f = DATA.demographic_fields.find(x=>x.key===fieldKey);
+  if(!f) return;
+  const sel = document.getElementById('filter-demo-field');
+  if(sel && sel.value!==fieldKey) sel.value = fieldKey;
+  document.getElementById('demo-content').innerHTML = renderDemoField(f);
+  drawDemoChart(f.key);
+  makeSortable('tbl-demo-' + slugify(f.key));
+}
+function renderDemoField(f){
+  const slugBase = 'demo-' + slugify(f.key);
+  return `
+    <div class="card" id="card-${slugBase}-chart">
+      <div class="card-head"><h3>Resultado por ${f.label}</h3>${dlBtn('card-'+slugBase+'-chart','demografico_'+slugify(f.key))}</div>
+      <div class="card-sub">Puntaje "Otros" y Autoevaluación por grupo · colores según el mapa de calor</div>
+      <canvas id="chart-${slugBase}" style="max-height:320px"></canvas>
+    </div>
+    <div class="card" id="card-${slugBase}-tbl">
+      <div class="card-head"><h3>Tabla — ${f.label}</h3>${dlBtn('card-'+slugBase+'-tbl','demografico_tabla_'+slugify(f.key))}</div>
+      <div class="table-wrap">
+        <table id="tbl-${slugBase}">
+          <thead><tr><th>${f.label}</th><th>Evaluadores</th><th>Líderes</th><th>Otros</th><th>Auto</th><th>Brecha</th><th>Jefe</th><th>Par</th><th>Colaborador</th></tr></thead>
+          <tbody>
+            ${[...DATA.demographics[f.key]].sort((a,b)=>(b.otros||0)-(a.otros||0)).map(r=>`<tr>
+              <td><b>${r.valor}</b></td><td>${r.n_evaluadores}</td><td>${r.n_lideres}</td>
+              ${heatCell(r.otros)}${heatCell(r.auto)}<td>${pill(r.brecha)}</td>
+              ${heatCell(r.jefe)}${heatCell(r.par)}${heatCell(r.colaborador)}</tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function drawDemoChart(fieldKey){
+  const slugBase = 'demo-' + slugify(fieldKey);
+  const rows = [...DATA.demographics[fieldKey]].sort((a,b)=>(b.otros||0)-(a.otros||0));
+  if(demoChart) demoChart.destroy();
+  demoChart = new Chart(document.getElementById('chart-'+slugBase), {
+    type:'bar',
+    data:{
+      labels: rows.map(r=>r.valor),
+      datasets:[
+        {label:'Otros', data:rows.map(r=>r.otros), backgroundColor: rows.map(r=>heatBarColor(r.otros)), borderRadius:6, datalabels:barLabels({anchor:'end',align:'top',color:'#1f2937'})},
+        {label:'Autoevaluación', data:rows.map(r=>r.auto), backgroundColor:COLORS.blue, borderRadius:6, datalabels:barLabels({anchor:'end',align:'top',color:'#1e3a8a'})},
+      ]
+    },
+    options:{ responsive:true, plugins:{legend:{position:'bottom'}},
+      scales:{ y:{ min:Math.max(DATA.escala.min,1), max:DATA.escala.max, grid:{color:COLORS.grid} }, x:{grid:{display:false}} } }
+  });
+}
+
+// ================= INSIGHTS Y PRIORIDADES =================
+function renderInsights(){
+  const bestBehav = DATA.behav_top5[0];
+  const worstBehav = DATA.behav_bottom5[0];
+  const topGapBehav = DATA.gap_top10[0];
+  const lowConsensusBehav = DATA.consenso_bajo[0];
+  const worstComp = DATA.top_oportunidades_comp[0];
+  const bestComp = DATA.top_fortalezas_comp[0];
+  const nDim = DATA.dimensiones.length;
+
+  let demoInsight = '';
+  if(HAS_DEMO){
+    const f0 = DATA.demographic_fields[0];
+    const rows = [...DATA.demographics[f0.key]].filter(r=>r.otros!=null).sort((a,b)=>b.otros-a.otros);
+    if(rows.length>1){
+      const best = rows[0], worst = rows[rows.length-1];
+      demoInsight = `<div class="insight teal"><b>Diferencias por ${f0.label}:</b> "${best.valor}" tiene el resultado más alto (${fmt(best.otros)}) y "${worst.valor}" el más bajo (${fmt(worst.otros)}) — revisa la pestaña Demográfico para el detalle completo.</div>`;
+    }
+  }
+
+  const html = `
+    <div class="section-title">Insights y Prioridades para Recursos Humanos</div>
+    <div class="section-desc">Hallazgos principales y recomendaciones accionables, sustentadas directamente en los datos de la medición de ${DATA.meta.cliente}.</div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Principales hallazgos</h3>
+        <div class="insight teal"><b>1. Nivel general.</b> Puntaje global de ${fmt(DATA.kpis.puntaje_otros)}/${DATA.escala.max}, con brecha de autopercepción de ${pill(DATA.kpis.brecha_global)} frente a la percepción del entorno.</div>
+        <div class="insight"><b>2. Mayor brecha puntual.</b> El comportamiento con mayor sobreestimación es <b>"${topGapBehav.comportamiento}"</b> (${topGapBehav.competencia}), con ${pill(topGapBehav.brecha)}.</div>
+        <div class="insight amber"><b>3. Mayor oportunidad.</b> "${worstComp.competencia}" es la competencia con menor puntaje (${fmt(worstComp.otros)}). A nivel de comportamiento, el ítem más crítico es <b>"${worstBehav.comportamiento}"</b> (${worstBehav.competencia}), con ${fmt(worstBehav.otros)}.</div>
+        <div class="insight teal"><b>4. Fortaleza principal.</b> "${bestComp.competencia}" lidera el ranking de competencias (${fmt(bestComp.otros)}); a nivel de comportamiento, <b>"${bestBehav.comportamiento}"</b> es el mejor valorado de toda la medición (${fmt(bestBehav.otros)}).</div>
+        <div class="insight amber"><b>5. Menor consenso entre evaluadores.</b> El comportamiento <b>"${lowConsensusBehav.comportamiento}"</b> (${lowConsensusBehav.competencia}) es donde Jefe, Par y Colaborador más discrepan entre sí (σ=${lowConsensusBehav.dispersion}).</div>
+        ${demoInsight}
+      </div>
+      <div class="card">
+        <h3>Recomendaciones para RRHH</h3>
+        ${recBox('Priorizar en programas de formación', `"${worstComp.competencia}" es la competencia de menor puntaje; dentro de ella, "${worstBehav.comportamiento}" es el punto más crítico — un objetivo concreto y accionable.`)}
+        ${recBox('Foco de coaching individual', `Trabajar la autopercepción en los comportamientos con mayor brecha (encabezados por "${topGapBehav.comportamiento}"), donde los líderes se autoevalúan sistemáticamente por encima de lo que percibe su entorno.`)}
+        ${recBox('Usar el detalle de comportamientos, no solo competencias', 'La pestaña "Comportamientos" permite identificar ítems específicos de desarrollo, más accionables para coaching 1:1 y diseño instruccional que un plan genérico a nivel de competencia.')}
+        ${HAS_DEMO ? recBox('Revisar diferencias organizacionales', 'La pestaña "Demográfico" compara los grupos disponibles en los datos — útil para decidir si el desarrollo debe ser transversal o focalizado en segmentos específicos.') : ''}
+        ${recBox('Próxima medición', `Repetir la medición permitirá comparar evolución por ${nDim>1?'dimensión, ':''}competencia y comportamiento frente a este primer corte.`)}
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-insights').innerHTML = html;
+}
+function recBox(title, body){ return `<div class="insight"><b>${title}.</b> ${body}</div>`; }
+
+// ================= GLOSARIO =================
+function renderGlosario(){
+  const categorias = [
+    { title: 'Escala y evaluadores', items: [
+      ['Escala de respuesta', `${DATA.escala.min} = Totalmente en desacuerdo · ${DATA.escala.max} = Totalmente de acuerdo.`],
+      ['Autoevaluación (Auto)', 'Puntaje que el propio líder se otorga al responder el cuestionario sobre sí mismo.'],
+      ['Otros', 'Promedio simple de todas las respuestas individuales dadas por Jefe, Pares y Colaboradores combinados (no ponderado por tipo de evaluador). Es el indicador principal de "percepción externa" en este dashboard.'],
+      ['Jefe', 'Evaluador que ocupa una posición jerárquica superior al líder evaluado.'],
+      ['Par', 'Evaluador que ocupa un nivel jerárquico equivalente al del líder evaluado.'],
+      ['Colaborador', 'Evaluador que reporta directa o indirectamente al líder evaluado.'],
+    ]},
+    { title: 'Estructura del modelo', items: [
+      ['Dimensión (Tema)', `Los grandes bloques del modelo de liderazgo evaluados en esta medición (${DATA.dimensiones.length} en este caso). Cada dimensión agrupa varias competencias.`],
+      ['Competencia', `Sub-componente de una dimensión (${DATA.competencias.length} en total en esta medición). Cada competencia agrupa varios comportamientos observables.`],
+      ['Comportamiento', `La unidad más granular del modelo (${DATA.comportamientos.length} en total en esta medición): una afirmación concreta y observable que los evaluadores califican.`],
+      ['Puntaje General', 'Indicador resumen de un líder o de la organización: promedio simple de todas las respuestas de Otros (Jefe+Par+Colaborador) sobre los comportamientos evaluados.'],
+    ]},
+    { title: 'Métricas y cálculos', items: [
+      ['Brecha (Auto − Otros)', 'Diferencia entre la autoevaluación del líder y el promedio de Otros. Una brecha positiva indica que el líder se percibe mejor de lo que lo percibe su entorno (sobreestimación); una brecha negativa indica subestimación.'],
+      ['Consenso / Dispersión (σ)', 'Desviación estándar entre los promedios de Jefe, Par y Colaborador para un mismo comportamiento. Un valor bajo indica que los distintos tipos de evaluador coinciden en su percepción (alto consenso); un valor alto indica percepciones divergentes entre grupos.'],
+    ]},
+    { title: 'Niveles de desempeño', items: [
+      ['Niveles de desempeño', '<b>Excepcional</b> · <b>Sólido</b> · <b>En desarrollo</b> · <b>Prioritario</b>, usando los mismos cortes que el mapa de calor (equivalentes a &gt;4.6 / 4.4–4.6 / 4.0–4.4 / &lt;4.0 en una escala 1–5).'],
+    ]},
+  ];
+  if(HAS_DEMO){
+    categorias.push({ title: 'Análisis demográfico', items: [
+      ['Campos demográficos mostrados', `Esta medición incluye datos reales para: ${DATA.demographic_fields.map(f=>f.label).join(', ')}. Se excluyen automáticamente los campos sin variación o que identifican a una sola persona (para proteger la confidencialidad de los participantes).`],
+    ]});
+  }
+  const html = `
+    <div class="section-title">Glosario</div>
+    <div class="section-desc">Definición de los términos, métricas y convenciones visuales utilizadas a lo largo del dashboard.</div>
+    ${categorias.map(cat => `
+      <div class="card">
+        <div class="gloss-cat-title">${cat.title}</div>
+        <div class="gloss-grid">
+          ${cat.items.map(([term, def])=>`<div class="gloss-card"><div class="gloss-term">${term}</div><div class="gloss-def">${def}</div></div>`).join('')}
+        </div>
+      </div>
+    `).join('')}
+    <div class="card">
+      <div class="gloss-cat-title">Cómo leer los mapas de calor</div>
+      <div class="card-sub">Escala de color usada en las tablas y gráficos de "Dimensiones", "Competencias", "Comportamientos" y "Perspectiva 360°"</div>
+      <div class="legend-scale" style="font-size:13px;">
+        <span><i style="background:#fecaca"></i><b>&lt; 4.0</b> — Requiere atención</span>
+        <span><i style="background:#fde68a"></i><b>4.0 – 4.4</b> — En desarrollo</span>
+        <span><i style="background:#bbf7d0"></i><b>4.4 – 4.6</b> — Sólido</span>
+        <span><i style="background:#4ade80"></i><b>&gt; 4.6</b> — Excepcional</span>
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-glosario').innerHTML = html;
+}
+
+// ================= sortable tables =================
+function makeSortable(tableId){
+  const table = document.getElementById(tableId);
+  if(!table) return;
+  const ths = table.querySelectorAll('th');
+  ths.forEach((th, colIdx)=>{
+    th.addEventListener('click', ()=>{
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const asc = th.dataset.asc !== 'true';
+      ths.forEach(t=>delete t.dataset.asc);
+      th.dataset.asc = asc;
+      rows.sort((a,b)=>{
+        let x = a.children[colIdx].innerText.replace('+','').trim();
+        let y = b.children[colIdx].innerText.replace('+','').trim();
+        const nx = parseFloat(x), ny = parseFloat(y);
+        if(!isNaN(nx) && !isNaN(ny)) return asc ? nx-ny : ny-nx;
+        return asc ? x.localeCompare(y) : y.localeCompare(x);
+      });
+      rows.forEach(r=>tbody.appendChild(r));
+    });
+  });
+}
+
+// ================= PDF EXPORT (full dashboard) =================
+function flattenPdfBlocks(panel){
+  const out = [];
+  Array.from(panel.children).forEach(child=>{
+    const isKnownBlock = ['card','grid2','grid3','kpi-row','insight','section-title','section-desc'].some(c=>child.classList.contains(c));
+    if(!isKnownBlock && child.children.length>0 && Array.from(child.children).every(c=>c.classList.contains('card') || c.classList.contains('dim-group-title'))){
+      Array.from(child.children).forEach(c=> out.push(c));
+    } else {
+      out.push(child);
+    }
+  });
+  return out;
+}
+// Inserta un canvas en el PDF.
+// Por defecto usa PNG cuantizado a 256 colores (UPNG): las tablas, textos y gráficos del dashboard
+// son colores planos, así que queda más nítido que un JPEG (sin halos en el texto) y pesa mucho menos.
+// Si las librerías no cargaron, usa JPEG como respaldo.
+const PDF_IMG = { fmt:'PNG8', scale:1.6 };
+function addCanvasToPdf(pdf, canvas, x, y, w, h, quality){
+  if(PDF_IMG.fmt === 'PNG8' && window.UPNG && window.pako){
+    const ctx = canvas.getContext('2d');
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const png = new Uint8Array(UPNG.encode([img.data.buffer], canvas.width, canvas.height, 256));
+    pdf.addImage(png, 'PNG', x, y, w, h, undefined, 'FAST');
+  } else if(PDF_IMG.fmt === 'PNG'){
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, w, h, undefined, 'FAST');
+  } else {
+    pdf.addImage(canvas.toDataURL('image/jpeg', quality || 0.82), 'JPEG', x, y, w, h);
+  }
+}
+function placeCanvasFit(pdf, canvas, cursorY, cfg, quality){
+  const {marginX, marginY, contentW, contentH} = cfg;
+  const mmPerPx = contentW / canvas.width;
+  let hMM = canvas.height * mmPerPx, wMM = contentW, xOff = marginX;
+  if(hMM > contentH - 1){
+    const f = (contentH - 1) / hMM;
+    hMM = contentH - 1; wMM = contentW * f; xOff = marginX + (contentW - wMM) / 2;
+  }
+  // Si por poco no cabe en lo que queda de la página (≤14% de reducción), se ajusta el tamaño
+  // en vez de dejar una página casi vacía con una sola tarjeta.
+  const remaining = marginY + contentH - cursorY;
+  if(cursorY > marginY + 1 && hMM > remaining && remaining / hMM >= 0.86){
+    const f2 = remaining / hMM; hMM = remaining; wMM = wMM * f2; xOff = marginX;
+  }
+  if(cursorY + hMM > marginY + contentH + 0.01){ pdf.addPage(); cursorY = marginY; }
+  addCanvasToPdf(pdf, canvas, xOff, cursorY, wMM, hMM, quality);
+  return cursorY + hMM + 5;
+}
+async function renderGenericBlockToPdf(pdf, el, cfg, cursorY){
+  const canvas = await html2canvas(el, {scale:PDF_IMG.scale, backgroundColor:'#ffffff', useCORS:true});
+  return placeCanvasFit(pdf, canvas, cursorY, cfg, 0.82);
+}
+async function renderTableBlockToPdf(pdf, cardEl, table, cfg, cursorY){
+  const {marginX, marginY, contentW, contentH} = cfg;
+  const wrap = cardEl.querySelector('.table-wrap.scroll-y');
+  let prevMaxHeight, prevOverflow;
+  if(wrap){ prevMaxHeight = wrap.style.maxHeight; prevOverflow = wrap.style.overflowY; wrap.style.maxHeight='none'; wrap.style.overflowY='visible'; }
+
+  // Si la tarjeta completa (título + tabla) cabe en una página, se captura entera y se mueve
+  // a la página siguiente si no cabe en el espacio restante: nunca se corta ni se separa del título.
+  const fullCanvas = await html2canvas(cardEl, {scale:PDF_IMG.scale, backgroundColor:'#ffffff', useCORS:true});
+  const fullHmm = fullCanvas.height * (contentW / fullCanvas.width);
+  if(fullHmm <= contentH - 1){
+    if(wrap){ wrap.style.maxHeight = prevMaxHeight; wrap.style.overflowY = prevOverflow; }
+    return placeCanvasFit(pdf, fullCanvas, cursorY, cfg, 0.85);
+  }
+
+  // Tabla más alta que una página: se parte SOLO entre filas, con el encabezado repetido
+  const wrapEl = cardEl.querySelector('.table-wrap');
+  const prevDisplay = wrapEl.style.display;
+  wrapEl.style.display = 'none';
+  const headerCanvas = await html2canvas(cardEl, {scale:PDF_IMG.scale, backgroundColor:'#ffffff', useCORS:true});
+  wrapEl.style.display = prevDisplay;
+  cursorY = placeCanvasFit(pdf, headerCanvas, cursorY, cfg, 0.85);
+
+  const tableScale = PDF_IMG.scale;
+  const tableCanvas = await html2canvas(table, {scale:tableScale, backgroundColor:'#ffffff', useCORS:true});
+  const mmPerPx = contentW / tableCanvas.width;
+
+  const trs = Array.from(table.querySelectorAll('tr'));
+  const tableRect = table.getBoundingClientRect();
+  const rowBoundaries = trs.map(tr=>{
+    const r = tr.getBoundingClientRect();
+    return { top:(r.top - tableRect.top) * tableScale, bottom:(r.bottom - tableRect.top) * tableScale };
+  });
+  const theadRowCount = table.tHead ? table.tHead.rows.length : 0;
+  const headerHeightPx = theadRowCount > 0 ? rowBoundaries[theadRowCount - 1].bottom : 0;
+
+  let cutStart = 0, isFirstSlice = true, guard = 0;
+  while(cutStart < tableCanvas.height - 1 && guard < 500){
+    guard++;
+    const availableMM = isFirstSlice ? (marginY + contentH - cursorY) : contentH;
+    const repeatsHeader = (cutStart >= headerHeightPx && headerHeightPx > 0);
+    const availablePx = Math.max(availableMM, 10) / mmPerPx - (repeatsHeader ? headerHeightPx : 0);
+    let sliceEnd = cutStart;
+    for(const rb of rowBoundaries){ if(rb.bottom <= cutStart + availablePx && rb.bottom > cutStart) sliceEnd = rb.bottom; }
+    if(sliceEnd <= cutStart || (cutStart === 0 && sliceEnd <= headerHeightPx)){
+      if(isFirstSlice && cursorY > marginY + 1){ pdf.addPage(); cursorY = marginY; continue; }
+      const nextRow = rowBoundaries.find(rb=>rb.bottom > Math.max(cutStart, headerHeightPx));
+      sliceEnd = nextRow ? nextRow.bottom : tableCanvas.height;
+    }
+    let sliceCanvas;
+    if(cutStart >= headerHeightPx && headerHeightPx > 0){
+      sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = tableCanvas.width; sliceCanvas.height = headerHeightPx + (sliceEnd - cutStart);
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.drawImage(tableCanvas, 0,0, tableCanvas.width, headerHeightPx, 0,0, tableCanvas.width, headerHeightPx);
+      ctx.drawImage(tableCanvas, 0,cutStart, tableCanvas.width, sliceEnd-cutStart, 0, headerHeightPx, tableCanvas.width, sliceEnd-cutStart);
+    } else {
+      sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = tableCanvas.width; sliceCanvas.height = sliceEnd - cutStart;
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.drawImage(tableCanvas, 0,cutStart, tableCanvas.width, sliceEnd-cutStart, 0,0, tableCanvas.width, sliceEnd-cutStart);
+    }
+    const sliceHmm = sliceCanvas.height * mmPerPx;
+    if(!isFirstSlice || cursorY + sliceHmm > marginY + contentH){ pdf.addPage(); cursorY = marginY; }
+    addCanvasToPdf(pdf, sliceCanvas, marginX, cursorY, contentW, sliceHmm, 0.82);
+    cursorY += sliceHmm + 5; cutStart = sliceEnd; isFirstSlice = false;
+  }
+  if(wrap){ wrap.style.maxHeight = prevMaxHeight; wrap.style.overflowY = prevOverflow; }
+  return cursorY;
+}
+function drawCoverPage(pdf){
+  const pageW = 297, pageH = 210;
+  const k = DATA.kpis;
+  pdf.setFillColor(76,29,149); pdf.rect(0, 0, pageW, pageH, 'F');
+  pdf.setFillColor(13,148,136); pdf.rect(0, pageH-9, pageW, 9, 'F');
+  pdf.setFillColor(109,40,217); pdf.rect(0, pageH-9, pageW*0.62, 9, 'F');
+  pdf.setTextColor(224,214,250); pdf.setFont(undefined,'bold'); pdf.setFontSize(10.5);
+  pdf.text('INFORME CONFIDENCIAL', 20, 28);
+  pdf.setTextColor(255,255,255); pdf.setFont(undefined,'bold'); pdf.setFontSize(30);
+  pdf.text('Dashboard Organizacional de', 20, 52);
+  pdf.text('Liderazgo 360°', 20, 65);
+  pdf.setFont(undefined,'normal'); pdf.setFontSize(14); pdf.setTextColor(224,214,250);
+  pdf.text(`${DATA.meta.medicion}  ·  ${DATA.meta.cliente}`, 20, 78);
+  pdf.setDrawColor(255,255,255); pdf.setLineWidth(0.4); pdf.line(20, 95, pageW-20, 95);
+  const items = [
+    [String(k.n_lideres), 'Líderes evaluados'], [String(k.n_evaluadores), 'Evaluadores'],
+    [k.n_respuestas.toLocaleString('es-CO'), 'Respuestas analizadas'],
+    [fmt(k.puntaje_otros), 'Resultado global (Otros)'], [fmt(k.puntaje_auto), 'Autoevaluación promedio'],
+  ];
+  let x = 20; const y = 118;
+  items.forEach(([val,label])=>{
+    pdf.setFont(undefined,'bold'); pdf.setFontSize(24); pdf.setTextColor(255,255,255);
+    pdf.text(val, x, y);
+    pdf.setFont(undefined,'normal'); pdf.setFontSize(9); pdf.setTextColor(224,214,250);
+    pdf.text(pdf.splitTextToSize(label, 48), x, y+7);
+    x += 53;
+  });
+  pdf.setFont(undefined,'normal'); pdf.setFontSize(9); pdf.setTextColor(224,214,250);
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  pdf.text('Generado el ' + today, 20, pageH-20);
+  pdf.text(`Escala de valoración: ${DATA.escala.min} – ${DATA.escala.max}`, 20, pageH-15);
+}
+async function generateFullPdf(){
+  const btn = document.getElementById('btn-download-pdf');
+  if(!window.jspdf || !window.html2canvas){ alert('No se pudieron cargar las librerías de exportación.'); return; }
+  const origBtnText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Preparando…';
+  document.querySelectorAll('.dl-btn').forEach(b=> b.style.visibility = 'hidden');
+  // Ocultar botones JPEG también en pestañas que se renderizan durante la exportación
+  document.body.classList.add('pdf-export');
+  // Sin animación: los gráficos se capturan ya terminados (con las barras a su altura real)
+  const prevAnim = Chart.defaults.animation;
+  Chart.defaults.animation = false;
+  Object.values(Chart.instances).forEach(ch=>{ ch.options.animation = false; ch.update('none'); });
+  const origActiveTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'resumen';
+  const filterIds = ['filter-comp-tema','filter-behav-tema','filter-behav-n','filter-behav-tbl-tema','filter-heat-tema','filter-demo-field'];
+  const origFilters = {};
+  filterIds.forEach(id=>{ const el = document.getElementById(id); if(el) origFilters[id] = el.value; });
+
+  try{
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4', compress:true });
+    const cfg = { marginX:10, marginY:14, contentW:277, contentH:182 };
+    drawCoverPage(pdf);
+
+    for(let i=0;i<TABS.length;i++){
+      const tab = TABS[i];
+      btn.textContent = `Generando… ${i+1}/${TABS.length}`;
+      document.querySelectorAll('.tab-panel').forEach(p=>{ p.style.display = (p.id==='panel-'+tab.id) ? 'block' : 'none'; });
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      if(!rendered.has(tab.id)){ RENDERERS[tab.id](); rendered.add(tab.id); }
+
+      if(tab.id === 'competencias'){ const fc=document.getElementById('filter-comp-tema'); if(fc){ fc.value='Todas'; drawCompChart('Todas'); } }
+      if(tab.id === 'comportamientos'){
+        const fbt=document.getElementById('filter-behav-tema'); if(fbt) fbt.value='Todas';
+        const fbn=document.getElementById('filter-behav-n'); if(fbn) fbn.value='15';
+        drawBehavChart();
+        const fbtt=document.getElementById('filter-behav-tbl-tema'); if(fbtt){ fbtt.value='Todas'; drawBehavTable('Todas'); }
+      }
+      if(tab.id === 'perspectiva'){ const fht=document.getElementById('filter-heat-tema'); if(fht){ fht.value='Todas'; drawBehavHeatmap(); } }
+
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      await new Promise(r=>setTimeout(r, 350));
+
+      pdf.addPage();
+      let cursorY = cfg.marginY;
+      const panel = document.getElementById('panel-'+tab.id);
+      const heading = panel.querySelector('.section-title')?.textContent?.trim() || tab.label;
+      pdf.setFont(undefined,'bold'); pdf.setFontSize(15); pdf.setTextColor(76,29,149);
+      pdf.text(heading, cfg.marginX, cursorY);
+      cursorY += 6;
+      pdf.setDrawColor(224,224,230); pdf.setLineWidth(0.3);
+      pdf.line(cfg.marginX, cursorY, cfg.marginX+cfg.contentW, cursorY);
+      cursorY += 6;
+      pdf.setFont(undefined,'normal');
+
+      // En Demográfico el PDF incluye TODOS los campos (uno tras otro), no solo el seleccionado
+      const passes = (tab.id==='demografico' && HAS_DEMO) ? DATA.demographic_fields.map(f=>f.key) : [null];
+      for(let pi=0; pi<passes.length; pi++){
+        if(passes[pi]){
+          drawDemoSelected(passes[pi]);
+          await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+          await new Promise(r=>setTimeout(r, 350));
+        }
+        const blocks = flattenPdfBlocks(panel);
+        for(const block of blocks){
+          if(block.classList.contains('section-title')) continue;
+          if(block.id === 'demo-selector-card') continue;
+          if(block.classList.contains('section-desc')){
+            if(pi>0) continue;
+            pdf.setFontSize(9); pdf.setTextColor(107,114,128);
+            const lines = pdf.splitTextToSize(block.textContent.trim(), cfg.contentW);
+            if(cursorY + lines.length*4 > cfg.marginY+cfg.contentH){ pdf.addPage(); cursorY = cfg.marginY; }
+            pdf.text(lines, cfg.marginX, cursorY);
+            cursorY += lines.length*4 + 4;
+            continue;
+          }
+          if(block.classList.contains('dim-group-title') && cursorY + 60 > cfg.marginY + cfg.contentH){ pdf.addPage(); cursorY = cfg.marginY; }
+          const table = block.querySelector('table');
+          if(table){ cursorY = await renderTableBlockToPdf(pdf, block, table, cfg, cursorY); }
+          else { cursorY = await renderGenericBlockToPdf(pdf, block, cfg, cursorY); }
+        }
+      }
+    }
+    pdf.save(`Dashboard_Liderazgo360_${slugify(DATA.meta.cliente)}.pdf`);
+  } catch(err){
+    console.error('Error generando PDF:', err);
+    alert('Hubo un problema generando el PDF. Por favor intenta de nuevo.');
+  } finally {
+    document.querySelectorAll('.tab-panel').forEach(p=> p.style.display = '');
+    activateTab(origActiveTab);
+    filterIds.forEach(id=>{ const el=document.getElementById(id); if(el && origFilters[id]!==undefined) el.value = origFilters[id]; });
+    if(document.getElementById('filter-comp-tema')) drawCompChart(document.getElementById('filter-comp-tema').value);
+    if(document.getElementById('filter-behav-tema')) drawBehavChart();
+    if(document.getElementById('filter-behav-tbl-tema')) drawBehavTable(document.getElementById('filter-behav-tbl-tema').value);
+    if(document.getElementById('filter-heat-tema')) drawBehavHeatmap();
+    if(document.getElementById('filter-demo-field')) drawDemoSelected(document.getElementById('filter-demo-field').value);
+    document.querySelectorAll('.dl-btn').forEach(b=> b.style.visibility = '');
+    document.body.classList.remove('pdf-export');
+    Chart.defaults.animation = prevAnim;
+    btn.disabled = false; btn.textContent = origBtnText;
+  }
+}
+
+window.generateFullPdf = generateFullPdf;
+window.downloadAsJpeg = downloadAsJpeg;
+
+  }
+
+  fetch(API + '?survey=' + encodeURIComponent(SURVEY), {
+    credentials: 'same-origin',
+    headers: { 'X-Frappe-CSRF-Token': (window.csrf_token || ''), 'Accept': 'application/json' }
+  })
+  .then(function(res){
+    if(res.status === 403) throw new Error('No tienes permiso para ver este dashboard. Inicia sesión con un usuario autorizado.');
+    return res.json().then(function(j){ if(!res.ok) throw new Error(parseErr(j)); return j; });
+  })
+  .then(function(j){
+    var DATA = j.message;
+    if(!DATA || !DATA.kpis){ throw new Error('La medición no tiene respuestas disponibles.'); }
+    document.getElementById('m-sub').textContent = DATA.meta.medicion + (DATA.meta.cliente && DATA.meta.cliente !== DATA.meta.medicion ? ' · ' + DATA.meta.cliente : '');
+    document.getElementById('m-footer').textContent = 'Dashboard generado a partir de ' + DATA.meta.medicion + '. Los resultados "Otros" agrupan Jefe + Pares + Colaboradores como promedio simple de respuestas individuales.';
+    state.style.display = 'none';
+    document.getElementById('ll-app').style.display = '';
+    boot(DATA);
+  })
+  .catch(function(err){ console.error(err); fail(err.message || 'Ocurrió un error cargando los datos.'); });
+
+  function parseErr(j){
+    try {
+      if(j._server_messages){ var m = JSON.parse(JSON.parse(j._server_messages)[0]); return (m.message || '').replace(/<[^>]+>/g,''); }
+      if(j.exception) return String(j.exception).split(': ').slice(1).join(': ') || j.exception;
+    } catch(e) {}
+    return 'Error al cargar los datos';
+  }
+})();
+</script>
+{% endraw %}
+{% endblock %}

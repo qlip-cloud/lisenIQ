@@ -264,7 +264,7 @@ async function goToDashboard() {
   const surveyName = state.selectedDoc;
   const surveyTitle = state.selectedName || '';
   const category = (state.selectedCategory || '').toLowerCase();
-  const dashboardPath = category.includes('cultura') ? '/cultura-dashboard' : '/engagement-dashboard';
+  const dashboardPath = category.includes('cultura') ? '/cultura-dashboard' : category.includes('liderazgo') ? '/leadership-dashboard' : '/engagement-dashboard';
 
   const params = new URLSearchParams({
     survey: surveyName,

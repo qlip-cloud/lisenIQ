@@ -31,11 +31,6 @@ export function initEngagementReport(dataConfig, surveyName) {
     const engagementIndexData = parseBackendData(dataConfig.engagement_index_chart_data);
     const npsData = dataConfig.nps_data || { score: 0 };
 
-    // Usamos la data con enunciados de preguntas (qn_statement) para el gráfico de Atributos
-    const attributesChartData = (groupedDimensionData && groupedDimensionData.length > 0)
-        ? groupedDimensionData
-        : dimensionData;
-
     // Inicializamos la sección eNPS
     renderNpsGaugeChart(npsData);
 
@@ -45,7 +40,7 @@ export function initEngagementReport(dataConfig, surveyName) {
     // Inicializamos las tablas desglosadas por tema
     initTopicsTables(topicQuestionsData);
 
-    // Renderizar Gráfico de Engagement
+    // Renderizar Gráfico de Engagement (Puntaje por Dimensión)
     if (appFeatures.includes('aiq_rep_engagement')) {
         renderEngagementChart(engagementChartType, engagementData);
         
@@ -85,7 +80,7 @@ export function initEngagementReport(dataConfig, surveyName) {
 
     // Renderizar Gráfico de Dimensiones / Atributos
     if (appFeatures.includes('aiq_rep_dimension') || true) {
-        renderDimensionChart(dimensionChartType, attributesChartData);
+        renderDimensionChart(dimensionChartType, groupedDimensionData);
         
         const btnDimension = document.getElementById('btn-toggle-dimension');
         if (btnDimension) {
@@ -97,7 +92,7 @@ export function initEngagementReport(dataConfig, surveyName) {
                 this.title = tooltipText;
                 this.innerHTML = `<i class="fa ${icon}" aria-hidden="true"></i>`;
                 
-                renderDimensionChart(dimensionChartType, attributesChartData);
+                renderDimensionChart(dimensionChartType, groupedDimensionData);
             });
         }
 
@@ -455,13 +450,13 @@ function renderEngagementChart(type, data) {
     engagementChartInstance.render();
 }
 
-// Renderizar el gráfico de Atributos dentro de #dimension-card-container mostrando qn_statement sin desbordarse
+// Renderizar el gráfico de Puntaje por Atributos usando las categorías agrupadas (temas/atributos, sin preguntas individuales)
 function renderDimensionChart(type, data) {
     const chartContainer = document.getElementById('dimension-chart-container');
     if (!chartContainer) return;
 
-    // Priorizamos item.question (qn_statement de qp_IQ_Question) sobre el ID/name
-    const categories = data.map(item => item.question || item.engagement || item.culture || 'N/A'); 
+    // Mostrar únicamente los temas/atributos agrupados (item.engagement), nunca las preguntas
+    const categories = data.map(item => item.engagement || item.topic || 'N/A'); 
     const scores = data.map(item => item.score || 0);
 
     const colorsArr = data.map(item => {
@@ -482,8 +477,8 @@ function renderDimensionChart(type, data) {
 
     let options = {};
     if (type === 'bar') {
-        // Altura dinámica suficiente para que todas las preguntas entren sin salirse de la tarjeta
-        const dynamicHeight = Math.max(360, categories.length * 42 + 90);
+        // Sincronizamos la altura del contenedor con la altura dinámica de ApexCharts para evitar desbordes
+        const dynamicHeight = Math.max(350, categories.length * 38 + 80);
         chartContainer.style.height = `${dynamicHeight}px`;
 
         options = {
@@ -540,11 +535,10 @@ function renderDimensionChart(type, data) {
             },
             yaxis: { 
                 labels: { 
-                    minWidth: 180,
-                    maxWidth: 360,
+                    maxWidth: 350,
                     formatter: function (value) {
                         if (typeof value !== 'string') return value;
-                        const maxLength = 50;
+                        const maxLength = 45;
                         const words = value.split(' ');
                         let lines = [];
                         let currentLine = '';
@@ -571,7 +565,7 @@ function renderDimensionChart(type, data) {
                 strokeDashArray: 4,
                 padding: {
                     top: 0,
-                    right: 20,
+                    right: 15,
                     bottom: 10,
                     left: 10
                 }
@@ -581,11 +575,9 @@ function renderDimensionChart(type, data) {
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
                     const score = series[seriesIndex][dataPointIndex];
-                    const item = data[dataPointIndex] || {};
-                    const questionText = categories[dataPointIndex];
-                    const dimLabel = item.dimension || item.topic || 'Atributo';
+                    const category = categories[dataPointIndex]; 
                     const color = w.config.colors[dataPointIndex % w.config.colors.length];
-                    return buildCustomTooltip(dimLabel, questionText, score, color);
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };
@@ -602,14 +594,14 @@ function renderDimensionChart(type, data) {
                 style: { fontSize: '14px', fontFamily: 'inherit', fontWeight: 700 }
             },
             legend: { position: 'bottom' },
-            title: { text: 'Puntaje por Atributos', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: 'Representación proporcional del promedio (escala 1 a 5)', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, w}) {
                     const score = series[seriesIndex];
                     const category = w.config.labels[seriesIndex]; 
                     const color = w.config.colors[seriesIndex % w.config.colors.length];
-                    return buildCustomTooltip('Atributo', category, score, color);
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };

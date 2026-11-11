@@ -164,9 +164,9 @@ async function captureElement(element) {
     if (!element) return null;
     try {
         const opts = { 
-            quality: 1.0, // Calidad máxima
-            bgcolor: '#ffffff', // Fondo blanco para evitar transparencias 
-            scale: 3, // Se aumenta para mejorar la resolución de la imagen capturada
+            quality: 1.0,
+            bgcolor: '#ffffff',
+            scale: 3,
             style: { margin: '0', transform: 'scale(1)', transformOrigin: 'top left' }
         };
         const dataUrl = await domtoimage.toJpeg(element, opts);
@@ -188,7 +188,6 @@ async function exportSingleSection(container, header, type) {
         
         if (!headerData || !containerData) throw new Error("Fallo en captura de imagen");
         
-        // Obtener ID
         const params = new URLSearchParams(window.location.search);
         const surveyId = params.get('survey_name') || 'ID_Desconocido';
         let sectionTitle = header.querySelector('.chart-section-title')?.innerText || 'Seccion';
@@ -203,23 +202,19 @@ async function exportSingleSection(container, header, type) {
             
             let currentY = 10;
             
-            // Draw Header
             let hPdfH = (headerData.height * maxW) / headerData.width;
             pdf.addImage(headerData.imgData, 'JPEG', 10, currentY, maxW, hPdfH);
             currentY += hPdfH + 5;
             
-            // Draw Container
             let cPdfH = (containerData.height * maxW) / containerData.width;
             let cPdfW = maxW;
             
-            // Escalar si no cabe
             if (cPdfH > pageH - currentY - 10) {
                 const ratio = (pageH - currentY - 10) / cPdfH;
                 cPdfH *= ratio;
                 cPdfW *= ratio;
             }
             
-            // Centrar si fue escalado
             let xPos = 10 + (maxW - cPdfW) / 2;
             pdf.addImage(containerData.imgData, 'JPEG', xPos, currentY, cPdfW, cPdfH);
             pdf.save(`${fileName}.pdf`);
@@ -252,9 +247,7 @@ function buildExportJobs(wrapper) {
             else if (node.classList.contains('chart-header-flex') || node.tagName.match(/^H[1-6]$/)) {
                 currentHeader = node; 
             }
-            // Aislamiento de tarjetas
             else if (node.classList.contains('top-bottom-container') || node.classList.contains('topics-tables-container') || node.classList.contains('contacts-charts-grid')) {
-                // Tomamos todos los hijos directos (tarjetas) del contenedor para separarlos
                 const cards = Array.from(node.children);
                 cards.forEach((card) => {
                     jobs.push({ 
@@ -265,7 +258,11 @@ function buildExportJobs(wrapper) {
                 });
                 currentHeader = null; 
             }
-            else if (node.classList.contains('metrics-container') || node.classList.contains('chart-card')) {
+            else if (
+                node.classList.contains('metrics-container') ||
+                node.classList.contains('chart-card') ||
+                node.classList.contains('dimension-card-container')
+            ) {
                 jobs.push({ type: 'block', header: currentHeader, el: node });
                 currentHeader = null;
             }
@@ -283,7 +280,6 @@ async function exportFullPageToPDF(surveyName, surveyTitle) {
     const btnExport = document.getElementById('btn-export-full-pdf');
     const originalBtnText = btnExport ? btnExport.innerHTML : '';
     
-    // Guardamos la posición de scroll actual y subimos
     const prevScrollY = window.scrollY;
     window.scrollTo(0, 0);
 
@@ -296,6 +292,21 @@ async function exportFullPageToPDF(surveyName, surveyTitle) {
         
         wrapper.style.height = 'auto';
         wrapper.style.overflowY = 'visible';
+
+        // Expandir temporalmente dimension-card-container si tiene scroll interno
+        const dimContainers = document.querySelectorAll('.dimension-card-container');
+        const prevDimStyles = [];
+        dimContainers.forEach(el => {
+            prevDimStyles.push({
+                el,
+                height: el.style.height,
+                maxHeight: el.style.maxHeight,
+                overflowY: el.style.overflowY
+            });
+            el.style.height = 'auto';
+            el.style.maxHeight = 'none';
+            el.style.overflowY = 'visible';
+        });
         
         const buttonsToHide = document.querySelectorAll('.chart-actions-group, #btn-export-full-pdf, .btn-outline-purple');
         buttonsToHide.forEach(btn => btn.style.display = 'none');
@@ -348,7 +359,6 @@ async function exportFullPageToPDF(surveyName, surveyTitle) {
                 if (blockData) addImg(blockData);
                 currentY += 5; 
             }
-            
             else if (job.type === 'isolated_card') {
                 if (currentY > margin) {
                     pdf.addPage();
@@ -367,6 +377,12 @@ async function exportFullPageToPDF(surveyName, surveyTitle) {
                 }
             }
         }
+
+        prevDimStyles.forEach(item => {
+            item.el.style.height = item.height;
+            item.el.style.maxHeight = item.maxHeight;
+            item.el.style.overflowY = item.overflowY;
+        });
 
         wrapper.style.height = originalHeight;
         wrapper.style.overflowY = originalOverflow;

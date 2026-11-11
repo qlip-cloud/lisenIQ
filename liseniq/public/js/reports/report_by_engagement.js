@@ -31,6 +31,11 @@ export function initEngagementReport(dataConfig, surveyName) {
     const engagementIndexData = parseBackendData(dataConfig.engagement_index_chart_data);
     const npsData = dataConfig.nps_data || { score: 0 };
 
+    // Usamos la data con enunciados de preguntas (qn_statement) para el gráfico de Atributos
+    const attributesChartData = (groupedDimensionData && groupedDimensionData.length > 0)
+        ? groupedDimensionData
+        : dimensionData;
+
     // Inicializamos la sección eNPS
     renderNpsGaugeChart(npsData);
 
@@ -78,9 +83,9 @@ export function initEngagementReport(dataConfig, surveyName) {
         if (btnExpPdfEngagement) btnExpPdfEngagement.addEventListener('click', () => exportChart(engagementChartInstance, `Reporte_Engagement_${surveyName}`, 'pdf'));
     }
 
-    // Renderizar Gráfico de Dimensiones
+    // Renderizar Gráfico de Dimensiones / Atributos
     if (appFeatures.includes('aiq_rep_dimension') || true) {
-        renderDimensionChart(dimensionChartType, groupedDimensionData);
+        renderDimensionChart(dimensionChartType, attributesChartData);
         
         const btnDimension = document.getElementById('btn-toggle-dimension');
         if (btnDimension) {
@@ -92,7 +97,7 @@ export function initEngagementReport(dataConfig, surveyName) {
                 this.title = tooltipText;
                 this.innerHTML = `<i class="fa ${icon}" aria-hidden="true"></i>`;
                 
-                renderDimensionChart(dimensionChartType, groupedDimensionData);
+                renderDimensionChart(dimensionChartType, attributesChartData);
             });
         }
 
@@ -172,7 +177,7 @@ function renderNpsGaugeChart(data) {
         chart: {
             height: 160,
             type: 'gauge',
-            sparkline: { enabled: true }, // Quita padding innecesario
+            sparkline: { enabled: true },
             animations: {
                 enabled: true,
                 dynamicAnimation: { enabled: true, speed: 800 },
@@ -252,7 +257,7 @@ function renderNpsGaugeChart(data) {
     chart.render();
 }
 
-// Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas agrupada por dimensión (dimensionData)
+// Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas (dimensionData)
 function initTopBottomCards(data) {
     const topContainer = document.getElementById('top-10-list');
     const bottomContainer = document.getElementById('bottom-10-list');
@@ -292,7 +297,6 @@ function initTopicsTables(data) {
     if (!container) return;
     if (!data || data.length === 0) return;
 
-    // Agrupamos las preguntas por su topic
     const grouped = {};
     data.forEach(item => {
         const topic = item.topic || 'Sin Tema';
@@ -301,18 +305,15 @@ function initTopicsTables(data) {
     });
 
     let html = '';
-    // Ordenamos los temas alfabéticamente para mantener consistencia visual
     const sortedTopics = Object.keys(grouped).sort();
 
     sortedTopics.forEach(topic => {
         const items = grouped[topic];
-        // Ordenar las preguntas dentro de cada tema de mayor a menor puntaje
         items.sort((a, b) => b.score - a.score);
 
         const rowsHtml = items.map(item => {
             const percentage = Math.min(100, Math.max(0, (item.score / 5) * 100));
             
-            // Asignación de color según el tema
             let c = item.color ? String(item.color).trim().toLowerCase() : "";
             let hexColor = '#7c3aed';
             if (c && c !== 'none' && c !== 'null') {
@@ -358,14 +359,10 @@ function renderEngagementChart(type, data) {
     const categories = data.map(item => item.topic || 'N/A');
     const scores = data.map(item => item.score || 0);
     
-    // Asignar el color dinámicamente
     const colorsArr = data.map(item => {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
-        
-        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
-        
         return item.color;
     });
 
@@ -441,7 +438,7 @@ function renderEngagementChart(type, data) {
                 style: { fontSize: '14px', fontFamily: 'inherit', fontWeight: 700 }
             },
             legend: { position: 'bottom' },
-            title: { text: 'Puntaje por tipo de Cultura', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por Dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: 'Representación proporcional del promedio (escala 1 a 5)', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, w}) {
@@ -458,22 +455,19 @@ function renderEngagementChart(type, data) {
     engagementChartInstance.render();
 }
 
-// Renderizar el grafico de dimensiones utilizando la data agrupada por dimensión (groupedDimensionData)
+// Renderizar el gráfico de Atributos dentro de #dimension-card-container mostrando qn_statement sin desbordarse
 function renderDimensionChart(type, data) {
     const chartContainer = document.getElementById('dimension-chart-container');
     if (!chartContainer) return;
 
-    // Utilizamos solo las categorías agrupadas (sin preguntas individuales)
-    const categories = data.map(item => item.engagement || 'N/A'); 
+    // Priorizamos item.question (qn_statement de qp_IQ_Question) sobre el ID/name
+    const categories = data.map(item => item.question || item.engagement || item.culture || 'N/A'); 
     const scores = data.map(item => item.score || 0);
 
-    // Asignar el color dinámicamente
     const colorsArr = data.map(item => {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
-        
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
-        
         return item.color;
     });
 
@@ -488,7 +482,9 @@ function renderDimensionChart(type, data) {
 
     let options = {};
     if (type === 'bar') {
-        const dynamicHeight = Math.max(300, categories.length * 35 + 50);
+        // Altura dinámica suficiente para que todas las preguntas entren sin salirse de la tarjeta
+        const dynamicHeight = Math.max(360, categories.length * 42 + 90);
+        chartContainer.style.height = `${dynamicHeight}px`;
 
         options = {
             series: [{ name: 'Puntaje Promedio', data: scores }],
@@ -544,10 +540,11 @@ function renderDimensionChart(type, data) {
             },
             yaxis: { 
                 labels: { 
-                    maxWidth: 350,
+                    minWidth: 180,
+                    maxWidth: 360,
                     formatter: function (value) {
                         if (typeof value !== 'string') return value;
-                        const maxLength = 45;
+                        const maxLength = 50;
                         const words = value.split(' ');
                         let lines = [];
                         let currentLine = '';
@@ -564,7 +561,7 @@ function renderDimensionChart(type, data) {
                     },
                     style: { 
                         colors: '#4b5563', 
-                        fontSize: '10px',
+                        fontSize: '11px',
                         fontWeight: 500 
                     } 
                 } 
@@ -574,8 +571,8 @@ function renderDimensionChart(type, data) {
                 strokeDashArray: 4,
                 padding: {
                     top: 0,
-                    right: 15,
-                    bottom: -15,
+                    right: 20,
+                    bottom: 10,
                     left: 10
                 }
             },
@@ -584,17 +581,20 @@ function renderDimensionChart(type, data) {
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
                     const score = series[seriesIndex][dataPointIndex];
-                    const category = categories[dataPointIndex]; 
+                    const item = data[dataPointIndex] || {};
+                    const questionText = categories[dataPointIndex];
+                    const dimLabel = item.dimension || item.topic || 'Atributo';
                     const color = w.config.colors[dataPointIndex % w.config.colors.length];
-                    return buildCustomTooltip(category, null, score, color);
+                    return buildCustomTooltip(dimLabel, questionText, score, color);
                 }
             }
         };
     } else {
+        chartContainer.style.height = '450px';
         options = {
             series: scores,
             labels: categories,
-            chart: { type: 'pie', height: '100%', toolbar: { show: false }, fontFamily: 'inherit' },
+            chart: { type: 'pie', height: 450, toolbar: { show: false }, fontFamily: 'inherit' },
             colors: colorsArr,
             dataLabels: {
                 enabled: true,
@@ -602,14 +602,14 @@ function renderDimensionChart(type, data) {
                 style: { fontSize: '14px', fontFamily: 'inherit', fontWeight: 700 }
             },
             legend: { position: 'bottom' },
-            title: { text: 'Puntaje por dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por Atributos', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: 'Representación proporcional del promedio (escala 1 a 5)', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, w}) {
                     const score = series[seriesIndex];
                     const category = w.config.labels[seriesIndex]; 
                     const color = w.config.colors[seriesIndex % w.config.colors.length];
-                    return buildCustomTooltip(category, null, score, color);
+                    return buildCustomTooltip('Atributo', category, score, color);
                 }
             }
         };

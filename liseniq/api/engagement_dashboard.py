@@ -34,7 +34,7 @@ INDICE_ENGAGEMENT_VARIABLE = "Índice de Engagement"
 # TAG/VARIABLE (columna 'variable' del reporte, viene de
 # qn_demographic -> dt_title), no por el tema (columna 'theme').
 # Ajusta el valor si en tu catálogo el tag se llama distinto.
-OPEN_TEXT_TAG = "Abierta"
+OPEN_TEXT_TAG = "ABIERTA"
 
 
 def _norm(text):

@@ -902,7 +902,7 @@ def _accumulate_360_batch(batch_responses, questions_data, evaluator_map):
             question_info = questions_data.get(question, {})
             dimension = question_info.get('dimension') or 'Sin Categoría'
             theme = question_info.get('theme') or 'Sin Tema'
-            if dimension == 'Abierta':
+            if dimension.lower() == 'abierta':
                 continue
                 
             
@@ -1051,7 +1051,7 @@ def _update_leader_reports_from_batch(batch_responses, questions_data, evaluator
                 dimension = question_info.get('dimension') or 'Sin Categoría'
                 theme = question_info.get('theme') or 'Sin Tema'
                 max_option_value = question_info.get('max_option_value') or 5
-                if dimension == 'Abierta':
+                if dimension.lower() == 'abierta':
                     text_val = resp.get('answer')
                     logger.info('Processing open question | leader=%s question=%s text_val=%s', leader_name, question_text, text_val)
                     if text_val and str(text_val).strip():

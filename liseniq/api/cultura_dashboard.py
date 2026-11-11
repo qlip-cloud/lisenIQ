@@ -41,7 +41,7 @@ REPORT_NAME = "Survey Response Custom Report Front"
 # (singular) — es el valor usado en el dashboard hermano de Engagement, y
 # es la causa más probable si aquí no aparecen preguntas abiertas. Si tu
 # catálogo usa un tercer valor distinto, agrégalo a esta lista.
-OPEN_TEXT_TAG_VARIANTS = ["Abiertas", "Abierta"]
+OPEN_TEXT_TAG_VARIANTS = ["ABIERTA", "ABIERTAS", "Abierta", "Abiertas", "abierta", "abiertas"]
 
 # Umbral mínimo de anonimato: ningún resultado se desagrega para grupos
 # con menos personas que esto (mismo valor que el HTML original).

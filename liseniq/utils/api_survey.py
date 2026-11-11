@@ -222,13 +222,16 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
                     preview_data = _get_cached_beta_preview(preview_id)
                     if not preview_data:
                         return {"allow": False, "message": "El enlace de prueba ha expirado."}
+                    beta_welcome_msg = preview_data.get("welcome_message") or ""
+                    if "iqPrivacyModal" not in beta_welcome_msg:
+                        beta_welcome_msg += get_legal_modals_html()
                     return {
                         "allow": True,
                         "is_beta": True,
                         "require_dni": False,
                         "survey_display_name": preview_data.get("name") or beta_payload.get("sur") or survey_name,
                         "welcome_subject": preview_data.get("welcome_subject"),
-                        "welcome_message": preview_data.get("welcome_message")
+                        "welcome_message": beta_welcome_msg
                     }
         except jwt.ExpiredSignatureError:
             return {"allow": False, "message": "El enlace ha expirado."}
@@ -270,8 +273,9 @@ def validate_survey_link(survey_name, user=None, token=None, dni=None, uq=None):
 
     # Añadir siempre la lógica y HTML de los modales para que estén disponibles
     # incluso si usan una plantilla personalizada que invoque los onClick
-    if welcome_message:
-        welcome_message += get_legal_modals_html()
+    if not welcome_message:
+        welcome_message = "Bienvenido/a a la medición. Por favor, lee y acepta los términos y condiciones para poder iniciar. Tu participación es muy importante para nosotros."
+    welcome_message += get_legal_modals_html()
 
     # Respuesta exitosa base incluyendo campos de bienvenida personalizados y los modales integrados
     success_response = {

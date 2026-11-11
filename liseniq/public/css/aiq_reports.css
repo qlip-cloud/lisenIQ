@@ -136,6 +136,18 @@
     height: 450px;
 }
 
+/* Evita el desbordamiento cuando hay muchas preguntas/atributos en el gráfico de dimensiones */
+#dimension-card-container {
+    height: auto !important;
+    overflow: hidden;
+}
+
+#dimension-card-container .chart-wrapper,
+#dimension-chart-container {
+    height: auto !important;
+    min-height: 350px;
+}
+
 /* Estilos para la sección de top 10 y bottom 10 */
 .top-bottom-container, .topics-tables-container {
     display: grid;

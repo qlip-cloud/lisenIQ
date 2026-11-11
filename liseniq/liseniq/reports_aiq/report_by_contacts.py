@@ -5,8 +5,8 @@ from frappe.utils import getdate, date_diff, nowdate
 def inject_contacts_demographics_data(context, survey_name):
     """
     Función para ser llamada desde el controlador principal.
-    Agrega primero los gráficos fijos (Rango de Edad y Antigüedad),
-    luego extrae los demográficos en custom_additional_details,
+    Agrega primero los gráficos fijos (Rango de Edad, Antigüedad y Género),
+    luego extrae los demográficos en custom_additional_details (dt_object_type = 'Contacto'),
     y calcula el promedio de respuestas.
     """
 
@@ -75,17 +75,15 @@ def inject_contacts_demographics_data(context, survey_name):
         context.contact_demographics_json = json.dumps(chart_data)
         return context
 
-    # Seección 1: Gráficos Demográficos Fijos (Edad, Antigüedad, Género)
+    # Sección 1: Gráficos Demográficos Fijos (Edad, Antigüedad, Género)
     today = getdate(nowdate())
 
-    # Obtener data base de contactos para Edad, Antigüedad y Género
     contacts_info = frappe.get_all("Contact",
         filters={"name": ["in", contacts_with_responses]},
         fields=["name", "custom_dob", "custom_entry_date", "gender"],
         ignore_permissions=True
     )
 
-    # Diccionarios pre-inicializados para mantener el orden exacto deseado
     age_ranges = {
         "< 25 años": {"score": 0.0, "count": 0},
         "25-35 años": {"score": 0.0, "count": 0},
@@ -165,13 +163,11 @@ def inject_contacts_demographics_data(context, survey_name):
                 "data": data_list
             }
 
-    # Insertamos primero los fijos en el objeto final
     build_fixed_data("Rango de Edad", age_ranges)
     build_fixed_data("Antigüedad", seniority_ranges)
     build_fixed_data("Género", gender_ranges, "#3b82f6")
-   
 
-    # Segunda parte: Demográficos dinámicos definidos en custom_additional_details
+    # Sección 2: Demográficos dinámicos definidos en custom_additional_details (dt_object_type == "Contacto")
     demographics = frappe.get_all("qp_IQ_ContactAdditionalDetail",
         filters={
             "parent": ["in", contacts_with_responses], 
@@ -182,38 +178,24 @@ def inject_contacts_demographics_data(context, survey_name):
         ignore_permissions=True
     )
     
-    # Extraer nombre y color de los tipos demográficos para mostrar en el reporte
     demo_links = list(set([d.cad_demographic_type for d in demographics if d.cad_demographic_type]))
     demo_info_map = {}
     
     if demo_links:
-        for d_id in demo_links:
-            try:
-                title = frappe.db.get_value("qp_IQ_DemographicType", d_id, "dt_title")
-                color = frappe.db.get_value("qp_IQ_DemographicType", d_id, "dt_tag_color")
-                
-                if not title:
-                    meta = frappe.get_meta("qp_IQ_DemographicType")
-                    t_field = meta.title_field or "name"
-                    if t_field not in ["dt_title", "name"]:
-                        title = frappe.db.get_value("qp_IQ_DemographicType", d_id, t_field)
-                        
-                if not title:
-                    parent_type = frappe.db.get_value("qp_IQ_Demographic", d_id, "dm_demographic_type")
-                    if parent_type:
-                        title = frappe.db.get_value("qp_IQ_DemographicType", parent_type, "dt_title")
-                        if not color:
-                            color = frappe.db.get_value("qp_IQ_DemographicType", parent_type, "dt_tag_color")
+        contact_demo_types = frappe.get_all("qp_IQ_DemographicType",
+            filters={
+                "name": ["in", demo_links],
+                "dt_object_type": "Contacto"
+            },
+            fields=["name", "dt_title", "dt_tag_color"],
+            ignore_permissions=True
+        )
+        for dt in contact_demo_types:
+            demo_info_map[dt.name] = {
+                "title": dt.dt_title or dt.name,
+                "color": dt.dt_tag_color or ""
+            }
 
-                demo_info_map[d_id] = {
-                    "title": title if title else d_id,
-                    "color": color if color else ""
-                }
-            except Exception:
-                # En caso de fallo absoluto, usamos el ID
-                demo_info_map[d_id] = {"title": d_id, "color": ""}
-
-    # Agrupar la data por Demográfico y su Valor
     grouped_data = {}
     
     for d in demographics:
@@ -222,13 +204,15 @@ def inject_contacts_demographics_data(context, survey_name):
             continue
         
         demo_key = d.cad_demographic_type
-        info = demo_info_map.get(demo_key, {})
-        demo_title = info.get("title", demo_key)
-        demo_color = info.get("color", "")
+        # Solo procesamos si pertenece a un demográfico válido de tipo "Contacto"
+        if demo_key not in demo_info_map:
+            continue
+
+        info = demo_info_map[demo_key]
+        demo_title = info["title"]
+        demo_color = info["color"]
         
         demo_val = d.cad_value or "Sin Asignar"
-        
-        # Promedio global del contacto
         c_avg_score = contact_scores[c_id] / contact_counts[c_id]
         
         if demo_title not in grouped_data:
@@ -237,11 +221,9 @@ def inject_contacts_demographics_data(context, survey_name):
         if demo_val not in grouped_data[demo_title]["values"]:
             grouped_data[demo_title]["values"][demo_val] = {"total_score": 0.0, "count": 0}
             
-        # Sumamos para agrupar y evitar duplicados
         grouped_data[demo_title]["values"][demo_val]["total_score"] += c_avg_score
         grouped_data[demo_title]["values"][demo_val]["count"] += 1
         
-    # Formatear la salida incluyendo el color
     for demo_title, payload in grouped_data.items():
         chart_data[demo_title] = {
             "color": payload["color"],
@@ -254,7 +236,6 @@ def inject_contacts_demographics_data(context, survey_name):
                 "value": val_name,
                 "score": avg
             })
-        # Ordenar categoría dinámica de mayor a menor puntaje
         chart_data[demo_title]["data"].sort(key=lambda x: x["score"], reverse=True)
             
     context.contact_demographics_json = json.dumps(chart_data)

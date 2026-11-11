@@ -273,20 +273,26 @@ def get_legal_modals_html():
     </div>
 
     <script>
-      function openIqModal(e, modalId) {
-        if(e) e.preventDefault();
-        var modal = document.getElementById(modalId);
-        if(modal) modal.style.display = 'block';
-      }
-      function closeIqModal(modalId) {
-        var modal = document.getElementById(modalId);
-        if(modal) modal.style.display = 'none';
-      }
-      function closeIqModalOnClickOutside(event, modalId) {
-        if (event.target.id === modalId) {
-          closeIqModal(modalId);
+      window.openIqModal = function(e, modalId) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
         }
-      }
+        var modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'block';
+      };
+      window.closeIqModal = function(modalId) {
+        var modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
+      };
+      window.closeIqModalOnClickOutside = function(event, modalId) {
+        if (event.target && event.target.id === modalId) {
+          window.closeIqModal(modalId);
+        }
+      };
+      function openIqModal(e, modalId) { window.openIqModal(e, modalId); }
+      function closeIqModal(modalId) { window.closeIqModal(modalId); }
+      function closeIqModalOnClickOutside(event, modalId) { window.closeIqModalOnClickOutside(event, modalId); }
     </script>
     """
     
@@ -601,7 +607,7 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
                 <label class="iq-welcome-terms-label">
                     <input type="checkbox" id="accept-terms-checkbox" class="iq-welcome-checkbox">
                     <span class="iq-welcome-terms-text">
-                        He leído y acepto los términos y condiciones (<a href="https://qlip.cloud/aviso-de-privacidad/?utm_source=listenaiq&utm_medium=referral&utm_campaign=aviso_privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Aviso de Privacidad</a> | <a href="https://qlip.cloud/privacy-policy/?utm_source=listenaiq&utm_medium=referral&utm_campaign=politica_privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Privacy Policy</a>), y consiento el tratamiento de mis datos y respuestas para los fines de esta medición.
+                        He leído y acepto el <a href="#iqPrivacyModal" data-iq-modal="iqPrivacyModal" onclick="openIqModal(event, 'iqPrivacyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Aviso de Privacidad</a> y la <a href="#iqPolicyModal" data-iq-modal="iqPolicyModal" onclick="openIqModal(event, 'iqPolicyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Política de Tratamiento de Datos</a> para participar en esta medición.
                     </span>
                 </label>
             </div>
@@ -630,6 +636,33 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
     `;
     
     $wrap.append(welcomeHTML);
+
+    // Delegación de eventos para abrir los modales incluso cuando TinyMCE limpia el atributo onclick en mensajes personalizados
+    $wrap.off('click.iqModal').on('click.iqModal', 'a', function(e) {
+        const href = ($(this).attr('href') || '').trim();
+        const modalAttr = $(this).attr('data-iq-modal');
+        const linkText = ($(this).text() || '').toLowerCase();
+        let targetModal = null;
+
+        if (modalAttr) {
+            targetModal = modalAttr;
+        } else if (href === '#iqPrivacyModal' || href.includes('aviso-de-privacidad') || linkText.includes('aviso de privacidad')) {
+            targetModal = 'iqPrivacyModal';
+        } else if (href === '#iqPolicyModal' || href.includes('privacy-policy') || linkText.includes('política de tratamiento') || linkText.includes('politica de tratamiento') || linkText.includes('privacy policy')) {
+            targetModal = 'iqPolicyModal';
+        }
+
+        if (targetModal) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.openIqModal === 'function') {
+                window.openIqModal(e, targetModal);
+            } else {
+                const modalEl = document.getElementById(targetModal);
+                if (modalEl) modalEl.style.display = 'block';
+            }
+        }
+    });
 
     $('#accept-terms-checkbox').on('change', function() {
         if ($(this).is(':checked')) {

@@ -28,10 +28,6 @@ export function initCultureReport(dataConfig, surveyName) {
     const groupedDimensionData = parseBackendData(dataConfig.grouped_dimension_chart_data);
     const topicQuestionsData = parseBackendData(dataConfig.topic_questions_data);
 
-    const attributesChartData = (groupedDimensionData && groupedDimensionData.length > 0)
-        ? groupedDimensionData
-        : dimensionData;
-
     // Inicializamos la sección de top 10 y bottom 10
     initTopBottomCards(dimensionData);
 
@@ -74,7 +70,7 @@ export function initCultureReport(dataConfig, surveyName) {
 
     // Renderizar Gráfico de Dimensiones / Atributos
     if (appFeatures.includes('aiq_rep_dimension')) {
-        renderDimensionChart(dimensionChartType, attributesChartData);
+        renderDimensionChart(dimensionChartType, groupedDimensionData);
         
         const btnDimension = document.getElementById('btn-toggle-dimension');
         if (btnDimension) {
@@ -86,7 +82,7 @@ export function initCultureReport(dataConfig, surveyName) {
                 this.title = tooltipText;
                 this.innerHTML = `<i class="fa ${icon}" aria-hidden="true"></i>`;
                 
-                renderDimensionChart(dimensionChartType, attributesChartData);
+                renderDimensionChart(dimensionChartType, groupedDimensionData);
             });
         }
 
@@ -329,13 +325,13 @@ function renderCultureChart(type, data) {
     cultureChartInstance.render();
 }
 
-// Renderizar el gráfico en #dimension-card-container usando qn_statement y altura dinámica
+// Renderizar el gráfico de Dimensiones utilizando las categorías agrupadas (groupedDimensionData: dimensiones/atributos, sin preguntas)
 function renderDimensionChart(type, data) {
     const chartContainer = document.getElementById('dimension-chart-container');
     if (!chartContainer) return;
 
-    // Priorizamos item.question (qn_statement de qp_IQ_Question) sobre el ID/name
-    const categories = data.map(item => item.question || item.culture || item.engagement || 'N/A');
+    // Mostrar únicamente las dimensiones/atributos agrupados (item.culture), nunca las preguntas
+    const categories = data.map(item => item.culture || item.topic || 'N/A');
     const scores = data.map(item => item.score || 0);
 
     const colorsArr = data.map(item => {
@@ -356,38 +352,27 @@ function renderDimensionChart(type, data) {
 
     let options = {};
     if (type === 'bar') {
-        const dynamicHeight = Math.max(360, categories.length * 42 + 90);
-        chartContainer.style.height = `${dynamicHeight}px`;
-
+        chartContainer.style.height = '450px';
         options = {
             series: [{ name: 'Puntaje Promedio', data: scores }],
-            chart: { 
-                type: 'bar', 
-                height: dynamicHeight, 
-                toolbar: { show: false }, 
-                fontFamily: 'inherit',
-                parentHeightOffset: 0
-            },
+            chart: { type: 'bar', height: 450, toolbar: { show: false }, fontFamily: 'inherit' },
             colors: colorsArr,
             plotOptions: { 
                 bar: { 
-                    horizontal: true, 
-                    barHeight: '65%', 
-                    borderRadius: 4, 
-                    distributed: true,
+                    horizontal: false, columnWidth: '45%', borderRadius: 4, distributed: true,
                     dataLabels: { position: 'center' }
                 } 
             },
             dataLabels: { 
                 enabled: true,
                 formatter: function (val) { return val.toFixed(2); },
-                style: { fontSize: '11px', fontWeight: 700, colors: ["#ffffff"] },
+                style: { fontSize: '13px', fontWeight: 700, colors: ["#ffffff"] },
                 dropShadow: { enabled: true, top: 1, left: 1, blur: 1, color: '#000', opacity: 0.45 }
             },
             legend: { show: false },
             annotations: {
-                xaxis: [{
-                    x: parseFloat(globalScore.toFixed(2)),
+                yaxis: [{
+                    y: globalScore.toFixed(2),
                     borderColor: '#ea580c',
                     strokeDashArray: 4,
                     borderWidth: 1.5,
@@ -395,29 +380,16 @@ function renderDimensionChart(type, data) {
                         borderColor: 'transparent',
                         style: { color: '#ea580c', background: 'transparent', fontSize: '12px', fontWeight: 600 },
                         text: `Promedio ${globalScore.toFixed(2)}`,
-                        position: 'top', offsetX: 0, offsetY: 0
+                        position: 'right', offsetX: 0, offsetY: -8
                     }
                 }]
             },
             xaxis: {
                 categories: categories,
-                min: 1,
-                max: 5,
-                tickAmount: 8,
                 labels: {
-                    formatter: function (val) {
-                        return isNaN(val) ? val : parseFloat(val).toFixed(1);
-                    },
-                    style: { colors: '#6b7280', fontWeight: 500 }
-                }
-            },
-            yaxis: { 
-                labels: { 
-                    minWidth: 180,
-                    maxWidth: 360,
                     formatter: function (value) {
                         if (typeof value !== 'string') return value;
-                        const maxLength = 50;
+                        const maxLength = 15;
                         const words = value.split(' ');
                         let lines = [];
                         let currentLine = '';
@@ -432,29 +404,22 @@ function renderDimensionChart(type, data) {
                         if (currentLine.trim()) lines.push(currentLine.trim());
                         return lines; 
                     },
-                    style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 } 
-                } 
-            },
-            grid: { 
-                borderColor: '#f3f4f6', 
-                strokeDashArray: 4,
-                padding: {
-                    top: 0,
-                    right: 20,
-                    bottom: 10,
-                    left: 10
+                    style: { colors: '#4b5563', fontSize: '11px', fontWeight: 500 }
                 }
             },
-            title: { text: 'Puntaje por Atributos', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            yaxis: { 
+                max: function(max) { return max * 1.15; },
+                labels: { formatter: function (val) { return val.toFixed(1); }, style: { colors: '#6b7280', fontWeight: 500 } } 
+            },
+            grid: { borderColor: '#f3f4f6', strokeDashArray: 4 },
+            title: { text: 'Puntaje por dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: `De menor a mayor — línea de referencia en promedio global (${globalScore.toFixed(2)})`, align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, dataPointIndex, w}) {
                     const score = series[seriesIndex][dataPointIndex];
-                    const item = data[dataPointIndex] || {};
-                    const questionText = categories[dataPointIndex];
-                    const dimLabel = item.dimension || item.topic || 'Dimensión';
+                    const category = categories[dataPointIndex]; 
                     const color = w.config.colors[dataPointIndex % w.config.colors.length];
-                    return buildCustomTooltip(dimLabel, questionText, score, color);
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };
@@ -478,7 +443,7 @@ function renderDimensionChart(type, data) {
                     const score = series[seriesIndex];
                     const category = w.config.labels[seriesIndex]; 
                     const color = w.config.colors[seriesIndex % w.config.colors.length];
-                    return buildCustomTooltip('Dimensión', category, score, color);
+                    return buildCustomTooltip(category, null, score, color);
                 }
             }
         };

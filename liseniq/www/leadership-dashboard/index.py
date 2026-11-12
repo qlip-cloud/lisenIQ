@@ -23,3 +23,8 @@ def get_context(context):
     context.survey = survey_title
     context.no_header = 1
     context.title = "Dashboard Liderazgo 360° — %s" % survey_title
+    context.no_cache = 1
+    context.no_breadcrumbs = True
+    context.is_navbar_custom = True
+    context.show_summary_section = False
+        

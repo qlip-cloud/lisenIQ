@@ -44,17 +44,15 @@ def get_dashboard_data(survey):
     from frappe.desk.query_report import run
 
     previous_user = frappe.session.user
-    elevated = ALLOW_GUEST and previous_user == "Guest"
+    frappe.session.user = "Administrator"
     survey_title = frappe.db.get_value(IQ_SURVEY_DOCTYPE, survey, "su_name") or survey
     try:
-        if elevated:
-            # El usuario Guest no tiene permiso sobre el reporte; se ejecuta como Administrator
-            # SOLO para leer este reporte y se restaura el usuario en el finally.
-            frappe.set_user("Administrator")
         report = run(REPORT_NAME, filters={REPORT_FILTER: survey_title})
+    except Exception as e:
+        frappe.session.user = previous_user
+        raise e
     finally:
-        if elevated:
-            frappe.set_user(previous_user)
+        frappe.session.user = previous_user
 
     rows = report.get("result") or []
     columns = report.get("columns") or []

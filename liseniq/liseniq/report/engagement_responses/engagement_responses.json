@@ -9,7 +9,7 @@
  "filters": [],
  "idx": 0,
  "is_standard": "Yes",
- "modified": "2026-04-28 10:47:29.293593",
+ "modified": "2026-11-12 13:04:20.795111",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "Engagement Responses",
@@ -21,6 +21,9 @@
  "roles": [
   {
    "role": "System Manager"
+  },
+  {
+   "role": "All"
   }
  ]
 }

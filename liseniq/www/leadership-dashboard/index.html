@@ -1229,7 +1229,7 @@ window.downloadAsJpeg = downloadAsJpeg;
   .then(function(j){
     var DATA = j.message;
     if(!DATA || !DATA.kpis){ throw new Error('La medición no tiene respuestas disponibles.'); }
-    document.getElementById('m-sub').textContent = DATA.meta.medicion + (DATA.meta.cliente && DATA.meta.cliente !== DATA.meta.medicion ? ' · ' + DATA.meta.cliente : '');
+    document.getElementById('m-sub').textContent = DATA.meta.titulo + (DATA.meta.cliente && DATA.meta.cliente !== DATA.meta.medicion ? ' · ' + DATA.meta.cliente : '');
     document.getElementById('m-footer').textContent = 'Dashboard generado a partir de ' + DATA.meta.medicion + '. Los resultados "Otros" agrupan Jefe + Pares + Colaboradores como promedio simple de respuestas individuales.';
     state.style.display = 'none';
     document.getElementById('ll-app').style.display = '';

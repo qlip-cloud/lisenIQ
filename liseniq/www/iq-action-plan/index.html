@@ -1,0 +1,700 @@
+{% extends "/templates/iq_base.html" %}
+{% from "/templates/macros/iq_header.html" import iq_header %}
+
+{% block page_header %}
+    {{ iq_header(title="Gestión de Mejoras") }}
+{% endblock %}
+
+{% block page_main_content %}
+<div class="main-content-padding ap-page-wrapper">
+    <!-- Datos precargados desde index.py -->
+    <div id="ap-preloaded-data"
+         data-company="{{ active_company | e if active_company else '' }}"
+         data-dashboard='{{ initial_dashboard_json | e if initial_dashboard_json else "{}" }}'
+         data-filter-options='{{ filter_options_json | e if filter_options_json else "{}" }}'
+         style="display:none;"></div>
+
+    <!-- Vista 1: Dashboard y listado de planes -->
+    <div id="view-dashboard" class="ap-view-section">
+        <nav class="ap-breadcrumb" aria-label="Breadcrumb">
+            <span>Listen AIQ</span>
+            <i class="fa fa-angle-right ap-breadcrumb-sep" aria-hidden="true"></i>
+            <span class="ap-breadcrumb-current">Gestión de Mejoras</span>
+        </nav>
+
+        <div class="ap-header-row">
+            <div>
+                <h1 class="ap-main-heading">Gestión de Mejoras</h1>
+                <p class="ap-subheading">
+                    Convierte los resultados de tus mediciones en planes de acción y mide su impacto.
+                </p>
+            </div>
+            <div>
+                <button type="button" id="btn-new-action-plan" class="ap-btn-primary">
+                    <i class="fa fa-plus mr-2" aria-hidden="true"></i>
+                    <span>Nuevo Plan</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tarjetas de indicadores de resumen (KPIs) -->
+        <section class="ap-kpi-grid" aria-label="Indicadores de resumen de planes de acción">
+            <article class="ap-kpi-card ap-kpi-card--blue" data-kpi-filter="status" data-kpi-value="En ejecución" title="Filtrar planes activos">
+                <div class="ap-kpi-info">
+                    <span class="ap-kpi-title">PLANES ACTIVOS</span>
+                    <strong class="ap-kpi-number" id="kpi-active-plans">0</strong>
+                </div>
+                <div class="ap-kpi-badge-icon ap-kpi-badge-icon--blue">
+                    <i class="fa fa-bullseye" aria-hidden="true"></i>
+                </div>
+            </article>
+
+            <article class="ap-kpi-card ap-kpi-card--green" data-kpi-filter="status" data-kpi-value="Finalizado" title="Filtrar planes finalizados">
+                <div class="ap-kpi-info">
+                    <span class="ap-kpi-title">PLANES FINALIZADOS</span>
+                    <strong class="ap-kpi-number" id="kpi-finished-plans">0</strong>
+                </div>
+                <div class="ap-kpi-badge-icon ap-kpi-badge-icon--green">
+                    <i class="fa fa-check-circle-o" aria-hidden="true"></i>
+                </div>
+            </article>
+
+            <article class="ap-kpi-card ap-kpi-card--emerald" data-kpi-filter="goal_status" data-kpi-value="Meta alcanzada" title="Filtrar metas alcanzadas">
+                <div class="ap-kpi-info">
+                    <span class="ap-kpi-title">METAS ALCANZADAS</span>
+                    <strong class="ap-kpi-number" id="kpi-achieved-goals">0</strong>
+                </div>
+                <div class="ap-kpi-badge-icon ap-kpi-badge-icon--emerald">
+                    <i class="fa fa-line-chart" aria-hidden="true"></i>
+                </div>
+            </article>
+
+            <article class="ap-kpi-card ap-kpi-card--amber" data-kpi-filter="goal_status" data-kpi-value="Pendiente de evaluación" title="Filtrar metas pendientes de evaluación">
+                <div class="ap-kpi-info">
+                    <span class="ap-kpi-title">METAS PENDIENTES</span>
+                    <strong class="ap-kpi-number" id="kpi-pending-eval-goals">0</strong>
+                </div>
+                <div class="ap-kpi-badge-icon ap-kpi-badge-icon--amber">
+                    <i class="fa fa-clock-o" aria-hidden="true"></i>
+                </div>
+            </article>
+
+            <article class="ap-kpi-card ap-kpi-card--purple ap-kpi-card--static">
+                <div class="ap-kpi-info">
+                    <span class="ap-kpi-title">ACCIONES PENDIENTES</span>
+                    <strong class="ap-kpi-number" id="kpi-pending-tasks">0</strong>
+                </div>
+                <div class="ap-kpi-badge-icon ap-kpi-badge-icon--purple">
+                    <i class="fa fa-tasks" aria-hidden="true"></i>
+                </div>
+            </article>
+
+            <article class="ap-kpi-card ap-kpi-card--red ap-kpi-card--static">
+                <div class="ap-kpi-info">
+                    <span class="ap-kpi-title">ACCIONES VENCIDAS</span>
+                    <strong class="ap-kpi-number" id="kpi-overdue-tasks">0</strong>
+                </div>
+                <div class="ap-kpi-badge-icon ap-kpi-badge-icon--red">
+                    <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+                </div>
+            </article>
+        </section>
+
+        <!-- Buscador, filtros y tabla de planes -->
+        <div class="ap-surface-card">
+            <div class="ap-filter-bar">
+                <div class="ap-toolbar-row">
+                    <div class="ap-search-box">
+                        <i class="fa fa-search ap-search-icon" aria-hidden="true"></i>
+                        <input
+                            id="ap-filter-search"
+                            type="text"
+                            class="ap-search-input"
+                            placeholder="Buscar planes..."
+                            autocomplete="off"
+                            aria-label="Buscar planes por nombre">
+                        <button
+                            type="button"
+                            id="ap-search-clear"
+                            class="ap-search-clear-btn d-none"
+                            title="Limpiar búsqueda"
+                            aria-label="Limpiar búsqueda">
+                            <i class="fa fa-times" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <div class="ap-toolbar-meta">
+                        <button
+                            type="button"
+                            id="btn-reset-filters"
+                            class="ap-btn-link-clear d-none"
+                            title="Restablecer todos los filtros">
+                            <i class="fa fa-times-circle mr-1" aria-hidden="true"></i>Limpiar filtros
+                        </button>
+                        <span class="ap-results-count">
+                            <i class="fa fa-filter mr-1" aria-hidden="true"></i>
+                            <span id="ap-results-counter">0 resultados</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="ap-filters-row">
+                    <div class="ap-filter-item">
+                        <label for="ap-filter-status" class="ap-filter-upper-label">ESTADO</label>
+                        <select id="ap-filter-status" class="ap-select-box">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+
+                    <div class="ap-filter-item">
+                        <label for="ap-filter-goal-status" class="ap-filter-upper-label">META</label>
+                        <select id="ap-filter-goal-status" class="ap-select-box">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+
+                    <div class="ap-filter-item">
+                        <label for="ap-filter-responsible" class="ap-filter-upper-label">RESPONSABLE</label>
+                        <select id="ap-filter-responsible" class="ap-select-box">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+
+                    <div class="ap-filter-item">
+                        <label for="ap-filter-category" class="ap-filter-upper-label">CATEGORÍA</label>
+                        <select id="ap-filter-category" class="ap-select-box">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+
+                    <div class="ap-filter-item">
+                        <label for="ap-filter-priority" class="ap-filter-upper-label">PRIORIDAD</label>
+                        <select id="ap-filter-priority" class="ap-select-box">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+
+                    <div class="ap-filter-item">
+                        <label for="ap-filter-survey" class="ap-filter-upper-label">MEDICIÓN</label>
+                        <select id="ap-filter-survey" class="ap-select-box">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+
+                    <div class="ap-filter-item">
+                        <label for="ap-filter-year" class="ap-filter-upper-label">AÑO</label>
+                        <select id="ap-filter-year" class="ap-select-box">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estado de carga -->
+            <div id="ap-loading-state" class="ap-state-box d-none" role="status" aria-live="polite">
+                <div class="ap-spinner" aria-hidden="true"></div>
+                <p class="text-muted small mb-0 mt-2">Cargando planes de acción...</p>
+            </div>
+
+            <!-- Tabla de planes de acción con columna Alcance (Sección 5.1) -->
+            <div id="ap-table-container" class="table-responsive">
+                <table class="table ap-table mb-0" aria-label="Listado de Planes de Acción">
+                    <thead>
+                        <tr>
+                            <th scope="col">Plan</th>
+                            <th scope="col">Alcance</th>
+                            <th scope="col">Responsable</th>
+                            <th scope="col">Categoría</th>
+                            <th scope="col">Prioridad</th>
+                            <th scope="col">Estado</th>
+                            <th scope="col">Meta</th>
+                            <th scope="col">Avance</th>
+                            <th scope="col">Fecha objetivo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ap-table-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Estado vacío -->
+            <div id="ap-empty-state" class="ap-state-box d-none">
+                <div class="ap-empty-circle">
+                    <i class="fa fa-clipboard" aria-hidden="true"></i>
+                </div>
+                <h6 class="ap-empty-heading">No hay resultados para los filtros seleccionados.</h6>
+                <p class="ap-empty-text">
+                    Ajusta los filtros de búsqueda o crea un nuevo plan de mejora enfocado en los resultados de tus mediciones.
+                </p>
+                <div class="ap-empty-buttons">
+                    <button type="button" id="btn-empty-clear-filters" class="ap-btn-secondary d-none">
+                        Limpiar filtros
+                    </button>
+                    <button type="button" id="btn-empty-new-plan" class="ap-btn-primary">
+                        <i class="fa fa-plus mr-2" aria-hidden="true"></i>Nuevo Plan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista 2: Asistente de 5 pasos (Nuevo / Editar Plan) -->
+    <div id="view-wizard" class="ap-view-section d-none">
+        <nav class="ap-breadcrumb" aria-label="Breadcrumb">
+            <a href="#" id="wizard-breadcrumb-back" class="ap-breadcrumb-link">Gestión de Mejoras</a>
+            <i class="fa fa-angle-right ap-breadcrumb-sep" aria-hidden="true"></i>
+            <span id="wizard-breadcrumb-current" class="ap-breadcrumb-current">Nuevo Plan</span>
+        </nav>
+
+        <div class="ap-header-row">
+            <div>
+                <h1 id="wizard-main-title" class="ap-main-heading">Nuevo Plan de Mejora</h1>
+                <p class="ap-subheading">Sigue los pasos para definir un plan enfocado en resultados.</p>
+            </div>
+            <div>
+                <button type="button" id="btn-wizard-cancel" class="ap-btn-ghost">Cancelar</button>
+            </div>
+        </div>
+
+        <!-- Stepper horizontal -->
+        <div class="ap-stepper-card">
+            <div class="ap-stepper-list" role="tablist">
+                <div class="ap-step-node active" data-step-indicator="1">
+                    <div class="ap-step-circle"><span class="ap-step-num">1</span></div>
+                    <div class="ap-step-text">
+                        <span class="ap-step-tag">PASO 1</span>
+                        <span class="ap-step-title">Información<br>General</span>
+                    </div>
+                </div>
+                <div class="ap-step-divider"></div>
+
+                <div class="ap-step-node" data-step-indicator="2">
+                    <div class="ap-step-circle"><span class="ap-step-num">2</span></div>
+                    <div class="ap-step-text">
+                        <span class="ap-step-tag">PASO 2</span>
+                        <span class="ap-step-title">Alcance</span>
+                    </div>
+                </div>
+                <div class="ap-step-divider"></div>
+
+                <div class="ap-step-node" data-step-indicator="3">
+                    <div class="ap-step-circle"><span class="ap-step-num">3</span></div>
+                    <div class="ap-step-text">
+                        <span class="ap-step-tag">PASO 3</span>
+                        <span class="ap-step-title">Meta</span>
+                    </div>
+                </div>
+                <div class="ap-step-divider"></div>
+
+                <div class="ap-step-node" data-step-indicator="4">
+                    <div class="ap-step-circle"><span class="ap-step-num">4</span></div>
+                    <div class="ap-step-text">
+                        <span class="ap-step-tag">PASO 4</span>
+                        <span class="ap-step-title">Acciones</span>
+                    </div>
+                </div>
+                <div class="ap-step-divider"></div>
+
+                <div class="ap-step-node" data-step-indicator="5">
+                    <div class="ap-step-circle"><span class="ap-step-num">5</span></div>
+                    <div class="ap-step-text">
+                        <span class="ap-step-tag">PASO 5</span>
+                        <span class="ap-step-title">Resumen</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ap-wizard-body-card">
+            <!-- Paso 1: Información General -->
+            <div class="ap-wizard-pane" data-step-pane="1">
+                <div class="ap-form-grid-2">
+                    <div class="ap-field-group">
+                        <label for="wiz-name" class="ap-field-label">Nombre del plan <span class="ap-req">*</span></label>
+                        <input id="wiz-name" type="text" class="ap-input-box" placeholder="Ej. Mejorar la comunicación entre líderes">
+                    </div>
+                    <div class="ap-field-group">
+                        <label for="wiz-category" class="ap-field-label">Categoría <span class="ap-req">*</span></label>
+                        <select id="wiz-category" class="ap-select-box ap-select-box--form"></select>
+                    </div>
+                </div>
+
+                <div class="ap-field-group">
+                    <label for="wiz-objective" class="ap-field-label">Objetivo <span class="ap-req">*</span></label>
+                    <textarea id="wiz-objective" rows="3" class="ap-textarea-box" placeholder="Describe qué se busca lograr con este plan de mejora..."></textarea>
+                </div>
+
+                <div class="ap-field-group">
+                    <label for="wiz-description" class="ap-field-label">Descripción</label>
+                    <textarea id="wiz-description" rows="3" class="ap-textarea-box" placeholder="Contexto o notas adicionales (opcional)..."></textarea>
+                </div>
+
+                <div class="ap-form-grid-2">
+                    <div class="ap-field-group">
+                        <label for="wiz-priority" class="ap-field-label">Prioridad <span class="ap-req">*</span></label>
+                        <select id="wiz-priority" class="ap-select-box ap-select-box--form"></select>
+                    </div>
+                    <div class="ap-field-group">
+                        <label for="wiz-responsible" class="ap-field-label">Responsable <span class="ap-req">*</span></label>
+                        <select id="wiz-responsible" class="ap-select-box ap-select-box--form"></select>
+                    </div>
+                </div>
+
+                <div class="ap-form-grid-2 mb-0">
+                    <div class="ap-field-group mb-0">
+                        <label for="wiz-start-date" class="ap-field-label">Fecha inicio <span class="ap-req">*</span></label>
+                        <input id="wiz-start-date" type="date" class="ap-input-box">
+                    </div>
+                    <div class="ap-field-group mb-0">
+                        <label for="wiz-target-date" class="ap-field-label">Fecha objetivo <span class="ap-req">*</span></label>
+                        <input id="wiz-target-date" type="date" class="ap-input-box">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paso 2: Alcance -->
+            <div class="ap-wizard-pane d-none" data-step-pane="2">
+                <div class="ap-field-group">
+                    <label for="wiz-survey" class="ap-field-label">Medición <span class="ap-req">*</span></label>
+                    <select id="wiz-survey" class="ap-select-box ap-select-box--form"></select>
+                </div>
+
+                <div class="ap-field-group">
+                    <label for="wiz-scope-type" class="ap-field-label">Tipo de alcance <span class="ap-req">*</span></label>
+                    <select id="wiz-scope-type" class="ap-select-box ap-select-box--form">
+                        <option value="Medición">Medición</option>
+                        <option value="Dimensión">Dimensión</option>
+                        <option value="Tema">Tema</option>
+                        <option value="Pregunta">Pregunta</option>
+                    </select>
+                </div>
+
+                <div id="wiz-scope-dim-topic-row" class="ap-form-grid-2 d-none">
+                    <div id="wiz-dimension-group" class="ap-field-group">
+                        <label for="wiz-dimension" class="ap-field-label">Dimensión <span class="ap-req">*</span></label>
+                        <select id="wiz-dimension" class="ap-select-box ap-select-box--form"></select>
+                    </div>
+                    <div id="wiz-topic-group" class="ap-field-group d-none">
+                        <label for="wiz-topic" class="ap-field-label">
+                            Tema <span id="wiz-topic-req" class="ap-req">*</span>
+                        </label>
+                        <select id="wiz-topic" class="ap-select-box ap-select-box--form"></select>
+                    </div>
+                </div>
+
+                <div id="wiz-question-group" class="ap-field-group d-none">
+                    <label for="wiz-question" class="ap-field-label">Pregunta <span class="ap-req">*</span></label>
+                    <select id="wiz-question" class="ap-select-box ap-select-box--form"></select>
+                </div>
+
+                <div class="ap-info-banner mt-3">
+                    <i class="fa fa-info-circle ap-info-banner-icon" aria-hidden="true"></i>
+                    <span>El alcance define qué resultado se comparará al re-medir. Puedes ajustarlo hasta que el plan esté en ejecución.</span>
+                </div>
+            </div>
+
+            <!-- Paso 3: Meta -->
+            <div class="ap-wizard-pane d-none" data-step-pane="3">
+                <div class="mb-4">
+                    <h3 class="ap-pane-heading">Meta del plan</h3>
+                    <p class="ap-pane-subheading">Define el puntaje que buscas alcanzar en la próxima medición.</p>
+                </div>
+
+                <div class="ap-goal-cards-grid">
+                    <div class="ap-goal-metric-card">
+                        <span class="ap-goal-card-tag">RESULTADO ACTUAL</span>
+                        <strong id="wiz-initial-score-display" class="ap-goal-big-num">0</strong>
+                        <span id="wiz-scope-caption" class="ap-goal-card-caption">Resultado base del alcance elegido</span>
+                    </div>
+
+                    <div class="ap-goal-metric-card ap-goal-metric-card--highlight">
+                        <span class="ap-goal-card-tag ap-goal-card-tag--purple">META</span>
+                        <input
+                            id="wiz-target-score"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            class="ap-goal-target-input"
+                            placeholder="75">
+                        <span id="wiz-scale-caption" class="ap-goal-card-caption">Puntaje objetivo (0-100)</span>
+                    </div>
+
+                    <div class="ap-goal-metric-card">
+                        <span class="ap-goal-card-tag">INCREMENTO ESPERADO</span>
+                        <strong id="wiz-increment-display" class="ap-goal-big-num ap-goal-big-num--green">+0</strong>
+                        <span class="ap-goal-card-caption">Puntos vs. resultado actual</span>
+                    </div>
+                </div>
+
+                <div class="ap-goal-progress-box mt-4">
+                    <div class="ap-goal-progress-top">
+                        <span class="ap-goal-progress-label">Progreso hacia la meta</span>
+                        <span id="wiz-goal-range-text" class="ap-goal-progress-range">0 &rarr; 0</span>
+                    </div>
+                    <div class="ap-goal-bar-track">
+                        <div id="wiz-goal-bar-fill" class="ap-goal-bar-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="ap-goal-scale-marks">
+                        <span id="wiz-scale-min-label">0</span>
+                        <span id="wiz-scale-mid-label">50</span>
+                        <span id="wiz-scale-max-label">100</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paso 4: Acciones -->
+            <div class="ap-wizard-pane d-none" data-step-pane="4">
+                <div class="ap-pane-header-flex mb-3">
+                    <div>
+                        <h3 class="ap-pane-heading">Acciones del plan</h3>
+                        <p class="ap-pane-subheading mb-0">Agrega las acciones concretas para alcanzar la meta.</p>
+                    </div>
+                    <button type="button" id="btn-add-task-row" class="ap-btn-outline">
+                        <i class="fa fa-plus mr-2" aria-hidden="true"></i>Agregar acción
+                    </button>
+                </div>
+
+                <div class="ap-tasks-table-wrapper">
+                    <table class="table ap-tasks-table mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 38%;">NOMBRE</th>
+                                <th style="width: 24%;">RESPONSABLE</th>
+                                <th style="width: 18%;">FECHA COMPROMISO</th>
+                                <th style="width: 15%;">ESTADO</th>
+                                <th style="width: 5%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="wiz-tasks-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Paso 5: Resumen -->
+            <div class="ap-wizard-pane d-none" data-step-pane="5">
+                <div class="mb-4">
+                    <h3 class="ap-pane-heading">Resumen</h3>
+                    <p class="ap-pane-subheading mb-0">Revisa la información antes de crear el plan.</p>
+                </div>
+
+                <div class="ap-summary-grid">
+                    <div class="ap-summary-box">
+                        <h4 class="ap-summary-box-title">INFORMACIÓN GENERAL</h4>
+                        <dl class="ap-summary-dl">
+                            <div class="ap-summary-row"><dt>Nombre</dt><dd id="sum-name">-</dd></div>
+                            <div class="ap-summary-row"><dt>Objetivo</dt><dd id="sum-objective">-</dd></div>
+                            <div class="ap-summary-row"><dt>Descripción</dt><dd id="sum-description">-</dd></div>
+                            <div class="ap-summary-row"><dt>Categoría</dt><dd id="sum-category">-</dd></div>
+                            <div class="ap-summary-row"><dt>Prioridad</dt><dd id="sum-priority">-</dd></div>
+                            <div class="ap-summary-row"><dt>Responsable</dt><dd id="sum-responsible">-</dd></div>
+                            <div class="ap-summary-row"><dt>Fechas</dt><dd id="sum-dates">-</dd></div>
+                        </dl>
+                    </div>
+
+                    <div class="ap-summary-box">
+                        <h4 class="ap-summary-box-title">ALCANCE</h4>
+                        <dl class="ap-summary-dl">
+                            <div class="ap-summary-row"><dt>Medición</dt><dd id="sum-survey">-</dd></div>
+                            <div class="ap-summary-row"><dt>Tipo</dt><dd id="sum-scope-type">-</dd></div>
+                            <div id="sum-row-dimension" class="ap-summary-row"><dt>Dimensión</dt><dd id="sum-dimension">-</dd></div>
+                            <div id="sum-row-topic" class="ap-summary-row"><dt>Tema</dt><dd id="sum-topic">-</dd></div>
+                            <div id="sum-row-question" class="ap-summary-row"><dt>Pregunta</dt><dd id="sum-question">-</dd></div>
+                        </dl>
+                    </div>
+
+                    <div class="ap-summary-box">
+                        <h4 class="ap-summary-box-title">META</h4>
+                        <div class="ap-summary-goal-flex">
+                            <div class="ap-summary-score-pair">
+                                <div>
+                                    <span class="ap-summary-score-label">Actual</span>
+                                    <strong id="sum-initial-score" class="ap-summary-score-val">0</strong>
+                                </div>
+                                <span class="ap-summary-arrow">&rarr;</span>
+                                <div>
+                                    <span class="ap-summary-score-label">Meta</span>
+                                    <strong id="sum-target-score" class="ap-summary-score-val ap-summary-score-val--purple">0</strong>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="ap-summary-score-label">Incremento</span>
+                                <strong id="sum-increment-score" class="ap-summary-score-val ap-summary-score-val--green">+0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ap-summary-box">
+                        <h4 id="sum-tasks-heading" class="ap-summary-box-title">ACCIONES (0)</h4>
+                        <div id="sum-tasks-list" class="ap-summary-tasks-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ap-wizard-footer">
+            <button type="button" id="btn-wizard-prev" class="ap-btn-ghost">
+                <i class="fa fa-arrow-left mr-2" aria-hidden="true"></i>Anterior
+            </button>
+            <div>
+                <button type="button" id="btn-wizard-next" class="ap-btn-primary">
+                    <span>Siguiente</span>
+                    <i class="fa fa-arrow-right ml-2" aria-hidden="true"></i>
+                </button>
+                <button type="button" id="btn-wizard-submit" class="ap-btn-primary d-none">
+                    <i class="fa fa-check mr-2" aria-hidden="true"></i>
+                    <span id="btn-wizard-submit-label">Crear Plan</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista 3: Detalle del plan y evaluación de impacto -->
+    <div id="view-detail" class="ap-view-section d-none">
+        <nav class="ap-breadcrumb" aria-label="Breadcrumb">
+            <a href="#" id="detail-breadcrumb-back" class="ap-breadcrumb-link">Gestión de Mejoras</a>
+            <i class="fa fa-angle-right ap-breadcrumb-sep" aria-hidden="true"></i>
+            <span id="detail-breadcrumb-current" class="ap-breadcrumb-current">Detalle del Plan</span>
+        </nav>
+
+        <div class="ap-header-row">
+            <div>
+                <div class="d-flex align-items-center flex-wrap" style="gap: 0.6rem;">
+                    <h1 id="det-plan-name" class="ap-main-heading mb-0">-</h1>
+                    <span id="det-status-badge" class="ap-pill-status"></span>
+                    <span id="det-priority-badge" class="ap-pill-priority"></span>
+                    <span id="det-category-badge" class="ap-pill-category"></span>
+                </div>
+                <p id="det-plan-subtitle" class="ap-subheading mt-1 mb-0"></p>
+            </div>
+            <div class="d-flex align-items-center" style="gap: 0.65rem;">
+                <select id="det-change-status" class="ap-select-box" style="min-width: 175px;" title="Cambiar estado del plan">
+                    <option value="Borrador">Estado: Borrador</option>
+                    <option value="En ejecución">Estado: En ejecución</option>
+                    <option value="Finalizado">Estado: Finalizado</option>
+                    <option value="Cancelado">Estado: Cancelado</option>
+                </select>
+                <button type="button" id="btn-detail-edit" class="ap-btn-outline">
+                    <i class="fa fa-pencil mr-1" aria-hidden="true"></i>Editar
+                </button>
+            </div>
+        </div>
+
+        <div class="ap-summary-grid mb-4">
+            <div class="ap-summary-box">
+                <h4 class="ap-summary-box-title">INFORMACIÓN GENERAL Y ALCANCE</h4>
+                <dl class="ap-summary-dl">
+                    <div class="ap-summary-row"><dt>Objetivo</dt><dd id="det-objective">-</dd></div>
+                    <div class="ap-summary-row"><dt>Descripción</dt><dd id="det-description">-</dd></div>
+                    <div class="ap-summary-row"><dt>Medición Origen</dt><dd id="det-survey">-</dd></div>
+                    <div class="ap-summary-row"><dt>Alcance</dt><dd id="det-scope">-</dd></div>
+                    <div class="ap-summary-row"><dt>Responsable</dt><dd id="det-responsible">-</dd></div>
+                    <div class="ap-summary-row"><dt>Vigencia</dt><dd id="det-dates">-</dd></div>
+                </dl>
+            </div>
+
+            <div class="ap-summary-box">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="ap-summary-box-title mb-0">META Y EVALUACIÓN DE IMPACTO</h4>
+                    <span id="det-goal-badge" class="ap-pill-goal"></span>
+                </div>
+
+                <!-- Métricas completas de evaluación de impacto (Sección 9) -->
+                <div class="ap-summary-goal-flex mb-3">
+                    <div class="ap-summary-score-pair">
+                        <div>
+                            <span class="ap-summary-score-label">Inicial</span>
+                            <strong id="det-initial-score" class="ap-summary-score-val">0</strong>
+                        </div>
+                        <span class="ap-summary-arrow">&rarr;</span>
+                        <div>
+                            <span class="ap-summary-score-label">Meta</span>
+                            <strong id="det-target-score" class="ap-summary-score-val ap-summary-score-val--purple">0</strong>
+                        </div>
+                        <span class="ap-summary-arrow">&rarr;</span>
+                        <div>
+                            <span class="ap-summary-score-label">Posterior</span>
+                            <strong id="det-posterior-score" class="ap-summary-score-val">-</strong>
+                        </div>
+                    </div>
+                    <div class="d-flex" style="gap: 1.25rem;">
+                        <div class="text-right">
+                            <span class="ap-summary-score-label">Variación observada</span>
+                            <strong id="det-variation-score" class="ap-summary-score-val ap-summary-score-val--green">-</strong>
+                        </div>
+                        <div class="text-right">
+                            <span class="ap-summary-score-label">Dif. vs Meta</span>
+                            <strong id="det-goal-diff-score" class="ap-summary-score-val">-</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barra de porcentaje de cumplimiento de meta (0-100%) -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="ap-summary-score-label">Cumplimiento de la meta</span>
+                        <strong id="det-goal-achievement-pct" class="small" style="color: #7B24FF;">-</strong>
+                    </div>
+                    <div class="ap-inline-bar-track">
+                        <div id="det-goal-achievement-bar" class="ap-inline-bar-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="ap-eval-selector-box">
+                    <label for="det-comparison-survey" class="ap-filter-upper-label">COMPARAR CON MEDICIÓN POSTERIOR COMPATIBLE</label>
+                    <div id="det-eval-controls" class="d-flex" style="gap: 0.5rem;">
+                        <select id="det-comparison-survey" class="ap-select-box flex-grow-1">
+                            <option value="">Seleccionar medición compatible...</option>
+                        </select>
+                        <button type="button" id="btn-evaluate-impact" class="ap-btn-primary">
+                            Evaluar meta
+                        </button>
+                    </div>
+                    <p id="det-no-compatible-msg" class="text-muted small mb-0 mt-2 d-none">
+                        Aún no hay una medición compatible disponible para evaluar la meta.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="ap-surface-card p-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap mb-3" style="gap: 1rem;">
+                <div>
+                    <h3 class="ap-pane-heading mb-1">Seguimiento de Acciones</h3>
+                    <p id="det-tasks-summary-text" class="ap-pane-subheading mb-0">0 de 0 finalizadas (0%)</p>
+                </div>
+                <div class="ap-inline-progress" style="min-width: 220px;">
+                    <div class="ap-inline-bar-track">
+                        <div id="det-tasks-progress-bar" class="ap-inline-bar-fill" style="width: 0%;"></div>
+                    </div>
+                    <span id="det-tasks-progress-pct" class="ap-inline-bar-pct">0%</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table ap-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Acción</th>
+                            <th>Responsable</th>
+                            <th>Fecha compromiso</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="det-tasks-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block style %}
+    {{ super() }}
+    <link rel="stylesheet" href="/assets/liseniq/css/main.css">
+    <link rel="stylesheet" href="/assets/liseniq/css/iq_action_plan.css">
+{% endblock %}
+
+{% block script %}
+    {{ super() }}
+    <script type="module" src="/assets/liseniq/js/iq_action_plan.js"></script>
+{% endblock %}

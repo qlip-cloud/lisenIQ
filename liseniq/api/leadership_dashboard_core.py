@@ -5,6 +5,7 @@ Recibe filas "largas" (una por evaluador x comportamiento) y devuelve el mismo
 payload JSON que consume el front-end (modelo DML y modelos a la medida).
 Compatible con Python 3.6+ (ERPNext v13).
 """
+import frappe
 import re
 import unicodedata
 from collections import OrderedDict
@@ -218,6 +219,7 @@ def _quasi_identifier(recs, label):
 
 
 def build_payload(rows, columns, cliente, medicion, demographic_columns=None):
+    titulo_medicion = frappe.db.get_value("qp_IQ_Survey", medicion, "su_name") or medicion
     recs, demo_labels = rows_to_records(rows, columns, demographic_columns)
     if not recs:
         d = getattr(rows_to_records, "last_diag", {})
@@ -285,7 +287,7 @@ def build_payload(rows, columns, cliente, medicion, demographic_columns=None):
         for it in lst:
             it.pop("_raw", None)
     payload = {
-        "meta": {"cliente": cliente, "medicion": medicion},
+        "meta": {"cliente": cliente, "medicion": medicion, "titulo": titulo_medicion},
         "escala": {"min": int(vmin) if vmin < 1 else 1, "max": 5 if vmax <= 5 else int(vmax)},
         "kpis": kpis,
         "dimensiones": dimensiones,

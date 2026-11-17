@@ -19,15 +19,12 @@ const state = {
     },
     items: [],
     filterOptions: {
-        statuses: ["Borrador", "En ejecución", "Finalizado", "Cancelado"],
-        goal_statuses: [
-            "Pendiente de evaluación",
-            "Meta alcanzada",
-            "Meta parcialmente alcanzada",
-            "Meta no alcanzada",
-        ],
+        statuses: [],
+        goal_statuses: [],
         categories: [],
-        priorities: ["Baja", "Media", "Alta", "Crítica"],
+        priorities: [],
+        scope_types: [],
+        task_statuses: [],
         responsibles: [],
         surveys: [],
         years: [],
@@ -46,20 +43,23 @@ const state = {
         step: 1,
         isEdit: false,
         planId: "",
-        ap_status: "Borrador",
+        ap_status: "",
         ap_name: "",
         ap_category: "",
         ap_objective: "",
         ap_description: "",
-        ap_priority: "Media",
+        ap_priority: "",
         ap_responsible: "",
         ap_start_date: "",
         ap_target_date: "",
         ap_origin_survey: "",
         ap_scope_type: "Medición",
         ap_dimension: "",
+        ap_dimension_label: "",
         ap_topic: "",
+        ap_topic_label: "",
         ap_question: "",
+        ap_question_label: "",
         ap_scope_label: "",
         has_valid_score: true,
         score_error_message: "",
@@ -71,7 +71,9 @@ const state = {
         scopeCatalog: {
             dimensions: [],
             topics: [],
+            allTopics: [],
             questions: [],
+            allQuestions: [],
         },
     },
     currentDetail: null,
@@ -206,7 +208,44 @@ function populateSelect(selectId, items, defaultLabel = null, preserveSelection 
     }
 }
 
-// Inicializa las listas desplegables de filtros y del asistente (incluyendo qnc_category en wiz-category)
+// Obtiene el ID de una opción del catálogo (compatible con string o {id, label})
+function getOptionId(optionItem) {
+    if (!optionItem) return "";
+    if (typeof optionItem === "object") return optionItem.id || "";
+    return String(optionItem);
+}
+
+// Resuelve el ID de categoría a partir de su name o qnc_category
+function resolveCategoryValue(rawCategory) {
+    if (!rawCategory) return "";
+    const categories = state.filterOptions.categories || [];
+    for (let i = 0; i < categories.length; i += 1) {
+        const item = categories[i];
+        if (item && typeof item === "object") {
+            if (item.id === rawCategory || item.label === rawCategory) {
+                return item.id;
+            }
+        } else if (item === rawCategory) {
+            return String(item);
+        }
+    }
+    return rawCategory;
+}
+
+// Obtiene la etiqueta legible (dt_title, qnc_category o qn_statement) de un catálogo a partir de su ID
+function findLabelById(list, id) {
+    if (!id) return "-";
+    const match = (list || []).find((item) => {
+        if (item && typeof item === "object") {
+            return item.id === id || item.label === id;
+        }
+        return String(item) === String(id);
+    });
+    if (!match) return id;
+    return typeof match === "object" ? match.label || match.id : String(match);
+}
+
+// Inicializa las listas desplegables de filtros, asistente y detalle desde los catálogos del backend
 function renderFilterCatalogs() {
     const opts = state.filterOptions;
     populateSelect("ap-filter-status", opts.statuses, "Todos");
@@ -219,8 +258,16 @@ function renderFilterCatalogs() {
 
     populateSelect("wiz-category", opts.categories, null);
     populateSelect("wiz-priority", opts.priorities, null);
+    populateSelect("wiz-scope-type", opts.scope_types, null);
     populateSelect("wiz-responsible", opts.responsibles, "Seleccionar responsable...");
     populateSelect("wiz-survey", opts.surveys, "Seleccionar medición...");
+
+    const detStatusItems = (opts.statuses || []).map((st) => {
+        const id = getOptionId(st);
+        const label = typeof st === "object" ? st.label || st.id : st;
+        return { id, label: `Estado: ${label}` };
+    });
+    populateSelect("det-change-status", detStatusItems, null);
 }
 
 // Renderiza los contadores de las 6 tarjetas KPI
@@ -335,7 +382,12 @@ function renderPlansTable() {
             const scopeType = escapeHtml(plan.ap_scope_type || "Medición");
             const scopeLabel = escapeHtml(plan.ap_scope_label || "-");
             const responsibleName = escapeHtml(plan.responsible_name || "-");
-            const category = escapeHtml(plan.ap_category || "-");
+            const rawCategoryLabel =
+                plan.category_name ||
+                findLabelById(state.filterOptions.categories, plan.ap_category) ||
+                plan.ap_category ||
+                "-";
+            const category = escapeHtml(rawCategoryLabel);
             const priority = escapeHtml(plan.ap_priority || "Media");
             const status = escapeHtml(plan.ap_status || "Borrador");
             const goalStatus = escapeHtml(plan.ap_goal_status || "Pendiente de evaluación");
@@ -465,7 +517,7 @@ function getTodayIso() {
 // Inicializa el Wizard en modo creación con estado inicial Borrador (Punto 1 / HU-01)
 function openWizardForCreate() {
     const opts = state.filterOptions;
-    const defaultCategory = opts.categories[0] || "";
+    const defaultCategory = getOptionId(opts.categories[0]);
     const defaultResp = opts.responsibles[0]?.id || "";
     const defaultSurvey = opts.surveys[0]?.id || "";
     const today = getTodayIso();
@@ -474,20 +526,23 @@ function openWizardForCreate() {
         step: 1,
         isEdit: false,
         planId: "",
-        ap_status: "Borrador",
+        ap_status: getOptionId((opts.statuses || [])[0]) || "Borrador",
         ap_name: "",
         ap_category: defaultCategory,
         ap_objective: "",
         ap_description: "",
-        ap_priority: "Media",
+        ap_priority: getOptionId((opts.priorities || []).find((pr) => getOptionId(pr) === "Media") || (opts.priorities || [])[0]) || "Media",
         ap_responsible: defaultResp,
         ap_start_date: today,
         ap_target_date: today,
         ap_origin_survey: defaultSurvey,
-        ap_scope_type: "Medición",
+        ap_scope_type: getOptionId(opts.scope_types[0]) || "Medición",
         ap_dimension: "",
+        ap_dimension_label: "",
         ap_topic: "",
+        ap_topic_label: "",
         ap_question: "",
+        ap_question_label: "",
         ap_scope_label: "",
         has_valid_score: true,
         score_error_message: "",
@@ -500,10 +555,16 @@ function openWizardForCreate() {
                 apt_title: "",
                 apt_responsible: defaultResp,
                 apt_due_date: today,
-                apt_status: "Pendiente",
+                apt_status: getOptionId(opts.task_statuses[0]) || "Pendiente",
             },
         ],
-        scopeCatalog: { dimensions: [], topics: [], questions: [] },
+        scopeCatalog: {
+            dimensions: [],
+            topics: [],
+            allTopics: [],
+            questions: [],
+            allQuestions: [],
+        },
     };
 
     const titleEl = document.getElementById("wizard-main-title");
@@ -516,6 +577,10 @@ function openWizardForCreate() {
     syncWizardInputsFromState();
     if (defaultSurvey) {
         loadScopeCatalogForSurvey(defaultSurvey);
+    } else {
+        populateSelect("wiz-dimension", [], "Seleccionar dimensión...", false);
+        populateSelect("wiz-topic", [], "Seleccionar tema...", false);
+        populateSelect("wiz-question", [], "Selecciona pregunta", false);
     }
     setWizardStep(1);
     switchView("wizard");
@@ -524,13 +589,16 @@ function openWizardForCreate() {
 // Inicializa el Wizard precargando un plan existente para edición
 function openWizardForEdit(plan) {
     if (!plan) return;
+    const defaultCategory = getOptionId(state.filterOptions.categories[0]);
+    const resolvedCat = resolveCategoryValue(plan.ap_category) || defaultCategory;
+
     state.wizard = {
         step: 1,
         isEdit: true,
         planId: plan.name,
         ap_status: plan.ap_status || "Borrador",
         ap_name: plan.ap_name || "",
-        ap_category: plan.ap_category || state.filterOptions.categories[0] || "",
+        ap_category: resolvedCat,
         ap_objective: plan.ap_objective || "",
         ap_description: plan.ap_description || "",
         ap_priority: plan.ap_priority || "Media",
@@ -540,8 +608,11 @@ function openWizardForEdit(plan) {
         ap_origin_survey: plan.ap_origin_survey || "",
         ap_scope_type: plan.ap_scope_type || "Medición",
         ap_dimension: plan.ap_dimension || "",
+        ap_dimension_label: plan.dimension_label || "",
         ap_topic: plan.ap_topic || "",
+        ap_topic_label: plan.topic_label || "",
         ap_question: plan.ap_question || "",
+        ap_question_label: plan.question_label || "",
         ap_scope_label: plan.ap_scope_label || "",
         has_valid_score: true,
         score_error_message: "",
@@ -558,7 +629,13 @@ function openWizardForEdit(plan) {
                       apt_status: t.apt_status || "Pendiente",
                   }))
                 : [],
-        scopeCatalog: { dimensions: [], topics: [], questions: [] },
+        scopeCatalog: {
+            dimensions: [],
+            topics: [],
+            allTopics: [],
+            questions: [],
+            allQuestions: [],
+        },
     };
 
     const titleEl = document.getElementById("wizard-main-title");
@@ -631,16 +708,56 @@ function updateScopeSelectorsVisibility() {
     if (questionSelect) questionSelect.disabled = !showQuestion;
 }
 
-// Filtra las preguntas mostradas en #wiz-question según Dimensión y Tema (incluyendo preguntas sin Tema)
+// Filtra los temas mostrados en #wiz-topic según la medición y la dimensión seleccionadas
+function filterAndRenderTopicsSelect() {
+    const w = state.wizard;
+    const allTopics = w.scopeCatalog.allTopics || w.scopeCatalog.topics || [];
+
+    let filteredTopics = allTopics;
+    if (w.ap_dimension) {
+        const byDim = allTopics.filter(
+            (t) =>
+                !Array.isArray(t.dimensions) ||
+                t.dimensions.length === 0 ||
+                t.dimensions.includes(w.ap_dimension)
+        );
+        filteredTopics = byDim.length > 0 ? byDim : allTopics;
+    }
+    w.scopeCatalog.topics = filteredTopics;
+
+    const topicPlaceholder =
+        w.ap_scope_type === "Pregunta"
+            ? "Todos los temas / Sin tema..."
+            : "Seleccionar tema...";
+
+    populateSelect("wiz-topic", filteredTopics, topicPlaceholder, false);
+
+    const topicEl = document.getElementById("wiz-topic");
+    if (topicEl) {
+        if (w.ap_topic && filteredTopics.some((t) => t.id === w.ap_topic)) {
+            topicEl.value = w.ap_topic;
+            w.ap_topic_label = findLabelById(allTopics, w.ap_topic);
+        } else {
+            if (w.ap_scope_type !== "Pregunta") {
+                w.ap_topic = "";
+                w.ap_topic_label = "";
+            }
+            topicEl.value = "";
+        }
+    }
+}
+
+// Filtra las preguntas mostradas en #wiz-question según la medición, Dimensión y Tema seleccionados
 function filterAndRenderQuestionsSelect() {
     const w = state.wizard;
-    const allQuestions = w.scopeCatalog.questions || [];
+    const baseQuestions = w.scopeCatalog.allQuestions || w.scopeCatalog.questions || [];
 
-    const filtered = allQuestions.filter((q) => {
-        const matchDim = !w.ap_dimension || !q.dimension || q.dimension === w.ap_dimension;
-        const matchTopic = !w.ap_topic || !q.topic || q.topic === w.ap_topic;
+    const filtered = baseQuestions.filter((q) => {
+        const matchDim = !w.ap_dimension || q.dimension === w.ap_dimension;
+        const matchTopic = !w.ap_topic || q.topic === w.ap_topic;
         return matchDim && matchTopic;
     });
+    w.scopeCatalog.questions = filtered;
 
     populateSelect("wiz-question", filtered, "Selecciona pregunta", false);
 
@@ -648,18 +765,42 @@ function filterAndRenderQuestionsSelect() {
     if (questionEl) {
         if (w.ap_question && filtered.some((q) => q.id === w.ap_question)) {
             questionEl.value = w.ap_question;
+            const qMatch = filtered.find((q) => q.id === w.ap_question);
+            if (qMatch) {
+                w.ap_question_label = qMatch.label || w.ap_question;
+                if (!w.ap_topic && qMatch.topic) {
+                    w.ap_topic = qMatch.topic;
+                    w.ap_topic_label =
+                        qMatch.topic_label ||
+                        findLabelById(w.scopeCatalog.allTopics || [], qMatch.topic);
+                }
+            }
         } else {
             w.ap_question = "";
+            w.ap_question_label = "";
             questionEl.value = "";
         }
     }
 }
 
-// Carga desde backend las dimensiones (dt_object_type=Dimension), temas (dt_object_type=Tema) y preguntas (qn_statement)
+// Carga desde backend las dimensiones, temas y preguntas atados a la medición seleccionada
 async function loadScopeCatalogForSurvey(surveyName) {
-    if (!surveyName) return;
+    const w = state.wizard;
+    if (!surveyName) {
+        w.scopeCatalog = {
+            dimensions: [],
+            topics: [],
+            allTopics: [],
+            questions: [],
+            allQuestions: [],
+        };
+        populateSelect("wiz-dimension", [], "Seleccionar dimensión...", false);
+        populateSelect("wiz-topic", [], "Seleccionar tema...", false);
+        populateSelect("wiz-question", [], "Selecciona pregunta", false);
+        return;
+    }
+
     try {
-        const w = state.wizard;
         const res = await callBackend(
             "get_survey_scope_options",
             {
@@ -671,40 +812,31 @@ async function loadScopeCatalogForSurvey(surveyName) {
             "GET"
         );
         if (res) {
+            const allTopics = res.all_topics || res.topics || [];
+            const allQuestions = res.all_questions || res.questions || [];
             w.scopeCatalog = {
                 dimensions: res.dimensions || [],
-                topics: res.topics || [],
-                questions: res.questions || [],
+                topics: res.topics || allTopics,
+                allTopics,
+                questions: res.questions || allQuestions,
+                allQuestions,
             };
 
-            const topicPlaceholder =
-                w.ap_scope_type === "Pregunta"
-                    ? "Todos los temas / Sin tema..."
-                    : "Seleccionar tema...";
-
             populateSelect("wiz-dimension", w.scopeCatalog.dimensions, "Seleccionar dimensión...", false);
-            populateSelect("wiz-topic", w.scopeCatalog.topics, topicPlaceholder, false);
 
             const dimEl = document.getElementById("wiz-dimension");
             if (dimEl) {
                 if (w.ap_dimension && w.scopeCatalog.dimensions.some((d) => d.id === w.ap_dimension)) {
                     dimEl.value = w.ap_dimension;
+                    w.ap_dimension_label = findLabelById(w.scopeCatalog.dimensions, w.ap_dimension);
                 } else {
                     w.ap_dimension = "";
+                    w.ap_dimension_label = "";
                     dimEl.value = "";
                 }
             }
 
-            const topicEl = document.getElementById("wiz-topic");
-            if (topicEl) {
-                if (w.ap_topic && w.scopeCatalog.topics.some((t) => t.id === w.ap_topic)) {
-                    topicEl.value = w.ap_topic;
-                } else {
-                    w.ap_topic = "";
-                    topicEl.value = "";
-                }
-            }
-
+            filterAndRenderTopicsSelect();
             filterAndRenderQuestionsSelect();
         }
         await refreshWizardInitialScore();
@@ -713,7 +845,7 @@ async function loadScopeCatalogForSurvey(surveyName) {
     }
 }
 
-// Consulta en backend las preguntas que cumplan con la Dimensión y el Tema seleccionados
+// Consulta en backend las preguntas y temas de la medición que cumplan con la Dimensión y Tema seleccionados
 async function reloadFilteredQuestionsFromBackend() {
     const w = state.wizard;
     if (!w.ap_origin_survey) return;
@@ -728,8 +860,19 @@ async function reloadFilteredQuestionsFromBackend() {
             },
             "GET"
         );
-        if (res && Array.isArray(res.questions)) {
-            w.scopeCatalog.questions = res.questions;
+        if (res) {
+            if (Array.isArray(res.all_topics)) {
+                w.scopeCatalog.allTopics = res.all_topics;
+            }
+            if (Array.isArray(res.topics)) {
+                w.scopeCatalog.topics = res.topics;
+            }
+            if (Array.isArray(res.all_questions)) {
+                w.scopeCatalog.allQuestions = res.all_questions;
+            }
+            if (Array.isArray(res.questions)) {
+                w.scopeCatalog.questions = res.questions;
+            }
             filterAndRenderQuestionsSelect();
         }
     } catch (err) {
@@ -760,6 +903,19 @@ async function refreshWizardInitialScore() {
             w.ap_scale_min = Number(res.scale_min ?? 0);
             w.ap_scale_max = Number(res.scale_max ?? 100);
             w.ap_scope_label = res.scope_label || "";
+
+            if (res.dimension_label) {
+                w.ap_dimension_label = res.dimension_label;
+            }
+            if (res.topic && !w.ap_topic && w.ap_scope_type === "Pregunta") {
+                w.ap_topic = res.topic;
+            }
+            if (res.topic_label) {
+                w.ap_topic_label = res.topic_label;
+            }
+            if (res.question_label) {
+                w.ap_question_label = res.question_label;
+            }
             renderWizardGoalPreview();
         }
     } catch (err) {
@@ -819,7 +975,7 @@ function renderWizardTasksTable() {
     if (!tbody) return;
 
     const responsibles = state.filterOptions.responsibles || [];
-    const statuses = ["Pendiente", "En progreso", "Finalizada"];
+    const statuses = state.filterOptions.task_statuses || [];
 
     tbody.innerHTML = state.wizard.tasks
         .map((task, idx) => {
@@ -885,11 +1041,74 @@ function renderWizardTasksTable() {
         .join("");
 }
 
-// Obtiene la etiqueta legible (dt_title o qn_statement) de un catálogo a partir de su ID
-function findLabelById(list, id) {
-    if (!id) return "-";
-    const match = (list || []).find((item) => item.id === id);
-    return match ? match.label : id;
+// Resuelve el dt_title de la Dimensión seleccionada para el Paso 5 (Resumen)
+function resolveSummaryDimensionLabel(w) {
+    if (!w.ap_dimension) return "-";
+    const fromDimCatalog = findLabelById(w.scopeCatalog.dimensions || [], w.ap_dimension);
+    if (fromDimCatalog && fromDimCatalog !== "-" && fromDimCatalog !== w.ap_dimension) {
+        return fromDimCatalog;
+    }
+    const allQuestions = w.scopeCatalog.allQuestions || w.scopeCatalog.questions || [];
+    const qWithDim = allQuestions.find((q) => q.dimension === w.ap_dimension && q.dimension_label);
+    if (qWithDim && qWithDim.dimension_label) {
+        return qWithDim.dimension_label;
+    }
+    if (w.ap_dimension_label && w.ap_dimension_label !== w.ap_dimension) {
+        return w.ap_dimension_label;
+    }
+    return fromDimCatalog || w.ap_dimension;
+}
+
+// Resuelve el dt_title del Tema seleccionado o inferido para el Paso 5 (Resumen), evitando mostrar el name
+function resolveSummaryTopicLabel(w) {
+    const allQuestions = w.scopeCatalog.allQuestions || w.scopeCatalog.questions || [];
+    const selectedQuestion = allQuestions.find((q) => q.id === w.ap_question) || null;
+    const topicId =
+        w.ap_topic ||
+        (w.ap_scope_type === "Pregunta" && selectedQuestion ? selectedQuestion.topic : "");
+
+    if (!topicId) {
+        return "No aplica / Sin tema";
+    }
+
+    const fromAllTopics = findLabelById(w.scopeCatalog.allTopics || [], topicId);
+    if (fromAllTopics && fromAllTopics !== "-" && fromAllTopics !== topicId) {
+        return fromAllTopics;
+    }
+
+    const fromTopics = findLabelById(w.scopeCatalog.topics || [], topicId);
+    if (fromTopics && fromTopics !== "-" && fromTopics !== topicId) {
+        return fromTopics;
+    }
+
+    if (selectedQuestion && selectedQuestion.topic === topicId && selectedQuestion.topic_label) {
+        return selectedQuestion.topic_label;
+    }
+
+    const anyQuestionWithTopic = allQuestions.find((q) => q.topic === topicId && q.topic_label);
+    if (anyQuestionWithTopic && anyQuestionWithTopic.topic_label) {
+        return anyQuestionWithTopic.topic_label;
+    }
+
+    if (w.ap_topic_label && w.ap_topic_label !== topicId) {
+        return w.ap_topic_label;
+    }
+
+    return fromAllTopics || fromTopics || topicId;
+}
+
+// Resuelve el qn_statement de la Pregunta seleccionada para el Paso 5 (Resumen)
+function resolveSummaryQuestionLabel(w) {
+    if (!w.ap_question) return "-";
+    const allQuestions = w.scopeCatalog.allQuestions || w.scopeCatalog.questions || [];
+    const fromAll = findLabelById(allQuestions, w.ap_question);
+    if (fromAll && fromAll !== "-" && fromAll !== w.ap_question) {
+        return fromAll;
+    }
+    if (w.ap_question_label && w.ap_question_label !== w.ap_question) {
+        return w.ap_question_label;
+    }
+    return fromAll || w.ap_question;
 }
 
 // Rellena las 4 tarjetas de resumen en el Paso 5
@@ -905,19 +1124,16 @@ function renderWizardSummary() {
     setTxt("sum-name", w.ap_name);
     setTxt("sum-objective", w.ap_objective);
     setTxt("sum-description", w.ap_description || "-");
-    setTxt("sum-category", w.ap_category);
+    setTxt("sum-category", findLabelById(opts.categories, w.ap_category));
     setTxt("sum-priority", w.ap_priority);
     setTxt("sum-responsible", findLabelById(opts.responsibles, w.ap_responsible));
     setTxt("sum-dates", `${w.ap_start_date || "-"} → ${w.ap_target_date || "-"}`);
 
     setTxt("sum-survey", findLabelById(opts.surveys, w.ap_origin_survey));
     setTxt("sum-scope-type", w.ap_scope_type);
-    setTxt("sum-dimension", findLabelById(w.scopeCatalog.dimensions, w.ap_dimension));
-    setTxt(
-        "sum-topic",
-        w.ap_topic ? findLabelById(w.scopeCatalog.topics, w.ap_topic) : "No aplica / Sin tema"
-    );
-    setTxt("sum-question", findLabelById(w.scopeCatalog.questions, w.ap_question));
+    setTxt("sum-dimension", resolveSummaryDimensionLabel(w));
+    setTxt("sum-topic", resolveSummaryTopicLabel(w));
+    setTxt("sum-question", resolveSummaryQuestionLabel(w));
 
     const showDim = ["Dimensión", "Tema", "Pregunta"].includes(w.ap_scope_type);
     const showTopic = ["Tema", "Pregunta"].includes(w.ap_scope_type);
@@ -986,10 +1202,30 @@ function captureCurrentStepInputs() {
         w.ap_topic = getVal("wiz-topic");
         w.ap_question = getVal("wiz-question");
 
-        if (w.ap_scope_type === "Pregunta" && w.ap_question && !w.ap_topic) {
-            const qObj = (w.scopeCatalog.questions || []).find((q) => q.id === w.ap_question);
-            if (qObj && qObj.topic) {
-                w.ap_topic = qObj.topic;
+        if (w.ap_dimension) {
+            w.ap_dimension_label = resolveSummaryDimensionLabel(w);
+        }
+        if (w.ap_topic) {
+            w.ap_topic_label = resolveSummaryTopicLabel(w);
+        }
+
+        if (w.ap_scope_type === "Pregunta" && w.ap_question) {
+            const allQuestions = w.scopeCatalog.allQuestions || w.scopeCatalog.questions || [];
+            const qObj = allQuestions.find((q) => q.id === w.ap_question);
+            if (qObj) {
+                w.ap_question_label = qObj.label || w.ap_question;
+                if (!w.ap_topic && qObj.topic) {
+                    w.ap_topic = qObj.topic;
+                    w.ap_topic_label =
+                        qObj.topic_label ||
+                        findLabelById(w.scopeCatalog.allTopics || [], qObj.topic);
+                }
+                if (!w.ap_dimension && qObj.dimension) {
+                    w.ap_dimension = qObj.dimension;
+                    w.ap_dimension_label =
+                        qObj.dimension_label ||
+                        findLabelById(w.scopeCatalog.dimensions || [], qObj.dimension);
+                }
             }
         }
     } else if (w.step === 3) {
@@ -1125,7 +1361,7 @@ async function submitWizardPlan() {
     const payload = {
         name: w.isEdit ? w.planId : "",
         ap_name: w.ap_name,
-        ap_category: w.ap_category,
+        ap_category: resolveCategoryValue(w.ap_category),
         ap_priority: w.ap_priority,
         ap_responsible: w.ap_responsible,
         ap_start_date: w.ap_start_date,
@@ -1212,7 +1448,11 @@ function renderPlanDetailView(plan, compatibleSurveys) {
     const catBadge = document.getElementById("det-category-badge");
     if (catBadge) {
         catBadge.className = "ap-pill-category";
-        catBadge.textContent = plan.ap_category || "-";
+        catBadge.textContent =
+            plan.category_name ||
+            findLabelById(state.filterOptions.categories, plan.ap_category) ||
+            plan.ap_category ||
+            "-";
     }
 
     const statusSelect = document.getElementById("det-change-status");
@@ -1313,13 +1553,14 @@ function renderPlanDetailView(plan, compatibleSurveys) {
         } else {
             tbody.innerHTML = tasks
                 .map((t) => {
-                    const statusOpts = ["Pendiente", "En progreso", "Finalizada"]
-                        .map(
-                            (st) =>
-                                `<option value="${st}" ${
-                                    st === t.apt_status ? "selected" : ""
-                                }>${st}</option>`
-                        )
+                    const statusOpts = (state.filterOptions.task_statuses || [])
+                        .map((st) => {
+                            const stVal = getOptionId(st);
+                            const stLbl = typeof st === "object" ? st.label || st.id : st;
+                            return `<option value="${escapeHtml(stVal)}" ${
+                                stVal === t.apt_status ? "selected" : ""
+                            }>${escapeHtml(stLbl)}</option>`;
+                        })
                         .join("");
                     return `
                         <tr>
@@ -1447,13 +1688,17 @@ function bindEvents() {
 
     document.getElementById("btn-wizard-submit")?.addEventListener("click", submitWizardPlan);
 
-    // Sección 6: Al cambiar la medición se reinician Dimensión, Tema y Pregunta
+    // Sección 6: Al cambiar la medición se reinician Dimensión, Tema y Pregunta y se cargan los atados a esa medición
     document.getElementById("wiz-survey")?.addEventListener("change", (e) => {
-        state.wizard.ap_origin_survey = e.target.value || "";
-        state.wizard.ap_dimension = "";
-        state.wizard.ap_topic = "";
-        state.wizard.ap_question = "";
-        loadScopeCatalogForSurvey(state.wizard.ap_origin_survey);
+        const w = state.wizard;
+        w.ap_origin_survey = e.target.value || "";
+        w.ap_dimension = "";
+        w.ap_dimension_label = "";
+        w.ap_topic = "";
+        w.ap_topic_label = "";
+        w.ap_question = "";
+        w.ap_question_label = "";
+        loadScopeCatalogForSurvey(w.ap_origin_survey);
     });
 
     // Sección 6: Al cambiar tipo de alcance se reinician los selectores dependientes
@@ -1461,22 +1706,17 @@ function bindEvents() {
         const w = state.wizard;
         w.ap_scope_type = e.target.value || "Medición";
         w.ap_dimension = "";
+        w.ap_dimension_label = "";
         w.ap_topic = "";
+        w.ap_topic_label = "";
         w.ap_question = "";
-
-        const topicPlaceholder =
-            w.ap_scope_type === "Pregunta"
-                ? "Todos los temas / Sin tema..."
-                : "Seleccionar tema...";
-        populateSelect("wiz-topic", w.scopeCatalog.topics, topicPlaceholder, false);
+        w.ap_question_label = "";
 
         const dimEl = document.getElementById("wiz-dimension");
-        const topicEl = document.getElementById("wiz-topic");
-        const qEl = document.getElementById("wiz-question");
         if (dimEl) dimEl.value = "";
-        if (topicEl) topicEl.value = "";
-        if (qEl) qEl.value = "";
 
+        filterAndRenderTopicsSelect();
+        filterAndRenderQuestionsSelect();
         updateScopeSelectorsVisibility();
         if (w.ap_scope_type === "Pregunta") {
             reloadFilteredQuestionsFromBackend();
@@ -1484,39 +1724,70 @@ function bindEvents() {
         refreshWizardInitialScore();
     });
 
-    // Sección 6: Al cambiar Dimensión se reinician Tema y Pregunta
+    // Sección 6: Al cambiar Dimensión se reinician Tema y Pregunta y se filtran por la dimensión elegida
     document.getElementById("wiz-dimension")?.addEventListener("change", async (e) => {
-        state.wizard.ap_dimension = e.target.value || "";
-        state.wizard.ap_topic = "";
-        state.wizard.ap_question = "";
+        const w = state.wizard;
+        w.ap_dimension = e.target.value || "";
+        w.ap_dimension_label = w.ap_dimension
+            ? findLabelById(w.scopeCatalog.dimensions || [], w.ap_dimension)
+            : "";
+        w.ap_topic = "";
+        w.ap_topic_label = "";
+        w.ap_question = "";
+        w.ap_question_label = "";
 
-        const topicEl = document.getElementById("wiz-topic");
-        const qEl = document.getElementById("wiz-question");
-        if (topicEl) topicEl.value = "";
-        if (qEl) qEl.value = "";
+        filterAndRenderTopicsSelect();
+        filterAndRenderQuestionsSelect();
 
-        if (state.wizard.ap_scope_type === "Pregunta") {
+        if (w.ap_scope_type === "Pregunta") {
             await reloadFilteredQuestionsFromBackend();
         }
         refreshWizardInitialScore();
     });
 
-    // Sección 6: Al cambiar Tema se reinicia Pregunta
+    // Sección 6: Al cambiar Tema se reinicia Pregunta y se actualiza su etiqueta dt_title
     document.getElementById("wiz-topic")?.addEventListener("change", async (e) => {
-        state.wizard.ap_topic = e.target.value || "";
-        state.wizard.ap_question = "";
+        const w = state.wizard;
+        w.ap_topic = e.target.value || "";
+        w.ap_topic_label = w.ap_topic
+            ? findLabelById(w.scopeCatalog.allTopics || w.scopeCatalog.topics || [], w.ap_topic)
+            : "";
+        w.ap_question = "";
+        w.ap_question_label = "";
 
-        const qEl = document.getElementById("wiz-question");
-        if (qEl) qEl.value = "";
+        filterAndRenderQuestionsSelect();
 
-        if (state.wizard.ap_scope_type === "Pregunta") {
+        if (w.ap_scope_type === "Pregunta") {
             await reloadFilteredQuestionsFromBackend();
         }
         refreshWizardInitialScore();
     });
 
+    // Al seleccionar una pregunta se sincroniza su tema (dt_title) cuando aplica
     document.getElementById("wiz-question")?.addEventListener("change", (e) => {
-        state.wizard.ap_question = e.target.value || "";
+        const w = state.wizard;
+        w.ap_question = e.target.value || "";
+        const allQuestions = w.scopeCatalog.allQuestions || w.scopeCatalog.questions || [];
+        const qObj = allQuestions.find((q) => q.id === w.ap_question);
+        if (qObj) {
+            w.ap_question_label = qObj.label || w.ap_question;
+            if (!w.ap_topic && qObj.topic) {
+                w.ap_topic = qObj.topic;
+                w.ap_topic_label =
+                    qObj.topic_label ||
+                    findLabelById(w.scopeCatalog.allTopics || [], qObj.topic);
+            } else if (w.ap_topic && qObj.topic_label) {
+                w.ap_topic_label = qObj.topic_label;
+            }
+            if (!w.ap_dimension && qObj.dimension) {
+                w.ap_dimension = qObj.dimension;
+                w.ap_dimension_label =
+                    qObj.dimension_label ||
+                    findLabelById(w.scopeCatalog.dimensions || [], qObj.dimension);
+            }
+        } else {
+            w.ap_question_label = "";
+        }
         refreshWizardInitialScore();
     });
 
@@ -1530,7 +1801,7 @@ function bindEvents() {
             apt_title: "",
             apt_responsible: state.wizard.ap_responsible || "",
             apt_due_date: state.wizard.ap_target_date || getTodayIso(),
-            apt_status: "Pendiente",
+            apt_status: getOptionId((state.filterOptions.task_statuses || [])[0]) || "Pendiente",
         });
         renderWizardTasksTable();
     });

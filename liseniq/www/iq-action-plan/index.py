@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import frappe
 from frappe import _
@@ -28,6 +28,20 @@ STANDARD_GOAL_STATUSES = [
 ]
 STANDARD_SCOPE_TYPES = ["Medición", "Dimensión", "Tema", "Pregunta"]
 STANDARD_TASK_STATUSES = ["Pendiente", "En progreso", "Finalizada"]
+
+_SYSTEM_ROW_FIELDS = {
+    "name",
+    "owner",
+    "creation",
+    "modified",
+    "modified_by",
+    "parent",
+    "parentfield",
+    "parenttype",
+    "idx",
+    "docstatus",
+    "doctype",
+}
 
 
 # Controlador principal de contexto para la vista de Gestión de Mejoras
@@ -77,29 +91,105 @@ def _require_active_company() -> str:
     return company
 
 
+# Lee las opciones activas de qp_IQ_CatalogOptions asociadas a un mnemónico en qp_IQ_Catalog
+def _get_action_plan_catalog_values(mnemonic: str, fallback: List[str]) -> List[str]:
+    try:
+        if frappe.db.exists("DocType", "qp_IQ_CatalogOptions"):
+            rows = frappe.db.sql(
+                """
+                SELECT co.co_label
+                FROM `tabqp_IQ_CatalogOptions` co
+                INNER JOIN `tabqp_IQ_Catalog` c ON c.name = co.co_catalog
+                WHERE IFNULL(co.co_is_active, 0) = 1
+                  AND c.ca_mnemonico = %s
+                  AND IFNULL(TRIM(co.co_label), '') != ''
+                ORDER BY IFNULL(co.co_sort_order, 0) ASC, co.co_label ASC
+                """,
+                [mnemonic],
+                as_dict=True,
+            )
+            values = [str(r.get("co_label")).strip() for r in rows if r.get("co_label")]
+            if values:
+                return values
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            f"iq-action-plan: _get_action_plan_catalog_values ({mnemonic})",
+        )
+    return list(fallback)
+
+
 # Obtiene el ID del estado 'Finalizada' en qp_IQ_SurveyStatus
 def _get_status_name_finalizada() -> Optional[str]:
     return frappe.db.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
 
 
-# Extrae las categorías desde el DocType qp_IQ_TemplateCategory (campo qnc_category)
-def _get_template_categories() -> List[str]:
+# Extrae el catálogo de categorías desde qp_IQ_TemplateCategory (id = name, label = qnc_category)
+def _get_template_categories() -> List[Dict[str, str]]:
     try:
         rows = frappe.db.sql(
             """
-            SELECT DISTINCT TRIM(qnc_category) AS category_name
+            SELECT
+                name AS id,
+                COALESCE(NULLIF(TRIM(qnc_category), ''), name) AS label
             FROM `tabqp_IQ_TemplateCategory`
             WHERE IFNULL(TRIM(qnc_category), '') != ''
-            ORDER BY category_name ASC
+            ORDER BY label ASC
             """,
             as_dict=True,
         )
-        categories = [r.get("category_name") for r in rows if r.get("category_name")]
+        seen_ids: Set[str] = set()
+        categories: List[Dict[str, str]] = []
+        for r in rows:
+            cat_id = (r.get("id") or "").strip()
+            cat_label = (r.get("label") or cat_id).strip()
+            if cat_id and cat_id not in seen_ids:
+                seen_ids.add(cat_id)
+                categories.append({"id": cat_id, "label": cat_label})
         if categories:
             return categories
     except Exception:
         frappe.log_error(frappe.get_traceback(), "iq-action-plan: _get_template_categories")
-    return STANDARD_CATEGORIES
+    return [{"id": c, "label": c} for c in STANDARD_CATEGORIES]
+
+
+# Resuelve el name (ID primario) de qp_IQ_TemplateCategory a partir de name o qnc_category
+def _resolve_template_category_id(category_val: Optional[str]) -> str:
+    val = (category_val or "").strip()
+    if not val:
+        return ""
+    try:
+        if frappe.db.exists("qp_IQ_TemplateCategory", val):
+            return val
+        rows = frappe.db.sql(
+            """
+            SELECT name
+            FROM `tabqp_IQ_TemplateCategory`
+            WHERE LOWER(TRIM(qnc_category)) = LOWER(TRIM(%s))
+            LIMIT 1
+            """,
+            [val],
+            as_dict=True,
+        )
+        if rows and rows[0].get("name"):
+            return rows[0].get("name")
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "iq-action-plan: _resolve_template_category_id")
+    return val
+
+
+# Resuelve la etiqueta legible qnc_category de qp_IQ_TemplateCategory
+def _resolve_template_category_label(category_id: Optional[str]) -> str:
+    val = (category_id or "").strip()
+    if not val:
+        return ""
+    try:
+        label = frappe.db.get_value("qp_IQ_TemplateCategory", val, "qnc_category")
+        if label and str(label).strip():
+            return str(label).strip()
+    except Exception:
+        pass
+    return val
 
 
 # Lista las mediciones finalizadas pertenecientes a la empresa activa
@@ -202,12 +292,12 @@ def _get_available_years(company: Optional[str]) -> List[int]:
 # Agrupa los catálogos de opciones para los selectores de filtros y asistente
 def _get_filter_options(company: Optional[str]) -> Dict[str, Any]:
     return {
-        "statuses": STANDARD_PLAN_STATUSES,
-        "goal_statuses": STANDARD_GOAL_STATUSES,
+        "statuses": _get_action_plan_catalog_values("AP_STATUS", STANDARD_PLAN_STATUSES),
+        "goal_statuses": _get_action_plan_catalog_values("AP_GOAL_STATUS", STANDARD_GOAL_STATUSES),
         "categories": _get_template_categories(),
-        "priorities": STANDARD_PRIORITIES,
-        "scope_types": STANDARD_SCOPE_TYPES,
-        "task_statuses": STANDARD_TASK_STATUSES,
+        "priorities": _get_action_plan_catalog_values("AP_PRIORITY", STANDARD_PRIORITIES),
+        "scope_types": _get_action_plan_catalog_values("AP_SCOPE_TYPE", STANDARD_SCOPE_TYPES),
+        "task_statuses": _get_action_plan_catalog_values("AP_TASK_STATUS", STANDARD_TASK_STATUSES),
         "responsibles": _get_company_contacts(company),
         "surveys": _get_company_finalized_surveys(company),
         "years": _get_available_years(company),
@@ -241,8 +331,13 @@ def _build_where_clause(company: str, filters: Dict[str, Any]) -> Tuple[str, Lis
 
     category = (filters.get("category") or "").strip()
     if category:
-        conditions.append("ap.ap_category = %s")
-        params.append(category)
+        conditions.append(
+            "(ap.ap_category = %s OR ap.ap_category IN ("
+            "SELECT tc_f.name FROM `tabqp_IQ_TemplateCategory` tc_f "
+            "WHERE LOWER(TRIM(tc_f.qnc_category)) = LOWER(TRIM(%s))"
+            ") OR LOWER(TRIM(ap.ap_category)) = LOWER(TRIM(%s)))"
+        )
+        params.extend([category, category, category])
 
     priority = (filters.get("priority") or "").strip()
     if priority:
@@ -283,7 +378,7 @@ def _fetch_dashboard_data(
 ) -> Dict[str, Any]:
     """
     Consulta agregada de KPIs y listado de planes para la empresa activa.
-    Resuelve medición y contacto con LEFT JOIN evitando consultas N+1.
+    Resuelve medición, categoría y contacto con LEFT JOIN evitando consultas N+1.
     """
     if not company:
         return {"kpis": _empty_kpis(), "items": []}
@@ -324,6 +419,7 @@ def _fetch_dashboard_data(
             ap.ap_objective,
             ap.ap_description,
             ap.ap_category,
+            COALESCE(NULLIF(TRIM(tc.qnc_category), ''), ap.ap_category) AS category_name,
             ap.ap_priority,
             ap.ap_status,
             ap.ap_goal_status,
@@ -357,6 +453,7 @@ def _fetch_dashboard_data(
             ap.modified
         FROM `tabqp_IQ_ActionPlan` ap
         LEFT JOIN `tabqp_IQ_Survey` s ON s.name = ap.ap_origin_survey
+        LEFT JOIN `tabqp_IQ_TemplateCategory` tc ON tc.name = ap.ap_category
         LEFT JOIN `tabContact` c ON c.name = ap.ap_responsible AND c.custom_company = ap.ap_company
         WHERE {where_sql}
         ORDER BY ap.modified DESC
@@ -411,6 +508,7 @@ def _fetch_dashboard_data(
                 "ap_objective": r.get("ap_objective") or "",
                 "ap_description": r.get("ap_description") or "",
                 "ap_category": r.get("ap_category") or "",
+                "category_name": r.get("category_name") or r.get("ap_category") or "",
                 "ap_priority": r.get("ap_priority") or "Media",
                 "ap_status": r.get("ap_status") or "Borrador",
                 "ap_goal_status": r.get("ap_goal_status") or "Pendiente de evaluación",
@@ -462,6 +560,149 @@ def _resolve_scope_display_label(
         d_title = frappe.db.get_value("qp_IQ_DemographicType", dimension, "dt_title")
         return (d_title or dimension).strip()
     return origin_survey_name or "-"
+
+
+# Limpia el valor de un campo de Frappe y devuelve posibles IDs como texto simple (sin recursividad)
+def _extract_string_tokens(raw_val: Any) -> Set[str]:
+    if not raw_val:  # Si el campo viene vacío o nulo, salimos de una vez
+        return set()
+    if isinstance(raw_val, str):  # Caso normal en Frappe: el campo guarda un ID en texto (ej. "QN-001")
+        text = raw_val.strip()  # Quitamos espacios en blanco a los lados
+        return {text} if 0 < len(text) <= 140 else set()  # Descartamos textos largos que sean párrafos y no IDs
+    if isinstance(raw_val, (list, tuple, set)):  # Por si el campo trae varios IDs en una lista simple
+        return {str(item).strip() for item in raw_val if item and len(str(item).strip()) <= 140}
+    return set()  # Si es número, fecha o booleano, lo ignoramos porque no es un ID
+
+
+# Obtiene los IDs de preguntas directamente desde su_questions (qp_IQ_Survey) o tp_questions (qp_IQ_Template)
+def _get_survey_question_ids(survey_name: str) -> List[str]:
+    if not survey_name or not frappe.db.exists("qp_IQ_Survey", survey_name):
+        return []
+
+    survey_doc = frappe.get_doc("qp_IQ_Survey", survey_name)  # Cargamos la medición seleccionada
+    rows = list(survey_doc.get("su_questions") or [])  # 1. Tomamos las filas de su_questions de la medición
+
+    # 2. Si su_questions está vacío y la medición tiene plantilla (su_template), leemos tp_questions de qp_IQ_Template
+    template_id = (survey_doc.get("su_template") or "").strip()
+    if not rows and template_id and frappe.db.exists("qp_IQ_Template", template_id):
+        tmpl_doc = frappe.get_doc("qp_IQ_Template", template_id)
+        rows = list(tmpl_doc.get("tp_questions") or [])
+
+    # 3. Extraemos los posibles IDs de pregunta de cada fila hija
+    candidates: Set[str] = set()
+    for row in rows:
+        row_dict = row.as_dict() if hasattr(row, "as_dict") else dict(row)
+        for field_name, cell_val in row_dict.items():
+            if field_name not in _SYSTEM_ROW_FIELDS:  # Ignoramos metadatos internos de Frappe (owner, parent, etc.)
+                candidates.update(_extract_string_tokens(cell_val))
+
+    if not candidates:
+        return []
+
+    # 4. Validamos en una sola consulta cuáles de esos IDs son preguntas reales en tabqp_IQ_Question
+    matched = frappe.db.sql(
+        "SELECT name FROM `tabqp_IQ_Question` WHERE name IN %(cands)s",
+        {"cands": list(candidates)},
+        as_dict=True,
+    )
+    return [r["name"] for r in matched if r.get("name")]
+
+
+# Arma los catálogos de dimensiones, temas y preguntas exclusivamente con las preguntas de la medición
+def _get_survey_linked_scope_data(survey_name: str, company: str) -> Dict[str, Any]:
+    empty_result: Dict[str, Any] = {
+        "dimensions": [],
+        "topics": [],
+        "all_topics": [],
+        "questions": [],
+        "all_questions": [],
+    }
+
+    question_ids = _get_survey_question_ids(survey_name)  # Buscamos solo las preguntas de esta medición
+    if not question_ids:
+        return empty_result
+
+    # Consultamos el enunciado (qn_statement), su dimensión (qn_demographic -> dt_title) y su tema (qp_topic -> dt_title)
+    q_rows = frappe.db.sql(
+        """
+        SELECT
+            q.name AS id,
+            COALESCE(NULLIF(TRIM(q.qn_statement), ''), q.name) AS label,
+            q.qn_demographic AS dimension,
+            COALESCE(NULLIF(TRIM(dtd.dt_title), ''), q.qn_demographic) AS dimension_label,
+            q.qp_topic AS topic,
+            COALESCE(NULLIF(TRIM(dtt.dt_title), ''), q.qp_topic) AS topic_label,
+            q.qp_is_public AS is_public,
+            q.qn_owner AS owner
+        FROM `tabqp_IQ_Question` q
+        LEFT JOIN `tabqp_IQ_DemographicType` dtd ON dtd.name = q.qn_demographic
+        LEFT JOIN `tabqp_IQ_DemographicType` dtt ON dtt.name = q.qp_topic
+        WHERE q.name IN %(q_ids)s
+          AND IFNULL(q.qn_status, 'Activa') NOT IN ('Archivada', 'Eliminada')
+        ORDER BY q.modified DESC
+        """,
+        {"q_ids": question_ids},
+        as_dict=True,
+    )
+
+    dimensions_by_id: Dict[str, str] = {}  # Mapa {id_dimension: dt_title}
+    topics_by_id: Dict[str, str] = {}  # Mapa {id_tema: dt_title}
+    topic_dimensions_map: Dict[str, Set[str]] = {}  # Qué dimensiones usan cada tema en esta medición
+    all_questions: List[Dict[str, Any]] = []
+
+    for r in q_rows:
+        q_id = (r.get("id") or "").strip()
+        if not q_id:
+            continue
+        dim_id = (r.get("dimension") or "").strip()
+        dim_label = (r.get("dimension_label") or dim_id).strip()
+        top_id = (r.get("topic") or "").strip()
+        top_label = (r.get("topic_label") or top_id).strip()
+
+        if dim_id:
+            dimensions_by_id[dim_id] = dim_label  # Solo agregamos dimensiones presentes en las preguntas de la medición
+        if top_id:
+            topics_by_id[top_id] = top_label  # Solo agregamos temas presentes en las preguntas de la medición
+            if dim_id:
+                topic_dimensions_map.setdefault(top_id, set()).add(dim_id)
+
+        all_questions.append(
+            {
+                "id": q_id,
+                "label": (r.get("label") or q_id).strip(),
+                "dimension": dim_id,
+                "dimension_label": dim_label,
+                "topic": top_id,
+                "topic_label": top_label,
+                "is_public": cint(r.get("is_public")),
+                "owner": r.get("owner") or "",
+            }
+        )
+
+    dimensions_list = sorted(
+        [{"id": d_id, "label": d_lbl} for d_id, d_lbl in dimensions_by_id.items()],
+        key=lambda x: (x["label"] or "").lower(),
+    )
+
+    all_topics_list = sorted(
+        [
+            {
+                "id": t_id,
+                "label": t_lbl,
+                "dimensions": sorted(list(topic_dimensions_map.get(t_id, set()))),
+            }
+            for t_id, t_lbl in topics_by_id.items()
+        ],
+        key=lambda x: (x["label"] or "").lower(),
+    )
+
+    return {
+        "dimensions": dimensions_list,
+        "topics": all_topics_list,
+        "all_topics": all_topics_list,
+        "questions": all_questions,
+        "all_questions": all_questions,
+    }
 
 
 # Normaliza filtros recibidos como JSON string, diccionario o parámetros sueltos
@@ -547,117 +788,56 @@ def get_survey_scope_options(
     topic: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Obtiene los catálogos del Paso 2 (Alcance):
-    - Dimensiones: `qp_IQ_DemographicType` con `dt_object_type = 'Dimension'`, mostrando `dt_title`.
-    - Temas: `qp_IQ_DemographicType` con `dt_object_type = 'Tema'`, mostrando `dt_title`.
-    - Preguntas: `qp_IQ_Question` de la empresa (`qn_owner = company`) o públicas (`qp_is_public = 1`),
-      filtrables por `qn_demographic` y opcionalmente por `qp_topic` (incluyendo preguntas sin tema), mostrando `qn_statement`.
+    Obtiene los catálogos del Paso 2 (Alcance) estrictamente atados a la medición seleccionada (`survey_name`):
+    - Dimensiones: `qp_IQ_DemographicType` vinculados a la medición, mostrando `dt_title`.
+    - Temas: `qp_IQ_DemographicType` vinculados a la medición (y filtrados por dimensión si aplica), mostrando `dt_title`.
+    - Preguntas: `qp_IQ_Question` vinculadas a la medición, filtradas por dimensión y tema cuando se seleccionan, mostrando `qn_statement`.
     """
     company = _require_active_company()
-    if survey_name:
-        survey_owner = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_owner")
-        if survey_owner and survey_owner != company:
-            frappe.throw(_("No tienes permisos sobre esta medición."), frappe.PermissionError)
+    survey_id = (survey_name or "").strip()
+    if not survey_id:
+        return {
+            "dimensions": [],
+            "topics": [],
+            "all_topics": [],
+            "questions": [],
+            "all_questions": [],
+        }
 
-    dimensions: List[Dict[str, str]] = []
-    topics: List[Dict[str, str]] = []
-    questions: List[Dict[str, Any]] = []
+    survey_owner = frappe.db.get_value("qp_IQ_Survey", survey_id, "su_owner")
+    if survey_owner and survey_owner != company:
+        frappe.throw(_("No tienes permisos sobre esta medición."), frappe.PermissionError)
 
-    # 1. Dimensiones desde qp_IQ_DemographicType (dt_object_type = 'Dimension')
-    try:
-        dim_rows = frappe.db.sql(
-            """
-            SELECT
-                dt.name AS id,
-                COALESCE(NULLIF(TRIM(dt.dt_title), ''), dt.name) AS label
-            FROM `tabqp_IQ_DemographicType` dt
-            WHERE dt.dt_object_type = 'Dimension'
-              AND (dt.dt_creator_company = %s OR IFNULL(dt.dt_creator_company, '') = '')
-            ORDER BY label ASC
-            """,
-            [company],
-            as_dict=True,
-        )
-        dimensions = [{"id": r.get("id"), "label": r.get("label")} for r in dim_rows if r.get("id")]
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "iq-action-plan: get_survey_scope_options (dimensions)")
+    scope_data = _get_survey_linked_scope_data(survey_name=survey_id, company=company)
+    dimensions = scope_data.get("dimensions") or []
+    all_topics = scope_data.get("all_topics") or []
+    all_questions = scope_data.get("all_questions") or []
 
-    # 2. Temas desde qp_IQ_DemographicType (dt_object_type = 'Tema')
-    try:
-        topic_rows = frappe.db.sql(
-            """
-            SELECT
-                dt.name AS id,
-                COALESCE(NULLIF(TRIM(dt.dt_title), ''), dt.name) AS label
-            FROM `tabqp_IQ_DemographicType` dt
-            WHERE dt.dt_object_type = 'Tema'
-              AND (dt.dt_creator_company = %s OR IFNULL(dt.dt_creator_company, '') = '')
-            ORDER BY label ASC
-            """,
-            [company],
-            as_dict=True,
-        )
-        topics = [{"id": r.get("id"), "label": r.get("label")} for r in topic_rows if r.get("id")]
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "iq-action-plan: get_survey_scope_options (topics)")
+    dim_filter = (dimension or "").strip()
+    topic_filter = (topic or "").strip()
 
-    # 3. Preguntas desde qp_IQ_Question (asociadas a la empresa o públicas qp_is_public = 1)
-    try:
-        q_conditions = [
-            "IFNULL(q.qn_status, 'Activa') = 'Activa'",
-            "(q.qn_owner = %s OR IFNULL(q.qp_is_public, 0) = 1 OR EXISTS ("
-            "SELECT 1 FROM `tabqp_IQ_DemographicType` dtq "
-            "WHERE dtq.name = q.qn_demographic "
-            "AND dtq.dt_object_type = 'Pregunta' "
-            "AND dtq.dt_creator_company = %s))",
+    if dim_filter:
+        filtered_topics = [
+            t
+            for t in all_topics
+            if not t.get("dimensions") or dim_filter in t.get("dimensions", [])
         ]
-        q_params: List[Any] = [company, company]
+        topics = filtered_topics if filtered_topics else all_topics
+    else:
+        topics = all_topics
 
-        if dimension:
-            q_conditions.append("q.qn_demographic = %s")
-            q_params.append(dimension)
-
-        if topic:
-            q_conditions.append("(q.qp_topic = %s OR IFNULL(q.qp_topic, '') = '')")
-            q_params.append(topic)
-
-        q_where = " AND ".join(q_conditions)
-        q_rows = frappe.db.sql(
-            f"""
-            SELECT
-                q.name AS id,
-                COALESCE(NULLIF(TRIM(q.qn_statement), ''), q.name) AS label,
-                q.qn_demographic AS dimension,
-                q.qp_topic AS topic,
-                q.qp_is_public AS is_public,
-                q.qn_owner AS owner
-            FROM `tabqp_IQ_Question` q
-            WHERE {q_where}
-            ORDER BY q.modified DESC
-            LIMIT 500
-            """,
-            q_params,
-            as_dict=True,
-        )
-        questions = [
-            {
-                "id": r.get("id"),
-                "label": r.get("label"),
-                "dimension": r.get("dimension") or "",
-                "topic": r.get("topic") or "",
-                "is_public": cint(r.get("is_public")),
-                "owner": r.get("owner") or "",
-            }
-            for r in q_rows
-            if r.get("id")
-        ]
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "iq-action-plan: get_survey_scope_options (questions)")
+    filtered_questions = all_questions
+    if dim_filter:
+        filtered_questions = [q for q in filtered_questions if q.get("dimension") == dim_filter]
+    if topic_filter:
+        filtered_questions = [q for q in filtered_questions if q.get("topic") == topic_filter]
 
     return {
         "dimensions": dimensions,
         "topics": topics,
-        "questions": questions,
+        "all_topics": all_topics,
+        "questions": filtered_questions,
+        "all_questions": all_questions,
     }
 
 
@@ -683,36 +863,58 @@ def _compute_official_score(
             "scale_min": 0.0,
             "scale_max": 100.0,
             "scope_label": "",
+            "dimension": "",
+            "dimension_label": "",
+            "topic": "",
+            "topic_label": "",
+            "question": "",
+            "question_label": "",
             "message": no_score_msg,
         }
 
-    if scope_type in ("Dimensión", "Tema", "Pregunta") and dimension:
-        if not frappe.db.exists("qp_IQ_DemographicType", dimension):
+    resolved_dim = (dimension or "").strip()
+    resolved_topic = (topic or "").strip()
+    resolved_question = (question or "").strip()
+
+    if scope_type in ("Dimensión", "Tema", "Pregunta") and resolved_dim:
+        if not frappe.db.exists("qp_IQ_DemographicType", resolved_dim):
             return {
                 "has_score": False,
                 "initial_score": None,
                 "scale_min": 0.0,
                 "scale_max": 100.0,
                 "scope_label": "",
+                "dimension": resolved_dim,
+                "dimension_label": "",
+                "topic": resolved_topic,
+                "topic_label": "",
+                "question": resolved_question,
+                "question_label": "",
                 "message": no_score_msg,
             }
 
-    if scope_type == "Tema" and topic:
-        if not frappe.db.exists("qp_IQ_DemographicType", topic):
+    if scope_type == "Tema" and resolved_topic:
+        if not frappe.db.exists("qp_IQ_DemographicType", resolved_topic):
             return {
                 "has_score": False,
                 "initial_score": None,
                 "scale_min": 0.0,
                 "scale_max": 100.0,
                 "scope_label": "",
+                "dimension": resolved_dim,
+                "dimension_label": "",
+                "topic": resolved_topic,
+                "topic_label": "",
+                "question": resolved_question,
+                "question_label": "",
                 "message": no_score_msg,
             }
 
-    if scope_type == "Pregunta" and question:
+    if scope_type == "Pregunta" and resolved_question:
         q_row = frappe.db.get_value(
             "qp_IQ_Question",
-            question,
-            ["name", "qn_status", "qn_nps_min", "qn_nps_max"],
+            resolved_question,
+            ["name", "qn_status", "qn_nps_min", "qn_nps_max", "qn_demographic", "qp_topic", "qn_statement"],
             as_dict=True,
         )
         if not q_row or q_row.get("qn_status") in ("Archivada", "Eliminada"):
@@ -722,28 +924,54 @@ def _compute_official_score(
                 "scale_min": 0.0,
                 "scale_max": 100.0,
                 "scope_label": "",
+                "dimension": resolved_dim,
+                "dimension_label": "",
+                "topic": resolved_topic,
+                "topic_label": "",
+                "question": resolved_question,
+                "question_label": "",
                 "message": no_score_msg,
             }
+        if not resolved_dim and q_row.get("qn_demographic"):
+            resolved_dim = (q_row.get("qn_demographic") or "").strip()
+        if not resolved_topic and q_row.get("qp_topic"):
+            resolved_topic = (q_row.get("qp_topic") or "").strip()
+
+    dimension_label = (
+        (frappe.db.get_value("qp_IQ_DemographicType", resolved_dim, "dt_title") or resolved_dim).strip()
+        if resolved_dim
+        else ""
+    )
+    topic_label = (
+        (frappe.db.get_value("qp_IQ_DemographicType", resolved_topic, "dt_title") or resolved_topic).strip()
+        if resolved_topic
+        else ""
+    )
+    question_label = (
+        (frappe.db.get_value("qp_IQ_Question", resolved_question, "qn_statement") or resolved_question).strip()
+        if resolved_question
+        else ""
+    )
 
     survey_label = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name or ""
     scope_label = _resolve_scope_display_label(
         origin_survey_name=survey_label,
         scope_type=scope_type,
-        dimension=dimension,
-        topic=topic,
-        question=question,
+        dimension=resolved_dim or None,
+        topic=resolved_topic or None,
+        question=resolved_question or None,
     )
 
     existing_filters: Dict[str, Any] = {
         "ap_origin_survey": survey_name,
         "ap_scope_type": scope_type,
     }
-    if dimension:
-        existing_filters["ap_dimension"] = dimension
-    if topic:
-        existing_filters["ap_topic"] = topic
-    if question:
-        existing_filters["ap_question"] = question
+    if resolved_dim:
+        existing_filters["ap_dimension"] = resolved_dim
+    if resolved_topic:
+        existing_filters["ap_topic"] = resolved_topic
+    if resolved_question:
+        existing_filters["ap_question"] = resolved_question
 
     existing_score = frappe.db.get_value(
         "qp_IQ_ActionPlan",
@@ -758,10 +986,16 @@ def _compute_official_score(
             "scale_min": flt(existing_score.get("ap_scale_min") or 0, 2),
             "scale_max": flt(existing_score.get("ap_scale_max") or 100, 2),
             "scope_label": scope_label,
+            "dimension": resolved_dim,
+            "dimension_label": dimension_label,
+            "topic": resolved_topic,
+            "topic_label": topic_label,
+            "question": resolved_question,
+            "question_label": question_label,
             "message": "",
         }
 
-    seed_str = f"{survey_name}:{scope_type}:{dimension or ''}:{topic or ''}:{question or ''}"
+    seed_str = f"{survey_name}:{scope_type}:{resolved_dim}:{resolved_topic}:{resolved_question}"
     deterministic_score = 55 + (sum(ord(ch) for ch in seed_str) % 30)
     return {
         "has_score": True,
@@ -769,6 +1003,12 @@ def _compute_official_score(
         "scale_min": 0.0,
         "scale_max": 100.0,
         "scope_label": scope_label,
+        "dimension": resolved_dim,
+        "dimension_label": dimension_label,
+        "topic": resolved_topic,
+        "topic_label": topic_label,
+        "question": resolved_question,
+        "question_label": question_label,
         "message": "",
     }
 
@@ -836,7 +1076,8 @@ def _recalculate_plan_task_counters(doc) -> None:
 def save_action_plan(payload: Any) -> Dict[str, Any]:
     """
     Crea o actualiza un plan en `qp_IQ_ActionPlan` y sus acciones en `qp_IQ_ActionPlanTask`
-    validando que la empresa y los contactos (`custom_company`) pertenezcan a la sesión.
+    validando que la empresa y los contactos (`custom_company`) pertenezcan a la sesión
+    y resolviendo el enlace de `ap_category` hacia `qp_IQ_TemplateCategory`.
     """
     company = _require_active_company()
 
@@ -861,9 +1102,15 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
         doc.ap_status = "Borrador"
         doc.ap_goal_status = "Pendiente de evaluación"
 
-    # Paso 1: Información General
+    # Paso 1: Información General (ap_category es Link a qp_IQ_TemplateCategory)
     doc.ap_name = (data.get("ap_name") or "").strip()
-    doc.ap_category = (data.get("ap_category") or "").strip()
+    raw_category = (data.get("ap_category") or "").strip()
+    cat_field = frappe.get_meta("qp_IQ_ActionPlan").get_field("ap_category")
+    if cat_field and cat_field.fieldtype == "Select":
+        # Si en este ambiente aún no se ha migrado qp_IQ_ActionPlan a Link, enviamos la etiqueta legible
+        doc.ap_category = _resolve_template_category_label(raw_category)
+    else:
+        doc.ap_category = _resolve_template_category_id(raw_category)
     doc.ap_priority = (data.get("ap_priority") or "Media").strip()
     doc.ap_responsible = (data.get("ap_responsible") or "").strip()
     doc.ap_start_date = data.get("ap_start_date")
@@ -871,8 +1118,10 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
     doc.ap_objective = (data.get("ap_objective") or "").strip()
     doc.ap_description = (data.get("ap_description") or "").strip()
 
-    if not doc.ap_name or not doc.ap_objective or not doc.ap_responsible:
-        frappe.throw(_("Completa los campos obligatorios de Información General (Nombre, Objetivo y Responsable)."))
+    if not doc.ap_name or not doc.ap_objective or not doc.ap_responsible or not doc.ap_category:
+        frappe.throw(
+            _("Completa los campos obligatorios de Información General (Nombre, Categoría, Objetivo y Responsable).")
+        )
 
     resp_company = frappe.db.get_value("Contact", doc.ap_responsible, "custom_company")
     if resp_company != company:
@@ -910,7 +1159,10 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
         question=doc.ap_question,
     )
     if not score_check.get("has_score"):
-        frappe.throw(score_check.get("message") or _("No hay un resultado disponible para este elemento en la medición seleccionada."))
+        frappe.throw(
+            score_check.get("message")
+            or _("No hay un resultado disponible para este elemento en la medición seleccionada.")
+        )
 
     survey_label = frappe.db.get_value("qp_IQ_Survey", doc.ap_origin_survey, "su_name") or doc.ap_origin_survey
     doc.ap_scope_label = _resolve_scope_display_label(
@@ -939,6 +1191,7 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
         doc.ap_expected_eval_date = data.get("ap_expected_eval_date")
 
     # Paso 4: Acciones (HU-04: No guardar acción sin nombre, responsable, fecha compromiso y estado)
+    valid_task_statuses = _get_action_plan_catalog_values("AP_TASK_STATUS", STANDARD_TASK_STATUSES)
     tasks_input = data.get("tasks") or []
     doc.set("ap_tasks", [])
     for idx, t in enumerate(tasks_input, start=1):
@@ -964,7 +1217,7 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
                 "apt_title": title,
                 "apt_responsible": resp,
                 "apt_due_date": due_date,
-                "apt_status": status if status in STANDARD_TASK_STATUSES else "Pendiente",
+                "apt_status": status if status in valid_task_statuses else (valid_task_statuses[0] if valid_task_statuses else "Pendiente"),
                 "apt_description": (t.get("apt_description") or "").strip(),
             },
         )
@@ -1014,6 +1267,23 @@ def get_action_plan_detail(name: str) -> Dict[str, Any]:
         else ""
     )
 
+    category_name = _resolve_template_category_label(doc.ap_category)
+    dimension_label = (
+        (frappe.db.get_value("qp_IQ_DemographicType", doc.ap_dimension, "dt_title") or doc.ap_dimension).strip()
+        if doc.ap_dimension
+        else ""
+    )
+    topic_label = (
+        (frappe.db.get_value("qp_IQ_DemographicType", doc.ap_topic, "dt_title") or doc.ap_topic).strip()
+        if doc.ap_topic
+        else ""
+    )
+    question_label = (
+        (frappe.db.get_value("qp_IQ_Question", doc.ap_question, "qn_statement") or doc.ap_question).strip()
+        if doc.ap_question
+        else ""
+    )
+
     scope_display = _resolve_scope_display_label(
         origin_survey_name=origin_survey_name,
         scope_type=doc.ap_scope_type,
@@ -1056,6 +1326,7 @@ def get_action_plan_detail(name: str) -> Dict[str, Any]:
             "ap_name": doc.ap_name,
             "ap_company": doc.ap_company,
             "ap_category": doc.ap_category,
+            "category_name": category_name,
             "ap_priority": doc.ap_priority,
             "ap_status": doc.ap_status,
             "ap_responsible": doc.ap_responsible,
@@ -1070,8 +1341,11 @@ def get_action_plan_detail(name: str) -> Dict[str, Any]:
             "origin_survey_name": origin_survey_name,
             "ap_scope_type": doc.ap_scope_type,
             "ap_dimension": doc.ap_dimension or "",
+            "dimension_label": dimension_label,
             "ap_topic": doc.ap_topic or "",
+            "topic_label": topic_label,
             "ap_question": doc.ap_question or "",
+            "question_label": question_label,
             "ap_scope_label": scope_display,
             "ap_initial_score": flt(doc.ap_initial_score, 2),
             "ap_target_score": flt(doc.ap_target_score, 2),
@@ -1109,7 +1383,8 @@ def update_task_status(plan_name: str, task_name: str, new_status: str) -> Dict[
     if doc.ap_status in ("Finalizado", "Cancelado"):
         frappe.throw(_("Los planes Finalizados o Cancelados no permiten editar acciones de forma ordinaria."))
 
-    if new_status not in STANDARD_TASK_STATUSES:
+    valid_task_statuses = _get_action_plan_catalog_values("AP_TASK_STATUS", STANDARD_TASK_STATUSES)
+    if new_status not in valid_task_statuses:
         frappe.throw(_("Estado de acción no válido."))
 
     updated = False
@@ -1137,7 +1412,8 @@ def update_plan_status(plan_name: str, new_status: str) -> Dict[str, Any]:
     if doc.ap_company != company:
         frappe.throw(_("No tienes permisos sobre este plan."), frappe.PermissionError)
 
-    if new_status not in STANDARD_PLAN_STATUSES:
+    valid_plan_statuses = _get_action_plan_catalog_values("AP_STATUS", STANDARD_PLAN_STATUSES)
+    if new_status not in valid_plan_statuses:
         frappe.throw(_("Estado de plan no válido."))
 
     if new_status == "En ejecución" and len(doc.get("ap_tasks") or []) == 0:
@@ -1177,7 +1453,10 @@ def evaluate_plan_impact(plan_name: str, comparison_survey: str) -> Dict[str, An
         question=doc.ap_question,
     )
     if not score_info.get("has_score"):
-        frappe.throw(score_info.get("message") or _("No hay un resultado disponible para este elemento en la medición seleccionada."))
+        frappe.throw(
+            score_info.get("message")
+            or _("No hay un resultado disponible para este elemento en la medición seleccionada.")
+        )
 
     posterior_score = flt(score_info.get("initial_score"), 2)
     initial_score = flt(doc.ap_initial_score, 2)

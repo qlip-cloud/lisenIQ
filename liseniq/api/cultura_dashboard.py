@@ -50,11 +50,11 @@ MIN_N = 5
 # Orden y color sugeridos para los 3 Tipos de Cultura, si el `theme`
 # coincide exactamente con estos nombres (colores extraídos por muestreo
 # de píxeles del PDF original de metodología OCC).
-TIPO_ORDER_HINT = ["Responsable", "Competitiva", "Humanista"]
+TIPO_ORDER_HINT = ["RESPONSABLE", "COMPETITIVA", "HUMANISTA"]
 TIPO_COLOR_HINT = {
-    "Responsable": "#0889D6",
-    "Competitiva": "#EB493C",
-    "Humanista": "#48BBA1",
+    "RESPONSABLE": "#0889D6",
+    "COMPETITIVA": "#EB493C",
+    "HUMANISTA": "#48BBA1",
 }
 DEFAULT_TIPO_COLOR = "#888888"
 

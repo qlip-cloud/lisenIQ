@@ -1493,15 +1493,18 @@ def get_question_variables_map():
     try:
         query = """
             SELECT 
-                a.name as question_id,
-                a.qn_statement as question_text,
-                b.dt_title as variable,
-                b.dt_title as tag,
-                c.dt_title as tema
+                a.name AS question_id,
+                a.qn_statement AS question_text,
+                b.dt_title AS variable,
+                b.dt_title AS tag,
+                c.dt_title AS tema
             FROM `tabqp_IQ_Question` a
-            LEFT JOIN `tabqp_IQ_DemographicType` b ON a.qn_demographic = b.name
-            LEFT JOIN `tabqp_IQ_DemographicType` c ON a.qp_topic = c.name
-            WHERE b.dt_object_type = 'Pregunta'
+            LEFT JOIN `tabqp_IQ_DemographicType` b
+                ON a.qn_demographic = b.name
+                AND b.dt_object_type = 'Dimension'
+            LEFT JOIN `tabqp_IQ_DemographicType` c
+                ON a.qp_topic = c.name
+                AND c.dt_object_type = 'Tema'
         """
         results = frappe.db.sql(query, as_dict=True)
         
@@ -1673,7 +1676,7 @@ def transform_data_by_question(
             
             # Identificar todas las preguntas abiertas de esta medición
             for qid in question_responses.keys():
-                if (question_types_map.get(qid) == 'Abierta' or question_types_map.get(qid) == 'Abierta texto corto')  and qid in all_questions_map:
+                if (question_types_map.get(qid).lower() == 'abierta' or question_types_map.get(qid).lower() == 'abierta texto corto')  and qid in all_questions_map:
                     question_text = all_questions_map[qid]
                     if question_text not in open_questions_dict[survey_id]:
                         open_questions_dict[survey_id][question_text] = f"open_question_{counter}"
@@ -1722,7 +1725,7 @@ def transform_data_by_question(
             tema = question_info.get('tema', '')
                 
             question_object['tema'] = tema
-            if question_object['question_type'] in ['Abierta', 'Abierta texto corto']:
+            if question_object['question_type'].lower() in ['abierta', 'abierta texto corto']:
                 survey_id = demographic_data.get('survey_id', '')
                 question_object['question_group'] = open_questions_dict.get(survey_id, {}).get(question_text, '')
             else:

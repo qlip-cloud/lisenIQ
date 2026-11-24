@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "creation": "2026-11-02 06:08:00.833740",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "apt_title",
+  "apt_responsible",
+  "apt_due_date",
+  "apt_status",
+  "column_break_1",
+  "apt_description",
+  "apt_completed_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "apt_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Nombre de la Acción",
+   "reqd": 1
+  },
+  {
+   "fieldname": "apt_responsible",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Responsable",
+   "options": "Contact",
+   "reqd": 1
+  },
+  {
+   "fieldname": "apt_due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Fecha Compromiso",
+   "reqd": 1
+  },
+  {
+   "default": "Pendiente",
+   "fieldname": "apt_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Estado",
+   "options": "Pendiente\nEn progreso\nFinalizada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "apt_description",
+   "fieldtype": "Small Text",
+   "label": "Descripción"
+  },
+  {
+   "fieldname": "apt_completed_on",
+   "fieldtype": "Date",
+   "label": "Fecha de Finalización",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-02 07:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Liseniq",
+ "name": "qp_IQ_ActionPlanTask",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

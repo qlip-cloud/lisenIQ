@@ -23,6 +23,7 @@ def build_engagement_context(context, survey_name):
     grouped_dimension_chart_data = []
     topic_questions_data = []
     engagement_index_chart_data = []
+    nps_score = 0
 
     if valid_types:
         valid_questions_data = frappe.get_all("qp_IQ_Question", 
@@ -34,38 +35,25 @@ def build_engagement_context(context, survey_name):
         nps_questions = [q.name for q in valid_questions_data if q.qn_type in nps_types]
         
         q_to_engagement = {q.name: q.qn_demographic for q in valid_questions_data if q.qn_demographic}
-        q_to_statement = {q.name: q.qn_statement for q in valid_questions_data}
+        q_to_statement = {q.name: (q.qn_statement or q.name).strip() for q in valid_questions_data}
         q_to_topic = {q.name: q.qp_topic for q in valid_questions_data if q.qp_topic}
         
         if valid_questions:
+            # 1. Demográficos para Dimensiones/Atributos y Preguntas (dt_object_type: Dimension, Tema o Pregunta)
             demo_types = frappe.get_all("qp_IQ_DemographicType", 
-                                        filters={"dt_object_type": "Pregunta"}, 
-                                        fields=["name", "dt_title", "dt_tag_color", "dt_mnemonico"],
+                                        filters={"dt_object_type": ["in", ["Dimension", "Tema", "Pregunta"]]}, 
+                                        fields=["name", "dt_title", "dt_tag_color", "dt_mnemonico", "dt_object_type"],
                                         ignore_permissions=True)
+            
             valid_demographics = [d.name for d in demo_types]
             demo_title_map = {d.name: (d.dt_title or d.name) for d in demo_types}
             demo_color_map = {d.name: d.dt_tag_color for d in demo_types if d.dt_tag_color}
             demo_mnemonic_map = {d.name: d.dt_mnemonico for d in demo_types if d.dt_mnemonico}
 
-            topic_title_map = {}
-            topic_color_map = {}
-            try:
-                topic_field = frappe.get_meta("qp_IQ_Question").get_field("qp_topic")
-                if topic_field and topic_field.fieldtype == "Link" and topic_field.options:
-                    t_doctype = topic_field.options
-                    t_title_field = frappe.get_meta(t_doctype).title_field or "name"
-                    
-                    td_list = frappe.get_all(t_doctype, fields=["name", t_title_field], ignore_permissions=True)
-                    topic_title_map = {d["name"]: (d.get(t_title_field) or d["name"]) for d in td_list}
-            except Exception as e:
-                frappe.log_error(f"Error extrayendo metadata de qp_topic: {e}", "AIQ Reports - Engagement")
-
-            # Extraemos el color de los temas desde qp_IQ_DemographicType
-            tema_types = frappe.get_all("qp_IQ_DemographicType", 
-                                        filters={"dt_object_type": "Tema"}, 
-                                        fields=["name", "dt_tag_color"],
-                                        ignore_permissions=True)
-            topic_color_map = {d.name: d.dt_tag_color for d in tema_types if d.dt_tag_color}
+            # 2. Demográficos para Temas (dt_object_type == "Tema", con fallback al mapa general si aplica)
+            tema_types = [d for d in demo_types if d.dt_object_type == "Tema"]
+            topic_title_map = {d.name: (d.dt_title or d.name) for d in (tema_types if tema_types else demo_types)}
+            topic_color_map = {d.name: d.dt_tag_color for d in (tema_types if tema_types else demo_types) if d.dt_tag_color}
 
             su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
             
@@ -80,7 +68,7 @@ def build_engagement_context(context, survey_name):
             dimension_totals = {}
             dimension_counts = {}
             
-            # Diccionarios para agrupar por demográfico
+            # Diccionarios para agrupar por atributo/dimensión (para el gráfico Puntaje por Atributos)
             grouped_dim_totals = {}
             grouped_dim_counts = {}
 
@@ -108,7 +96,6 @@ def build_engagement_context(context, survey_name):
                     for q_name, answer in data.items():
                         if q_name in valid_questions:
                             try:
-                                # Capturamos el valor original para los cálculos de NPS y detractores/promotores antes de que mute
                                 original_val = float(answer)
                                 val = original_val
                                 
@@ -147,7 +134,7 @@ def build_engagement_context(context, survey_name):
                                         dimension_totals[q_name] = dimension_totals.get(q_name, 0.0) + val
                                         dimension_counts[q_name] = dimension_counts.get(q_name, 0) + 1
                                         
-                                        # Data agrupada por dimensión/demográfico (para el gráfico)
+                                        # Data agrupada por atributo/dimensión (para el gráfico Puntaje por Atributos)
                                         grouped_dim_totals[demo_id] = grouped_dim_totals.get(demo_id, 0.0) + val
                                         grouped_dim_counts[demo_id] = grouped_dim_counts.get(demo_id, 0) + 1
 
@@ -180,15 +167,12 @@ def build_engagement_context(context, survey_name):
                 engagement_index_score = round(ei_total_score / ei_total_answers, 2)
             
             # Calculamos los porcentajes y el score de eNPS
-            nps_promoters_perc = 0
-            nps_detractors_perc = 0
-            nps_score = 0
             if nps_total_answers > 0:
                 nps_promoters_perc = round((nps_promoters / nps_total_answers) * 100)
                 nps_detractors_perc = round((nps_detractors / nps_total_answers) * 100)
                 nps_score = nps_promoters_perc - nps_detractors_perc
 
-            # Armamos data detallada para Top/Bottom 10
+            # Armamos data detallada para Top/Bottom 10 (usa el enunciado qn_statement en 'question')
             for q_name, t_score in dimension_totals.items():
                 avg = round(t_score / dimension_counts[q_name], 2)
                 statement_text = q_to_statement.get(q_name, q_name)
@@ -196,7 +180,7 @@ def build_engagement_context(context, survey_name):
                 demo_title = demo_title_map.get(demo_id, demo_id)
                 
                 t_id = q_to_topic.get(q_name)
-                t_title = topic_title_map.get(t_id, "N/A") if t_id else "N/A"
+                t_title = topic_title_map.get(t_id, demo_title_map.get(t_id, "N/A")) if t_id else "N/A"
                 
                 dimension_chart_data.append({
                     "engagement": demo_title, 
@@ -206,7 +190,7 @@ def build_engagement_context(context, survey_name):
                 })
             dimension_chart_data.sort(key=lambda x: x["score"])
 
-            # Armamos data para el nuevo Gráfico de Índice de Engagement
+            # Armamos data para el Gráfico de Índice de Engagement
             for q_name, t_score in ei_question_totals.items():
                 if ei_question_counts[q_name] > 0:
                     avg = round(t_score / ei_question_counts[q_name], 2)
@@ -219,7 +203,6 @@ def build_engagement_context(context, survey_name):
                         "score": avg,
                         "color": demo_color
                     })
-            # Ordenamos el índice de mayor a menor para una mejor visualización en el gráfico
             engagement_index_chart_data.sort(key=lambda x: x["score"], reverse=True)
 
             # Armamos data para TODAS las preguntas, para las tablas por Tema
@@ -229,10 +212,9 @@ def build_engagement_context(context, survey_name):
                     statement_text = q_to_statement.get(q_name, q_name)
                     
                     t_id = q_to_topic.get(q_name)
-                    t_title = topic_title_map.get(t_id, "Sin Tema") if t_id else "Sin Tema"
-                    t_color = topic_color_map.get(t_id, "") if t_id else ""
+                    t_title = topic_title_map.get(t_id, demo_title_map.get(t_id, "Sin Tema")) if t_id else "Sin Tema"
+                    t_color = topic_color_map.get(t_id, demo_color_map.get(t_id, "")) if t_id else ""
 
-                    # Obtenemos la dimensión para agregarla a la tabla
                     demo_id = q_to_engagement.get(q_name)
                     demo_title = demo_title_map.get(demo_id, "Sin Dimensión") if demo_id else "Sin Dimensión"
                     
@@ -244,7 +226,7 @@ def build_engagement_context(context, survey_name):
                         "color": t_color
                     })
 
-            # Armamos data agrupada para el Gráfico de Dimensiones (Agrupado por TÍTULO para evitar duplicados)
+            # Armamos data agrupada por Atributo/Dimensión (dt_title) para el Gráfico "Puntaje por Atributos"
             title_agg_totals = {}
             title_agg_counts = {}
             title_agg_colors = {}
@@ -271,11 +253,11 @@ def build_engagement_context(context, survey_name):
             topic_title_agg_colors = {}
 
             for t_id, t_score in topic_totals.items():
-                t_title = topic_title_map.get(t_id, t_id)
+                t_title = topic_title_map.get(t_id, demo_title_map.get(t_id, t_id))
                 topic_title_agg_totals[t_title] = topic_title_agg_totals.get(t_title, 0.0) + t_score
                 topic_title_agg_counts[t_title] = topic_title_agg_counts.get(t_title, 0) + topic_counts[t_id]
                 if t_title not in topic_title_agg_colors:
-                    topic_title_agg_colors[t_title] = topic_color_map.get(t_id, "")
+                    topic_title_agg_colors[t_title] = topic_color_map.get(t_id, demo_color_map.get(t_id, ""))
 
             for t_title, t_score in topic_title_agg_totals.items():
                 avg = round(t_score / topic_title_agg_counts[t_title], 2)

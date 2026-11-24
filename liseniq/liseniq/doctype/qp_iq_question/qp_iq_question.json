@@ -20,7 +20,6 @@
   "qp_sec_od",
   "qn_demographic",
   "qp_topic",
-  "qn_is_demographic",
   "qn_statement_positive",
   "qn_statement_negative",
   "qn_response_options",
@@ -47,7 +46,7 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Texto de la Pregunta / Enunciado Principal",
+   "label": "Enunciado de la Pregunta",
    "reqd": 1
   },
   {
@@ -60,60 +59,50 @@
    "default": "0",
    "fieldname": "qn_optional",
    "fieldtype": "Check",
-   "label": "Pregunta Opcional"
+   "label": "\u00bfEs opcional?"
   },
   {
    "fieldname": "qn_category",
    "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_preview": 1,
-   "label": "Categoria de la Pregunta",
+   "label": "Categor\u00eda",
    "options": "qp_IQ_TemplateCategory"
-  },
-  {
-   "default": "0",
-   "fieldname": "qn_is_demographic",
-   "fieldtype": "Check",
-   "label": "Es Demogr\u00e1fica"
   },
   {
    "fieldname": "qn_demographic",
    "fieldtype": "Link",
-   "label": "Dato Demogr\u00e1fico",
+   "label": "Dimensi\u00f3n",
    "options": "qp_IQ_DemographicType"
   },
   {
    "default": "Activa",
    "fieldname": "qn_status",
    "fieldtype": "Select",
-   "in_list_view": 1,
-   "in_preview": 1,
-   "label": "Estado de la Pregunta",
+   "label": "Estado",
    "options": "Activa\nArchivada\nEliminada"
   },
   {
    "fieldname": "qn_helper_text",
    "fieldtype": "Small Text",
-   "label": "Texto de Ayuda"
+   "label": "Texto de ayuda"
   },
   {
    "fieldname": "qn_owner",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Pertene a Compa\u00f1ia",
+   "label": "Compa\u00f1\u00eda",
    "options": "qp_IQ_Company",
    "reqd": 1
   },
   {
    "fieldname": "qn_statement_positive",
    "fieldtype": "Data",
-   "label": "Enunciado del Extremo Positivo"
+   "label": "Etiqueta Extremo Positivo"
   },
   {
    "fieldname": "qn_statement_negative",
    "fieldtype": "Data",
-   "label": "Enunciado del Extremo Negativo"
+   "label": "Etiqueta Extremo Negativo"
   },
   {
    "fieldname": "qn_positive_statement",
@@ -128,32 +117,31 @@
   {
    "fieldname": "qn_nps_min",
    "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Valor M\u00ednimo NPS"
+   "label": "Puntaje m\u00ednimo (NPS)"
   },
   {
    "fieldname": "qn_nps_max",
    "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Valor M\u00e1ximo NPS"
+   "label": "Puntaje m\u00e1ximo (NPS)"
   },
   {
    "fieldname": "qn_creator",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
-   "label": "Creador",
+   "label": "Creado por",
    "options": "Contact",
    "reqd": 1
   },
   {
    "fieldname": "qp_sec_question",
    "fieldtype": "Section Break",
-   "label": "Pregunta"
+   "label": "Informaci\u00f3n de la Pregunta"
   },
   {
    "fieldname": "qp_sec_od",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Configuraci\u00f3n y M\u00e9tricas"
   },
   {
    "fieldname": "qp_col_1",
@@ -167,35 +155,37 @@
    "default": "0",
    "fieldname": "qp_is_public",
    "fieldtype": "Check",
-   "label": "Pregunta Publica"
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "\u00bfEs p\u00fablica?"
   },
   {
    "fieldname": "qn_statement_others",
    "fieldtype": "Small Text",
-   "label": "Texto de la Pregunta / Enunciado Principal / Terceros"
+   "label": "Enunciado para Terceros"
   },
   {
    "default": "0",
    "fieldname": "qp_others",
    "fieldtype": "Check",
-   "label": "Permitir \"Otros\""
+   "label": "Permitir opci\u00f3n \u00abOtros\u00bb"
   },
   {
    "default": "0",
    "fieldname": "qp_none_above",
    "fieldtype": "Check",
-   "label": "Permitir \"Ninguna\""
+   "label": "Permitir \u00abNinguna de las anteriores\u00bb"
   },
   {
    "fieldname": "qp_topic",
    "fieldtype": "Link",
-   "label": "Tema de la pregunta",
+   "label": "Tema",
    "options": "qp_IQ_DemographicType"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-05 11:40:48.968689",
+ "modified": "2026-10-06 18:49:49.492763",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_Question",

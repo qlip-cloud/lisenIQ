@@ -66,6 +66,10 @@ def process_survey_response(doc, method):
         except jwt.InvalidTokenError:
             frappe.throw("Enlace inválido o expirado.")
 
+        # Si por cualquier vía llegara una respuesta de Prueba Beta al backend, no debe almacenarse ni alterar métricas
+        if payload.get("beta"):
+            return
+
         status_finished = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "Finalizada"}, "name")
         status_in_progress = frappe.get_value("qp_IQ_SurveyStatus", {"se_status": "En Progreso"}, "name")
         rs_responded = frappe.get_value("qp_IQ_RecipientStatus", {"rs_status": "Responded"}, "name") or "Responded"

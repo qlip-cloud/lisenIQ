@@ -400,9 +400,9 @@ def _process_responses_for_global_metrics(
             theme = question_info.get('theme') or 'Sin Tema'
             
             # Skip open-ended questions (dimension = 'Abierta')
-            if dimension == 'Abierta':
+            if dimension.lower() == 'abierta':
                 continue
-            if dimension == 'Índice de Engagement':
+            if dimension.lower() == 'índice de engagement':
                 value = resp['answer_converted']
             # Add to global scores (using converted 1-5 values)
             all_scores.append(value)
@@ -416,11 +416,11 @@ def _process_responses_for_global_metrics(
 
             # For engagement index (NPS/ENPS), use original 1-10 values
             if (enps_engagement_scores is not None and 
-                dimension == 'Índice de Engagement' and 
+                dimension.lower() == 'índice de engagement' and 
                 theme == 'AMBIENTE LABORAL POSITIVO'):
                 enps_engagement_scores.append(resp['answer'])  # Original 1-10 value
 
-            if all_engagement_scores is not None and dimension == 'Índice de Engagement':
+            if all_engagement_scores is not None and dimension.lower() == 'índice de engagement':
                 all_engagement_scores.append(resp['answer_converted'])  
 
 
@@ -478,14 +478,14 @@ def process_demographic_cutoff_data(
             theme = question_info.get('theme') or 'Sin Tema'
             
             # Handle open-ended questions (text or dimension = 'Abierta')
-            if resp['answer_type'] == 'text' or dimension == 'Abierta':
+            if resp['answer_type'] == 'text' or dimension.lower() == 'abierta':
                 question_text = question_info.get('text', question)
                 open_questions_answers[question_text].append(resp['answer'])
                 continue
 
             # Use converted value (1-5 scale) for all metrics
             value = resp['answer']
-            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+            if dimension.lower() == 'índice de engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                 value = resp['answer_converted']
             scores.append(value)
 
@@ -496,10 +496,10 @@ def process_demographic_cutoff_data(
             dimension_themes[dimension].add(theme)
             
 
-            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+            if dimension.lower() == 'índice de engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                 engagement_scores_cutoff.append(resp['answer'])  
             
-            if dimension == 'Índice de Engagement':
+            if dimension.lower() == 'índice de engagement':
                 engagement_scores_cutoff_converted.append(value)
 
     # Calculate cutoff metrics
@@ -832,10 +832,10 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
             dimension = question_info.get('dimension') or 'Sin Dimensión'
             theme = question_info.get('theme') or 'Sin Tema'
             
-            if dimension == 'Abierta':
+            if dimension.lower() == 'abierta':
                 continue
             
-            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+            if dimension.lower() == 'índice de engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                 value = resp.get('answer_converted')
 
             accumulated['global_score']['total'] += value
@@ -852,7 +852,7 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
             accumulated['dimension_scores'][dimension]['count'] += 1
             
          
-            if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+            if dimension.lower() == 'índice de engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                 original_value = resp.get('answer')  
                 if original_value is not None:
                     if original_value >= 9:
@@ -863,7 +863,7 @@ def _accumulate_cultura_batch(batch_responses, questions_metadata):
                         accumulated['enps_detractors']['count'] += 1
 
             
-            if dimension == 'Índice de Engagement':
+            if dimension.lower() == 'índice de engagement':
                 accumulated['engagement_scores']['total'] += value
                 accumulated['engagement_scores']['count'] += 1
 
@@ -978,10 +978,10 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                 dimension = question_info.get('dimension') or 'Sin Dimensión'
                 question_text = question_info.get('text', question)
 
-                if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+                if dimension.lower() == 'índice de engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                     value = resp.get('answer_converted')
                 
-                if dimension == 'Abierta':
+                if dimension.lower() == 'abierta':
                     text_val = resp.get('answer')
                     if text_val and str(text_val).strip():
                         if question_text not in open_answers:
@@ -1016,7 +1016,7 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                 q_row.total_score += value
                 q_row.response_count += 1
 
-                if dimension == 'Índice de Engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
+                if dimension.lower() == 'índice de engagement' and theme == 'AMBIENTE LABORAL POSITIVO':
                     original_value = resp.get('answer')  
                     if original_value is not None:
                         if original_value >= 9:
@@ -1024,7 +1024,7 @@ def _update_demographic_reports_from_batch(batch_responses, respondents_by_demo,
                         elif original_value <= 6:
                             report_doc.enps_detractores += 1
 
-                if dimension == 'Índice de Engagement':
+                if dimension.lower() == 'índice de engagement':
                     report_doc.engagement_response_count += 1
                     report_doc.engagement_score_accumulator = getattr(report_doc, 'engagement_score_accumulator', 0.0) + value
                 

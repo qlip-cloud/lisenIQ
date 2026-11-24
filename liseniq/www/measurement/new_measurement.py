@@ -1,13 +1,107 @@
 import frappe
 import json
+import re
+import unicodedata
 import base64
 import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
 from io import BytesIO
 from frappe import _
-from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS
-from liseniq.utils.api_survey import generate_public_link_for_survey
+from frappe.utils import md_to_html
+import re
+import jwt
+from time import time
+from email.utils import formataddr
+from liseniq.utils.constants import WEB_FORM_CLIENT_SCRIPT, WEB_FORM_CUSTOM_CSS, get_legal_modals_html
+from liseniq.utils.api_survey import generate_public_link_for_survey, _get_jwt_secret, generate_default_welcome_markdown
 from liseniq.utils.login_util import global_website_context, get_current_active_company
+from liseniq.tasks import _get_invitation_html, _get_notification_sender_name
+
+def _normalize_demographic_title(text):
+    """
+    Normaliza el título de un Tema o Dimensión para comparaciones insensibles a:
+    - Mayúsculas y minúsculas
+    - Acentos, tildes y diéresis (NFKD)
+    - Caracteres especiales, signos de puntuación y espacios múltiples
+    """
+    if not text:
+        return ""
+    text_str = str(text).strip()
+    no_accents = "".join(
+        c for c in unicodedata.normalize("NFKD", text_str)
+        if unicodedata.category(c) != "Mn"
+    )
+    cleaned = re.sub(r"[^a-z0-9]+", " ", no_accents.lower()).strip()
+    return cleaned or text_str.lower()
+
+
+def _get_or_create_demographic_type(raw_value, object_type, user_company=None):
+    """
+    Valida si ya existe un Tema o Dimensión en qp_IQ_DemographicType (dt_title)
+    indiferentemente de la compañía creadora (dt_creator_company), ignorando
+    acentos, mayúsculas/minúsculas y caracteres especiales.
+    Si existe, retorna su 'name'; si no existe, lo crea sin compañía asociada
+    (compartido entre empresas) y retorna el nuevo 'name'.
+    """
+    if not raw_value or not str(raw_value).strip():
+        return None
+
+    clean_raw = str(raw_value).strip()
+    norm_obj_type = _normalize_demographic_title(object_type)
+    allowed_norm_types = ("dimension", "pregunta") if norm_obj_type == "dimension" else (norm_obj_type,)
+
+    # Si el valor recibido es un ID (name) existente de qp_IQ_DemographicType, resolver su dt_title
+    by_id = frappe.db.sql(
+        """
+        SELECT name, dt_title, dt_object_type
+        FROM `tabqp_IQ_DemographicType`
+        WHERE name = %s
+        LIMIT 1
+        """,
+        (clean_raw,),
+        as_dict=True
+    )
+    if by_id and _normalize_demographic_title(by_id[0].get("dt_object_type")) in allowed_norm_types:
+        if by_id[0].get("dt_title"):
+            clean_raw = by_id[0].get("dt_title").strip()
+        else:
+            return by_id[0].name
+
+    normalized_target = _normalize_demographic_title(clean_raw)
+    if not normalized_target:
+        return None
+
+    # Consultar todos los registros sin filtrar por compañía ni depender de colación en dt_object_type
+    candidates = frappe.db.sql(
+        """
+        SELECT name, dt_title, dt_object_type
+        FROM `tabqp_IQ_DemographicType`
+        WHERE dt_title IS NOT NULL
+          AND dt_title != ''
+        ORDER BY creation ASC
+        """,
+        as_dict=True
+    )
+
+    # Priorizar coincidencia exacta de tipo ('dimension' o 'tema') sobre 'pregunta'
+    candidates.sort(
+        key=lambda r: 0 if _normalize_demographic_title(r.get("dt_object_type")) == norm_obj_type else 1
+    )
+
+    for rec in candidates:
+        rec_type_norm = _normalize_demographic_title(rec.get("dt_object_type"))
+        if rec_type_norm in allowed_norm_types:
+            if _normalize_demographic_title(rec.get("dt_title")) == normalized_target:
+                return rec.name
+
+    # Si no existe coincidencia normalizada, crear el nuevo registro compartido (sin dt_creator_company para Dimension/Tema)
+    new_doc = frappe.new_doc("qp_IQ_DemographicType")
+    new_doc.dt_title = clean_raw
+    new_doc.dt_object_type = object_type
+    if norm_obj_type not in ("dimension", "tema") and user_company:
+        new_doc.dt_creator_company = user_company
+    new_doc.insert(ignore_permissions=True)
+    return new_doc.name
 
 def get_context(context):
 
@@ -69,6 +163,7 @@ def get_context(context):
                     "demographic": demo_title,
                     "qp_topic": q_doc.get("qp_topic"),
                     "qp_topic_title": topic_title,
+                    "culture": topic_title,
                     "options": options,
                     "nps_min": q_doc.qn_nps_min,
                     "nps_max": q_doc.qn_nps_max,
@@ -564,20 +659,9 @@ def _process_manual_questions(questions_data, user_company, user_contact):
                 new_question.qn_owner = user_company
                 
                 if q.get("demographic"):
-                    demo_filters = {"dt_title": q["demographic"], "dt_object_type": "Pregunta"}
-                    if user_company:
-                        demo_filters["dt_creator_company"] = user_company
-                    
-                    demographic_name = frappe.db.exists("qp_IQ_DemographicType", demo_filters)
-                    if not demographic_name:
-                        demographic_doc = frappe.new_doc("qp_IQ_DemographicType")
-                        demographic_doc.dt_title = q["demographic"]
-                        demographic_doc.dt_object_type = "Pregunta"
-                        if user_company:
-                            demographic_doc.dt_creator_company = user_company
-                        demographic_doc.insert(ignore_permissions=True)
-                        demographic_name = demographic_doc.name
-                    new_question.qn_demographic = demographic_name
+                    new_question.qn_demographic = _get_or_create_demographic_type(
+                        q.get("demographic"), "Dimension", user_company
+                    )
 
                 if q.get("options"):
                     if q.get("typeName") == "Likert" or (isinstance(q.get("options")[0], dict) and "value" in q.get("options")[0]):
@@ -601,25 +685,11 @@ def _process_manual_questions(questions_data, user_company, user_contact):
                 
                 new_question.qn_optional = q.get("qn_optional", 0)
 
-                topic_val = q.get("qp_topic") or q.get("culture")
+                topic_val = q.get("culture") or q.get("qp_topic_title") or q.get("qp_topic")
                 if topic_val:
-                    if frappe.db.exists("qp_IQ_DemographicType", topic_val):
-                        new_question.qp_topic = topic_val
-                    else:
-                        topic_filters = {"dt_title": topic_val, "dt_object_type": "Pregunta"}
-                        if user_company:
-                            topic_filters["dt_creator_company"] = user_company
-                        
-                        topic_name = frappe.db.exists("qp_IQ_DemographicType", topic_filters)
-                        if not topic_name:
-                            topic_doc = frappe.new_doc("qp_IQ_DemographicType")
-                            topic_doc.dt_title = topic_val
-                            topic_doc.dt_object_type = "Pregunta"
-                            if user_company:
-                                topic_doc.dt_creator_company = user_company
-                            topic_doc.insert(ignore_permissions=True)
-                            topic_name = topic_doc.name
-                        new_question.qp_topic = topic_name
+                    new_question.qp_topic = _get_or_create_demographic_type(
+                        topic_val, "Tema", user_company
+                    )
                     
                 new_question.insert(ignore_permissions=True)
                 manual_question_map[q_id] = new_question.name
@@ -735,6 +805,244 @@ def _build_survey_elements(questions_data, manual_question_map):
         elements.append(element)
         
     return elements
+
+def _build_preview_survey_elements(questions_data, is_leadership=False, test_role="Autoevaluación"):
+    """
+    Construye los elementos de SurveyJS en memoria para la Encuesta de Prueba (sin insertar registros en BD).
+    Soporta tanto preguntas existentes en qp_IQ_Question como preguntas manuales aún no guardadas,
+    y aplica enunciados hacia terceros (qn_statement_others) cuando es 360° en rol Evaluador.
+    """
+    if not questions_data:
+        return []
+
+    question_types_map = {
+        qt.name: qt
+        for qt in frappe.get_all("qp_IQ_QuestionType", fields=["name", "qnt_type_name", "qnt_mnemonico"])
+    }
+    elements = []
+
+    LIKERT_ICON_MAP = {
+        5: "/files/aiq - totalmente de acuerdo.png",
+        4: "/files/aiq - de acuerdo.png",
+        3: "/files/aiq - ni de acuerdo ni desacuerdo.png",
+        2: "/files/aiq - desacuerdo.png",
+        1: "/files/aiq - totalmente desacuerdo.png",
+    }
+    DEFAULT_LIKERT_OPTIONS = [
+        {"text": "Totalmente de acuerdo", "value": 5},
+        {"text": "De acuerdo", "value": 4},
+        {"text": "Ni de acuerdo ni en desacuerdo", "value": 3},
+        {"text": "En desacuerdo", "value": 2},
+        {"text": "Totalmente en desacuerdo", "value": 1},
+    ]
+    transparent_gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+    use_others = bool(is_leadership and test_role and test_role != "Autoevaluación")
+
+    for idx, q in enumerate(questions_data):
+        q_id = str(q.get("id") or f"preview-q-{idx + 1}")
+        is_manual = q_id.startswith("manual-")
+        q_doc = None
+        if not is_manual and frappe.db.exists("qp_IQ_Question", q_id):
+            try:
+                q_doc = frappe.get_doc("qp_IQ_Question", q_id)
+            except Exception:
+                q_doc = None
+
+        qt_info = question_types_map.get(q.get("type"), {})
+        question_type_mnemonic = qt_info.get("qnt_mnemonico")
+
+        surveyjs_type = "text"
+        if question_type_mnemonic == "radio_group":
+            surveyjs_type = "radiogroup"
+        elif question_type_mnemonic == "text_area":
+            surveyjs_type = "comment"
+        elif question_type_mnemonic == "score_nps":
+            surveyjs_type = "rating"
+        elif question_type_mnemonic in ["scale_likert", "scale_emoji"]:
+            surveyjs_type = "imagepicker"
+        elif question_type_mnemonic == "check_group":
+            surveyjs_type = "checkbox"
+        elif question_type_mnemonic == "text_short":
+            surveyjs_type = "text"
+
+        title_text = q.get("text") or ""
+        if use_others:
+            other_stmt = (
+                q.get("qn_statement_others")
+                or q.get("statement_others")
+                or (getattr(q_doc, "qn_statement_others", None) if q_doc else None)
+            )
+            if other_stmt:
+                title_text = other_stmt
+
+        element = {
+            "type": surveyjs_type,
+            "name": q_id,
+            "title": title_text,
+            "isRequired": False if q.get("qn_optional") else True
+        }
+
+        if question_type_mnemonic == "scale_likert":
+            choices = []
+            if q_doc and q_doc.qn_response_options:
+                for opt in q_doc.qn_response_options:
+                    try:
+                        val_int = int(opt.qo_option_value)
+                    except Exception:
+                        val_int = None
+                    image_url = getattr(opt, "qo_url", None) or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
+                    choices.append({
+                        "text": opt.qo_option_text,
+                        "value": opt.qo_option_value,
+                        "imageLink": image_url if image_url else transparent_gif
+                    })
+            else:
+                raw_opts = q.get("options") or DEFAULT_LIKERT_OPTIONS
+                for i_opt, opt in enumerate(raw_opts):
+                    if isinstance(opt, dict):
+                        opt_text = opt.get("text") or str(opt.get("value") or "")
+                        opt_val = opt.get("value") if opt.get("value") is not None else (5 - i_opt)
+                        opt_url = opt.get("url")
+                    else:
+                        opt_text = str(opt)
+                        opt_val = 5 - i_opt
+                        opt_url = None
+                    try:
+                        val_int = int(opt_val)
+                    except Exception:
+                        val_int = None
+                    image_url = opt_url or (LIKERT_ICON_MAP.get(val_int) if val_int else None)
+                    choices.append({
+                        "text": opt_text,
+                        "value": opt_val,
+                        "imageLink": image_url if image_url else transparent_gif
+                    })
+            element["choices"] = choices
+            element["showLabel"] = True
+            element["multiSelect"] = False
+            element["imageFit"] = "contain"
+            element["imageHeight"] = 32
+            element["imageWidth"] = 32
+            element["choicesOrder"] = "none"
+
+        elif question_type_mnemonic == "scale_emoji":
+            choices = []
+            if q_doc and q_doc.qn_response_options:
+                for opt in q_doc.qn_response_options:
+                    choices.append({
+                        "text": opt.qo_option_text,
+                        "value": opt.qo_option_value,
+                        "imageLink": opt.qo_url if opt.qo_url else transparent_gif
+                    })
+            else:
+                for opt in (q.get("options") or []):
+                    if isinstance(opt, dict):
+                        choices.append({
+                            "text": opt.get("text") or "",
+                            "value": opt.get("value") if opt.get("value") is not None else opt.get("text"),
+                            "imageLink": opt.get("url") or transparent_gif
+                        })
+                    else:
+                        choices.append({
+                            "text": str(opt),
+                            "value": str(opt),
+                            "imageLink": transparent_gif
+                        })
+            element["choices"] = choices
+            element["showLabel"] = True
+            element["multiSelect"] = False
+            element["imageFit"] = "contain"
+            element["imageHeight"] = 32
+            element["imageWidth"] = 32
+            element["choicesOrder"] = "none"
+
+        elif question_type_mnemonic == "radio_group" and q.get("options"):
+            element["choices"] = q["options"]
+
+        elif question_type_mnemonic == "check_group":
+            if q.get("options"):
+                element["choices"] = q["options"]
+            if q.get("qp_others"):
+                element["hasOther"] = True
+                element["otherText"] = "Otros"
+            if q.get("qp_none_above"):
+                element["hasNone"] = True
+                element["noneText"] = "Ninguna de las anteriores"
+
+        elif question_type_mnemonic == "score_nps":
+            element["rateMin"] = q.get("nps_min", 1)
+            element["rateMax"] = q.get("nps_max", 10)
+            element["minRateDescription"] = "NADA PROBABLE"
+            element["maxRateDescription"] = "MUY PROBABLE"
+            element["rateDescriptionLocation"] = "top"
+
+        elif question_type_mnemonic == "text_short":
+            element["maxLength"] = 70
+
+        elements.append(element)
+
+    return elements
+
+def _ensure_beta_preview_web_form():
+    """
+    Garantiza que exista un único Web Form genérico de previsualización (ruta: 'encuesta-de-prueba')
+    sin asociarlo a ningún qp_IQ_Survey (custom_iq_survey = None), evitando guardar la medición en BD.
+    """
+    preview_route = "encuesta-de-prueba"
+    preview_title = "Encuesta de Prueba"
+    existing_wf_name = frappe.db.get_value("Web Form", {"route": preview_route}, "name")
+
+    if existing_wf_name:
+        wf_doc = frappe.get_doc("Web Form", existing_wf_name)
+        needs_save = False
+        if wf_doc.client_script != WEB_FORM_CLIENT_SCRIPT:
+            wf_doc.client_script = WEB_FORM_CLIENT_SCRIPT
+            needs_save = True
+        if wf_doc.custom_css != WEB_FORM_CUSTOM_CSS:
+            wf_doc.custom_css = WEB_FORM_CUSTOM_CSS
+            needs_save = True
+        if not wf_doc.published:
+            wf_doc.published = 1
+            needs_save = True
+        if needs_save:
+            wf_doc.save(ignore_permissions=True)
+            frappe.db.commit()
+        return preview_route
+
+    web_form = frappe.new_doc("Web Form")
+    web_form.title = preview_title
+    web_form.route = preview_route
+    web_form.doc_type = "Survey Response"
+    web_form.module = "Frappe Survey"
+    web_form.client_script = WEB_FORM_CLIENT_SCRIPT
+    web_form.custom_css = WEB_FORM_CUSTOM_CSS
+    web_form.published = 1
+    web_form.custom_iq_survey = None
+
+    survey_response_meta = frappe.get_meta("Survey Response")
+    fieldtype_mapping = {"Long Text": "Text Editor"}
+    for field in survey_response_meta.fields:
+        if field.fieldtype not in ["Section Break", "Column Break", "Tab Break"]:
+            web_form_fieldtype = fieldtype_mapping.get(field.fieldtype, field.fieldtype)
+            is_hidden = field.hidden
+            if field.fieldname in ["custom_evaluatee", "custom_evaluator", "responses", "response_json", "user", "survey"]:
+                is_hidden = 1
+
+            web_form.append("web_form_fields", {
+                "fieldname": field.fieldname,
+                "fieldtype": web_form_fieldtype,
+                "label": field.label,
+                "reqd": field.reqd,
+                "options": field.options,
+                "hidden": is_hidden,
+                "read_only": field.read_only,
+                "default": field.default,
+                "description": field.description,
+            })
+
+    web_form.insert(ignore_permissions=True)
+    frappe.db.commit()
+    return preview_route
 
 @frappe.whitelist()
 def save_measurement(data):
@@ -909,6 +1217,8 @@ def save_measurement(data):
                         web_form_doc = frappe.get_doc("Web Form", web_form_name)
                         web_form_doc.title = survey.su_name
                         web_form_doc.route = survey.su_name.lower().replace(" ", "-")
+                        web_form_doc.client_script = WEB_FORM_CLIENT_SCRIPT
+                        web_form_doc.custom_css = WEB_FORM_CUSTOM_CSS
                         web_form_doc.save(ignore_permissions=True)
 
             survey.save(ignore_permissions=True)
@@ -1353,3 +1663,249 @@ def process_leadership_excel(file_base64):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "process_leadership_excel")
         return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
+def send_beta_measurement(measurement_data=None, beta_emails=None, test_role="Autoevaluación", survey_name=None):
+    """
+    Envía una Encuesta de prueba (Modo Piloto / Dry-Run) 100% efímera y sin estado en BD:
+    - NO guarda ni modifica registros en qp_IQ_Survey, Survey, Contact ni qp_IQ_SurveyRecipient.
+    - Construye la vista previa de la encuesta en memoria a partir de `measurement_data` y la guarda temporalmente en Redis (frappe.cache).
+    - Genera un enlace hacia el Web Form genérico de prueba ('encuesta-de-prueba') con un JWT firmado ('beta': True, 'preview_id': ...).
+    - Retorna siempre 'url', 'email_subject' y 'email_html' sin importar si el servidor de correo completó o no el envío.
+    """
+    try:
+        user_company = get_current_active_company()
+        if not user_company:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        data = {}
+        if measurement_data:
+            data = json.loads(measurement_data) if isinstance(measurement_data, str) else dict(measurement_data)
+        elif survey_name and frappe.db.exists("qp_IQ_Survey", survey_name):
+            survey_doc = frappe.get_doc("qp_IQ_Survey", survey_name)
+            if survey_doc.su_owner != user_company:
+                return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+            data = {
+                "name": survey_doc.su_name,
+                "is_leadership": bool(survey_doc.su_is_leadership),
+                "endDate": survey_doc.su_end_date,
+                "email_use_default": str(getattr(survey_doc, "su_default_notif", "1")) != "0",
+                "welcome_use_default": str(getattr(survey_doc, "su_default_welcome", "1")) != "0",
+                "email_customization": {
+                    "invitation_subject": survey_doc.su_invitation_subject,
+                    "invitation_body": survey_doc.su_invitation_body,
+                    "welcome_subject": survey_doc.su_term_subject,
+                    "welcome_body": survey_doc.su_term_body,
+                },
+                "questions": [
+                    {
+                        "id": sq.sq_question,
+                        "text": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_statement") or "",
+                        "type": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_type"),
+                        "qn_optional": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_optional") or 0,
+                        "nps_min": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_nps_min"),
+                        "nps_max": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qn_nps_max"),
+                        "qp_others": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qp_others") or 0,
+                        "qp_none_above": frappe.db.get_value("qp_IQ_Question", sq.sq_question, "qp_none_above") or 0,
+                    }
+                    for sq in (survey_doc.su_questions or [])
+                ]
+            }
+
+        su_name = (data.get("name") or "Encuesta de Prueba").strip()
+        is_leadership = bool(data.get("is_leadership"))
+        end_date = data.get("endDate")
+        email_use_default = bool(data.get("email_use_default", True))
+        welcome_use_default = bool(data.get("welcome_use_default", True))
+        email_data = data.get("email_customization") or {}
+        questions_list = data.get("questions")
+
+        # Si estaba en modo edición de una medición ya en curso y questions no vino en el payload, leer las preguntas actuales sin modificar BD
+        if questions_list is None and data.get("doc_name") and frappe.db.exists("qp_IQ_Survey", data.get("doc_name")):
+            existing_survey = frappe.get_doc("qp_IQ_Survey", data.get("doc_name"))
+            questions_list = []
+            for sq in (existing_survey.su_questions or []):
+                q_doc = frappe.get_doc("qp_IQ_Question", sq.sq_question)
+                questions_list.append({
+                    "id": q_doc.name,
+                    "text": q_doc.qn_statement,
+                    "type": q_doc.qn_type,
+                    "options": [opt.qo_option_text for opt in (q_doc.qn_response_options or [])],
+                    "nps_min": q_doc.qn_nps_min,
+                    "nps_max": q_doc.qn_nps_max,
+                    "qp_others": q_doc.get("qp_others", 0),
+                    "qp_none_above": q_doc.get("qp_none_above", 0),
+                    "qn_optional": q_doc.get("qn_optional", 0)
+                })
+        questions_list = questions_list or []
+
+        if isinstance(beta_emails, str):
+            try:
+                parsed_emails = json.loads(beta_emails)
+            except Exception:
+                parsed_emails = [e.strip() for e in beta_emails.split(",") if e.strip()]
+        elif isinstance(beta_emails, (list, tuple)):
+            parsed_emails = list(beta_emails)
+        else:
+            parsed_emails = []
+
+        email_regex = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+        clean_emails = []
+        for raw_email in parsed_emails:
+            em = str(raw_email or "").strip().lower()
+            if em and email_regex.match(em) and em not in clean_emails:
+                clean_emails.append(em)
+
+        if not clean_emails:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        secret = _get_jwt_secret()
+        if not secret:
+            return {"status": "error", "mail_sent": 0, "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")}
+
+        # Construir elementos de SurveyJS en memoria sin crear registros en qp_IQ_Question ni Survey
+        elements = _build_preview_survey_elements(questions_list, is_leadership=is_leadership, test_role=test_role)
+        survey_json_str = json.dumps({
+            "title": su_name,
+            "description": "",
+            "pages": [{"name": "page1", "elements": elements}]
+        })
+
+        # Construir asunto y mensaje de bienvenida en memoria
+        if welcome_use_default:
+            welcome_subject = f"¡Bienvenido/a a la medición {su_name}!"
+            raw_markdown = generate_default_welcome_markdown({
+                "nombre_medicion": su_name,
+                "numero_preguntas": len(questions_list)
+            })
+            welcome_message = md_to_html(raw_markdown)
+        else:
+            welcome_subject = email_data.get("welcome_subject") or su_name
+            welcome_message = email_data.get("welcome_body") or ""
+
+        if welcome_message:
+            welcome_message += get_legal_modals_html()
+
+        # Guardar previsualización efímera en Redis (frappe.cache) por 48 horas sin tocar las tablas de mediciones
+        preview_id = frappe.generate_hash(length=12)
+        preview_cache_payload = {
+            "name": su_name,
+            "is_leadership": 1 if is_leadership else 0,
+            "role": test_role or "Autoevaluación",
+            "survey_json": survey_json_str,
+            "welcome_subject": welcome_subject,
+            "welcome_message": welcome_message
+        }
+        frappe.cache().set_value(
+            f"liseniq_beta_preview:{preview_id}",
+            json.dumps(preview_cache_payload),
+            expires_in_sec=172800
+        )
+
+        # Garantizar el Web Form contenedor genérico ('encuesta-de-prueba')
+        web_form_route = _ensure_beta_preview_web_form()
+
+        payload = {
+            "sur": su_name,
+            "beta": True,
+            "preview_id": preview_id,
+            "role": test_role or "Autoevaluación",
+            "iat": int(time())
+        }
+        token = jwt.encode(payload, secret, algorithm="HS256")
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
+
+        base_url = frappe.utils.get_url(web_form_route)
+        unique_url = f"{base_url}?new=1&token={token}"
+
+        is_custom_email = not email_use_default
+        custom_inv_subject = email_data.get("invitation_subject")
+        custom_inv_body = email_data.get("invitation_body")
+
+        base_subject = (
+            custom_inv_subject
+            if (is_custom_email and custom_inv_subject)
+            else f"Bienvenido(a) al proceso de Medición - {su_name}"
+        )
+        subject = f"[ENCUESTA DE PRUEBA] {base_subject}"
+
+        end_date_html = ""
+        if end_date:
+            end_date_html = f'<p>La fecha máxima para diligenciar esta encuesta es el <strong>{end_date}</strong></p>'
+
+        html_body = _get_invitation_html(
+            su_name,
+            custom_inv_body,
+            end_date_html,
+            unique_url,
+            is_custom_email
+        )
+
+        sender_formatted = None
+        try:
+            sender_email = None
+            notification_email_account = frappe.db.get_value("qp_IQ_Company", user_company, "co_notification_email")
+            if notification_email_account:
+                sender_email = frappe.db.get_value("Email Account", notification_email_account, "email_id")
+            if not sender_email:
+                sender_email = frappe.db.get_value("Email Account", {"default_outgoing": 1}, "email_id")
+
+            if sender_email:
+                sender_formatted = formataddr((_get_notification_sender_name(), sender_email))
+        except Exception:
+            sender_formatted = None
+
+        mail_sent_count = 0
+
+        for email in clean_emails:
+            sendmail_kwargs = {
+                "recipients": [email],
+                "subject": subject,
+                "message": html_body,
+                "now": True
+            }
+            if sender_formatted:
+                sendmail_kwargs["sender"] = sender_formatted
+
+            try:
+                frappe.sendmail(**sendmail_kwargs)
+                mail_sent_count += 1
+            except Exception as e_mail_now:
+                try:
+                    fallback_kwargs = {
+                        "recipients": [email],
+                        "subject": subject,
+                        "message": html_body,
+                        "now": False
+                    }
+                    frappe.sendmail(**fallback_kwargs)
+                    mail_sent_count += 1
+                except Exception:
+                    frappe.log_error(
+                        f"Error enviando correo de prueba a {email}: {e_mail_now}\n{frappe.get_traceback()}",
+                        "send_beta_measurement - Error Mail"
+                    )
+
+        is_mail_ok = mail_sent_count > 0
+        return {
+            "status": "success" if is_mail_ok else "error",
+            "sent": len(clean_emails),
+            "mail_sent": mail_sent_count,
+            "url": unique_url,
+            "email_subject": subject,
+            "email_html": html_body,
+            "message": _(
+                "El envío del correo de la encuesta de prueba fue exitoso."
+                if is_mail_ok
+                else "El envío del correo de la encuesta de prueba no fue exitoso."
+            )
+        }
+
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "send_beta_measurement")
+        return {
+            "status": "error",
+            "mail_sent": 0,
+            "message": _("El envío del correo de la encuesta de prueba no fue exitoso.")
+        }

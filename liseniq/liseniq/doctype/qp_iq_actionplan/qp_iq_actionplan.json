@@ -80,11 +80,11 @@
   },
   {
    "fieldname": "ap_category",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Categoría",
-   "options": "Liderazgo\nComunicación\nBienestar\nCapacitación\nReconocimiento\nInnovación\nCultura\nSeguridad\nDiversidad e inclusión",
+   "options": "qp_IQ_TemplateCategory",
    "reqd": 1
   },
   {
@@ -371,7 +371,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-02 07:15:00.000000",
+ "modified": "2026-11-17 19:00:49.000000",
  "modified_by": "Administrator",
  "module": "Liseniq",
  "name": "qp_IQ_ActionPlan",

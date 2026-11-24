@@ -1,2 +1,3 @@
 liseniq.patches.add_liseniq_indexes
 liseniq.patches.migrar_empresas_contacto
+liseniq.patches.setup_action_plan_catalogs

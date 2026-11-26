@@ -2,6 +2,8 @@
 
 const API_BASE = "liseniq.www.iq-action-plan.index";
 const DEBOUNCE_DELAY_MS = 300;
+const DEFAULT_SCALE_MIN = 1;
+const DEFAULT_SCALE_MAX = 5;
 const NO_SCORE_MESSAGE =
     "No hay un resultado disponible para este elemento en la medición seleccionada. Elige otro alcance o verifica los resultados.";
 
@@ -63,10 +65,10 @@ const state = {
         ap_scope_label: "",
         has_valid_score: true,
         score_error_message: "",
-        ap_initial_score: 62,
-        ap_target_score: 75,
-        ap_scale_min: 0,
-        ap_scale_max: 100,
+        ap_initial_score: 0,
+        ap_target_score: 4.5,
+        ap_scale_min: DEFAULT_SCALE_MIN,
+        ap_scale_max: DEFAULT_SCALE_MAX,
         tasks: [],
         scopeCatalog: {
             dimensions: [],
@@ -243,6 +245,13 @@ function findLabelById(list, id) {
     });
     if (!match) return id;
     return typeof match === "object" ? match.label || match.id : String(match);
+}
+
+// Formatea un puntaje numérico a 2 decimales (ej. 4.19)
+function formatScoreValue(val) {
+    const num = Number(val ?? 0);
+    if (Number.isNaN(num)) return "0.00";
+    return num.toFixed(2);
 }
 
 // Inicializa las listas desplegables de filtros, asistente y detalle desde los catálogos del backend
@@ -546,10 +555,10 @@ function openWizardForCreate() {
         ap_scope_label: "",
         has_valid_score: true,
         score_error_message: "",
-        ap_initial_score: 62,
-        ap_target_score: 75,
-        ap_scale_min: 0,
-        ap_scale_max: 100,
+        ap_initial_score: 0,
+        ap_target_score: 4.5,
+        ap_scale_min: DEFAULT_SCALE_MIN,
+        ap_scale_max: DEFAULT_SCALE_MAX,
         tasks: [
             {
                 apt_title: "",
@@ -616,10 +625,10 @@ function openWizardForEdit(plan) {
         ap_scope_label: plan.ap_scope_label || "",
         has_valid_score: true,
         score_error_message: "",
-        ap_initial_score: Number(plan.ap_initial_score ?? 62),
-        ap_target_score: Number(plan.ap_target_score ?? 75),
-        ap_scale_min: Number(plan.ap_scale_min ?? 0),
-        ap_scale_max: Number(plan.ap_scale_max ?? 100),
+        ap_initial_score: Number(plan.ap_initial_score ?? 0),
+        ap_target_score: Number(plan.ap_target_score ?? 4.5),
+        ap_scale_min: Number(plan.ap_scale_min ?? DEFAULT_SCALE_MIN),
+        ap_scale_max: Number(plan.ap_scale_max ?? DEFAULT_SCALE_MAX),
         tasks:
             Array.isArray(plan.tasks) && plan.tasks.length > 0
                 ? plan.tasks.map((t) => ({
@@ -900,9 +909,22 @@ async function refreshWizardInitialScore() {
             w.has_valid_score = res.has_score !== false && res.initial_score !== null;
             w.score_error_message = res.message || "";
             w.ap_initial_score = Number(res.initial_score ?? 0);
-            w.ap_scale_min = Number(res.scale_min ?? 0);
-            w.ap_scale_max = Number(res.scale_max ?? 100);
+            w.ap_scale_min = Number(res.scale_min ?? DEFAULT_SCALE_MIN);
+            w.ap_scale_max = Number(res.scale_max ?? DEFAULT_SCALE_MAX);
             w.ap_scope_label = res.scope_label || "";
+
+            // Si estamos creando un plan o la meta actual quedó fuera de la escala (1-5), sugerimos una meta válida
+            const outOfBounds =
+                Number.isNaN(w.ap_target_score) ||
+                w.ap_target_score < w.ap_scale_min ||
+                w.ap_target_score > w.ap_scale_max;
+            if (w.has_valid_score && (!w.isEdit || outOfBounds)) {
+                const suggested = Math.min(
+                    w.ap_scale_max,
+                    Number((w.ap_initial_score + 0.5).toFixed(2))
+                );
+                w.ap_target_score = Math.max(w.ap_scale_min, suggested);
+            }
 
             if (res.dimension_label) {
                 w.ap_dimension_label = res.dimension_label;
@@ -931,9 +953,9 @@ function renderWizardGoalPreview() {
     const initial = Number(w.ap_initial_score || 0);
     const target = Number(w.ap_target_score || 0);
     const diff = Number((target - initial).toFixed(2));
-    const scaleMin = Number(w.ap_scale_min ?? 0);
-    const scaleMax = Number(w.ap_scale_max ?? 100);
-    const scaleMid = Number(((scaleMin + scaleMax) / 2).toFixed(0));
+    const scaleMin = Number(w.ap_scale_min ?? DEFAULT_SCALE_MIN);
+    const scaleMax = Number(w.ap_scale_max ?? DEFAULT_SCALE_MAX);
+    const scaleMid = Number(((scaleMin + scaleMax) / 2).toFixed(2));
 
     const initEl = document.getElementById("wiz-initial-score-display");
     const incEl = document.getElementById("wiz-increment-display");
@@ -941,10 +963,20 @@ function renderWizardGoalPreview() {
     const scaleCapEl = document.getElementById("wiz-scale-caption");
     const rangeTextEl = document.getElementById("wiz-goal-range-text");
     const barFillEl = document.getElementById("wiz-goal-bar-fill");
+    const targetInput = document.getElementById("wiz-target-score");
 
-    if (initEl) initEl.textContent = initial;
+    if (targetInput) {
+        targetInput.min = String(scaleMin);
+        targetInput.max = String(scaleMax);
+        targetInput.placeholder = formatScoreValue(scaleMax);
+        if (document.activeElement !== targetInput) {
+            targetInput.value = target;
+        }
+    }
+
+    if (initEl) initEl.textContent = formatScoreValue(initial);
     if (incEl) {
-        incEl.textContent = diff >= 0 ? `+${diff}` : `${diff}`;
+        incEl.textContent = diff >= 0 ? `+${diff.toFixed(2)}` : `${diff.toFixed(2)}`;
         incEl.classList.toggle("ap-goal-big-num--green", diff >= 0);
     }
     if (scopeCapEl) {
@@ -954,10 +986,10 @@ function renderWizardGoalPreview() {
         scaleCapEl.textContent = `Puntaje objetivo (${scaleMin}-${scaleMax})`;
     }
     if (rangeTextEl) {
-        rangeTextEl.innerHTML = `${initial} &rarr; ${target}`;
+        rangeTextEl.innerHTML = `${formatScoreValue(initial)} &rarr; ${formatScoreValue(target)}`;
     }
 
-    const span = scaleMax - scaleMin > 0 ? scaleMax - scaleMin : 100;
+    const span = scaleMax - scaleMin > 0 ? scaleMax - scaleMin : DEFAULT_SCALE_MAX - DEFAULT_SCALE_MIN;
     const pct = Math.max(0, Math.min(100, ((target - scaleMin) / span) * 100));
     if (barFillEl) barFillEl.style.width = `${pct}%`;
 
@@ -1144,9 +1176,9 @@ function renderWizardSummary() {
     document.getElementById("sum-row-question")?.classList.toggle("d-none", !showQuestion);
 
     const diff = Number((Number(w.ap_target_score || 0) - Number(w.ap_initial_score || 0)).toFixed(2));
-    setTxt("sum-initial-score", String(w.ap_initial_score ?? 0));
-    setTxt("sum-target-score", String(w.ap_target_score ?? 0));
-    setTxt("sum-increment-score", diff >= 0 ? `+${diff}` : `${diff}`);
+    setTxt("sum-initial-score", formatScoreValue(w.ap_initial_score));
+    setTxt("sum-target-score", formatScoreValue(w.ap_target_score));
+    setTxt("sum-increment-score", diff >= 0 ? `+${diff.toFixed(2)}` : `${diff.toFixed(2)}`);
 
     const tasksHeading = document.getElementById("sum-tasks-heading");
     const tasksListEl = document.getElementById("sum-tasks-list");
@@ -1281,8 +1313,8 @@ function validateWizardStep(step) {
             return false;
         }
     } else if (step === 3) {
-        const min = Number(w.ap_scale_min ?? 0);
-        const max = Number(w.ap_scale_max ?? 100);
+        const min = Number(w.ap_scale_min ?? DEFAULT_SCALE_MIN);
+        const max = Number(w.ap_scale_max ?? DEFAULT_SCALE_MAX);
         if (Number.isNaN(w.ap_target_score) || w.ap_target_score < min || w.ap_target_score > max) {
             showNotification(`El puntaje objetivo debe estar entre ${min} y ${max}.`, "error");
             return false;
@@ -1471,12 +1503,12 @@ function renderPlanDetailView(plan, compatibleSurveys) {
         goalBadge.textContent = plan.ap_goal_status;
     }
 
-    setTxt("det-initial-score", plan.ap_initial_score);
-    setTxt("det-target-score", plan.ap_target_score);
+    setTxt("det-initial-score", formatScoreValue(plan.ap_initial_score));
+    setTxt("det-target-score", formatScoreValue(plan.ap_target_score));
     setTxt(
         "det-posterior-score",
         plan.ap_posterior_score !== null && plan.ap_posterior_score !== undefined
-            ? plan.ap_posterior_score
+            ? formatScoreValue(plan.ap_posterior_score)
             : "-"
     );
 
@@ -1485,8 +1517,8 @@ function renderPlanDetailView(plan, compatibleSurveys) {
         "det-variation-score",
         varScore !== null && varScore !== undefined
             ? varScore >= 0
-                ? `+${varScore}`
-                : `${varScore}`
+                ? `+${Number(varScore).toFixed(2)}`
+                : `${Number(varScore).toFixed(2)}`
             : "-"
     );
 
@@ -1495,8 +1527,8 @@ function renderPlanDetailView(plan, compatibleSurveys) {
         "det-goal-diff-score",
         diffScore !== null && diffScore !== undefined
             ? diffScore >= 0
-                ? `+${diffScore}`
-                : `${diffScore}`
+                ? `+${Number(diffScore).toFixed(2)}`
+                : `${Number(diffScore).toFixed(2)}`
             : "-"
     );
 

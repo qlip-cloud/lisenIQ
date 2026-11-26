@@ -683,7 +683,7 @@ class MeasurementCreator {
 <li>La información será utilizada únicamente para los fines definidos por la organización.</li>
 </ul>
 <p>Antes de continuar, debes leer y aceptar los Términos y Condiciones y el Aviso de Privacidad relacionados con esta medición.</p>
-<p>[ ] He leído y acepto el <a href="https://qlip.cloud/aviso-de-privacidad/?utm_source=listenaiq&utm_medium=referral&utm_campaign=aviso_privacidad" target="_blank" rel="noopener">Aviso de Privacidad</a> y la <a href="https://qlip.cloud/privacy-policy/?utm_source=listenaiq&utm_medium=referral&utm_campaign=politica_privacidad" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
+<p>[ ] He leído y acepto el <a href="#iqPrivacyModal" data-iq-modal="iqPrivacyModal" onclick="openIqModal(event, 'iqPrivacyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Aviso de Privacidad</a> y la <a href="#iqPolicyModal" data-iq-modal="iqPolicyModal" onclick="openIqModal(event, 'iqPolicyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Política de Tratamiento de Datos</a> para participar en esta medición.</p>
 <p>Cuando estés listo, haz clic en "Comenzar" para iniciar la medición.</p>`
             };
         }
@@ -1455,6 +1455,7 @@ class MeasurementCreator {
                 branding: false,
                 plugins: 'link lists autoresize',
                 toolbar: 'undo redo | bold italic underline | bullist numlist | link removeformat',
+                extended_valid_elements: 'a[href|onclick|data-iq-modal|style|class|id]',
                 autoresize_bottom_margin: 24,
                 min_height: 360,
                 content_style: 'body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto; font-size:14px;}',
@@ -1796,9 +1797,9 @@ class MeasurementCreator {
         if (betaFeedbackMsg) betaFeedbackMsg.classList.add('d-none');
 
         try {
-            // Auto-guardado transparente (creación o sincronización en modo edición) sin redirigir a /iq-home
+            // Sincronizar en memoria sin guardar la medición en base de datos hasta que el usuario pulse 'Enviar'
             this.syncEmailStateFromFields();
-            await this.saveMeasurement(true);
+            const measurementPayload = this.buildMeasurementPayload();
 
             const testRole = (this.state.measurementData.isLeadership && betaRoleSelect)
                 ? betaRoleSelect.value
@@ -1807,7 +1808,7 @@ class MeasurementCreator {
             const response = await frappe.call({
                 method: 'liseniq.www.measurement.new_measurement.send_beta_measurement',
                 args: {
-                    survey_name: this.state.docName,
+                    measurement_data: JSON.stringify(measurementPayload),
                     beta_emails: JSON.stringify(validEmails),
                     test_role: testRole
                 }

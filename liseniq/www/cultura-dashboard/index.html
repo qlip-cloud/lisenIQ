@@ -626,7 +626,7 @@ window.__ERPNEXT_RUN_REST__ = function () {
   //-----------Botón Chatbot IA-----------
   const chatbotButton = document.createElement('button');
   chatbotButton.id = "qlip-fab";
-  const iaAccess = DATA.permission_ia;
+  const iaAccess = Boolean(window.__CD && window.__CD.DATA && window.__CD.DATA.permission_ia);
   chatbotButton.disabled = !iaAccess;
   chatbotButton.innerHTML = '<span class="material-symbols-outlined">robot_2</span>';
   chatbotButton.title = "qlipIA";

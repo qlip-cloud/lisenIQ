@@ -273,20 +273,26 @@ def get_legal_modals_html():
     </div>
 
     <script>
-      function openIqModal(e, modalId) {
-        if(e) e.preventDefault();
-        var modal = document.getElementById(modalId);
-        if(modal) modal.style.display = 'block';
-      }
-      function closeIqModal(modalId) {
-        var modal = document.getElementById(modalId);
-        if(modal) modal.style.display = 'none';
-      }
-      function closeIqModalOnClickOutside(event, modalId) {
-        if (event.target.id === modalId) {
-          closeIqModal(modalId);
+      window.openIqModal = function(e, modalId) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
         }
-      }
+        var modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'block';
+      };
+      window.closeIqModal = function(modalId) {
+        var modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
+      };
+      window.closeIqModalOnClickOutside = function(event, modalId) {
+        if (event.target && event.target.id === modalId) {
+          window.closeIqModal(modalId);
+        }
+      };
+      function openIqModal(e, modalId) { window.openIqModal(e, modalId); }
+      function closeIqModal(modalId) { window.closeIqModal(modalId); }
+      function closeIqModalOnClickOutside(event, modalId) { window.closeIqModalOnClickOutside(event, modalId); }
     </script>
     """
     
@@ -305,6 +311,7 @@ let uqFlag = uqFromUrl || uqStored;
 window.liseniq_is_anonymous_survey = false;
 window.liseniq_is_leadership = false;
 window.liseniq_is_beta = false;
+window.liseniq_survey_display_name = null;
 
 if (uqFlag && !uqFromUrl) {
   const loc = new URL(window.location.href);
@@ -375,10 +382,6 @@ frappe.web_form.after_load = () => {
   
   $('.web-form-actions button[type="submit"]').hide();
 
-  // Validar si ya hay respuestas guardadas en localStorage
-  const surveyCacheKey = "liseniq_survey_cache_" + frappe.web_form.title;
-  const cachedResponses = localStorage.getItem(surveyCacheKey);
-
   // Extraer parámetros
   const urlParams = urlParamsGlobal;
   const token = urlParams.get("token");
@@ -389,10 +392,18 @@ frappe.web_form.after_load = () => {
   const hasRid = decodedToken && !!decodedToken.rid;
   const isBetaToken = decodedToken && !!decodedToken.beta;
   window.liseniq_is_beta = isBetaToken;
+  if (decodedToken && decodedToken.sur) {
+      window.liseniq_survey_display_name = decodedToken.sur;
+  }
+
+  // Validar si ya hay respuestas guardadas en localStorage
+  const effectiveTitle = window.liseniq_survey_display_name || frappe.web_form.title;
+  const surveyCacheKey = "liseniq_survey_cache_" + effectiveTitle;
+  const cachedResponses = localStorage.getItem(surveyCacheKey);
 
   frappe.call({
       method: "liseniq.utils.api_survey.get_survey_is_anonymous",
-      args: { survey_name: frappe.web_form.title }
+      args: { survey_name: effectiveTitle }
   }).then(r => {
       const is_anonymous = r.message;
       // Guardamos el estado globalmente para usarlo al enviar
@@ -438,7 +449,7 @@ frappe.web_form.after_load = () => {
         .call({
           method: "liseniq.utils.api_survey.validate_survey_link",
           args: {
-            survey_name: frappe.web_form.title,
+            survey_name: effectiveTitle,
             user: (is_anonymous && !window.liseniq_is_beta) ? "Anonimo" : (token || "Anonimo"),
             token: (is_anonymous && !window.liseniq_is_beta) ? null : token,
             dni: dni || null,
@@ -448,6 +459,9 @@ frappe.web_form.after_load = () => {
         .then((r) => {
           const res = r.message || {};
           window.liseniq_is_beta = !!res.is_beta || isBetaToken;
+          if (res.survey_display_name) {
+              window.liseniq_survey_display_name = res.survey_display_name;
+          }
 
           if (res.redirect_register && !window.liseniq_is_beta) {
               const reg_token = res.register_token || token;
@@ -469,8 +483,9 @@ frappe.web_form.after_load = () => {
     
           $('.web-form-actions button[type="submit"]').show();
           
+          const displayTitle = window.liseniq_survey_display_name || frappe.web_form.title;
           // Mostrar pantalla de bienvenida antes de cargar el Webform (Survey)
-          show_welcome_screen(frappe.web_form.title, cachedResponses, res.welcome_subject, res.welcome_message, window.liseniq_is_beta);
+          show_welcome_screen(displayTitle, cachedResponses, res.welcome_subject, res.welcome_message, window.liseniq_is_beta);
         });
   });
 };
@@ -488,7 +503,8 @@ frappe.ready(function() {
   // Eliminar dni y cache al cerrar navegador
   window.addEventListener("unload", function() {
     localStorage.removeItem("liseniq_doc_id");
-    localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
+    const effectiveTitle = window.liseniq_survey_display_name || frappe.web_form.title;
+    localStorage.removeItem("liseniq_survey_cache_" + effectiveTitle);
   });
 });
 
@@ -591,7 +607,7 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
                 <label class="iq-welcome-terms-label">
                     <input type="checkbox" id="accept-terms-checkbox" class="iq-welcome-checkbox">
                     <span class="iq-welcome-terms-text">
-                        He leído y acepto los términos y condiciones (<a href="https://qlip.cloud/aviso-de-privacidad/?utm_source=listenaiq&utm_medium=referral&utm_campaign=aviso_privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Aviso de Privacidad</a> | <a href="https://qlip.cloud/privacy-policy/?utm_source=listenaiq&utm_medium=referral&utm_campaign=politica_privacidad/" target="_blank" rel="noopener noreferrer" style="color: #7B24FF; text-decoration: underline;">Privacy Policy</a>), y consiento el tratamiento de mis datos y respuestas para los fines de esta medición.
+                        He leído y acepto el <a href="#iqPrivacyModal" data-iq-modal="iqPrivacyModal" onclick="openIqModal(event, 'iqPrivacyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Aviso de Privacidad</a> y la <a href="#iqPolicyModal" data-iq-modal="iqPolicyModal" onclick="openIqModal(event, 'iqPolicyModal')" style="text-decoration: underline; color: #007bff; font-weight: bold;">Política de Tratamiento de Datos</a> para participar en esta medición.
                     </span>
                 </label>
             </div>
@@ -621,6 +637,33 @@ const show_welcome_screen = function (survey_name, cachedResponses, customSubjec
     
     $wrap.append(welcomeHTML);
 
+    // Delegación de eventos para abrir los modales incluso cuando TinyMCE limpia el atributo onclick en mensajes personalizados
+    $wrap.off('click.iqModal').on('click.iqModal', 'a', function(e) {
+        const href = ($(this).attr('href') || '').trim();
+        const modalAttr = $(this).attr('data-iq-modal');
+        const linkText = ($(this).text() || '').toLowerCase();
+        let targetModal = null;
+
+        if (modalAttr) {
+            targetModal = modalAttr;
+        } else if (href === '#iqPrivacyModal' || href.includes('aviso-de-privacidad') || linkText.includes('aviso de privacidad')) {
+            targetModal = 'iqPrivacyModal';
+        } else if (href === '#iqPolicyModal' || href.includes('privacy-policy') || linkText.includes('política de tratamiento') || linkText.includes('politica de tratamiento') || linkText.includes('privacy policy')) {
+            targetModal = 'iqPolicyModal';
+        }
+
+        if (targetModal) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.openIqModal === 'function') {
+                window.openIqModal(e, targetModal);
+            } else {
+                const modalEl = document.getElementById(targetModal);
+                if (modalEl) modalEl.style.display = 'block';
+            }
+        }
+    });
+
     $('#accept-terms-checkbox').on('change', function() {
         if ($(this).is(':checked')) {
             $('#btn-start-survey').prop('disabled', false);
@@ -647,12 +690,13 @@ const load_survey = function (survey_name, cachedResponses) {
   const urlParams = urlParamsGlobal;
   const token = urlParams.get("token");
   const doc_id = localStorage.getItem("liseniq_doc_id");
+  const effectiveTitle = window.liseniq_survey_display_name || survey_name || frappe.web_form.title;
 
   frappe
     .call({
       method: "liseniq.utils.api_survey.get_public_survey",
       args: {
-        survey_name: frappe.web_form.title,
+        survey_name: effectiveTitle,
         token: token || null,
         dni: doc_id || null
       },
@@ -684,7 +728,7 @@ const load_survey = function (survey_name, cachedResponses) {
       survey.onValueChanged.add((sender, options) => {
         // Guardar respuestas en cache cada vez que cambie una respuesta
         localStorage.setItem(
-          "liseniq_survey_cache_" + frappe.web_form.title,
+          "liseniq_survey_cache_" + effectiveTitle,
           JSON.stringify(sender.data)
         );
       });
@@ -717,10 +761,11 @@ const submit_response = function (data) {
   const token = urlParams.get("token");
   const doc_id = localStorage.getItem("liseniq_doc_id");
   const decodedTokenCheck = parseJwt(token);
+  const effectiveTitle = window.liseniq_survey_display_name || frappe.web_form.title;
 
   // Si es Encuesta de prueba, NO se guarda ninguna respuesta en la base de datos
   if (window.liseniq_is_beta || (decodedTokenCheck && decodedTokenCheck.beta)) {
-      localStorage.removeItem("liseniq_survey_cache_" + frappe.web_form.title);
+      localStorage.removeItem("liseniq_survey_cache_" + effectiveTitle);
       window.saving = false;
       return;
   }

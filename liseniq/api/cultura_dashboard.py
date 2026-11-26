@@ -41,7 +41,7 @@ REPORT_NAME = "Survey Response Custom Report Front"
 # (singular) — es el valor usado en el dashboard hermano de Engagement, y
 # es la causa más probable si aquí no aparecen preguntas abiertas. Si tu
 # catálogo usa un tercer valor distinto, agrégalo a esta lista.
-OPEN_TEXT_TAG_VARIANTS = ["Abiertas", "Abierta"]
+OPEN_TEXT_TAG_VARIANTS = ["ABIERTA", "ABIERTAS", "Abierta", "Abiertas", "abierta", "abiertas"]
 
 # Umbral mínimo de anonimato: ningún resultado se desagrega para grupos
 # con menos personas que esto (mismo valor que el HTML original).
@@ -50,11 +50,11 @@ MIN_N = 5
 # Orden y color sugeridos para los 3 Tipos de Cultura, si el `theme`
 # coincide exactamente con estos nombres (colores extraídos por muestreo
 # de píxeles del PDF original de metodología OCC).
-TIPO_ORDER_HINT = ["Responsable", "Competitiva", "Humanista"]
+TIPO_ORDER_HINT = ["RESPONSABLE", "COMPETITIVA", "HUMANISTA"]
 TIPO_COLOR_HINT = {
-    "Responsable": "#0889D6",
-    "Competitiva": "#EB493C",
-    "Humanista": "#48BBA1",
+    "RESPONSABLE": "#0889D6",
+    "COMPETITIVA": "#EB493C",
+    "HUMANISTA": "#48BBA1",
 }
 DEFAULT_TIPO_COLOR = "#888888"
 

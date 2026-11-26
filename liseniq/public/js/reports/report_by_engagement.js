@@ -40,7 +40,7 @@ export function initEngagementReport(dataConfig, surveyName) {
     // Inicializamos las tablas desglosadas por tema
     initTopicsTables(topicQuestionsData);
 
-    // Renderizar Gráfico de Engagement
+    // Renderizar Gráfico de Engagement (Puntaje por Dimensión)
     if (appFeatures.includes('aiq_rep_engagement')) {
         renderEngagementChart(engagementChartType, engagementData);
         
@@ -78,7 +78,7 @@ export function initEngagementReport(dataConfig, surveyName) {
         if (btnExpPdfEngagement) btnExpPdfEngagement.addEventListener('click', () => exportChart(engagementChartInstance, `Reporte_Engagement_${surveyName}`, 'pdf'));
     }
 
-    // Renderizar Gráfico de Dimensiones
+    // Renderizar Gráfico de Dimensiones / Atributos
     if (appFeatures.includes('aiq_rep_dimension') || true) {
         renderDimensionChart(dimensionChartType, groupedDimensionData);
         
@@ -172,7 +172,7 @@ function renderNpsGaugeChart(data) {
         chart: {
             height: 160,
             type: 'gauge',
-            sparkline: { enabled: true }, // Quita padding innecesario
+            sparkline: { enabled: true },
             animations: {
                 enabled: true,
                 dynamicAnimation: { enabled: true, speed: 800 },
@@ -252,7 +252,7 @@ function renderNpsGaugeChart(data) {
     chart.render();
 }
 
-// Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas agrupada por dimensión (dimensionData)
+// Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas (dimensionData)
 function initTopBottomCards(data) {
     const topContainer = document.getElementById('top-10-list');
     const bottomContainer = document.getElementById('bottom-10-list');
@@ -292,7 +292,6 @@ function initTopicsTables(data) {
     if (!container) return;
     if (!data || data.length === 0) return;
 
-    // Agrupamos las preguntas por su topic
     const grouped = {};
     data.forEach(item => {
         const topic = item.topic || 'Sin Tema';
@@ -301,18 +300,15 @@ function initTopicsTables(data) {
     });
 
     let html = '';
-    // Ordenamos los temas alfabéticamente para mantener consistencia visual
     const sortedTopics = Object.keys(grouped).sort();
 
     sortedTopics.forEach(topic => {
         const items = grouped[topic];
-        // Ordenar las preguntas dentro de cada tema de mayor a menor puntaje
         items.sort((a, b) => b.score - a.score);
 
         const rowsHtml = items.map(item => {
             const percentage = Math.min(100, Math.max(0, (item.score / 5) * 100));
             
-            // Asignación de color según el tema
             let c = item.color ? String(item.color).trim().toLowerCase() : "";
             let hexColor = '#7c3aed';
             if (c && c !== 'none' && c !== 'null') {
@@ -358,14 +354,10 @@ function renderEngagementChart(type, data) {
     const categories = data.map(item => item.topic || 'N/A');
     const scores = data.map(item => item.score || 0);
     
-    // Asignar el color dinámicamente
     const colorsArr = data.map(item => {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
-        
-        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
-        
         return item.color;
     });
 
@@ -441,7 +433,7 @@ function renderEngagementChart(type, data) {
                 style: { fontSize: '14px', fontFamily: 'inherit', fontWeight: 700 }
             },
             legend: { position: 'bottom' },
-            title: { text: 'Puntaje por tipo de Cultura', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
+            title: { text: 'Puntaje por Dimensión', align: 'left', style: { fontSize: '16px', fontWeight: '700', color: '#1f2937' } },
             subtitle: { text: 'Representación proporcional del promedio (escala 1 a 5)', align: 'left', margin: 30, style: { fontSize: '13px', color: '#6b7280' } },
             tooltip: {
                 custom: function({series, seriesIndex, w}) {
@@ -458,22 +450,19 @@ function renderEngagementChart(type, data) {
     engagementChartInstance.render();
 }
 
-// Renderizar el grafico de dimensiones utilizando la data agrupada por dimensión (groupedDimensionData)
+// Renderizar el gráfico de Puntaje por Atributos usando las categorías agrupadas (temas/atributos, sin preguntas individuales)
 function renderDimensionChart(type, data) {
     const chartContainer = document.getElementById('dimension-chart-container');
     if (!chartContainer) return;
 
-    // Utilizamos solo las categorías agrupadas (sin preguntas individuales)
-    const categories = data.map(item => item.engagement || 'N/A'); 
+    // Mostrar únicamente los temas/atributos agrupados (item.engagement), nunca las preguntas
+    const categories = data.map(item => item.engagement || item.topic || 'N/A'); 
     const scores = data.map(item => item.score || 0);
 
-    // Asignar el color dinámicamente
     const colorsArr = data.map(item => {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
-        
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
-        
         return item.color;
     });
 
@@ -488,7 +477,9 @@ function renderDimensionChart(type, data) {
 
     let options = {};
     if (type === 'bar') {
-        const dynamicHeight = Math.max(300, categories.length * 35 + 50);
+        // Sincronizamos la altura del contenedor con la altura dinámica de ApexCharts para evitar desbordes
+        const dynamicHeight = Math.max(350, categories.length * 38 + 80);
+        chartContainer.style.height = `${dynamicHeight}px`;
 
         options = {
             series: [{ name: 'Puntaje Promedio', data: scores }],
@@ -564,7 +555,7 @@ function renderDimensionChart(type, data) {
                     },
                     style: { 
                         colors: '#4b5563', 
-                        fontSize: '10px',
+                        fontSize: '11px',
                         fontWeight: 500 
                     } 
                 } 
@@ -575,7 +566,7 @@ function renderDimensionChart(type, data) {
                 padding: {
                     top: 0,
                     right: 15,
-                    bottom: -15,
+                    bottom: 10,
                     left: 10
                 }
             },
@@ -591,10 +582,11 @@ function renderDimensionChart(type, data) {
             }
         };
     } else {
+        chartContainer.style.height = '450px';
         options = {
             series: scores,
             labels: categories,
-            chart: { type: 'pie', height: '100%', toolbar: { show: false }, fontFamily: 'inherit' },
+            chart: { type: 'pie', height: 450, toolbar: { show: false }, fontFamily: 'inherit' },
             colors: colorsArr,
             dataLabels: {
                 enabled: true,

@@ -68,7 +68,7 @@ export function initCultureReport(dataConfig, surveyName) {
         hideSection('culture-header-container', 'culture-card-container');
     }
 
-    // Renderizar Gráfico de Dimensiones
+    // Renderizar Gráfico de Dimensiones / Atributos
     if (appFeatures.includes('aiq_rep_dimension')) {
         renderDimensionChart(dimensionChartType, groupedDimensionData);
         
@@ -127,7 +127,7 @@ function parseBackendData(rawData) {
     return data;
 }
 
-// Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas agrupada por dimensión (dimensionData)
+// Inicializar las tarjetas de top 10 y bottom 10 utilizando la data de preguntas (dimensionData)
 function initTopBottomCards(data) {
     const topContainer = document.getElementById('top-10-list');
     const bottomContainer = document.getElementById('bottom-10-list');
@@ -167,7 +167,6 @@ function initTopicsTables(data) {
     if (!container) return;
     if (!data || data.length === 0) return;
 
-    // Agrupamos las preguntas por su topic
     const grouped = {};
     data.forEach(item => {
         const topic = item.topic || 'Sin Tema';
@@ -176,18 +175,15 @@ function initTopicsTables(data) {
     });
 
     let html = '';
-    // Ordenamos los temas alfabéticamente para mantener consistencia visual
     const sortedTopics = Object.keys(grouped).sort();
 
     sortedTopics.forEach(topic => {
         const items = grouped[topic];
-        // Ordenar las preguntas dentro de cada tema de mayor a menor puntaje
         items.sort((a, b) => b.score - a.score);
 
         const rowsHtml = items.map(item => {
             const percentage = Math.min(100, Math.max(0, (item.score / 5) * 100));
             
-            // Asignación de color según el tema
             let c = item.color ? String(item.color).trim().toLowerCase() : "";
             let hexColor = '#7c3aed';
             if (c && c !== 'none' && c !== 'null') {
@@ -233,14 +229,10 @@ function renderCultureChart(type, data) {
     const categories = data.map(item => item.topic || 'N/A');
     const scores = data.map(item => item.score || 0);
     
-    // Asignar el color dinámicamente
     const colorsArr = data.map(item => {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
-        
-        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
-        
         return item.color;
     });
 
@@ -333,23 +325,19 @@ function renderCultureChart(type, data) {
     cultureChartInstance.render();
 }
 
-// Renderizar el grafico de dimensiones utilizando la data agrupada por dimensión (groupedDimensionData)
+// Renderizar el gráfico de Dimensiones utilizando las categorías agrupadas (groupedDimensionData: dimensiones/atributos, sin preguntas)
 function renderDimensionChart(type, data) {
     const chartContainer = document.getElementById('dimension-chart-container');
     if (!chartContainer) return;
 
-    // Utilizamos solo las categorías agrupadas (sin preguntas individuales)
-    const categories = data.map(item => item.culture || 'N/A');
+    // Mostrar únicamente las dimensiones/atributos agrupados (item.culture), nunca las preguntas
+    const categories = data.map(item => item.culture || item.topic || 'N/A');
     const scores = data.map(item => item.score || 0);
 
-    // Asignar el color dinámicamente
     const colorsArr = data.map(item => {
         let c = item.color ? String(item.color).trim().toLowerCase() : "";
         if (!c || c === 'none' || c === 'null') return '#7c3aed';
-        
-        // Agregamos el '#' automáticamente en caso de que en la BD solo hayan puesto el código hex
         if (/^[0-9a-f]{6}$/i.test(c)) return '#' + item.color.trim();
-        
         return item.color;
     });
 
@@ -364,9 +352,10 @@ function renderDimensionChart(type, data) {
 
     let options = {};
     if (type === 'bar') {
+        chartContainer.style.height = '450px';
         options = {
             series: [{ name: 'Puntaje Promedio', data: scores }],
-            chart: { type: 'bar', height: '100%', toolbar: { show: false }, fontFamily: 'inherit' },
+            chart: { type: 'bar', height: 450, toolbar: { show: false }, fontFamily: 'inherit' },
             colors: colorsArr,
             plotOptions: { 
                 bar: { 
@@ -435,10 +424,11 @@ function renderDimensionChart(type, data) {
             }
         };
     } else {
+        chartContainer.style.height = '450px';
         options = {
             series: scores,
             labels: categories,
-            chart: { type: 'pie', height: '100%', toolbar: { show: false }, fontFamily: 'inherit' },
+            chart: { type: 'pie', height: 450, toolbar: { show: false }, fontFamily: 'inherit' },
             colors: colorsArr,
             dataLabels: {
                 enabled: true,

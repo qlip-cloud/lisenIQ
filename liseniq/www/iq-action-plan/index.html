@@ -397,7 +397,7 @@
                 <div class="ap-goal-cards-grid">
                     <div class="ap-goal-metric-card">
                         <span class="ap-goal-card-tag">RESULTADO ACTUAL</span>
-                        <strong id="wiz-initial-score-display" class="ap-goal-big-num">0</strong>
+                        <strong id="wiz-initial-score-display" class="ap-goal-big-num">0.00</strong>
                         <span id="wiz-scope-caption" class="ap-goal-card-caption">Resultado base del alcance elegido</span>
                     </div>
 
@@ -407,16 +407,16 @@
                             id="wiz-target-score"
                             type="number"
                             step="0.01"
-                            min="0"
-                            max="100"
+                            min="1"
+                            max="5"
                             class="ap-goal-target-input"
-                            placeholder="75">
-                        <span id="wiz-scale-caption" class="ap-goal-card-caption">Puntaje objetivo (0-100)</span>
+                            placeholder="4.50">
+                        <span id="wiz-scale-caption" class="ap-goal-card-caption">Puntaje objetivo (1-5)</span>
                     </div>
 
                     <div class="ap-goal-metric-card">
                         <span class="ap-goal-card-tag">INCREMENTO ESPERADO</span>
-                        <strong id="wiz-increment-display" class="ap-goal-big-num ap-goal-big-num--green">+0</strong>
+                        <strong id="wiz-increment-display" class="ap-goal-big-num ap-goal-big-num--green">+0.00</strong>
                         <span class="ap-goal-card-caption">Puntos vs. resultado actual</span>
                     </div>
                 </div>
@@ -424,15 +424,15 @@
                 <div class="ap-goal-progress-box mt-4">
                     <div class="ap-goal-progress-top">
                         <span class="ap-goal-progress-label">Progreso hacia la meta</span>
-                        <span id="wiz-goal-range-text" class="ap-goal-progress-range">0 &rarr; 0</span>
+                        <span id="wiz-goal-range-text" class="ap-goal-progress-range">0.00 &rarr; 0.00</span>
                     </div>
                     <div class="ap-goal-bar-track">
                         <div id="wiz-goal-bar-fill" class="ap-goal-bar-fill" style="width: 0%;"></div>
                     </div>
                     <div class="ap-goal-scale-marks">
-                        <span id="wiz-scale-min-label">0</span>
-                        <span id="wiz-scale-mid-label">50</span>
-                        <span id="wiz-scale-max-label">100</span>
+                        <span id="wiz-scale-min-label">1</span>
+                        <span id="wiz-scale-mid-label">3</span>
+                        <span id="wiz-scale-max-label">5</span>
                     </div>
                 </div>
             </div>
@@ -503,17 +503,17 @@
                             <div class="ap-summary-score-pair">
                                 <div>
                                     <span class="ap-summary-score-label">Actual</span>
-                                    <strong id="sum-initial-score" class="ap-summary-score-val">0</strong>
+                                    <strong id="sum-initial-score" class="ap-summary-score-val">0.00</strong>
                                 </div>
                                 <span class="ap-summary-arrow">&rarr;</span>
                                 <div>
                                     <span class="ap-summary-score-label">Meta</span>
-                                    <strong id="sum-target-score" class="ap-summary-score-val ap-summary-score-val--purple">0</strong>
+                                    <strong id="sum-target-score" class="ap-summary-score-val ap-summary-score-val--purple">0.00</strong>
                                 </div>
                             </div>
                             <div class="text-right">
                                 <span class="ap-summary-score-label">Incremento</span>
-                                <strong id="sum-increment-score" class="ap-summary-score-val ap-summary-score-val--green">+0</strong>
+                                <strong id="sum-increment-score" class="ap-summary-score-val ap-summary-score-val--green">+0.00</strong>
                             </div>
                         </div>
                     </div>
@@ -593,12 +593,12 @@
                     <div class="ap-summary-score-pair">
                         <div>
                             <span class="ap-summary-score-label">Inicial</span>
-                            <strong id="det-initial-score" class="ap-summary-score-val">0</strong>
+                            <strong id="det-initial-score" class="ap-summary-score-val">0.00</strong>
                         </div>
                         <span class="ap-summary-arrow">&rarr;</span>
                         <div>
                             <span class="ap-summary-score-label">Meta</span>
-                            <strong id="det-target-score" class="ap-summary-score-val ap-summary-score-val--purple">0</strong>
+                            <strong id="det-target-score" class="ap-summary-score-val ap-summary-score-val--purple">0.00</strong>
                         </div>
                         <span class="ap-summary-arrow">&rarr;</span>
                         <div>

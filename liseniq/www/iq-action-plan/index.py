@@ -29,6 +29,9 @@ STANDARD_GOAL_STATUSES = [
 STANDARD_SCOPE_TYPES = ["Medición", "Dimensión", "Tema", "Pregunta"]
 STANDARD_TASK_STATUSES = ["Pendiente", "En progreso", "Finalizada"]
 
+DEFAULT_SCALE_MIN = 1.0
+DEFAULT_SCALE_MAX = 5.0
+
 _SYSTEM_ROW_FIELDS = {
     "name",
     "owner",
@@ -524,8 +527,12 @@ def _fetch_dashboard_data(
                 "ap_initial_score": flt(r.get("ap_initial_score"), 2),
                 "ap_target_score": flt(r.get("ap_target_score"), 2),
                 "ap_expected_increment": flt(r.get("ap_expected_increment"), 2),
-                "ap_scale_min": flt(r.get("ap_scale_min") or 0, 2),
-                "ap_scale_max": flt(r.get("ap_scale_max") or 100, 2),
+                "ap_scale_min": flt(
+                    r.get("ap_scale_min") if r.get("ap_scale_min") is not None else DEFAULT_SCALE_MIN, 2
+                ),
+                "ap_scale_max": flt(
+                    r.get("ap_scale_max") if r.get("ap_scale_max") is not None else DEFAULT_SCALE_MAX, 2
+                ),
                 "ap_total_tasks": total_tasks,
                 "ap_completed_tasks": completed_tasks,
                 "ap_pending_tasks": pending_tasks,
@@ -564,14 +571,14 @@ def _resolve_scope_display_label(
 
 # Limpia el valor de un campo de Frappe y devuelve posibles IDs como texto simple (sin recursividad)
 def _extract_string_tokens(raw_val: Any) -> Set[str]:
-    if not raw_val:  # Si el campo viene vacío o nulo, salimos de una vez
+    if not raw_val:
         return set()
-    if isinstance(raw_val, str):  # Caso normal en Frappe: el campo guarda un ID en texto (ej. "QN-001")
-        text = raw_val.strip()  # Quitamos espacios en blanco a los lados
-        return {text} if 0 < len(text) <= 140 else set()  # Descartamos textos largos que sean párrafos y no IDs
-    if isinstance(raw_val, (list, tuple, set)):  # Por si el campo trae varios IDs en una lista simple
+    if isinstance(raw_val, str):
+        text = raw_val.strip()
+        return {text} if 0 < len(text) <= 140 else set()
+    if isinstance(raw_val, (list, tuple, set)):
         return {str(item).strip() for item in raw_val if item and len(str(item).strip()) <= 140}
-    return set()  # Si es número, fecha o booleano, lo ignoramos porque no es un ID
+    return set()
 
 
 # Obtiene los IDs de preguntas directamente desde su_questions (qp_IQ_Survey) o tp_questions (qp_IQ_Template)
@@ -579,27 +586,24 @@ def _get_survey_question_ids(survey_name: str) -> List[str]:
     if not survey_name or not frappe.db.exists("qp_IQ_Survey", survey_name):
         return []
 
-    survey_doc = frappe.get_doc("qp_IQ_Survey", survey_name)  # Cargamos la medición seleccionada
-    rows = list(survey_doc.get("su_questions") or [])  # 1. Tomamos las filas de su_questions de la medición
+    survey_doc = frappe.get_doc("qp_IQ_Survey", survey_name)
+    rows = list(survey_doc.get("su_questions") or [])
 
-    # 2. Si su_questions está vacío y la medición tiene plantilla (su_template), leemos tp_questions de qp_IQ_Template
     template_id = (survey_doc.get("su_template") or "").strip()
     if not rows and template_id and frappe.db.exists("qp_IQ_Template", template_id):
         tmpl_doc = frappe.get_doc("qp_IQ_Template", template_id)
         rows = list(tmpl_doc.get("tp_questions") or [])
 
-    # 3. Extraemos los posibles IDs de pregunta de cada fila hija
     candidates: Set[str] = set()
     for row in rows:
         row_dict = row.as_dict() if hasattr(row, "as_dict") else dict(row)
         for field_name, cell_val in row_dict.items():
-            if field_name not in _SYSTEM_ROW_FIELDS:  # Ignoramos metadatos internos de Frappe (owner, parent, etc.)
+            if field_name not in _SYSTEM_ROW_FIELDS:
                 candidates.update(_extract_string_tokens(cell_val))
 
     if not candidates:
         return []
 
-    # 4. Validamos en una sola consulta cuáles de esos IDs son preguntas reales en tabqp_IQ_Question
     matched = frappe.db.sql(
         "SELECT name FROM `tabqp_IQ_Question` WHERE name IN %(cands)s",
         {"cands": list(candidates)},
@@ -618,11 +622,10 @@ def _get_survey_linked_scope_data(survey_name: str, company: str) -> Dict[str, A
         "all_questions": [],
     }
 
-    question_ids = _get_survey_question_ids(survey_name)  # Buscamos solo las preguntas de esta medición
+    question_ids = _get_survey_question_ids(survey_name)
     if not question_ids:
         return empty_result
 
-    # Consultamos el enunciado (qn_statement), su dimensión (qn_demographic -> dt_title) y su tema (qp_topic -> dt_title)
     q_rows = frappe.db.sql(
         """
         SELECT
@@ -645,9 +648,9 @@ def _get_survey_linked_scope_data(survey_name: str, company: str) -> Dict[str, A
         as_dict=True,
     )
 
-    dimensions_by_id: Dict[str, str] = {}  # Mapa {id_dimension: dt_title}
-    topics_by_id: Dict[str, str] = {}  # Mapa {id_tema: dt_title}
-    topic_dimensions_map: Dict[str, Set[str]] = {}  # Qué dimensiones usan cada tema en esta medición
+    dimensions_by_id: Dict[str, str] = {}
+    topics_by_id: Dict[str, str] = {}
+    topic_dimensions_map: Dict[str, Set[str]] = {}
     all_questions: List[Dict[str, Any]] = []
 
     for r in q_rows:
@@ -660,9 +663,9 @@ def _get_survey_linked_scope_data(survey_name: str, company: str) -> Dict[str, A
         top_label = (r.get("topic_label") or top_id).strip()
 
         if dim_id:
-            dimensions_by_id[dim_id] = dim_label  # Solo agregamos dimensiones presentes en las preguntas de la medición
+            dimensions_by_id[dim_id] = dim_label
         if top_id:
-            topics_by_id[top_id] = top_label  # Solo agregamos temas presentes en las preguntas de la medición
+            topics_by_id[top_id] = top_label
             if dim_id:
                 topic_dimensions_map.setdefault(top_id, set()).add(dim_id)
 
@@ -703,6 +706,156 @@ def _get_survey_linked_scope_data(survey_name: str, company: str) -> Dict[str, A
         "questions": all_questions,
         "all_questions": all_questions,
     }
+
+
+# Obtiene los tipos de pregunta puntuables (Likert y NPS) igual que en los reportes generales
+def _get_scorable_question_types() -> Tuple[Set[str], Set[str]]:
+    all_q_types = frappe.get_all(
+        "qp_IQ_QuestionType",
+        fields=["name", "qnt_mnemonico", "qnt_type_name"],
+        ignore_permissions=True,
+    )
+    valid_types: Set[str] = set()
+    nps_types: Set[str] = set()
+
+    for qt in all_q_types:
+        q_type_id = qt.get("name")
+        if not q_type_id:
+            continue
+        mnemonic = (qt.get("qnt_mnemonico") or "").strip()
+        type_name = (qt.get("qnt_type_name") or "").strip().lower()
+
+        if mnemonic in ("scale_likert", "score_nps") or "likert" in type_name:
+            valid_types.add(q_type_id)
+        if mnemonic == "score_nps":
+            nps_types.add(q_type_id)
+
+    return valid_types, nps_types
+
+
+# Convierte una respuesta numérica a escala Likert (1-5); las NPS (0-10) se mapean igual que en report_by_engagement.py
+def _normalize_response_score(raw_answer: Any, is_nps: bool) -> Optional[float]:
+    try:
+        val = float(raw_answer)
+    except (ValueError, TypeError):
+        return None
+
+    if is_nps:
+        if val <= 2:
+            return 1.0
+        if val <= 4:
+            return 2.0
+        if val <= 6:
+            return 3.0
+        if val <= 8:
+            return 4.0
+        return 5.0
+
+    return val
+
+
+# Calcula el promedio simple de respuestas en Survey Response igual que los gráficos generales (escala 1-5)
+def _calculate_survey_scope_average(
+    survey_name: str,
+    scope_type: str,
+    dimension: str = "",
+    dimension_label: str = "",
+    topic: str = "",
+    topic_label: str = "",
+    question: str = "",
+) -> Optional[float]:
+    valid_types, nps_types = _get_scorable_question_types()
+    if not valid_types:
+        return None
+
+    valid_questions_data = frappe.get_all(
+        "qp_IQ_Question",
+        filters={"qn_type": ["in", list(valid_types)]},
+        fields=["name", "qn_demographic", "qp_topic", "qn_type"],
+        ignore_permissions=True,
+    )
+    if not valid_questions_data:
+        return None
+
+    # Mapeamos los títulos de demográficos para agrupar por dt_title igual que en los gráficos generales
+    demo_types = frappe.get_all(
+        "qp_IQ_DemographicType",
+        filters={"dt_object_type": ["in", ["Dimension", "Tema", "Pregunta"]]},
+        fields=["name", "dt_title"],
+        ignore_permissions=True,
+    )
+    demo_title_map = {
+        d.name: (d.dt_title or d.name).strip().lower()
+        for d in demo_types
+        if d.name
+    }
+
+    target_dim_title = (dimension_label or "").strip().lower()
+    target_topic_title = (topic_label or "").strip().lower()
+
+    # Filtramos las preguntas que corresponden al alcance seleccionado
+    target_questions: Set[str] = set()
+    nps_questions: Set[str] = set()
+
+    for q in valid_questions_data:
+        q_id = q.name
+        if q.qn_type in nps_types:
+            nps_questions.add(q_id)
+
+        if scope_type == "Medición":
+            target_questions.add(q_id)
+        elif scope_type == "Dimensión":
+            q_dim = (q.qn_demographic or "").strip()
+            q_dim_title = demo_title_map.get(q_dim, "")
+            if q_dim == dimension or (target_dim_title and q_dim_title == target_dim_title):
+                target_questions.add(q_id)
+        elif scope_type == "Tema":
+            q_topic = (q.qp_topic or "").strip()
+            q_topic_title = demo_title_map.get(q_topic, "")
+            if q_topic == topic or (target_topic_title and q_topic_title == target_topic_title):
+                target_questions.add(q_id)
+        elif scope_type == "Pregunta":
+            if q_id == question:
+                target_questions.add(q_id)
+
+    if not target_questions:
+        return None
+
+    su_name = frappe.db.get_value("qp_IQ_Survey", survey_name, "su_name") or survey_name
+    survey_responses = frappe.get_all(
+        "Survey Response",
+        filters={"survey": ["in", [survey_name, su_name]]},
+        pluck="response_json",
+        ignore_permissions=True,
+    )
+
+    total_score = 0.0
+    total_answers = 0
+
+    # Promedio simple de todas las respuestas válidas para las preguntas del alcance
+    for resp_json in survey_responses:
+        if not resp_json:
+            continue
+        try:
+            data = json.loads(resp_json)
+        except Exception:
+            continue
+
+        if not isinstance(data, dict):
+            continue
+
+        for q_name, answer in data.items():
+            if q_name not in target_questions:
+                continue
+            val = _normalize_response_score(answer, q_name in nps_questions)
+            if val is not None:
+                total_score += val
+                total_answers += 1
+
+    if total_answers == 0:
+        return None
+
+    return round(total_score / total_answers, 2)
 
 
 # Normaliza filtros recibidos como JSON string, diccionario o parámetros sueltos
@@ -849,8 +1002,9 @@ def _compute_official_score(
     question: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Calcula y valida el puntaje inicial oficial según la medición y el nivel de alcance (RN-04, RN-15 y Sección 12).
-    Si el elemento seleccionado no existe o no dispone de puntaje calculable, retorna has_score = False.
+    Calcula y valida el puntaje inicial oficial según la medición y el nivel de alcance (RN-04, RN-15 y Sección 12),
+    usando el promedio simple de las respuestas en Survey Response (escala 1-5), igual que los gráficos generales.
+    Si el elemento seleccionado no existe o no dispone de respuestas, retorna has_score = False.
     """
     no_score_msg = _(
         "No hay un resultado disponible para este elemento en la medición seleccionada. Elige otro alcance o verifica los resultados."
@@ -860,8 +1014,8 @@ def _compute_official_score(
         return {
             "has_score": False,
             "initial_score": None,
-            "scale_min": 0.0,
-            "scale_max": 100.0,
+            "scale_min": DEFAULT_SCALE_MIN,
+            "scale_max": DEFAULT_SCALE_MAX,
             "scope_label": "",
             "dimension": "",
             "dimension_label": "",
@@ -881,8 +1035,8 @@ def _compute_official_score(
             return {
                 "has_score": False,
                 "initial_score": None,
-                "scale_min": 0.0,
-                "scale_max": 100.0,
+                "scale_min": DEFAULT_SCALE_MIN,
+                "scale_max": DEFAULT_SCALE_MAX,
                 "scope_label": "",
                 "dimension": resolved_dim,
                 "dimension_label": "",
@@ -898,8 +1052,8 @@ def _compute_official_score(
             return {
                 "has_score": False,
                 "initial_score": None,
-                "scale_min": 0.0,
-                "scale_max": 100.0,
+                "scale_min": DEFAULT_SCALE_MIN,
+                "scale_max": DEFAULT_SCALE_MAX,
                 "scope_label": "",
                 "dimension": resolved_dim,
                 "dimension_label": "",
@@ -921,8 +1075,8 @@ def _compute_official_score(
             return {
                 "has_score": False,
                 "initial_score": None,
-                "scale_min": 0.0,
-                "scale_max": 100.0,
+                "scale_min": DEFAULT_SCALE_MIN,
+                "scale_max": DEFAULT_SCALE_MAX,
                 "scope_label": "",
                 "dimension": resolved_dim,
                 "dimension_label": "",
@@ -962,29 +1116,23 @@ def _compute_official_score(
         question=resolved_question or None,
     )
 
-    existing_filters: Dict[str, Any] = {
-        "ap_origin_survey": survey_name,
-        "ap_scope_type": scope_type,
-    }
-    if resolved_dim:
-        existing_filters["ap_dimension"] = resolved_dim
-    if resolved_topic:
-        existing_filters["ap_topic"] = resolved_topic
-    if resolved_question:
-        existing_filters["ap_question"] = resolved_question
-
-    existing_score = frappe.db.get_value(
-        "qp_IQ_ActionPlan",
-        existing_filters,
-        ["ap_initial_score", "ap_scale_min", "ap_scale_max"],
-        as_dict=True,
+    # Calculamos el promedio simple directamente desde Survey Response (misma lógica que gráficos generales)
+    avg_score = _calculate_survey_scope_average(
+        survey_name=survey_name,
+        scope_type=scope_type,
+        dimension=resolved_dim,
+        dimension_label=dimension_label,
+        topic=resolved_topic,
+        topic_label=topic_label,
+        question=resolved_question,
     )
-    if existing_score and existing_score.get("ap_initial_score") is not None:
+
+    if avg_score is None:
         return {
-            "has_score": True,
-            "initial_score": flt(existing_score.get("ap_initial_score"), 2),
-            "scale_min": flt(existing_score.get("ap_scale_min") or 0, 2),
-            "scale_max": flt(existing_score.get("ap_scale_max") or 100, 2),
+            "has_score": False,
+            "initial_score": None,
+            "scale_min": DEFAULT_SCALE_MIN,
+            "scale_max": DEFAULT_SCALE_MAX,
             "scope_label": scope_label,
             "dimension": resolved_dim,
             "dimension_label": dimension_label,
@@ -992,16 +1140,14 @@ def _compute_official_score(
             "topic_label": topic_label,
             "question": resolved_question,
             "question_label": question_label,
-            "message": "",
+            "message": no_score_msg,
         }
 
-    seed_str = f"{survey_name}:{scope_type}:{resolved_dim}:{resolved_topic}:{resolved_question}"
-    deterministic_score = 55 + (sum(ord(ch) for ch in seed_str) % 30)
     return {
         "has_score": True,
-        "initial_score": flt(deterministic_score, 2),
-        "scale_min": 0.0,
-        "scale_max": 100.0,
+        "initial_score": flt(avg_score, 2),
+        "scale_min": DEFAULT_SCALE_MIN,
+        "scale_max": DEFAULT_SCALE_MAX,
         "scope_label": scope_label,
         "dimension": resolved_dim,
         "dimension_label": dimension_label,
@@ -1098,7 +1244,6 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
     else:
         doc = frappe.new_doc("qp_IQ_ActionPlan")
         doc.ap_company = company
-        # HU-01 y Sección 5.2: Todo plan nuevo se crea con estado inicial Borrador
         doc.ap_status = "Borrador"
         doc.ap_goal_status = "Pendiente de evaluación"
 
@@ -1107,7 +1252,6 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
     raw_category = (data.get("ap_category") or "").strip()
     cat_field = frappe.get_meta("qp_IQ_ActionPlan").get_field("ap_category")
     if cat_field and cat_field.fieldtype == "Select":
-        # Si en este ambiente aún no se ha migrado qp_IQ_ActionPlan a Link, enviamos la etiqueta legible
         doc.ap_category = _resolve_template_category_label(raw_category)
     else:
         doc.ap_category = _resolve_template_category_id(raw_category)
@@ -1173,9 +1317,13 @@ def save_action_plan(payload: Any) -> Dict[str, Any]:
         question=doc.ap_question,
     )
 
-    # Paso 3: Meta
-    scale_min = flt(data.get("ap_scale_min") if data.get("ap_scale_min") is not None else 0.0, 2)
-    scale_max = flt(data.get("ap_scale_max") if data.get("ap_scale_max") is not None else 100.0, 2)
+    # Paso 3: Meta (usa siempre la escala oficial devuelta por _compute_official_score)
+    scale_min = flt(
+        score_check.get("scale_min") if score_check.get("scale_min") is not None else DEFAULT_SCALE_MIN, 2
+    )
+    scale_max = flt(
+        score_check.get("scale_max") if score_check.get("scale_max") is not None else DEFAULT_SCALE_MAX, 2
+    )
     initial_score = flt(score_check.get("initial_score"), 2)
     target_score = flt(data.get("ap_target_score"), 2)
 
@@ -1351,8 +1499,12 @@ def get_action_plan_detail(name: str) -> Dict[str, Any]:
             "ap_target_score": flt(doc.ap_target_score, 2),
             "ap_expected_increment": flt(doc.ap_expected_increment, 2),
             "ap_expected_eval_date": str(doc.ap_expected_eval_date or ""),
-            "ap_scale_min": flt(doc.ap_scale_min or 0, 2),
-            "ap_scale_max": flt(doc.ap_scale_max or 100, 2),
+            "ap_scale_min": flt(
+                doc.ap_scale_min if doc.ap_scale_min is not None else DEFAULT_SCALE_MIN, 2
+            ),
+            "ap_scale_max": flt(
+                doc.ap_scale_max if doc.ap_scale_max is not None else DEFAULT_SCALE_MAX, 2
+            ),
             "ap_total_tasks": cint(doc.ap_total_tasks),
             "ap_completed_tasks": cint(doc.ap_completed_tasks),
             "ap_pending_tasks": cint(doc.ap_pending_tasks),
